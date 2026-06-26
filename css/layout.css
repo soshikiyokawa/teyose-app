@@ -1,0 +1,24 @@
+/* ── shell ── */
+.shell{max-width:960px;margin:0 auto;padding-bottom:70px}
+.topbar{background:var(--surface);border-bottom:0.5px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50;box-shadow:var(--sh)}
+.logo{width:32px;height:32px;background:#2a1e0e;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo svg{width:18px;height:18px;stroke:#d4a96a;fill:none;stroke-width:2}
+.topbar-title{flex:1}
+.topbar-title h1{font-size:15px;font-weight:800;letter-spacing:-.3px}
+.topbar-title small{font-size:10px;color:var(--text-muted);font-weight:400}
+
+/* ── main nav (bottom) ── */
+.main-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:0.5px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom)}
+.main-nav-btn{flex:1;border:none;background:none;cursor:pointer;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--text-muted);font-size:10px;font-family:inherit;border-top:2px solid transparent;transition:all .15s}
+.main-nav-btn.active{color:var(--accent);border-top-color:var(--accent)}
+.main-nav-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+
+/* ── page / subpage / tabs ── */
+.page{display:none;padding:14px 16px 0}.page.active{display:block}
+.sub-tab-bar{display:flex;background:var(--surface);border-bottom:0.5px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -16px;padding:0 16px}
+.sub-tab-btn{flex-shrink:0;padding:9px 16px;font-size:13px;font-family:inherit;border:none;background:none;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.sub-tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.sub-page{display:none;padding-top:14px}.sub-page.active{display:block}
+
+.empty{text-align:center;color:var(--text-muted);padding:32px 16px;font-size:13px}
+.section-lbl{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 7px}

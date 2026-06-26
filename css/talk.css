@@ -1,0 +1,56 @@
+/* ── やり取りスレッド一覧 ── */
+.sup-thread-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;transition:background .12s}
+.sup-thread-row:last-child{border-bottom:none}
+.sup-thread-row:hover{background:var(--surface2)}
+.sup-thread-icon{width:40px;height:40px;border-radius:50%;background:var(--wood-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;border:0.5px solid var(--border)}
+.sup-thread-info{flex:1;min-width:0}
+.sup-thread-name{font-size:14px;font-weight:700}
+.sup-thread-preview{font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.sup-thread-meta{font-size:11px;color:var(--text-muted);text-align:right;flex-shrink:0}
+.sup-thread-unread{background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;margin-top:3px;display:inline-block}
+
+/* ── トークバブル ── */
+.talk-bubble{max-width:84%;display:flex;flex-direction:column;gap:2px}
+.talk-bubble.me{align-self:flex-end;align-items:flex-end}
+.talk-bubble.them{align-self:flex-start;align-items:flex-start}
+.talk-bubble .bbl{padding:9px 12px;font-size:13px;line-height:1.55;border-radius:12px;word-break:break-all}
+.talk-bubble.me .bbl{background:var(--accent);color:#fff;border-radius:12px 3px 12px 12px}
+.talk-bubble.them .bbl{background:var(--surface2);border:0.5px solid var(--border);border-radius:3px 12px 12px 12px}
+.talk-bubble .ts{font-size:10px;color:var(--text-muted);padding:0 4px}
+.talk-date-sep{text-align:center;font-size:11px;color:var(--text-muted);margin:6px 0;display:flex;align-items:center;gap:8px}
+.talk-date-sep::before,.talk-date-sep::after{content:'';flex:1;height:0.5px;background:var(--border)}
+
+/* ── 発注書カード（チャット内） ── */
+.order-card-bubble{background:var(--surface);border:0.5px solid var(--border);border-radius:10px;overflow:hidden;max-width:100%;box-shadow:var(--sh)}
+.order-card-bubble .ocb-head{background:#2a1e0e;padding:10px 12px;display:flex;align-items:center;gap:8px}
+.order-card-bubble .ocb-head svg{flex-shrink:0}
+.order-card-bubble .ocb-title{font-size:13px;font-weight:700;color:#d4a96a;flex:1}
+.order-card-bubble .ocb-no{font-size:10px;color:#a08060}
+.order-card-bubble .ocb-body{padding:10px 12px;font-size:12px}
+.order-card-bubble .ocb-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:0.5px solid var(--border)}
+.order-card-bubble .ocb-row:last-child{border-bottom:none}
+.order-card-bubble .ocb-total{font-size:14px;font-weight:800;color:var(--wood-t);padding-top:6px;text-align:right}
+.order-card-bubble .ocb-foot{padding:8px 12px;border-top:0.5px solid var(--border);display:flex;gap:6px}
+
+/* ── やり取りパネル（ドロワー） ── */
+#ai-chat-panel{position:fixed;inset:0;z-index:400;pointer-events:none;visibility:hidden}
+#ai-chat-panel.open{pointer-events:all;visibility:visible}
+#ai-chat-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;transition:opacity .25s}
+#ai-chat-panel.open #ai-chat-backdrop{opacity:1}
+#ai-chat-drawer{
+  position:absolute;bottom:0;right:0;
+  width:min(100%,420px);height:min(88vh,680px);
+  background:var(--surface);border-radius:16px 16px 0 0;
+  display:flex;flex-direction:column;
+  transform:translateY(110%);transition:transform .28s cubic-bezier(.32,1,.5,1);
+  box-shadow:0 -4px 24px rgba(0,0,0,.15);
+}
+#ai-chat-panel.open #ai-chat-drawer{transform:translateY(0)}
+@media(min-width:600px){
+  #ai-chat-drawer{border-radius:16px;bottom:80px;right:16px;height:min(80vh,600px);transform:translateY(calc(100% + 80px))}
+}
+#ai-chat-header{padding:12px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+
+/* ── トースト ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#2a1e0e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:300;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
