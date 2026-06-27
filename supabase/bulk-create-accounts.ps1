@@ -1,4 +1,4 @@
-# 手寄アプリ：アカウント一括作成スクリプト
+﻿# 手寄アプリ：アカウント一括作成スクリプト
 #
 # 【重要】実行前に、このPowerShellウィンドウだけで以下を実行してください（このファイルには書き込まないこと）：
 #   $env:SUPABASE_SERVICE_ROLE_KEY = "（Supabaseダッシュボード Settings > API の service_role キーを貼る）"
