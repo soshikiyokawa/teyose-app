@@ -1,0 +1,5 @@
+type,display_name,supplier_name,email
+staff,きよかわ 太郎,,taro@kiyokawanoie.com
+staff,きよかわ 花子,,hanako@kiyokawanoie.com
+supplier,大林製材,大林製材,ohbayashi-seizai@example.com
+supplier,大林住設建材,大林住設建材,ohbayashi-jusetsu@example.com

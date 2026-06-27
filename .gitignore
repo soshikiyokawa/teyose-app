@@ -1,1 +1,5 @@
 .claude/
+
+# アカウント一括作成：パスワード等の機密情報を含むため絶対にコミットしない
+supabase/accounts.csv
+supabase/accounts-output.csv
