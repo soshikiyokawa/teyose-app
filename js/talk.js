@@ -112,16 +112,11 @@ function sendTalkPanelMsg(){
   const text=input.value.trim();
   if(!text||!activeTalkPanelSupplier) return;
   if(!talkThreads[activeTalkPanelSupplier]) talkThreads[activeTalkPanelSupplier]=[];
-  talkThreads[activeTalkPanelSupplier].push({id:Date.now(),role:'me',type:'text',text,ts:Date.now()});
+  const role = currentUserRole==='staff' ? 'me' : 'them';
   input.value='';
-  renderTalkPanelMessages();
-  scheduleAutosave();
-}
-
-function postOrderCardToThread(order){
-  const sup=order.suppliers;
-  if(!talkThreads[sup]) talkThreads[sup]=[];
-  talkThreads[sup].push({id:Date.now(),role:'me',type:'order',orderData:{...order},ts:Date.now(),unread:false});
+  dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text})
+    .then(renderTalkPanelMessages)
+    .catch(()=>{});
 }
 
 function downloadOrderPdf(msgId){

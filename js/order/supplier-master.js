@@ -22,12 +22,17 @@ function openSupplierEdit(id){
   document.getElementById('supplier-modal').classList.add('open');
 }
 function closeSupplierModal(){document.getElementById('supplier-modal').classList.remove('open');}
-function saveSupplier(){
+async function saveSupplier(){
   const item={name:document.getElementById('s-name').value.trim(),contact:document.getElementById('s-contact').value.trim(),tel:document.getElementById('s-tel').value.trim(),email:document.getElementById('s-email').value.trim(),cats:document.getElementById('s-cats').value.trim(),note:document.getElementById('s-note').value.trim()};
   if(!item.name){alert('発注先名を入力してください');return;}
-  if(editingSupplierId===-1) suppliers.push({id:supplierIdSeq++,...item});
-  else{const s=suppliers.find(x=>x.id===editingSupplierId);if(s)Object.assign(s,item);}
-  closeSupplierModal();renderSupplierMaster();scheduleAutosave();
+  try{
+    if(editingSupplierId===-1) await dbAddSupplier(item);
+    else{
+      await dbUpdateSupplier(editingSupplierId,item);
+      const s=suppliers.find(x=>x.id===editingSupplierId);if(s)Object.assign(s,item);
+    }
+  }catch(e){return;}
+  closeSupplierModal();renderSupplierMaster();
 }
 
 function buildSupplierOptions(selected=''){

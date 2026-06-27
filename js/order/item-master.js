@@ -39,9 +39,9 @@ function renderMaster(){
       const row = document.createElement('div');
       row.className = 'master-item draggable';
       row.dataset.id = m.id;
-      row.draggable = true;
+      row.draggable = currentUserRole==='staff';
       row.innerHTML = `
-        <div class="drag-handle" title="ドラッグで並び替え">⠿</div>
+        <div class="drag-handle staff-only" title="ドラッグで並び替え">⠿</div>
         <div class="mi-info">
           <div class="mi-row">
             <span class="mi-item-name">${n}</span>
@@ -52,8 +52,8 @@ function renderMaster(){
             <span>原価 ¥${fmt(m.cost)}</span>
           </div>
         </div>
-        <button class="mi-edit-btn-sm" onclick="duplicateMasterItem(${m.id})" title="この品目を複製して次の品目を追加">複製</button>
-        <button class="mi-edit-btn-sm" onclick="openMasterEdit(${m.id})">編集</button>`;
+        <button class="mi-edit-btn-sm staff-only" onclick="duplicateMasterItem(${m.id})" title="この品目を複製して次の品目を追加">複製</button>
+        <button class="mi-edit-btn-sm" onclick="openMasterEdit(${m.id})">${currentUserRole==='staff'?'編集':'単価編集'}</button>`;
 
       row.addEventListener('dragstart', e=>{
         dragSrcId = m.id;
@@ -89,10 +89,12 @@ function renderMaster(){
   });
 }
 
-function saveMasterOrder(){
+async function saveMasterOrder(){
   masterDirty = false;
+  try{
+    await dbReorderMasterItems(master);
+  }catch(e){return;}
   renderMaster();
-  scheduleAutosave();
   showToast('並び順を保存しました');
 }
 
@@ -106,8 +108,6 @@ function openMasterEdit(id){
   // 発注先セレクトを最新状態に更新
   document.getElementById('m-supplier-sel').innerHTML=buildSupplierOptions();
   document.getElementById('master-modal-title').textContent=editingMasterId===-1?'品目を追加':'品目を編集';
-  // 削除ボタンは編集時のみ表示
-  document.getElementById('master-delete-btn').style.display=editingMasterId===-1?'none':'inline-flex';
   if(editingMasterId===-1){
     ['m-name','m-unit'].forEach(i=>document.getElementById(i).value='');
     ['m-price','m-cost'].forEach(i=>document.getElementById(i).value='');
@@ -123,6 +123,10 @@ function openMasterEdit(id){
     document.getElementById('m-cost').value=m.cost;
     document.getElementById('m-supplier-sel').value=m.supplier;
   }
+  // 発注先ロールは価格・原価のみ編集可（その他は閲覧のみ）
+  const supplierOnly = currentUserRole!=='staff';
+  ['m-cat','m-name','m-unit','m-supplier-sel'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
+  document.getElementById('master-delete-btn').style.display = (supplierOnly||editingMasterId===-1) ? 'none' : 'inline-flex';
   document.getElementById('master-modal').classList.add('open');
 }
 
@@ -147,22 +151,24 @@ function duplicateMasterItem(id){
   },100);
 }
 
-function deleteMasterItem(){
+async function deleteMasterItem(){
   if(editingMasterId===null||editingMasterId===-1){
     showToast('削除対象が選択されていません');return;
   }
   const m=master.find(x=>x.id===editingMasterId);
   if(!m){showToast('品目が見つかりません');return;}
   if(!confirm(`「${m.name}」を削除しますか？`)) return;
+  try{
+    await dbDeleteMasterItem(editingMasterId);
+  }catch(e){return;}
   master=master.filter(x=>x.id!==editingMasterId);
   editingMasterId=null;
   closeMasterModal();
   renderMaster();
-  scheduleAutosave();
   showToast('品目を削除しました');
 }
 function closeMasterModal(){document.getElementById('master-modal').classList.remove('open');}
-function saveMasterItem(){
+async function saveMasterItem(){
   const item={
     cat: document.getElementById('m-cat').value,
     name: document.getElementById('m-name').value.trim(),
@@ -177,21 +183,23 @@ function saveMasterItem(){
   btn.disabled = true;
   btn.innerHTML = '保存中…';
 
-  setTimeout(()=>{
+  try{
     if(editingMasterId===-1){
-      master.push({id:masterIdSeq++,...item});
+      await dbAddMasterItem(item);
       activeMasterSupplier = item.supplier; // 追加した発注先タブに移動
     } else {
+      await dbUpdateMasterItem(editingMasterId,item);
       const m=master.find(x=>x.id===editingMasterId);
       if(m) Object.assign(m,item);
       activeMasterSupplier = item.supplier;
     }
     closeMasterModal();
     renderMaster();
-    scheduleAutosave();
-    // 保存完了トースト表示
     showToast(editingMasterId===-1?'品目を追加しました':'品目を保存しました');
+  }catch(e){
+    // dbAdd/dbUpdate内でトースト表示済み
+  }finally{
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>保存して反映';
-  }, 300);
+  }
 }

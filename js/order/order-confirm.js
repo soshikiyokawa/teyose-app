@@ -54,10 +54,19 @@ function openOrderPreview(){
 
 function closeOrderPdf(){document.getElementById('order-pdf-overlay').classList.remove('open');}
 
-function confirmOrder(){
+async function confirmOrder(){
   if(!currentOrder) return;
+  const btn = document.querySelector('#order-pdf-foot .btn.wood');
+  if(btn){btn.disabled=true;btn.textContent='処理中…';}
 
-  // ① 発注データを確定・保存
+  try{
+    // ① 発注データ・原価・チャットへの投稿をまとめて確定（Supabaseに保存）
+    await dbConfirmOrder(currentOrder);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='✓ 発注確定・PDF保存';}
+    return;
+  }
+
   orders.unshift({...currentOrder, status:'pending'});
   currentOrder.items.forEach(item=>{
     costEntries.unshift({
@@ -68,20 +77,17 @@ function confirmOrder(){
     });
   });
 
-  // ② やり取りに自動投稿
-  postOrderCardToThread(currentOrder);
-
-  // ③ PDF出力（ポップアップブロックされても発注確定は完了済み）
+  // PDF出力（ポップアップブロックされても発注確定は完了済み）
   const body = document.getElementById('order-pdf-body').innerHTML;
   printHtml(`発注書 ${currentOrder.no}`, body);
 
-  // ④ UI後処理（PDF成否に関わらず実行）
+  // UI後処理
   cart = []; currentOrder = null;
   renderCart();
   if(selectedSupplier) renderItemSelectList();
   closeOrderPdf();
+  if(btn){btn.disabled=false;btn.textContent='✓ 発注確定・PDF保存';}
   document.getElementById('nav-talk-dot').style.display='block';
-  scheduleAutosave();
   showToast('✅ 発注確定・チャットに記録しました');
 }
 

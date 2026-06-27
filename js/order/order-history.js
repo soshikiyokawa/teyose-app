@@ -19,11 +19,13 @@ function reShowOrder(i){
   document.getElementById('order-pdf-foot').style.display='none';
   document.getElementById('order-pdf-overlay').classList.add('open');
 }
-function markReceived(i){
+async function markReceived(i){
+  try{
+    await dbMarkOrderReceived(orders[i].no, orders[i].suppliers);
+  }catch(e){return;}
   orders[i].status='received';
   costEntries.filter(e=>e.orderNo===orders[i].no).forEach(e=>e.status='received');
   renderOrders();renderCost();
-  scheduleAutosave();
 }
 
 function renderCost(){

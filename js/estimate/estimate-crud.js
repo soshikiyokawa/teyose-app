@@ -13,12 +13,17 @@ function collectEstData(){
     sections:sections.map(s=>({...s,items:[...s.items]})),miscRate:parseFloat(v('misc-rate'))||5,taxRate:parseFloat(v('tax-rate'))||10};
 }
 
-function saveEstimate(){
+async function saveEstimate(){
   const data=collectEstData();
+  let savedId;
+  try{
+    savedId = await dbSaveEstimate(data);
+  }catch(e){return;}
+  data.id = savedId;
   if(editingEstId){const i=estimates.findIndex(e=>e.id===editingEstId);if(i>=0)estimates[i]=data;}
-  else{editingEstId=data.id;estimates.unshift(data);}
+  else{estimates.unshift(data);}
+  editingEstId = savedId;
   updateEstBadge();
-  scheduleAutosave();
   alert('保存しました：'+(data.projectName||data.siteName||data.no||'無題'));
 }
 

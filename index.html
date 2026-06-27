@@ -14,19 +14,36 @@
 <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
-<div class="shell">
+
+<!-- ════ ログイン画面 ════ -->
+<div class="modal-overlay open" id="login-overlay">
+  <div class="modal-sheet" style="max-width:360px">
+    <h3>手寄 にログイン</h3>
+    <div class="fg" style="margin-bottom:10px"><label>メールアドレス</label><input type="email" id="login-email" placeholder="you@example.com"></div>
+    <div class="fg" style="margin-bottom:10px"><label>パスワード</label><input type="password" id="login-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div id="login-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+    <div class="modal-actions">
+      <button class="btn primary" id="login-btn" style="width:100%;justify-content:center" onclick="doLogin()">ログイン</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell" id="app-shell" style="display:none">
 
 <!-- topbar -->
 <div class="topbar">
   <div class="logo"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
   <div class="topbar-title"><h1>手寄</h1><small>てよせ | きよかわ</small></div>
-  <select id="g-project" style="font-size:12px;border:0.5px solid var(--border-s);border-radius:6px;padding:5px 8px;background:var(--surface2);color:var(--text);font-family:inherit;max-width:130px;-webkit-appearance:none">
+  <select id="g-project" class="staff-only" style="font-size:12px;border:0.5px solid var(--border-s);border-radius:6px;padding:5px 8px;background:var(--surface2);color:var(--text);font-family:inherit;max-width:130px;-webkit-appearance:none">
     <option>山田邸 新築</option><option>田中邸 リフォーム</option><option>佐藤邸 増築</option><option>物件未選択</option>
   </select>
+  <button class="btn sm" onclick="doLogout()" title="ログアウト" style="padding:5px 8px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+  </button>
 </div>
 
 <!-- ════ 見積ページ ════ -->
-<div class="page active" id="page-estimate">
+<div class="page active staff-only" id="page-estimate">
   <div class="sub-tab-bar">
     <button class="sub-tab-btn active" onclick="estSubTab('info')">案件情報</button>
     <button class="sub-tab-btn" onclick="estSubTab('items')">明細入力</button>
@@ -137,7 +154,7 @@
 </div>
 
 <!-- ════ 原価管理ページ ════ -->
-<div class="page" id="page-cost">
+<div class="page staff-only" id="page-cost">
   <div class="section-lbl">原価サマリー</div>
   <div class="metric-grid">
     <div class="metric"><div class="lbl">発注総額（原価）</div><div class="val g" id="c-total">¥0</div></div>
@@ -151,14 +168,14 @@
 <!-- ════ 受発注ページ ════ -->
 <div class="page" id="page-order">
   <div class="sub-tab-bar">
-    <button class="sub-tab-btn active" onclick="orderSubTab('new')">発注作成</button>
-    <button class="sub-tab-btn" onclick="orderSubTab('supplier')">発注先マスタ</button>
-    <button class="sub-tab-btn" onclick="orderSubTab('master')">品目マスタ</button>
-    <button class="sub-tab-btn" onclick="orderSubTab('history')">発注履歴</button>
+    <button class="sub-tab-btn active staff-only" onclick="orderSubTab('new')">発注作成</button>
+    <button class="sub-tab-btn staff-only" onclick="orderSubTab('supplier')">発注先マスタ</button>
+    <button class="sub-tab-btn" id="subtab-master" onclick="orderSubTab('master')">品目マスタ</button>
+    <button class="sub-tab-btn staff-only" onclick="orderSubTab('history')">発注履歴</button>
   </div>
 
   <!-- ① 発注作成（発注先選択 → 品目選択 → カート） -->
-  <div class="sub-page active" id="ordersub-new">
+  <div class="sub-page active staff-only" id="ordersub-new">
 
     <!-- STEP 1: 発注先選択 -->
     <div id="order-step1">
@@ -212,7 +229,7 @@
   </div>
 
   <!-- 発注先マスタ -->
-  <div class="sub-page" id="ordersub-supplier">
+  <div class="sub-page staff-only" id="ordersub-supplier">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <span class="section-lbl" style="margin:0">発注先マスタ</span>
       <button class="btn sm primary" onclick="openSupplierEdit(-1)">
@@ -227,7 +244,7 @@
   <div class="sub-page" id="ordersub-master">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <span class="section-lbl" style="margin:0">品目マスタ</span>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px" class="staff-only">
         <button class="btn sm primary" id="master-order-save-btn" onclick="saveMasterOrder()" style="display:none;background:var(--wood);border-color:var(--wood)">
           <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="13" height="13" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           並び順を保存
@@ -245,7 +262,7 @@
   </div>
 
   <!-- 発注履歴 -->
-  <div class="sub-page" id="ordersub-history">
+  <div class="sub-page staff-only" id="ordersub-history">
     <div class="section-lbl">発注履歴</div>
     <div class="card" id="orders-list"><div class="empty">発注履歴はありません</div></div>
   </div>
@@ -255,12 +272,12 @@
 <div class="toast" id="toast"></div>
 
 <!-- bottom nav -->
-<nav class="main-nav">
-  <button class="main-nav-btn active" id="nav-estimate" onclick="mainTab('estimate')">
+<nav class="main-nav" id="app-nav" style="display:none">
+  <button class="main-nav-btn active staff-only" id="nav-estimate" onclick="mainTab('estimate')">
     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     見積
   </button>
-  <button class="main-nav-btn" id="nav-cost" onclick="mainTab('cost')">
+  <button class="main-nav-btn staff-only" id="nav-cost" onclick="mainTab('cost')">
     <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
     原価管理
   </button>
@@ -432,18 +449,18 @@
   </div>
 </div>
 
+<!-- Supabase（共有データベース） -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/supabase-client.js"></script>
+
 <!-- 共通ユーティリティ -->
 <script src="js/utils.js"></script>
-
-<!-- 初期データ（シード） -->
-<script src="js/data/suppliers-seed.js"></script>
-<script src="js/data/master-items-seed.js"></script>
 
 <!-- グローバル状態 -->
 <script src="js/state.js"></script>
 
-<!-- 自動保存（localStorage） -->
-<script src="js/storage.js"></script>
+<!-- データ層（Supabase取得・保存・リアルタイム同期） -->
+<script src="js/data/db.js"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js"></script>
@@ -467,5 +484,8 @@
 
 <!-- 初期化 -->
 <script src="js/init.js"></script>
+
+<!-- 認証（ログイン・ログアウト・権限） -->
+<script src="js/auth.js"></script>
 </body>
 </html>
