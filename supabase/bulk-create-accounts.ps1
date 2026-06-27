@@ -27,9 +27,8 @@ function New-RandomPassword {
   -join (1..12 | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
 }
 
-# 日本語を含むJSONを正しいUTF-8バイト列として送るためのヘルパー
 function ConvertTo-Utf8JsonBody($obj){
-  [System.Text.Encoding]::UTF8.GetBytes(($obj | ConvertTo-Json))
+  $obj | ConvertTo-Json
 }
 
 function Get-OrCreateSupplierId($name){
@@ -73,8 +72,9 @@ foreach($row in $rows){
     $results += [PSCustomObject]@{ display_name=$displayName; type=$type; email=$email; password=$password; status='成功' }
     Write-Host "  -> 成功" -ForegroundColor Green
   } catch {
-    $results += [PSCustomObject]@{ display_name=$displayName; type=$type; email=$email; password=''; status="失敗: $($_.Exception.Message)" }
-    Write-Host "  -> 失敗: $($_.Exception.Message)" -ForegroundColor Red
+    $detail = if($_.ErrorDetails.Message){ $_.ErrorDetails.Message } else { $_.Exception.Message }
+    $results += [PSCustomObject]@{ display_name=$displayName; type=$type; email=$email; password=''; status="失敗: $detail" }
+    Write-Host "  -> 失敗: $detail" -ForegroundColor Red
   }
 }
 
