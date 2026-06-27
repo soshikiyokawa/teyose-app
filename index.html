@@ -398,7 +398,14 @@
 <!-- 見積書PDF sheet -->
 <div class="overlay" id="est-pdf-overlay" onclick="if(event.target.id==='est-pdf-overlay')closeEstPdf()">
   <div class="sheet">
-    <div class="sheet-toolbar"><span>見積書プレビュー</span><button class="btn sm" onclick="closeEstPdf()">閉じる</button></div>
+    <div class="sheet-toolbar">
+      <span>見積書プレビュー</span>
+      <select id="est-pdf-mode" onchange="renderEstPdfBody()" style="font-size:12px;border:0.5px solid var(--border-s);border-radius:6px;padding:5px 8px;background:var(--surface2);color:var(--text);font-family:inherit;margin-left:8px">
+        <option value="detail">②現行（全工種・全明細を通しで表示）</option>
+        <option value="summary">①1ページ目に工種一覧＋合計、2ページ目以降を工種ごと1ページ</option>
+      </select>
+      <button class="btn sm" onclick="closeEstPdf()" style="margin-left:auto">閉じる</button>
+    </div>
     <div class="sheet-body" id="est-pdf-body"></div>
     <div class="sheet-foot" id="est-pdf-foot">
       <button class="btn" onclick="closeEstPdf()">閉じる</button>
