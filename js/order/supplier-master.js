@@ -27,7 +27,7 @@ function saveSupplier(){
   if(!item.name){alert('発注先名を入力してください');return;}
   if(editingSupplierId===-1) suppliers.push({id:supplierIdSeq++,...item});
   else{const s=suppliers.find(x=>x.id===editingSupplierId);if(s)Object.assign(s,item);}
-  closeSupplierModal();renderSupplierMaster();
+  closeSupplierModal();renderSupplierMaster();scheduleAutosave();
 }
 
 function buildSupplierOptions(selected=''){

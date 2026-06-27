@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v1';
+const CACHE_NAME = 'teyose-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -15,6 +15,7 @@ const ASSETS = [
   './css/overlay.css',
   './js/utils.js',
   './js/state.js',
+  './js/storage.js',
   './js/nav.js',
   './js/talk.js',
   './js/init.js',

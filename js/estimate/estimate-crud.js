@@ -18,6 +18,7 @@ function saveEstimate(){
   if(editingEstId){const i=estimates.findIndex(e=>e.id===editingEstId);if(i>=0)estimates[i]=data;}
   else{editingEstId=data.id;estimates.unshift(data);}
   updateEstBadge();
+  scheduleAutosave();
   alert('保存しました：'+(data.projectName||data.siteName||data.no||'無題'));
 }
 

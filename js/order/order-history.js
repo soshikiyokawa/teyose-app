@@ -23,6 +23,7 @@ function markReceived(i){
   orders[i].status='received';
   costEntries.filter(e=>e.orderNo===orders[i].no).forEach(e=>e.status='received');
   renderOrders();renderCost();
+  scheduleAutosave();
 }
 
 function renderCost(){

@@ -92,6 +92,7 @@ function renderMaster(){
 function saveMasterOrder(){
   masterDirty = false;
   renderMaster();
+  scheduleAutosave();
   showToast('並び順を保存しました');
 }
 
@@ -157,6 +158,7 @@ function deleteMasterItem(){
   editingMasterId=null;
   closeMasterModal();
   renderMaster();
+  scheduleAutosave();
   showToast('品目を削除しました');
 }
 function closeMasterModal(){document.getElementById('master-modal').classList.remove('open');}
@@ -186,6 +188,7 @@ function saveMasterItem(){
     }
     closeMasterModal();
     renderMaster();
+    scheduleAutosave();
     // 保存完了トースト表示
     showToast(editingMasterId===-1?'品目を追加しました':'品目を保存しました');
     btn.disabled = false;

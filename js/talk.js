@@ -115,6 +115,7 @@ function sendTalkPanelMsg(){
   talkThreads[activeTalkPanelSupplier].push({id:Date.now(),role:'me',type:'text',text,ts:Date.now()});
   input.value='';
   renderTalkPanelMessages();
+  scheduleAutosave();
 }
 
 function postOrderCardToThread(order){

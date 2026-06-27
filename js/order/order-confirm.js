@@ -81,6 +81,7 @@ function confirmOrder(){
   if(selectedSupplier) renderItemSelectList();
   closeOrderPdf();
   document.getElementById('nav-talk-dot').style.display='block';
+  scheduleAutosave();
   showToast('✅ 発注確定・チャットに記録しました');
 }
 
