@@ -19,9 +19,24 @@ function openSupplierEdit(id){
   document.getElementById('supplier-modal-title').textContent=id===-1?'発注先を追加':'発注先を編集';
   if(id===-1){['s-name','s-contact','s-tel','s-email','s-cats','s-note'].forEach(i=>document.getElementById(i).value='');}
   else{const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('s-name').value=s.name;document.getElementById('s-contact').value=s.contact;document.getElementById('s-tel').value=s.tel;document.getElementById('s-email').value=s.email;document.getElementById('s-cats').value=s.cats;document.getElementById('s-note').value=s.note;}
+  document.getElementById('supplier-delete-btn').style.display=id===-1?'none':'inline-flex';
   document.getElementById('supplier-modal').classList.add('open');
 }
 function closeSupplierModal(){document.getElementById('supplier-modal').classList.remove('open');}
+async function deleteSupplier(){
+  if(editingSupplierId===null||editingSupplierId===-1) return;
+  const s=suppliers.find(x=>x.id===editingSupplierId);
+  if(!s){showToast('発注先が見つかりません');return;}
+  if(!confirm(`「${s.name}」を削除しますか？\n紐づく品目・発注履歴は発注先未設定になります。`)) return;
+  try{
+    await dbDeleteSupplier(editingSupplierId);
+  }catch(e){return;}
+  suppliers=suppliers.filter(x=>x.id!==editingSupplierId);
+  editingSupplierId=null;
+  closeSupplierModal();
+  renderSupplierMaster();
+  showToast('発注先を削除しました');
+}
 async function saveSupplier(){
   const item={name:document.getElementById('s-name').value.trim(),contact:document.getElementById('s-contact').value.trim(),tel:document.getElementById('s-tel').value.trim(),email:document.getElementById('s-email').value.trim(),cats:document.getElementById('s-cats').value.trim(),note:document.getElementById('s-note').value.trim()};
   if(!item.name){alert('発注先名を入力してください');return;}

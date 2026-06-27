@@ -60,6 +60,10 @@ async function dbUpdateSupplier(id,item){
   const { error } = await sb.from('suppliers').update({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note}).eq('id',id);
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
 }
+async function dbDeleteSupplier(id){
+  const { error } = await sb.from('suppliers').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
 
 // ── 品目マスタ ──
 async function dbAddMasterItem(item){
