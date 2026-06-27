@@ -103,6 +103,17 @@ async function dbSaveEstimate(data){
   return inserted.id;
 }
 
+// 発注書PDFをSupabase Storageにアップロードし、ダウンロード用URLを返す
+async function dbUploadOrderPdf(orderNo, blob){
+  const path = `${orderNo}.pdf`;
+  const { error } = await sb.storage.from('order-pdfs').upload(path, blob, {
+    contentType: 'application/pdf', upsert: true
+  });
+  if(error){showToast('発注書PDFの保存に失敗しました：'+error.message);throw error;}
+  const { data } = sb.storage.from('order-pdfs').getPublicUrl(path);
+  return data.publicUrl;
+}
+
 // ── 発注確定（発注書・原価・チャット投稿） ──
 async function dbConfirmOrder(order){
   const supplier_id = supplierIdByName(order.suppliers);

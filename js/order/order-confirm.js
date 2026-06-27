@@ -62,7 +62,12 @@ async function confirmOrder(){
   if(btn){btn.disabled=true;btn.textContent='処理中…';}
 
   try{
-    // ① 発注データ・原価・チャットへの投稿をまとめて確定（Supabaseに保存）
+    // ① 発注書PDFを生成してSupabase Storageに保存し、チャットに添付できるURLを得る
+    const body = document.getElementById('order-pdf-body').innerHTML;
+    const pdfBlob = await htmlToPdfBlob(`発注書_${currentOrder.no}`, body);
+    currentOrder.pdfUrl = await dbUploadOrderPdf(currentOrder.no, pdfBlob);
+
+    // ② 発注データ・原価・チャットへの投稿をまとめて確定（Supabaseに保存）
     await dbConfirmOrder(currentOrder);
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='✓ 発注確定・PDF保存';}
@@ -79,8 +84,7 @@ async function confirmOrder(){
     });
   });
 
-  // PDF出力（ポップアップブロックされても発注確定は完了済み）
-  const body = document.getElementById('order-pdf-body').innerHTML;
+  // 自分用にも印刷ダイアログを表示（ポップアップブロックされても発注確定は完了済み）
   printHtml(`発注書 ${currentOrder.no}`, body);
 
   // UI後処理

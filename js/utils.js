@@ -30,6 +30,25 @@ function splitNameSpec(name){
   return {n: name, s: ''};
 }
 
+// HTML断片から実際のPDFファイル（Blob）を生成する（チャットへの添付用）
+async function htmlToPdfBlob(title, body){
+  const wrap=document.createElement('div');
+  wrap.style.cssText='position:fixed;left:-9999px;top:0;width:800px;background:#fff';
+  wrap.innerHTML=`<div style="font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px">${body}</div>`;
+  document.body.appendChild(wrap);
+  try{
+    const blob=await html2pdf().from(wrap).set({
+      margin:10,
+      filename:`${title}.pdf`,
+      html2canvas:{scale:2},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).outputPdf('blob');
+    return blob;
+  }finally{
+    wrap.remove();
+  }
+}
+
 // PDF印刷ユーティリティ（ポップアップブロック対応）
 function printHtml(title, body){
   const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}table{width:100%;border-collapse:collapse}@media print{@page{margin:15mm}button{display:none}}</style></head><body>${body}</body></html>`;
