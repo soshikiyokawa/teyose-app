@@ -1,7 +1,7 @@
 // ════ 見積：見積書PDFプレビュー・印刷 ════
 // 配色：緑系（添付の参考デザインの配色を緑に変更したもの）
 
-const EST_PDF_GREEN = '#2f6b4d';
+const EST_PDF_GREEN = '#5a9b78';
 const EST_PDF_GREEN_LIGHT = '#eef5f0';
 const EST_PDF_BORDER = '#d7e3da';
 
@@ -127,7 +127,7 @@ function renderEstPdfBody(){
     // ② 全工種・全明細を通しで表示
     const rows=data.sections.map(sec=>{
       const sTotal=sec.items.reduce((s,i)=>s+i.qty*i.price,0);
-      return `<tr><td colspan="6" style="padding:7px 8px;background:${EST_PDF_GREEN_LIGHT};font-weight:700;font-size:13px;color:${EST_PDF_GREEN};border-top:2px solid ${EST_PDF_GREEN}">${sec.name||'（工種未入力）'}</td></tr>
+      return `<tr><td colspan="6" style="padding:7px 8px;background:#fff;font-weight:700;font-size:13px;color:${EST_PDF_GREEN};border-top:2px solid ${EST_PDF_GREEN}">${sec.name||'（工種未入力）'}</td></tr>
       ${estPdfItemRowsHtml(sec.items)}
       <tr style="background:${EST_PDF_GREEN_LIGHT}"><td colspan="5" style="padding:5px 8px;text-align:right;font-size:12px;color:#888">小計</td><td style="padding:5px 8px;text-align:right;font-weight:700;color:${EST_PDF_GREEN}">¥${fmt(sTotal)}</td></tr>`;
     }).join('');

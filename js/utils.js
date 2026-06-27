@@ -51,7 +51,7 @@ async function htmlToPdfBlob(title, body){
 
 // PDF印刷ユーティリティ（ポップアップブロック対応）
 function printHtml(title, body){
-  const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${title}</title><style>body{font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}table{width:100%;border-collapse:collapse}@media print{@page{margin:15mm}button{display:none}}</style></head><body>${body}</body></html>`;
+  const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${title}</title><style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}body{font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}table{width:100%;border-collapse:collapse}@media print{@page{margin:15mm}button{display:none}}</style></head><body>${body}</body></html>`;
   const win=window.open('','_blank');
   if(win){
     win.document.write(html);win.document.close();
