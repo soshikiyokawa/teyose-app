@@ -17,7 +17,16 @@ let cart=[], orders=[], orderSeq=1, costEntries=[], currentOrder=null;
 // 見積
 let estimates=[],estSeq=1,editingEstId=null;
 let sections=[],secSeq=1,itemSeq=1;
-let estimatePresets=[]; // 工事種類・明細・単位・原価の選択候補
+let estimatePresets=[]; // 工事品目マスタ（工種ごとの明細・単位・原価の選択候補）
+let estimateCategories=[]; // 工種マスタ
+let estimateDefaults={}; // 工事区分（新築／リフォーム等）ごとのデフォルト明細 {type: sections[]}
+
+// 工種・工事品目マスタ画面の一時状態
+let editingEstCatId=null;
+let editingEstPresetId=null;
+let activeEstPresetCat=null;
+let dragSrcEstCatId=null, estCatDirty=false;
+let dragSrcEstPresetId=null, estPresetDirty=false;
 
 // 発注先マスタ
 let suppliers = [];

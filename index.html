@@ -48,6 +48,7 @@
     <button class="sub-tab-btn active" onclick="estSubTab('info')">案件情報</button>
     <button class="sub-tab-btn" onclick="estSubTab('items')">明細入力</button>
     <button class="sub-tab-btn" onclick="estSubTab('summary')">金額確認</button>
+    <button class="sub-tab-btn" onclick="estSubTab('master')">工種・品目マスタ</button>
   </div>
 
   <!-- 案件情報 -->
@@ -70,7 +71,7 @@
           </select>
         </div>
         <div class="fg"><label>工事区分</label>
-          <select id="est-type"><option>新築</option><option>リフォーム</option><option>増築</option><option>外構</option><option>その他</option></select>
+          <select id="est-type" onchange="applyDefaultForCurrentType()"><option>新築</option><option>リフォーム</option><option>増築</option><option>外構</option><option>その他</option></select>
         </div>
         <div class="fg"><label>着工予定日</label><input type="date" id="est-start-date"></div>
         <div class="fg"><label>完工予定日</label><input type="date" id="est-end-date"></div>
@@ -103,11 +104,11 @@
     <div class="card" style="padding:0;overflow:hidden">
       <div class="card-head">
         <span class="card-head-title">明細</span>
+        <button class="btn sm" onclick="saveCurrentAsDefault()" title="現在の明細を、選択中の工事区分のデフォルトとして保存">この内容をデフォルトに保存</button>
         <span id="est-grand" style="font-size:13px;font-weight:700;color:var(--wood-t)">¥0</span>
       </div>
       <div id="sections-wrap" style="padding:10px 12px 4px"></div>
       <datalist id="sec-cat-list"></datalist>
-      <datalist id="item-presets-list"></datalist>
       <div style="padding:0 12px 12px">
         <button class="add-sec-btn" onclick="addSection()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -152,6 +153,42 @@
         <button class="btn" onclick="saveEstimate()"><svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 保存</button>
         <button class="btn wood" onclick="openEstPdf()"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 見積書PDF</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 工種・品目マスタ -->
+  <div class="sub-page" id="estsub-master">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div class="card-head">
+        <span class="card-head-title">工種マスタ</span>
+        <button class="btn sm primary" id="estcat-order-save-btn" onclick="saveEstCatOrder()" style="display:none;background:var(--wood);border-color:var(--wood)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="13" height="13" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          並び順を保存
+        </button>
+        <button class="btn sm primary" onclick="openEstCatEdit(-1)">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          工種追加
+        </button>
+      </div>
+      <div id="estcat-master-list" style="padding:0;overflow:hidden"></div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;margin-top:12px">
+      <div class="card-head">
+        <span class="card-head-title">工事品目マスタ</span>
+        <button class="btn sm primary" id="estpreset-order-save-btn" onclick="saveEstPresetOrder()" style="display:none;background:var(--wood);border-color:var(--wood)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="13" height="13" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          並び順を保存
+        </button>
+        <button class="btn sm primary" onclick="openEstPresetEdit(-1)">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          品目追加
+        </button>
+      </div>
+      <div style="padding:10px 12px 0">
+        <div id="estpreset-cat-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px"></div>
+      </div>
+      <div id="estpreset-master-list" style="padding:0;overflow:hidden"></div>
     </div>
   </div>
 </div>
@@ -463,6 +500,45 @@
   </div>
 </div>
 
+<!-- 工種 追加・編集 modal -->
+<div class="modal-overlay" id="estcat-modal" onclick="if(event.target.id==='estcat-modal')closeEstCatModal()">
+  <div class="modal-sheet" style="max-width:360px">
+    <h3 id="estcat-modal-title">工種を追加</h3>
+    <div class="fg"><label>工種名</label><input id="estcat-name" placeholder="例：仮設工事"></div>
+    <div class="modal-actions" style="margin-top:14px;display:flex;align-items:center;gap:8px">
+      <button class="btn danger" id="estcat-delete-btn" onclick="deleteEstCat()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        削除
+      </button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeEstCatModal()">キャンセル</button>
+      <button class="btn primary" onclick="saveEstCat()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 工事品目 追加・編集 modal -->
+<div class="modal-overlay" id="estpreset-modal" onclick="if(event.target.id==='estpreset-modal')closeEstPresetModal()">
+  <div class="modal-sheet">
+    <h3 id="estpreset-modal-title">工事品目を追加</h3>
+    <div class="form-row2">
+      <div class="fg"><label>工種</label><select id="ep-cat-sel"></select></div>
+      <div class="fg"><label>単位</label><input id="ep-unit" placeholder="本・枚・式"></div>
+    </div>
+    <div class="fg" style="margin-top:10px"><label>品目名（明細）</label><input id="ep-name" placeholder="例：構造用合板 12mm"></div>
+    <div class="fg" style="margin-top:10px"><label>原価（円）</label><input type="number" id="ep-cost" placeholder="0"></div>
+    <div class="modal-actions" style="margin-top:14px;display:flex;align-items:center;gap:8px">
+      <button class="btn danger" id="estpreset-delete-btn" onclick="deleteEstPreset()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        削除
+      </button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeEstPresetModal()">キャンセル</button>
+      <button class="btn primary" onclick="saveEstPreset()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="js/supabase-client.js"></script>
@@ -488,6 +564,7 @@
 <!-- 見積 -->
 <script src="js/estimate/estimate-tabs.js"></script>
 <script src="js/estimate/estimate-items.js"></script>
+<script src="js/estimate/estimate-master.js"></script>
 <script src="js/estimate/estimate-summary.js"></script>
 <script src="js/estimate/estimate-crud.js"></script>
 <script src="js/estimate/estimate-pdf.js"></script>

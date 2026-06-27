@@ -37,22 +37,19 @@ function updateItem(secId,itemId,field,val){
   if(['qty','cost','margin','price'].includes(field)) item[field]=parseFloat(val)||0;
   else item[field]=val;
   if(field==='name'){
-    // リストから選択された場合、単位・原価を自動入力
-    const preset=(estimatePresets||[]).find(p=>p.name===val);
+    // 同じ工種のリストから選択された場合、単位・原価を自動入力
+    const preset=(estimatePresets||[]).find(p=>p.cat===sec.name && p.name===val);
     if(preset){item.unit=preset.unit;item.cost=Number(preset.cost);}
   }
   if(field==='cost'||field==='margin'||field==='name') item.price=calcPrice(item.cost,item.margin);
   renderSections();
 }
 
-// 工事種類・明細のリスト候補（datalist）を更新。リストに無いものは自由記述可。
+// 工種名のリスト候補（datalist）を更新。リストに無いものは自由記述可。
 function renderPresetDatalists(){
   const catEl=document.getElementById('sec-cat-list');
-  const nameEl=document.getElementById('item-presets-list');
-  if(!catEl||!nameEl) return;
-  const cats=[...new Set((estimatePresets||[]).map(p=>p.cat))];
-  catEl.innerHTML=cats.map(c=>`<option value="${esc(c)}">`).join('');
-  nameEl.innerHTML=(estimatePresets||[]).map(p=>`<option value="${esc(p.name)}">`).join('');
+  if(!catEl) return;
+  catEl.innerHTML=(estimateCategories||[]).map(c=>`<option value="${esc(c.name)}">`).join('');
 }
 
 function updateSecName(secId,val){const sec=sections.find(s=>s.id===secId);if(sec)sec.name=val;}
@@ -66,11 +63,13 @@ function renderSections(){
     const sCost=sec.items.reduce((s,i)=>s+i.qty*i.cost,0);
     gTotal+=sTotal;gCost+=sCost;
     const sMargin=sTotal>0?((sTotal-sCost)/sTotal*100):0;
+    const secPresets=(estimatePresets||[]).filter(p=>p.cat===sec.name);
+    const secDatalistId=`item-presets-list-${sec.id}`;
     const rows=sec.items.map(item=>{
       const mc=item.price>0?((item.price-item.cost)/item.price*100):0;
       const mc_col=mc>=25?'var(--accent-t)':mc>=15?'var(--warn-t)':'var(--danger)';
       return `<tr>
-        <td><input type="text" list="item-presets-list" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" oninput="updateItem(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
+        <td><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" oninput="updateItem(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItem(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="0.1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
         <td><select onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
@@ -88,6 +87,7 @@ function renderSections(){
         <span style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
         <button class="btn danger xs" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
       </div>
+      <datalist id="${secDatalistId}">${secPresets.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
       ${sec.open?`<div class="items-wrap">
         <table class="items-table">
           <thead><tr>

@@ -32,8 +32,18 @@ async function fetchAllData(){
   });
 
   if(currentUserRole==='staff'){
+    const { data: catRows } = await sb.from('estimate_categories').select('*').order('sort_order').order('id');
+    estimateCategories = (catRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
+    estCatIdSeq = Math.max(0,...estimateCategories.map(c=>c.id))+1;
+
     const { data: presetRows } = await sb.from('estimate_presets').select('*').order('sort_order').order('id');
-    estimatePresets = presetRows||[];
+    estimatePresets = (presetRows||[]).map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,cost:Number(r.cost),sortOrder:r.sort_order}));
+    estPresetIdSeq = Math.max(0,...estimatePresets.map(p=>p.id))+1;
+
+    const { data: defRows } = await sb.from('estimate_defaults').select('*');
+    estimateDefaults = {};
+    (defRows||[]).forEach(r=>{estimateDefaults[r.type]=r.sections||[];});
+
     renderPresetDatalists();
 
     const { data: estRows } = await sb.from('estimates').select('*').order('created_at',{ascending:false});
@@ -52,6 +62,57 @@ function rowToEstimate(r){
   return {id:r.id,no:r.no,date:r.date,expire:r.expire,status:r.status,type:r.type,
     startDate:r.start_date,endDate:r.end_date,clientName:r.client_name,projectName:r.project_name,siteName:r.site_name,
     note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[]};
+}
+
+// ── 見積：工種マスタ ──
+async function dbAddEstCategory(name){
+  const { data, error } = await sb.from('estimate_categories').insert({name}).select().single();
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
+async function dbUpdateEstCategory(id,name){
+  const { error } = await sb.from('estimate_categories').update({name}).eq('id',id);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+}
+async function dbDeleteEstCategory(id){
+  const { error } = await sb.from('estimate_categories').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+async function dbReorderEstCategories(orderedCats){
+  for(let i=0;i<orderedCats.length;i++){
+    const { error } = await sb.from('estimate_categories').update({sort_order:i}).eq('id',orderedCats[i].id);
+    if(error){showToast('並び順の保存に失敗しました：'+error.message);throw error;}
+    orderedCats[i].sortOrder = i;
+  }
+}
+
+// ── 見積：工事品目マスタ ──
+async function dbAddEstPreset(item){
+  const { data, error } = await sb.from('estimate_presets').insert({cat:item.cat,name:item.name,unit:item.unit,cost:item.cost}).select().single();
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
+async function dbUpdateEstPreset(id,item){
+  const { error } = await sb.from('estimate_presets').update({cat:item.cat,name:item.name,unit:item.unit,cost:item.cost}).eq('id',id);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+}
+async function dbDeleteEstPreset(id){
+  const { error } = await sb.from('estimate_presets').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+async function dbReorderEstPresets(orderedPresets){
+  for(let i=0;i<orderedPresets.length;i++){
+    const { error } = await sb.from('estimate_presets').update({sort_order:i}).eq('id',orderedPresets[i].id);
+    if(error){showToast('並び順の保存に失敗しました：'+error.message);throw error;}
+    orderedPresets[i].sortOrder = i;
+  }
+}
+
+// ── 見積：工事区分ごとのデフォルト明細 ──
+async function dbSaveEstimateDefault(type,sectionsData){
+  const { error } = await sb.from('estimate_defaults').upsert({type,sections:sectionsData,updated_at:new Date().toISOString()});
+  if(error){showToast('デフォルトの保存に失敗しました：'+error.message);throw error;}
+  estimateDefaults[type] = sectionsData;
 }
 
 // ── 発注先 ──

@@ -27,6 +27,13 @@ create table public.master_items (
   created_at timestamptz default now()
 );
 
+create table public.estimate_categories (
+  id bigint generated always as identity primary key,
+  name text not null,
+  sort_order integer not null default 0,
+  created_at timestamptz default now()
+);
+
 create table public.estimate_presets (
   id bigint generated always as identity primary key,
   cat text not null,
@@ -35,6 +42,12 @@ create table public.estimate_presets (
   cost numeric not null default 0,
   sort_order integer not null default 0,
   created_at timestamptz default now()
+);
+
+create table public.estimate_defaults (
+  type text primary key,
+  sections jsonb not null default '[]',
+  updated_at timestamptz default now()
 );
 
 create table public.estimates (
@@ -123,7 +136,9 @@ $$;
 
 alter table public.suppliers enable row level security;
 alter table public.master_items enable row level security;
+alter table public.estimate_categories enable row level security;
 alter table public.estimate_presets enable row level security;
+alter table public.estimate_defaults enable row level security;
 alter table public.estimates enable row level security;
 alter table public.orders enable row level security;
 alter table public.cost_entries enable row level security;
@@ -177,10 +192,20 @@ create trigger trg_restrict_supplier_item_update
   for each row execute function public.restrict_supplier_item_update();
 
 -- ════ estimates / orders / cost_entries（社内のみ） ════
+create policy estimate_categories_select on public.estimate_categories for select using (app_user_role() = 'staff');
+create policy estimate_categories_insert on public.estimate_categories for insert with check (app_user_role() = 'staff');
+create policy estimate_categories_update on public.estimate_categories for update using (app_user_role() = 'staff');
+create policy estimate_categories_delete on public.estimate_categories for delete using (app_user_role() = 'staff');
+
 create policy estimate_presets_select on public.estimate_presets for select using (app_user_role() = 'staff');
 create policy estimate_presets_insert on public.estimate_presets for insert with check (app_user_role() = 'staff');
 create policy estimate_presets_update on public.estimate_presets for update using (app_user_role() = 'staff');
 create policy estimate_presets_delete on public.estimate_presets for delete using (app_user_role() = 'staff');
+
+create policy estimate_defaults_select on public.estimate_defaults for select using (app_user_role() = 'staff');
+create policy estimate_defaults_insert on public.estimate_defaults for insert with check (app_user_role() = 'staff');
+create policy estimate_defaults_update on public.estimate_defaults for update using (app_user_role() = 'staff');
+create policy estimate_defaults_delete on public.estimate_defaults for delete using (app_user_role() = 'staff');
 
 create policy estimates_select on public.estimates for select using (app_user_role() = 'staff');
 create policy estimates_insert on public.estimates for insert with check (app_user_role() = 'staff');

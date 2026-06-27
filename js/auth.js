@@ -61,7 +61,6 @@ async function bootstrapApp(){
 
   if(currentUserRole==='staff'){
     newEstimate();
-    addSection('仮設工事');
     renderSupplierSelectList();
     mainTab('estimate');
   } else {

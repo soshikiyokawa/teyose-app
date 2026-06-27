@@ -38,7 +38,44 @@ function newEstimate(){
   document.getElementById('tax-rate').value='10';
   document.getElementById('est-no').value='E'+new Date().getFullYear()+'-'+String(estSeq++).padStart(3,'0');
   document.getElementById('est-date').value=new Date().toISOString().slice(0,10);
-  sections=[];updateEstBadge();renderSections();estSubTab('info');
+  loadDefaultSectionsForType('新築');
+  updateEstBadge();renderSections();estSubTab('info');
+}
+
+function cloneSections(list){
+  return (list||[]).map(s=>({...s,items:s.items.map(i=>({...i}))}));
+}
+
+// 指定の工事区分のデフォルト明細を読み込む（無ければ空の工種を1つ用意）
+function loadDefaultSectionsForType(type){
+  const def=estimateDefaults[type];
+  if(def && def.length){
+    sections=cloneSections(def);
+    secSeq=Math.max(secSeq,...sections.map(s=>s.id))+1;
+    itemSeq=Math.max(itemSeq,1,...sections.flatMap(s=>s.items.map(i=>i.id)))+1;
+  } else {
+    sections=[];
+    addSection('仮設工事');
+  }
+}
+
+// 工事区分の選択を変えたときに、その区分のデフォルト明細を読み込み直す
+function applyDefaultForCurrentType(){
+  const type=document.getElementById('est-type').value;
+  if(sections.length && !confirm(`現在の明細を消して「${type}」のデフォルトを読み込みますか？`)) return;
+  loadDefaultSectionsForType(type);
+  renderSections();
+}
+
+// 現在の明細を、選択中の工事区分のデフォルトとして保存する
+async function saveCurrentAsDefault(){
+  const type=document.getElementById('est-type').value;
+  if(!sections.length){alert('明細が空です');return;}
+  if(!confirm(`現在の明細を「${type}」のデフォルトとして保存しますか？\n以後この工事区分で新規見積を作成した際の初期値になります。`)) return;
+  try{
+    await dbSaveEstimateDefault(type,cloneSections(sections));
+  }catch(e){return;}
+  showToast(`「${type}」のデフォルトを保存しました`);
 }
 
 function loadEstimate(est){
