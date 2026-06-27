@@ -142,6 +142,7 @@ function renderEstPresetMaster(){
         <div style="font-size:13px;font-weight:700">${esc(p.name)}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc(p.cat)}　単位：${esc(p.unit)}　原価：¥${fmt(p.cost)}</div>
       </div>
+      <button class="mi-edit-btn-sm" onclick="duplicateEstPreset(${p.id})" title="この品目を複製して次の品目を追加">複製</button>
       <button style="padding:4px 9px;border-radius:6px;font-size:11px;border:0.5px solid var(--border);background:var(--surface2);cursor:pointer;font-family:inherit;color:var(--text-sub);white-space:nowrap" onclick="openEstPresetEdit(${p.id})">編集</button>`;
 
     row.addEventListener('dragstart', e=>{
@@ -210,6 +211,24 @@ function openEstPresetEdit(id){
   document.getElementById('estpreset-modal').classList.add('open');
 }
 function closeEstPresetModal(){document.getElementById('estpreset-modal').classList.remove('open');}
+function duplicateEstPreset(id){
+  const p=estimatePresets.find(x=>x.id===id);
+  if(!p)return;
+  editingEstPresetId=-1;
+  document.getElementById('ep-cat-sel').innerHTML=buildEstCatOptions();
+  document.getElementById('estpreset-modal-title').textContent='工事品目を追加（複製）';
+  document.getElementById('estpreset-delete-btn').style.display='none';
+  document.getElementById('ep-cat-sel').value=p.cat;
+  document.getElementById('ep-name').value=p.name;
+  document.getElementById('ep-unit').value=p.unit;
+  document.getElementById('ep-cost').value=p.cost;
+  document.getElementById('estpreset-modal').classList.add('open');
+  setTimeout(()=>{
+    const nameInput=document.getElementById('ep-name');
+    nameInput.focus();
+    nameInput.select();
+  },100);
+}
 async function saveEstPreset(){
   const item={
     cat: document.getElementById('ep-cat-sel').value,
