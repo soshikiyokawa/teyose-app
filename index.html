@@ -233,10 +233,16 @@
   <div class="sub-page staff-only" id="ordersub-supplier">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <span class="section-lbl" style="margin:0">発注先マスタ</span>
-      <button class="btn sm primary" onclick="openSupplierEdit(-1)">
-        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        発注先追加
-      </button>
+      <div style="display:flex;gap:6px">
+        <button class="btn sm primary" id="supplier-order-save-btn" onclick="saveSupplierOrder()" style="display:none;background:var(--wood);border-color:var(--wood)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="13" height="13" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          並び順を保存
+        </button>
+        <button class="btn sm primary" onclick="openSupplierEdit(-1)">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          発注先追加
+        </button>
+      </div>
     </div>
     <div class="card" id="supplier-master-list" style="padding:0;overflow:hidden"></div>
   </div>

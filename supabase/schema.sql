@@ -11,6 +11,7 @@ create table public.suppliers (
   email text default '',
   cats text default '',
   note text default '',
+  sort_order integer not null default 0,
   created_at timestamptz default now()
 );
 

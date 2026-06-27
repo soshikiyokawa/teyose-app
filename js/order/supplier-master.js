@@ -1,17 +1,70 @@
 // ════ 受発注：発注先マスタ ════
 
 function renderSupplierMaster(){
+  const saveBtn=document.getElementById('supplier-order-save-btn');
+  if(saveBtn) saveBtn.style.cssText = supplierDirty
+    ? 'display:inline-flex;background:var(--wood);border-color:var(--wood)'
+    : 'display:none';
+
   const el=document.getElementById('supplier-master-list');
-  el.innerHTML=suppliers.length?suppliers.map(s=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:0.5px solid var(--border)">
+  if(!suppliers.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
+  el.innerHTML='';
+  suppliers.forEach(s=>{
+    const row=document.createElement('div');
+    row.className='draggable';
+    row.draggable=true;
+    row.dataset.id=s.id;
+    row.style.cssText='display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:0.5px solid var(--border)';
+    row.innerHTML=`
+      <div class="drag-handle" title="ドラッグで並び替え">⠿</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:700">${s.name}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${[s.contact,s.tel,s.email].filter(Boolean).join(' · ')}</div>
         ${s.cats?`<div style="font-size:11px;color:var(--accent-t);margin-top:1px">取扱：${s.cats}</div>`:''}
         ${s.note?`<div style="font-size:11px;color:var(--text-muted);margin-top:1px">${s.note}</div>`:''}
       </div>
-      <button style="padding:4px 9px;border-radius:6px;font-size:11px;border:0.5px solid var(--border);background:var(--surface2);cursor:pointer;font-family:inherit;color:var(--text-sub);white-space:nowrap" onclick="openSupplierEdit(${s.id})">編集</button>
-    </div>`).join(''):'<div class="empty">発注先が登録されていません</div>';
+      <button style="padding:4px 9px;border-radius:6px;font-size:11px;border:0.5px solid var(--border);background:var(--surface2);cursor:pointer;font-family:inherit;color:var(--text-sub);white-space:nowrap" onclick="openSupplierEdit(${s.id})">編集</button>`;
+
+    row.addEventListener('dragstart', e=>{
+      dragSrcSupplierId = s.id;
+      setTimeout(()=>row.classList.add('dragging'),0);
+      e.dataTransfer.effectAllowed='move';
+    });
+    row.addEventListener('dragend', ()=>{
+      row.classList.remove('dragging');
+      document.querySelectorAll('#supplier-master-list .draggable').forEach(r=>r.classList.remove('drag-over'));
+    });
+    row.addEventListener('dragover', e=>{
+      e.preventDefault();
+      if(dragSrcSupplierId !== s.id){
+        document.querySelectorAll('#supplier-master-list .draggable').forEach(r=>r.classList.remove('drag-over'));
+        row.classList.add('drag-over');
+      }
+    });
+    row.addEventListener('dragleave', ()=>row.classList.remove('drag-over'));
+    row.addEventListener('drop', e=>{
+      e.preventDefault();
+      if(dragSrcSupplierId === s.id) return;
+      const fromIdx = suppliers.findIndex(x=>x.id===dragSrcSupplierId);
+      const toIdx   = suppliers.findIndex(x=>x.id===s.id);
+      if(fromIdx<0||toIdx<0) return;
+      const [moved] = suppliers.splice(fromIdx,1);
+      suppliers.splice(toIdx,0,moved);
+      supplierDirty = true;
+      renderSupplierMaster();
+    });
+
+    el.appendChild(row);
+  });
+}
+
+async function saveSupplierOrder(){
+  supplierDirty = false;
+  try{
+    await dbReorderSuppliers(suppliers);
+  }catch(e){return;}
+  renderSupplierMaster();
+  showToast('並び順を保存しました');
 }
 
 function openSupplierEdit(id){

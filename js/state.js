@@ -33,3 +33,7 @@ let selectedSupplier=null, activeCat='全て', pendingItem=null;
 let dragSrcId = null;
 let activeMasterSupplier = null;
 let masterDirty = false; // 並び替え後に保存ボタンを光らせるフラグ
+
+// 発注先マスタ画面（ドラッグ並び替え）の一時状態
+let dragSrcSupplierId = null;
+let supplierDirty = false;

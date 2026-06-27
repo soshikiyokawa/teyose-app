@@ -11,9 +11,9 @@ function supplierNameById(id){
 
 // ── 初回データ取得 ──
 async function fetchAllData(){
-  const { data: supplierRows, error: supErr } = await sb.from('suppliers').select('*').order('id');
+  const { data: supplierRows, error: supErr } = await sb.from('suppliers').select('*').order('sort_order').order('id');
   if(supErr) throw supErr;
-  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||''}));
+  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',sortOrder:r.sort_order}));
   supplierIdSeq = Math.max(0,...suppliers.map(s=>s.id))+1;
 
   const { data: itemRows, error: itemErr } = await sb.from('master_items').select('*').order('sort_order').order('id');
@@ -63,6 +63,13 @@ async function dbUpdateSupplier(id,item){
 async function dbDeleteSupplier(id){
   const { error } = await sb.from('suppliers').delete().eq('id',id);
   if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+async function dbReorderSuppliers(orderedSuppliers){
+  for(let i=0;i<orderedSuppliers.length;i++){
+    const { error } = await sb.from('suppliers').update({sort_order:i}).eq('id',orderedSuppliers[i].id);
+    if(error){showToast('並び順の保存に失敗しました：'+error.message);throw error;}
+    orderedSuppliers[i].sortOrder = i;
+  }
 }
 
 // ── 品目マスタ ──
