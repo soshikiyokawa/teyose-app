@@ -51,6 +51,7 @@ create table public.orders (
   no text,
   project text,
   date date,
+  due_date date,
   supplier_id bigint references public.suppliers(id) on delete set null,
   items jsonb default '[]',
   subtotal numeric default 0,

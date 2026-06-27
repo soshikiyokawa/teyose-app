@@ -37,7 +37,7 @@ async function fetchAllData(){
     estSeq = estimates.length+1;
 
     const { data: orderRows } = await sb.from('orders').select('*').order('created_at',{ascending:false});
-    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status}));
+    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status}));
 
     const { data: costRows } = await sb.from('cost_entries').select('*').order('created_at',{ascending:false});
     costEntries = (costRows||[]).map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,status:r.status}));
@@ -107,7 +107,7 @@ async function dbSaveEstimate(data){
 async function dbConfirmOrder(order){
   const supplier_id = supplierIdByName(order.suppliers);
   const { data: orderRow, error: orderErr } = await sb.from('orders').insert({
-    no:order.no,project:order.project,date:order.date,supplier_id,
+    no:order.no,project:order.project,date:order.date,due_date:order.dueDate||null,supplier_id,
     items:order.items,subtotal:order.subtotal,tax:order.tax,total:order.total,status:'pending'
   }).select().single();
   if(orderErr){showToast('発注確定に失敗しました：'+orderErr.message);throw orderErr;}
