@@ -52,6 +52,7 @@ function renderMaster(){
             <span>原価 ¥${fmt(m.cost)}</span>
           </div>
         </div>
+        <button class="mi-edit-btn-sm" onclick="duplicateMasterItem(${m.id})" title="この品目を複製して次の品目を追加">複製</button>
         <button class="mi-edit-btn-sm" onclick="openMasterEdit(${m.id})">編集</button>`;
 
       row.addEventListener('dragstart', e=>{
@@ -122,6 +123,27 @@ function openMasterEdit(id){
     document.getElementById('m-supplier-sel').value=m.supplier;
   }
   document.getElementById('master-modal').classList.add('open');
+}
+
+function duplicateMasterItem(id){
+  const m=master.find(x=>x.id===id);
+  if(!m)return;
+  editingMasterId=-1;
+  document.getElementById('m-supplier-sel').innerHTML=buildSupplierOptions();
+  document.getElementById('master-modal-title').textContent='品目を追加（複製）';
+  document.getElementById('master-delete-btn').style.display='none';
+  document.getElementById('m-cat').value=m.cat;
+  document.getElementById('m-name').value=m.name;
+  document.getElementById('m-unit').value=m.unit;
+  document.getElementById('m-price').value=m.price;
+  document.getElementById('m-cost').value=m.cost;
+  document.getElementById('m-supplier-sel').value=m.supplier;
+  document.getElementById('master-modal').classList.add('open');
+  setTimeout(()=>{
+    const nameInput=document.getElementById('m-name');
+    nameInput.focus();
+    nameInput.select();
+  },100);
 }
 
 function deleteMasterItem(){
