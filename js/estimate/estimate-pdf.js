@@ -17,11 +17,12 @@ function openEstPdf(){
     <div style="background:#f7f3eb;border-radius:7px;padding:12px 14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:5px 18px;font-size:12px">
       <div><span style="color:#888">施主名：</span><strong>${data.clientName||'　'}</strong></div>
       <div><span style="color:#888">見積番号：</span><strong>${data.no||'　'}</strong></div>
-      <div style="grid-column:1/-1"><span style="color:#888">物件名：</span><strong>${data.siteName||'　'}</strong></div>
+      <div><span style="color:#888">物件名：</span><strong>${data.projectName||'　'}</strong></div>
+      <div><span style="color:#888">工事場所：</span><strong>${data.siteName||'　'}</strong></div>
       <div><span style="color:#888">見積日：</span><strong>${data.date||'　'}</strong></div>
       <div><span style="color:#888">有効期限：</span><strong>${data.expire||'　'}</strong></div>
       <div><span style="color:#888">工事区分：</span><strong>${data.type}</strong></div>
-      <div><span style="color:#888">工期：</span><strong>${data.duration||'　'}</strong></div>
+      <div><span style="color:#888">工期：</span><strong>${data.startDate||'　'}　〜　${data.endDate||'　'}</strong></div>
     </div>
     <div style="font-size:15px;font-weight:800;color:#2a1e0e;margin-bottom:8px;text-align:right">合計金額（税込）：<span style="font-size:20px;color:#5c3d1e">¥${fmt(c.total)}</span></div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px">
@@ -42,6 +43,13 @@ function openEstPdf(){
       <tr><td style="padding:5px 7px;color:#666">消費税（${c.taxRate}%）</td><td style="padding:5px 7px;text-align:right">¥${fmt(c.tax)}</td></tr>
       <tr style="background:#2a1e0e"><td style="padding:7px 8px;font-weight:800;color:#d4a96a;font-size:14px">合計金額</td><td style="padding:7px 8px;text-align:right;font-weight:800;color:#fff;font-size:15px">¥${fmt(c.total)}</td></tr>
     </table>
+    ${data.payments&&data.payments.some(p=>p.date||p.amount)?`
+    <div style="margin-top:14px;border-top:1px solid #e0d8c8;padding-top:10px">
+      <div style="font-size:12px;font-weight:700;color:#2a1e0e;margin-bottom:4px">入金予定</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <tbody>${data.payments.map(p=>`<tr><td style="padding:3px 7px;color:#666;width:90px">${p.label}</td><td style="padding:3px 7px;color:#666">${p.date||'　'}</td><td style="padding:3px 7px;text-align:right;font-weight:600">¥${fmt(p.amount)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`:''}
     ${data.note?`<div style="margin-top:14px;font-size:12px;color:#555;border-top:1px solid #e0d8c8;padding-top:10px"><strong>備考：</strong>${data.note}</div>`:''}
     <div style="margin-top:18px;font-size:11px;color:#888;text-align:center">上記の通り御見積申し上げます。</div>`;
   document.getElementById('est-pdf-overlay').classList.add('open');

@@ -55,12 +55,27 @@
         <div class="fg"><label>工事区分</label>
           <select id="est-type"><option>新築</option><option>リフォーム</option><option>増築</option><option>外構</option><option>その他</option></select>
         </div>
-        <div class="fg"><label>工期</label><input id="est-duration" placeholder="2025年4月〜6月"></div>
+        <div class="fg"><label>着工予定日</label><input type="date" id="est-start-date"></div>
+        <div class="fg"><label>完工予定日</label><input type="date" id="est-end-date"></div>
         <div class="fg full"><label>施主名</label><input id="est-client" placeholder="山田 太郎 様"></div>
-        <div class="fg full"><label>物件名・工事場所</label><input id="est-site" placeholder="山田邸 新築工事（広島市安佐北区）"></div>
+        <div class="fg full"><label>物件名</label><input id="est-project" placeholder="山田邸 新築工事"></div>
+        <div class="fg full"><label>工事場所</label><input id="est-site" placeholder="広島市安佐北区可部2-13-31-1"></div>
         <div class="fg full"><label>備考・特記事項</label><textarea id="est-note" placeholder="支払条件、特記事項など"></textarea></div>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-head-title">入金予定</span></div>
+      <div class="form-grid">
+        <div class="fg"><label>着工金（日付）</label><input type="date" id="est-pay1-date"></div>
+        <div class="fg"><label>着工金（金額）</label><input type="number" id="est-pay1-amount" placeholder="0"></div>
+        <div class="fg"><label>上棟時金（日付）</label><input type="date" id="est-pay2-date"></div>
+        <div class="fg"><label>上棟時金（金額）</label><input type="number" id="est-pay2-amount" placeholder="0"></div>
+        <div class="fg"><label>最終金（日付）</label><input type="date" id="est-pay3-date"></div>
+        <div class="fg"><label>最終金（金額）</label><input type="number" id="est-pay3-amount" placeholder="0"></div>
+      </div>
+    </div>
+
     <div style="display:flex;justify-content:flex-end">
       <button class="btn primary" onclick="estSubTab('items')">明細入力へ <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
