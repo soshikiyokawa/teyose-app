@@ -1,5 +1,27 @@
 type,display_name,supplier_name,email
-staff,きよかわ 太郎,,taro@kiyokawanoie.com
-staff,きよかわ 花子,,hanako@kiyokawanoie.com
-supplier,大林製材,大林製材,ohbayashi-seizai@example.com
-supplier,大林住設建材,大林住設建材,ohbayashi-jusetsu@example.com
+staff,清川創史,,so.kiyokawa@kiyokawanoie.com
+staff,清川太視,,ta.kiyokawa@kiyokawanoie.com
+staff,清川説志,,to.kiyokawa@kiyokawanoie.com
+staff,清川伸二,,sh.kiyokawa@kiyokawanoie.com
+staff,原口晴郎,,ha.haraguchi@kiyokawanoie.com
+staff,山口大輔,,da.yamaguchi@kiyokawanoie.com
+staff,石橋実咲,,shixiaoshiqiao004@gmail.com
+staff,梶原大地,,tyad1238@icloud.com
+staff,梅田昭文,,a.umeda@kiyokawanoie.com
+staff,清川優香,,yuuka.sou.tai.toku@gmail.com
+supplier,大林住設建材,有限会社大林住設建材,arashu0618@gmail.com
+supplier,大林製材,大林製材株式会社,obsk2410@gmail.com
+supplier,坂口左官,坂口左官,sakan1988113@gmail.com
+supplier,リペイント　ヒラタ,リペイント　ヒラタ,raksr603@gmail.com
+supplier,ランテック,株式会社ランテック,itani-jun@neat-garden.co.jp
+supplier,秀電工,株式会社秀電工,syuudenkou@ab.auone-net.jp
+supplier,眞鍋板金,眞鍋板金,skyfuuta@gmail.com
+supplier,チヨダインテリア,チヨダインテリア,chiyodainterior.sasaki@gmail.com
+supplier,イシザキ,株式会社イシザキ,yoshihisa.morihiro@ishizaki-k.com
+supplier,渡辺パイプ,渡辺パイプ株式会社,r_higashi@sedia-system.co.jp
+supplier,ミサキ工業,有限会社ミサキ工業,den5211@icloud.com
+supplier,広島ガス可部販売,広島ガス可部販売株式会社,mtakeshita@hiroshima-gas.co.jp
+supplier,内藤設備,有限会社内藤設備,naito-setsubi@nifty.com
+supplier,池田畳店,有限会社池田畳店,tatamikun@ikeda-tatamiten.co.jp
+supplier,成架技建,成架技建株式会社,yss@w2015.jp
+supplier,玖田設備工業,有限会社玖田設備工業,bravo1215fz@gmail.com

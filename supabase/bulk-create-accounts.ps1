@@ -19,7 +19,7 @@ if(-not $ServiceKey){
 $Headers = @{
   apikey        = $ServiceKey
   Authorization = "Bearer $ServiceKey"
-  "Content-Type" = "application/json"
+  "Content-Type" = "application/json; charset=utf-8"
 }
 
 function New-RandomPassword {
@@ -27,11 +27,16 @@ function New-RandomPassword {
   -join (1..12 | ForEach-Object { $chars[(Get-Random -Maximum $chars.Length)] })
 }
 
+# 日本語を含むJSONを正しいUTF-8バイト列として送るためのヘルパー
+function ConvertTo-Utf8JsonBody($obj){
+  [System.Text.Encoding]::UTF8.GetBytes(($obj | ConvertTo-Json))
+}
+
 function Get-OrCreateSupplierId($name){
   $encoded = [uri]::EscapeDataString($name)
   $existing = Invoke-RestMethod -Uri "$SupabaseUrl/rest/v1/suppliers?name=eq.$encoded&select=id" -Headers $Headers -Method Get
   if($existing.Count -gt 0){ return $existing[0].id }
-  $body = @{ name = $name } | ConvertTo-Json
+  $body = ConvertTo-Utf8JsonBody @{ name = $name }
   $created = Invoke-RestMethod -Uri "$SupabaseUrl/rest/v1/suppliers" -Headers ($Headers + @{Prefer="return=representation"}) -Method Post -Body $body
   return $created[0].id
 }
@@ -41,7 +46,7 @@ if(-not (Test-Path $csvPath)){
   Write-Error "accounts.csv が見つかりません。accounts-template.csv をコピーして作成してください。"
   exit 1
 }
-$rows = Import-Csv $csvPath
+$rows = Import-Csv -Path $csvPath -Encoding UTF8
 $results = @()
 
 foreach($row in $rows){
@@ -59,10 +64,10 @@ foreach($row in $rows){
       $supplierId = Get-OrCreateSupplierId $row.supplier_name.Trim()
     }
 
-    $userBody = @{ email = $email; password = $password; email_confirm = $true } | ConvertTo-Json
+    $userBody = ConvertTo-Utf8JsonBody @{ email = $email; password = $password; email_confirm = $true }
     $user = Invoke-RestMethod -Uri "$SupabaseUrl/auth/v1/admin/users" -Headers $Headers -Method Post -Body $userBody
 
-    $profileBody = @{ id = $user.id; role = $type; supplier_id = $supplierId; display_name = $displayName } | ConvertTo-Json
+    $profileBody = ConvertTo-Utf8JsonBody @{ id = $user.id; role = $type; supplier_id = $supplierId; display_name = $displayName }
     Invoke-RestMethod -Uri "$SupabaseUrl/rest/v1/profiles" -Headers ($Headers + @{Prefer="return=minimal"}) -Method Post -Body $profileBody | Out-Null
 
     $results += [PSCustomObject]@{ display_name=$displayName; type=$type; email=$email; password=$password; status='成功' }
