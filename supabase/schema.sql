@@ -27,6 +27,16 @@ create table public.master_items (
   created_at timestamptz default now()
 );
 
+create table public.estimate_presets (
+  id bigint generated always as identity primary key,
+  cat text not null,
+  name text not null,
+  unit text not null default '式',
+  cost numeric not null default 0,
+  sort_order integer not null default 0,
+  created_at timestamptz default now()
+);
+
 create table public.estimates (
   id bigint generated always as identity primary key,
   no text,
@@ -40,7 +50,7 @@ create table public.estimates (
   project_name text,
   site_name text,
   note text,
-  misc_rate numeric default 5,
+  discount_amount numeric default 0,
   tax_rate numeric default 10,
   payments jsonb default '[]',
   sections jsonb default '[]',
@@ -113,6 +123,7 @@ $$;
 
 alter table public.suppliers enable row level security;
 alter table public.master_items enable row level security;
+alter table public.estimate_presets enable row level security;
 alter table public.estimates enable row level security;
 alter table public.orders enable row level security;
 alter table public.cost_entries enable row level security;
@@ -166,6 +177,11 @@ create trigger trg_restrict_supplier_item_update
   for each row execute function public.restrict_supplier_item_update();
 
 -- ════ estimates / orders / cost_entries（社内のみ） ════
+create policy estimate_presets_select on public.estimate_presets for select using (app_user_role() = 'staff');
+create policy estimate_presets_insert on public.estimate_presets for insert with check (app_user_role() = 'staff');
+create policy estimate_presets_update on public.estimate_presets for update using (app_user_role() = 'staff');
+create policy estimate_presets_delete on public.estimate_presets for delete using (app_user_role() = 'staff');
+
 create policy estimates_select on public.estimates for select using (app_user_role() = 'staff');
 create policy estimates_insert on public.estimates for insert with check (app_user_role() = 'staff');
 create policy estimates_update on public.estimates for update using (app_user_role() = 'staff');

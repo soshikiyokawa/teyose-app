@@ -3,9 +3,8 @@
 function recalcSum(){
   const wTotal=sections.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
   const wCost=sections.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.cost,0),0);
-  const miscRate=parseFloat(document.getElementById('misc-rate').value)||0;
-  const misc=Math.round(wTotal*miscRate/100);
-  const sub2=wTotal+misc;
+  const discount=parseFloat(document.getElementById('discount-amount').value)||0;
+  const sub2=Math.max(0,wTotal-discount);
   const taxRate=parseFloat(document.getElementById('tax-rate').value)||0;
   const tax=Math.round(sub2*taxRate/100);
   const total=sub2+tax;
@@ -14,11 +13,12 @@ function recalcSum(){
   document.getElementById('s-cost').textContent='¥'+fmt(wCost);
   document.getElementById('s-profit').textContent='¥'+fmt(profit);
   document.getElementById('s-margin').textContent=margin.toFixed(1)+'%';
-  document.getElementById('s-misc').textContent='¥'+fmt(misc);
+  document.getElementById('s-wtotal').textContent='¥'+fmt(wTotal);
+  document.getElementById('s-discount').textContent='¥'+fmt(discount);
   document.getElementById('s-sub2').textContent='¥'+fmt(sub2);
   document.getElementById('s-tax').textContent='¥'+fmt(tax);
   document.getElementById('s-total').textContent='¥'+fmt(total);
-  return {wTotal,wCost,profit,margin,misc,sub2,tax,total,miscRate,taxRate};
+  return {wTotal,wCost,profit,margin,discount,sub2,tax,total,taxRate};
 }
 
 function renderSumBreakdown(){

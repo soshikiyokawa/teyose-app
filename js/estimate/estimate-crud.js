@@ -10,7 +10,7 @@ function collectEstData(){
       {label:'上棟時金',date:v('est-pay2-date'),amount:parseFloat(v('est-pay2-amount'))||0},
       {label:'最終金',date:v('est-pay3-date'),amount:parseFloat(v('est-pay3-amount'))||0}
     ],
-    sections:sections.map(s=>({...s,items:[...s.items]})),miscRate:parseFloat(v('misc-rate'))||5,taxRate:parseFloat(v('tax-rate'))||10};
+    sections:sections.map(s=>({...s,items:[...s.items]})),discountAmount:parseFloat(v('discount-amount'))||0,taxRate:parseFloat(v('tax-rate'))||10};
 }
 
 async function saveEstimate(){
@@ -34,7 +34,7 @@ function newEstimate(){
   ].forEach(id=>document.getElementById(id).value='');
   document.getElementById('est-status').value='draft';
   document.getElementById('est-type').value='新築';
-  document.getElementById('misc-rate').value='5';
+  document.getElementById('discount-amount').value='0';
   document.getElementById('tax-rate').value='10';
   document.getElementById('est-no').value='E'+new Date().getFullYear()+'-'+String(estSeq++).padStart(3,'0');
   document.getElementById('est-date').value=new Date().toISOString().slice(0,10);
@@ -47,7 +47,7 @@ function loadEstimate(est){
   sv('est-no',est.no);sv('est-date',est.date);sv('est-expire',est.expire);sv('est-status',est.status);sv('est-type',est.type);
   sv('est-start-date',est.startDate);sv('est-end-date',est.endDate);
   sv('est-client',est.clientName);sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
-  sv('misc-rate',est.miscRate);sv('tax-rate',est.taxRate);
+  sv('discount-amount',est.discountAmount);sv('tax-rate',est.taxRate);
   const pays=est.payments||[];
   sv('est-pay1-date',pays[0]?.date);sv('est-pay1-amount',pays[0]?.amount);
   sv('est-pay2-date',pays[1]?.date);sv('est-pay2-amount',pays[1]?.amount);
@@ -58,8 +58,7 @@ function loadEstimate(est){
 
 function calcEstTotal(e){
   const w=(e.sections||[]).reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
-  const misc=Math.round(w*(e.miscRate||5)/100);
-  const sub=w+misc;
+  const sub=Math.max(0,w-(e.discountAmount||0));
   return sub+Math.round(sub*(e.taxRate||10)/100);
 }
 

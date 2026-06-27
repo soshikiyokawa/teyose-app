@@ -38,8 +38,8 @@ function openEstPdf(){
     </table>
     <table style="width:240px;margin-left:auto;border-collapse:collapse;font-size:13px">
       <tr><td style="padding:5px 7px;color:#666">工事費 小計</td><td style="padding:5px 7px;text-align:right">¥${fmt(c.wTotal)}</td></tr>
-      <tr><td style="padding:5px 7px;color:#666">諸経費（${c.miscRate}%）</td><td style="padding:5px 7px;text-align:right">¥${fmt(c.misc)}</td></tr>
-      <tr style="border-top:0.5px solid #ccc"><td style="padding:5px 7px;color:#666">小計</td><td style="padding:5px 7px;text-align:right">¥${fmt(c.sub2)}</td></tr>
+      <tr><td style="padding:5px 7px;color:#666">出精値引き</td><td style="padding:5px 7px;text-align:right">${c.discount?'-¥'+fmt(c.discount):'¥0'}</td></tr>
+      <tr style="border-top:0.5px solid #ccc"><td style="padding:5px 7px;color:#666">税抜合計</td><td style="padding:5px 7px;text-align:right">¥${fmt(c.sub2)}</td></tr>
       <tr><td style="padding:5px 7px;color:#666">消費税（${c.taxRate}%）</td><td style="padding:5px 7px;text-align:right">¥${fmt(c.tax)}</td></tr>
       <tr style="background:#2a1e0e"><td style="padding:7px 8px;font-weight:800;color:#d4a96a;font-size:14px">合計金額</td><td style="padding:7px 8px;text-align:right;font-weight:800;color:#fff;font-size:15px">¥${fmt(c.total)}</td></tr>
     </table>

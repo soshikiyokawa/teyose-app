@@ -36,8 +36,23 @@ function updateItem(secId,itemId,field,val){
   const item=sec.items.find(i=>i.id===itemId);if(!item)return;
   if(['qty','cost','margin','price'].includes(field)) item[field]=parseFloat(val)||0;
   else item[field]=val;
-  if(field==='cost'||field==='margin') item.price=calcPrice(item.cost,item.margin);
+  if(field==='name'){
+    // リストから選択された場合、単位・原価を自動入力
+    const preset=(estimatePresets||[]).find(p=>p.name===val);
+    if(preset){item.unit=preset.unit;item.cost=Number(preset.cost);}
+  }
+  if(field==='cost'||field==='margin'||field==='name') item.price=calcPrice(item.cost,item.margin);
   renderSections();
+}
+
+// 工事種類・明細のリスト候補（datalist）を更新。リストに無いものは自由記述可。
+function renderPresetDatalists(){
+  const catEl=document.getElementById('sec-cat-list');
+  const nameEl=document.getElementById('item-presets-list');
+  if(!catEl||!nameEl) return;
+  const cats=[...new Set((estimatePresets||[]).map(p=>p.cat))];
+  catEl.innerHTML=cats.map(c=>`<option value="${esc(c)}">`).join('');
+  nameEl.innerHTML=(estimatePresets||[]).map(p=>`<option value="${esc(p.name)}">`).join('');
 }
 
 function updateSecName(secId,val){const sec=sections.find(s=>s.id===secId);if(sec)sec.name=val;}
@@ -55,10 +70,10 @@ function renderSections(){
       const mc=item.price>0?((item.price-item.cost)/item.price*100):0;
       const mc_col=mc>=25?'var(--accent-t)':mc>=15?'var(--warn-t)':'var(--danger)';
       return `<tr>
-        <td><input type="text" value="${esc(item.name)}" placeholder="工事・品目名" oninput="updateItem(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
+        <td><input type="text" list="item-presets-list" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" oninput="updateItem(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItem(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="0.1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
-        <td><select onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','袋','巻','箱','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
+        <td><select onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
         <td class="num"><input type="number" value="${item.cost}" min="0" step="100" onchange="updateItem(${sec.id},${item.id},'cost',this.value)" style="width:78px;text-align:right"></td>
         <td class="num"><input type="number" value="${item.margin}" min="0" max="99" step="1" onchange="updateItem(${sec.id},${item.id},'margin',this.value)" style="width:42px;text-align:right;color:${mc_col};font-weight:700"><span style="font-size:10px;color:var(--text-muted)">%</span></td>
         <td class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
@@ -68,7 +83,7 @@ function renderSections(){
     return `<div class="section-block">
       <div class="section-head">
         <button class="sec-toggle" onclick="toggleSec(${sec.id})">${sec.open?'▾':'▸'}</button>
-        <input class="sec-name" type="text" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" oninput="updateSecName(${sec.id},this.value)">
+        <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" oninput="updateSecName(${sec.id},this.value)">
         <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap;margin-right:4px">粗利 ${sMargin.toFixed(1)}%</span>
         <span style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
         <button class="btn danger xs" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>

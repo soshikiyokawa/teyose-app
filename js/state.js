@@ -17,6 +17,7 @@ let cart=[], orders=[], orderSeq=1, costEntries=[], currentOrder=null;
 // 見積
 let estimates=[],estSeq=1,editingEstId=null;
 let sections=[],secSeq=1,itemSeq=1;
+let estimatePresets=[]; // 工事種類・明細・単位・原価の選択候補
 
 // 発注先マスタ
 let suppliers = [];
