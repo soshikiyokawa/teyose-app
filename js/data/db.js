@@ -259,7 +259,11 @@ async function dbAddChatMessage(supplierName, msg){
 
 // チャット添付ファイル（写真・PDF等）をSupabase Storageにアップロードし、公開URLを返す
 async function dbUploadChatFile(file){
-  const path = `${Date.now()}_${file.name}`;
+  // 保存先のキーには日本語等が使えないため、拡張子だけ残して安全な名前に変換する
+  // （元のファイル名はfile_nameに別途保存し、表示時に使う）
+  const extMatch = file.name.match(/\.[a-zA-Z0-9]+$/);
+  const ext = extMatch ? extMatch[0] : '';
+  const path = `${Date.now()}_${Math.random().toString(36).slice(2,8)}${ext}`;
   const { error } = await sb.storage.from('chat-files').upload(path, file, { contentType: file.type || 'application/octet-stream' });
   if(error){showToast('ファイルのアップロードに失敗しました：'+error.message);throw error;}
   const { data } = sb.storage.from('chat-files').getPublicUrl(path);
