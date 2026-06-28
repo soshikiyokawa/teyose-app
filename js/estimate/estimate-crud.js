@@ -53,7 +53,11 @@ function newEstimate(){
   document.getElementById('tax-rate').value='10';
   document.getElementById('est-title').value=defaultEstTitle();
   document.getElementById('est-no').value='E'+new Date().getFullYear()+'-'+String(estSeq++).padStart(3,'0');
-  document.getElementById('est-date').value=new Date().toISOString().slice(0,10);
+  const now=new Date();
+  document.getElementById('est-date').value=now.toISOString().slice(0,10);
+  const expire=new Date(now);
+  expire.setMonth(expire.getMonth()+1);
+  document.getElementById('est-expire').value=expire.toISOString().slice(0,10);
   loadDefaultSectionsForType('新築');
   updateEstBadge();renderSections();estSubTab('info');
 }
