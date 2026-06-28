@@ -83,8 +83,11 @@ async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
-  const regularBytes = await Deno.readFile(new URL("./fonts/NotoSansJP-Regular.ttf", import.meta.url));
-  const boldBytes = await Deno.readFile(new URL("./fonts/NotoSansJP-Bold.ttf", import.meta.url));
+  // フォントファイルが大きく、デプロイ時にFunctionへ同梱されないことがあるため、
+  // Supabase Storage（publicバケット）に置いたフォントをHTTPで取得して埋め込む。
+  const FONTS_BASE = `${SUPABASE_URL}/storage/v1/object/public/assets/fonts`;
+  const regularBytes = new Uint8Array(await (await fetch(`${FONTS_BASE}/NotoSansJP-Regular.ttf`)).arrayBuffer());
+  const boldBytes = new Uint8Array(await (await fetch(`${FONTS_BASE}/NotoSansJP-Bold.ttf`)).arrayBuffer());
   const font = await pdfDoc.embedFont(regularBytes, { subset: true });
   const fontBold = await pdfDoc.embedFont(boldBytes, { subset: true });
 
