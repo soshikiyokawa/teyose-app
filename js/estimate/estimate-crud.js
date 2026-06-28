@@ -123,8 +123,26 @@ function calcEstTotal(e){
 }
 
 function showEstList(){
+  const typeSel=document.getElementById('est-list-type-filter');
+  typeSel.innerHTML='<option value="">区分：全て</option>'+estimateTypes.map(t=>`<option>${esc(t.name)}</option>`).join('');
+  document.getElementById('est-list-search').value='';
+  renderEstListBody();
+  document.getElementById('est-list-overlay').classList.add('open');
+}
+
+function filterEstList(){ renderEstListBody(); }
+
+function renderEstListBody(){
+  const kw=(document.getElementById('est-list-search')?.value||'').trim().toLowerCase();
+  const typeFilter=document.getElementById('est-list-type-filter')?.value||'';
+  const list=estimates.filter(e=>{
+    if(typeFilter && e.type!==typeFilter) return false;
+    if(!kw) return true;
+    const hay=[e.title,e.clientName,e.projectName,e.siteName,e.no].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(kw);
+  });
   const el=document.getElementById('est-list-body');
-  el.innerHTML=estimates.length?estimates.map(e=>`
+  el.innerHTML=list.length?list.map(e=>`
     <div class="list-item" onclick="loadEstimate(estimates.find(x=>x.id===${e.id}));closeEstList()">
       <div class="li-info">
         <div class="li-name">${e.title||e.projectName||e.siteName||e.no||'無題の見積'}</div>
@@ -132,8 +150,7 @@ function showEstList(){
       </div>
       <div class="li-amt">¥${fmt(calcEstTotal(e))}</div>
       <button class="btn danger xs" onclick="event.stopPropagation();deleteEstimateFromList(${e.id})" style="margin-left:8px">削除</button>
-    </div>`).join(''):'<div class="empty">保存された見積はありません</div>';
-  document.getElementById('est-list-overlay').classList.add('open');
+    </div>`).join(''):'<div class="empty">該当する見積はありません</div>';
 }
 
 async function deleteEstimateFromList(id){
@@ -145,7 +162,7 @@ async function deleteEstimateFromList(id){
   }catch(err){return;}
   estimates=estimates.filter(x=>x.id!==id);
   if(editingEstId===id) editingEstId=null;
-  showEstList();
+  renderEstListBody();
   showToast('見積を削除しました');
 }
 function closeEstList(){document.getElementById('est-list-overlay').classList.remove('open');}

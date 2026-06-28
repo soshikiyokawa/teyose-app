@@ -416,6 +416,10 @@
 <div class="overlay" id="est-list-overlay" onclick="if(event.target.id==='est-list-overlay')closeEstList()">
   <div class="sheet" style="max-width:560px">
     <div class="sheet-toolbar"><span>見積一覧</span><button class="btn sm" onclick="closeEstList()">閉じる</button></div>
+    <div style="display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid #e0d8c8">
+      <input id="est-list-search" placeholder="案件名・施主名・物件名・見積番号で検索" oninput="filterEstList()" style="flex:1">
+      <select id="est-list-type-filter" onchange="filterEstList()" style="flex:0 0 110px"><option value="">区分：全て</option></select>
+    </div>
     <div id="est-list-body" style="padding:8px 0;min-height:100px"></div>
     <div style="padding:12px 14px;border-top:1px solid #e0d8c8">
       <button class="btn primary" style="width:100%;justify-content:center" onclick="newEstimate();closeEstList()">＋ 新規作成</button>
