@@ -60,10 +60,10 @@ async function confirmOrder(){
   const btn = document.querySelector('#order-pdf-foot .btn.wood');
   if(btn){btn.disabled=true;btn.textContent='処理中…';}
 
+  const bodyEl = document.getElementById('order-pdf-body');
+  const body = bodyEl.innerHTML;
   try{
     // ① 発注書PDFを生成してSupabase Storageに保存し、チャットに添付できるURLを得る
-    const bodyEl = document.getElementById('order-pdf-body');
-    const body = bodyEl.innerHTML;
     const pdfBlob = await htmlToPdfBlob(`発注書_${currentOrder.no}`, bodyEl);
     currentOrder.pdfUrl = await dbUploadOrderPdf(currentOrder.no, pdfBlob);
 
