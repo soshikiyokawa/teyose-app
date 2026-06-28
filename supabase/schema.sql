@@ -106,9 +106,12 @@ create table public.chat_messages (
   id bigint generated always as identity primary key,
   supplier_id bigint references public.suppliers(id) on delete cascade,
   role text not null, -- 'me'（きよかわ）/ 'them'（発注先）
-  type text not null default 'text', -- 'text' / 'order'
+  type text not null default 'text', -- 'text' / 'order' / 'file'
   text text,
   order_data jsonb,
+  file_url text,
+  file_name text,
+  file_mime text,
   unread boolean default false,
   created_at timestamptz default now()
 );
@@ -244,6 +247,22 @@ create policy chat_messages_update on public.chat_messages
   for update using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
 create policy chat_messages_delete on public.chat_messages
   for delete using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
+
+-- ════ chat-files（チャットへの写真・PDF等の資料添付用ストレージ） ════
+-- バケット自体はSupabaseダッシュボードのStorageで作成する（public、名前は chat-files）
+insert into storage.buckets (id, name, public)
+values ('chat-files', 'chat-files', true)
+on conflict (id) do nothing;
+
+drop policy if exists "chat_files_insert" on storage.objects;
+create policy "chat_files_insert" on storage.objects
+for insert to authenticated
+with check (bucket_id = 'chat-files');
+
+drop policy if exists "chat_files_select" on storage.objects;
+create policy "chat_files_select" on storage.objects
+for select to authenticated
+using (bucket_id = 'chat-files');
 
 -- ════ push_subscriptions（自分の端末の購読のみ操作可。送信処理はEdge Functionがservice roleで参照） ════
 alter table public.push_subscriptions enable row level security;

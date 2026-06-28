@@ -19,7 +19,7 @@ function renderTalkPanelList(){
   el.innerHTML=allSups.map(name=>{
     const msgs=talkThreads[name]||[];
     const last=msgs[msgs.length-1];
-    const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.text):'タップしてトークを開始';
+    const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text):'タップしてトークを開始';
     const sup=suppliers.find(s=>s.name===name);
     const unread=msgs.filter(m=>m.unread).length;
     return `<div class="sup-thread-row" onclick="openTalkPanelThread('${name.replace(/'/g,"\\'")}')">
@@ -102,6 +102,17 @@ function renderTalkPanelMessages(){
       </div>`;
     }
     const isMe=m.role==='me';
+    if(m.type==='file'){
+      const isImage=(m.fileMime||'').startsWith('image/');
+      return `${sep}<div class="talk-bubble ${isMe?'me':'them'}">
+        ${isImage
+          ? `<a href="${m.fileUrl}" target="_blank" rel="noopener"><img src="${m.fileUrl}" alt="${esc(m.fileName||'')}" style="max-width:200px;max-height:200px;border-radius:8px;display:block"></a>`
+          : `<a href="${m.fileUrl}" target="_blank" rel="noopener" download class="bbl" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:inherit">
+              <span style="font-size:18px">📄</span><span style="word-break:break-all">${esc(m.fileName||'資料')}</span>
+            </a>`}
+        <div class="ts">${isMe?'きよかわ':activeTalkPanelSupplier}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+      </div>`;
+    }
     return `${sep}<div class="talk-bubble ${isMe?'me':'them'}">
       <div class="bbl">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
       <div class="ts">${isMe?'きよかわ':activeTalkPanelSupplier}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
@@ -120,6 +131,19 @@ function sendTalkPanelMsg(){
   dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text})
     .then(renderTalkPanelMessages)
     .catch(()=>{});
+}
+
+async function sendTalkPanelFile(fileInput){
+  const file=fileInput.files[0];
+  fileInput.value='';
+  if(!file||!activeTalkPanelSupplier) return;
+  const role = currentUserRole==='staff' ? 'me' : 'them';
+  showToast('アップロード中…');
+  try{
+    const fileUrl = await dbUploadChatFile(file);
+    await dbAddChatMessage(activeTalkPanelSupplier,{role,type:'file',fileUrl,fileName:file.name,fileMime:file.type});
+    renderTalkPanelMessages();
+  }catch(e){}
 }
 
 async function deleteTalkMessage(msgId){
