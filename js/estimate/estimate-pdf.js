@@ -40,11 +40,14 @@ function estPdfHeaderHtml(data){
           ${data.note?`<tr><td style="padding:5px 4px;color:#888;vertical-align:top">備考</td><td style="padding:5px 4px">${data.note}</td></tr>`:''}
         </table>
       </div>
-      <div style="width:200px;text-align:right;font-size:11px;color:#555;line-height:1.7;flex-shrink:0">
+      <div style="width:220px;text-align:right;font-size:11px;color:#555;line-height:1.7;flex-shrink:0">
         <div style="font-weight:800;font-size:13px;color:#222;margin-bottom:2px">${COMPANY.name}</div>
-        <div>${COMPANY.zip} ${COMPANY.address}</div>
+        <div>${COMPANY.zip}</div>
+        <div>${COMPANY.address}</div>
         <div>TEL：${COMPANY.tel}</div>
-        <div style="color:${EST_PDF_GREEN}">${COMPANY.url}</div>
+        <div>FAX：${COMPANY.fax}</div>
+        <div style="font-size:10px;color:#888">登録番号：${COMPANY.regNo}</div>
+        <div style="color:${EST_PDF_GREEN};margin-top:2px">${COMPANY.url}</div>
         <div style="margin-top:10px;color:#888">工事区分：${data.type}</div>
       </div>
     </div>`;

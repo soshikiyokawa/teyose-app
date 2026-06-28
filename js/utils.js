@@ -1,5 +1,5 @@
 const fmt = n => Math.round(n).toLocaleString('ja-JP');
-const COMPANY = {name:'株式会社きよかわ',zip:'〒731-0221',address:'広島県広島市安佐北区可部2-13-31-1',tel:'082-815-6080',url:'kiyokawanoie.com'};
+const COMPANY = {name:'株式会社きよかわ',zip:'〒731-0221',address:'広島県広島市安佐北区可部2-13-31-1',tel:'082-815-6080',fax:'082-815-6081',regNo:'T9-2400-0101-8389',url:'kiyokawanoie.com'};
 
 function showToast(msg, duration=2000){
   const t=document.getElementById('toast');
