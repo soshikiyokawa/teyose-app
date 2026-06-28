@@ -131,16 +131,21 @@ function calcEstTotal(e){
 function renderProjectSidebar(){
   const el=document.getElementById('est-project-sidebar-list');
   if(!el) return;
+  const kw=(document.getElementById('est-sidebar-search')?.value||'').trim().toLowerCase();
   const groups={};
   estimates.forEach(e=>{
     const name=e.projectName||'（物件名未設定）';
     const t=e.updatedAt?new Date(e.updatedAt).getTime():0;
-    if(!groups[name]) groups[name]={latest:t,count:0};
+    if(!groups[name]) groups[name]={latest:t,count:0,clientNames:new Set()};
     groups[name].count++;
+    if(e.clientName) groups[name].clientNames.add(e.clientName);
     if(t>groups[name].latest) groups[name].latest=t;
   });
-  const list=Object.keys(groups).map(name=>({name,...groups[name]})).sort((a,b)=>b.latest-a.latest);
-  if(!list.length){el.innerHTML='<div class="empty" style="padding:10px;font-size:12px">案件がありません</div>';return;}
+  let list=Object.keys(groups).map(name=>({name,...groups[name]})).sort((a,b)=>b.latest-a.latest);
+  if(kw){
+    list=list.filter(g=>g.name.toLowerCase().includes(kw) || [...g.clientNames].some(c=>c.toLowerCase().includes(kw)));
+  }
+  if(!list.length){el.innerHTML='<div class="empty" style="padding:10px;font-size:12px">該当する案件がありません</div>';return;}
   el.innerHTML=list.map(g=>`
     <div onclick="selectProjectSidebar('${g.name.replace(/'/g,"\\'")}')"
       style="padding:8px 10px;font-size:12px;cursor:pointer;border-radius:6px;margin:2px 8px;${selectedProjectName===g.name?'background:var(--wood);color:#fff;font-weight:700':'color:var(--text-sub)'}">
@@ -149,15 +154,20 @@ function renderProjectSidebar(){
     </div>`).join('');
 }
 
+function filterProjectSidebar(){ renderProjectSidebar(); }
+
+// 案件を選択したら、その案件の最新の見積情報を案件情報タブに読み込んで表示する
 function selectProjectSidebar(name){
-  selectedProjectName = (selectedProjectName===name) ? null : name;
-  renderProjectSidebar();
+  selectedProjectName = name;
+  const matches=estimates.filter(e=>(e.projectName||'（物件名未設定）')===name);
+  matches.sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));
+  if(matches.length) loadEstimate(matches[0]);
+  else renderProjectSidebar();
 }
 
 function showEstList(){
   const typeSel=document.getElementById('est-list-type-filter');
   typeSel.innerHTML='<option value="">区分：全て</option>'+estimateTypes.map(t=>`<option>${esc(t.name)}</option>`).join('');
-  document.getElementById('est-list-search').value='';
   renderEstListBody();
   document.getElementById('est-list-overlay').classList.add('open');
 }
@@ -171,14 +181,11 @@ function clearProjectFilterInList(){
 }
 
 function renderEstListBody(){
-  const kw=(document.getElementById('est-list-search')?.value||'').trim().toLowerCase();
   const typeFilter=document.getElementById('est-list-type-filter')?.value||'';
   const list=estimates.filter(e=>{
     if(selectedProjectName && (e.projectName||'（物件名未設定）')!==selectedProjectName) return false;
     if(typeFilter && e.type!==typeFilter) return false;
-    if(!kw) return true;
-    const hay=[e.title,e.clientName,e.projectName,e.siteName,e.no].filter(Boolean).join(' ').toLowerCase();
-    return hay.includes(kw);
+    return true;
   });
   const chip = selectedProjectName ? `
     <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:11px;color:var(--text-sub);background:var(--surface2)">

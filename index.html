@@ -48,6 +48,9 @@
   <!-- 案件一覧（左サイドバー） -->
   <div id="est-project-sidebar" style="width:160px;flex:0 0 160px;border-right:1px solid var(--border);max-height:calc(100vh - 56px);overflow-y:auto">
     <div class="section-lbl" style="margin:10px 10px 4px">案件一覧</div>
+    <div style="padding:0 8px 8px">
+      <input id="est-sidebar-search" placeholder="案件名・施主名で検索" oninput="filterProjectSidebar()" style="width:100%;font-size:12px;padding:6px 8px">
+    </div>
     <div id="est-project-sidebar-list"></div>
   </div>
 
@@ -426,8 +429,7 @@
   <div class="sheet" style="max-width:560px">
     <div class="sheet-toolbar"><span>見積一覧</span><button class="btn sm" onclick="closeEstList()">閉じる</button></div>
     <div style="display:flex;gap:6px;padding:10px 14px;border-bottom:1px solid #e0d8c8">
-      <input id="est-list-search" placeholder="案件名・施主名・物件名・見積番号で検索" oninput="filterEstList()" style="flex:1">
-      <select id="est-list-type-filter" onchange="filterEstList()" style="flex:0 0 110px"><option value="">区分：全て</option></select>
+      <select id="est-list-type-filter" onchange="filterEstList()" style="flex:1"><option value="">区分：全て</option></select>
     </div>
     <div id="est-list-body" style="padding:8px 0;min-height:100px"></div>
     <div style="padding:12px 14px;border-top:1px solid #e0d8c8">
