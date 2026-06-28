@@ -1,20 +1,21 @@
 // ════ 受発注：発注書プレビュー・発注確定 ════
 
-// カートの内容・費目区分・納品希望日がすべて揃うまで「発注書作成」ボタンを押せないようにする
+// カートの内容・費目区分・納品希望日がすべて揃うまで「発注書作成」ボタンを押せないように見せる
+// （クリック自体は無効化しない。押された時にエラーを表示するため）
 function updateOrderPreviewBtnState(){
   const btn=document.getElementById('order-preview-btn');
   if(!btn) return;
   const costType=document.getElementById('order-cost-type')?.value;
   const dueDate=document.getElementById('order-due-date')?.value;
-  btn.disabled = !(cart.length && costType && dueDate);
+  const ready = !!(cart.length && costType && dueDate);
+  btn.classList.toggle('btn-incomplete', !ready);
 }
 
 function openOrderPreview(){
   if(!cart.length){alert('カートが空です。');return;}
   const costType=document.getElementById('order-cost-type').value;
   const dueDate=document.getElementById('order-due-date').value;
-  if(!costType){alert('費目区分を選択してください。');return;}
-  if(!dueDate){alert('納品希望日を入力してください。');return;}
+  if(!costType || !dueDate){alert('必須項目を入力してください。');return;}
   const project=document.getElementById('g-project').value;
   const now=new Date();
   const date=now.toISOString().slice(0,10);

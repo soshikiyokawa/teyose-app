@@ -3,6 +3,7 @@
 .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn.primary:active{opacity:.88}
 .btn.wood{background:var(--wood);color:#fff;border-color:var(--wood)}
+.btn.btn-incomplete{opacity:.45}
 .btn.sm{padding:5px 9px;font-size:12px}
 .btn.xs{padding:3px 7px;font-size:11px}
 .btn.danger{color:var(--danger);border-color:transparent;background:none}
