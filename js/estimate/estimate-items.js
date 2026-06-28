@@ -55,6 +55,33 @@ function renderPresetDatalists(){
 function updateSecName(secId,val){const sec=sections.find(s=>s.id===secId);if(sec)sec.name=val;}
 function toggleSec(secId){const sec=sections.find(s=>s.id===secId);if(sec){sec.open=!sec.open;renderSections();}}
 
+// 工種（セクション）の並び替え
+function estDragStartSec(secId){ dragSrcSecId=secId; }
+function estDropSec(targetSecId){
+  if(dragSrcSecId===null||dragSrcSecId===targetSecId) return;
+  const fromIdx=sections.findIndex(s=>s.id===dragSrcSecId);
+  const toIdx=sections.findIndex(s=>s.id===targetSecId);
+  if(fromIdx<0||toIdx<0) return;
+  const [moved]=sections.splice(fromIdx,1);
+  sections.splice(toIdx,0,moved);
+  dragSrcSecId=null;
+  renderSections();
+}
+
+// 明細行（品目）の並び替え（同じ工種内のみ）
+function estDragStartItem(secId,itemId){ dragSrcItemSecId=secId; dragSrcItemId=itemId; }
+function estDropItem(secId,itemId){
+  if(dragSrcItemSecId!==secId||dragSrcItemId===null||dragSrcItemId===itemId) return;
+  const sec=sections.find(s=>s.id===secId); if(!sec) return;
+  const fromIdx=sec.items.findIndex(i=>i.id===dragSrcItemId);
+  const toIdx=sec.items.findIndex(i=>i.id===itemId);
+  if(fromIdx<0||toIdx<0) return;
+  const [moved]=sec.items.splice(fromIdx,1);
+  sec.items.splice(toIdx,0,moved);
+  dragSrcItemSecId=null;dragSrcItemId=null;
+  renderSections();
+}
+
 function renderSections(){
   const wrap=document.getElementById('sections-wrap');
   let gTotal=0,gCost=0;
@@ -68,7 +95,8 @@ function renderSections(){
     const rows=sec.items.map(item=>{
       const mc=item.price>0?((item.price-item.cost)/item.price*100):0;
       const mc_col=mc>=25?'var(--accent-t)':mc>=15?'var(--warn-t)':'var(--danger)';
-      return `<tr>
+      return `<tr ondragover="event.preventDefault()" ondrop="estDropItem(${sec.id},${item.id})">
+        <td draggable="true" ondragstart="estDragStartItem(${sec.id},${item.id})" style="width:18px;text-align:center;cursor:grab;color:var(--text-muted)" title="ドラッグで並び替え">⠿</td>
         <td><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" oninput="updateItem(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItem(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
@@ -80,7 +108,8 @@ function renderSections(){
         <td style="width:24px;text-align:center"><button class="btn danger xs" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
       </tr>`;}).join('');
     return `<div class="section-block">
-      <div class="section-head">
+      <div class="section-head" ondragover="event.preventDefault()" ondrop="estDropSec(${sec.id})">
+        <span draggable="true" ondragstart="estDragStartSec(${sec.id})" style="cursor:grab;color:var(--text-muted);padding:0 2px" title="ドラッグで工種の順序を変更">⠿</span>
         <button class="sec-toggle" onclick="toggleSec(${sec.id})">${sec.open?'▾':'▸'}</button>
         <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" oninput="updateSecName(${sec.id},this.value)">
         <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap;margin-right:4px">粗利 ${sMargin.toFixed(1)}%</span>
@@ -91,7 +120,7 @@ function renderSections(){
       ${sec.open?`<div class="items-wrap">
         <table class="items-table">
           <thead><tr>
-            <th>工事・品目名</th><th>規格・仕様</th>
+            <th style="width:18px"></th><th>工事・品目名</th><th>規格・仕様</th>
             <th class="r" style="width:52px">数量</th><th style="width:50px">単位</th>
             <th class="r" style="width:86px">原価（円）</th>
             <th class="r" style="width:60px">粗利率</th>
