@@ -203,17 +203,12 @@ async function dbDeleteChatMessage(supplierName,msgId){
   if(talkThreads[supplierName]) talkThreads[supplierName]=talkThreads[supplierName].filter(m=>m.id!==msgId);
 }
 
-// 発注書PDFをSupabase Storageにアップロードし、ダウンロード用URLを返す
-async function dbUploadOrderPdf(orderNo, blob){
-  const yyyymm = orderNo.slice(0,6); // 発注番号（YYYYMMDDHHmm）の先頭6桁＝年月でフォルダ分け
-  const path = `${yyyymm}/${orderNo}.pdf`;
-  const { error } = await sb.storage.from('order-pdfs').upload(path, blob, {
-    contentType: 'application/pdf', upsert: true
-  });
-  if(error){showToast('発注書PDFの保存に失敗しました：'+error.message);throw error;}
-  const { data } = sb.storage.from('order-pdfs').getPublicUrl(path);
-  // CDN・ブラウザに古い内容がキャッシュされたまま返されるのを防ぐため、毎回ユニークなURLにする
-  return data.publicUrl + '?t=' + Date.now();
+// 発注書PDFをサーバー側（Edge Function）で生成・保存してもらい、ダウンロード用URLを受け取る
+async function dbGenerateOrderPdf(order){
+  const { data, error } = await sb.functions.invoke('generate-order-pdf', { body: order });
+  if(error){showToast('発注書PDFの生成に失敗しました：'+error.message);throw error;}
+  if(data?.error){showToast('発注書PDFの生成に失敗しました：'+data.error);throw new Error(data.error);}
+  return data.url;
 }
 
 // ── 発注確定（発注書・原価・チャット投稿） ──

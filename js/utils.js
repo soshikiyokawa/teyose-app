@@ -30,22 +30,6 @@ function splitNameSpec(name){
   return {n: name, s: ''};
 }
 
-// 画面に実際に表示されているDOM要素から、そのままPDFファイル（Blob）を生成する（チャットへの添付用）
-// 複製した要素やHTML文字列を渡すとhtml2canvasが正しく撮影できず白紙になることがあるため、
-// 表示中の本物の要素（element）を直接渡すこと。
-async function htmlToPdfBlob(title, element){
-  // 60秒以上かかる場合は処理が固まったと判断してタイムアウトさせる
-  // （iOS Safariでhtml2canvasの描画が止まったまま固まることがあるため）
-  const genPromise = html2pdf().from(element).set({
-    margin:10,
-    filename:`${title}.pdf`,
-    html2canvas:{scale:1.5},
-    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
-  }).outputPdf('blob');
-  const timeoutPromise = new Promise((_,reject)=>setTimeout(()=>reject(new Error('PDF生成がタイムアウトしました')),60000));
-  return await Promise.race([genPromise, timeoutPromise]);
-}
-
 // PDF印刷ユーティリティ（ポップアップブロック対応）
 function printHtml(title, body){
   const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${title}</title><style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}body{font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}table{width:100%;border-collapse:collapse}@media print{@page{margin:15mm}button{display:none}}</style></head><body>${body}</body></html>`;

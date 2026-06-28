@@ -56,11 +56,11 @@ async function confirmOrder(){
   const btn = document.querySelector('#order-pdf-foot .btn.wood');
   if(btn){btn.disabled=true;btn.textContent='処理中…';}
 
-  const bodyEl = document.getElementById('order-pdf-body');
   try{
-    // ① 発注書PDFを生成してSupabase Storageに保存し、チャットに添付できるURLを得る
-    const pdfBlob = await htmlToPdfBlob(`発注書_${currentOrder.no}`, bodyEl);
-    currentOrder.pdfUrl = await dbUploadOrderPdf(currentOrder.no, pdfBlob);
+    // ① 発注書PDFをサーバー側（Edge Function）で生成・保存し、チャットに添付できるURLを得る
+    //    （ブラウザのCanvas読み取りがセキュリティソフト等でブロックされる端末があるため、
+    //     画面の画像化ではなくサーバー側で直接PDFを組み立てる方式にしている）
+    currentOrder.pdfUrl = await dbGenerateOrderPdf(currentOrder);
 
     // ② 発注データ・原価・チャットへの投稿をまとめて確定（Supabaseに保存）
     await dbConfirmOrder(currentOrder);
