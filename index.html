@@ -42,11 +42,11 @@
   </button>
 </div>
 
-<!-- ════ 見積ページ ════ -->
-<div class="page active staff-only" id="page-estimate" style="display:flex;gap:0;align-items:flex-start;padding:0">
+<!-- ════ メイン表示エリア（案件一覧サイドバーは見積・原価管理・受発注の全画面で常時表示） ════ -->
+<div style="display:flex;align-items:flex-start">
 
   <!-- 案件一覧（左サイドバー） -->
-  <div id="est-project-sidebar" style="width:160px;flex:0 0 160px;border-right:1px solid var(--border);max-height:calc(100vh - 56px);overflow-y:auto;padding-top:14px">
+  <div id="est-project-sidebar" class="staff-only" style="width:160px;flex:0 0 160px;border-right:1px solid var(--border);max-height:calc(100vh - 56px);overflow-y:auto;position:sticky;top:0;padding-top:14px">
     <div class="section-lbl" style="margin:0 10px 6px">案件一覧</div>
     <div style="padding:0 10px 8px">
       <input id="est-sidebar-search" placeholder="案件名・施主名で検索" oninput="filterProjectSidebar()" style="width:100%;font-size:12px;padding:6px 8px;box-sizing:border-box">
@@ -54,7 +54,10 @@
     <div id="est-project-sidebar-list"></div>
   </div>
 
-  <div style="flex:1;min-width:0;padding:14px 16px 0">
+  <div style="flex:1;min-width:0">
+
+<!-- ════ 見積ページ ════ -->
+<div class="page active staff-only" id="page-estimate">
   <div class="sub-tab-bar">
     <button class="sub-tab-btn active" onclick="estSubTab('info')">案件情報</button>
     <button class="sub-tab-btn" onclick="estSubTab('items')">明細入力</button>
@@ -208,7 +211,6 @@
       <div id="estpreset-master-list" style="padding:0;overflow:hidden"></div>
     </div>
   </div>
-  </div>
 </div>
 
 <!-- ════ 原価管理ページ ════ -->
@@ -347,6 +349,9 @@
     <div class="card" id="orders-list"><div class="empty">発注履歴はありません</div></div>
   </div>
 </div>
+
+  </div><!-- /main content -->
+</div><!-- /sidebar flex wrap -->
 
 </div><!-- /shell -->
 <div class="toast" id="toast"></div>
