@@ -34,10 +34,12 @@ function splitNameSpec(name){
 // 複製した要素やHTML文字列を渡すとhtml2canvasが正しく撮影できず白紙になることがあるため、
 // 表示中の本物の要素（element）を直接渡すこと。
 async function htmlToPdfBlob(title, element){
+  // foreignObjectRendering:falseは必須。iOS Safari（WebKit）はSVG foreignObjectを使った
+  // 高速描画パスの対応が不完全で、自動検出が誤判定すると白紙のPDFになることがある。
   const blob=await html2pdf().from(element).set({
     margin:10,
     filename:`${title}.pdf`,
-    html2canvas:{scale:2},
+    html2canvas:{scale:2, foreignObjectRendering:false, useCORS:true},
     jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
   }).outputPdf('blob');
   return blob;
