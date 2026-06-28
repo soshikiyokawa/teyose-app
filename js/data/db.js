@@ -59,7 +59,7 @@ async function fetchAllData(){
 }
 
 function rowToEstimate(r){
-  return {id:r.id,no:r.no,date:r.date,expire:r.expire,status:r.status,type:r.type,
+  return {id:r.id,title:r.title,no:r.no,date:r.date,expire:r.expire,status:r.status,type:r.type,
     startDate:r.start_date,endDate:r.end_date,clientName:r.client_name,projectName:r.project_name,siteName:r.site_name,
     note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[]};
 }
@@ -164,7 +164,7 @@ async function dbReorderMasterItems(orderedItems){
 // ── 見積 ──
 async function dbSaveEstimate(data){
   const row = {
-    no:data.no,date:data.date||null,expire:data.expire||null,status:data.status,type:data.type,
+    title:data.title,no:data.no,date:data.date||null,expire:data.expire||null,status:data.status,type:data.type,
     start_date:data.startDate||null,end_date:data.endDate||null,
     client_name:data.clientName,project_name:data.projectName,site_name:data.siteName,note:data.note,
     discount_amount:data.discountAmount,tax_rate:data.taxRate,payments:data.payments,sections:data.sections

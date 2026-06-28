@@ -52,6 +52,7 @@ create table public.estimate_defaults (
 
 create table public.estimates (
   id bigint generated always as identity primary key,
+  title text,
   no text,
   date date,
   expire date,

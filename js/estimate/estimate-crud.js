@@ -1,8 +1,13 @@
 // ════ 見積：保存・新規作成・読み込み・一覧 ════
 
+function defaultEstTitle(){
+  const d=new Date();
+  return '御見積書'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+}
+
 function collectEstData(){
   const v=id=>document.getElementById(id).value;
-  return {id:editingEstId||Date.now(),no:v('est-no'),date:v('est-date'),expire:v('est-expire'),status:v('est-status'),type:v('est-type'),
+  return {id:editingEstId||Date.now(),title:v('est-title')||defaultEstTitle(),no:v('est-no'),date:v('est-date'),expire:v('est-expire'),status:v('est-status'),type:v('est-type'),
     startDate:v('est-start-date'),endDate:v('est-end-date'),
     clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
     payments:[
@@ -24,7 +29,17 @@ async function saveEstimate(){
   else{estimates.unshift(data);}
   editingEstId = savedId;
   updateEstBadge();
-  alert('保存しました：'+(data.projectName||data.siteName||data.no||'無題'));
+  alert('保存しました：'+(data.title||data.projectName||data.siteName||data.no||'無題'));
+}
+
+// 編集中の内容を、別の名前を付けて新しい見積として保存する（上書きしない）
+async function saveEstimateAs(){
+  const current=document.getElementById('est-title').value || defaultEstTitle();
+  const newTitle=prompt('保存名を入力してください',current);
+  if(newTitle===null) return; // キャンセル
+  document.getElementById('est-title').value=newTitle.trim()||defaultEstTitle();
+  editingEstId=null; // 新規保存させる
+  await saveEstimate();
 }
 
 function newEstimate(){
@@ -36,6 +51,7 @@ function newEstimate(){
   document.getElementById('est-type').value='新築';
   document.getElementById('discount-amount').value='0';
   document.getElementById('tax-rate').value='10';
+  document.getElementById('est-title').value=defaultEstTitle();
   document.getElementById('est-no').value='E'+new Date().getFullYear()+'-'+String(estSeq++).padStart(3,'0');
   document.getElementById('est-date').value=new Date().toISOString().slice(0,10);
   loadDefaultSectionsForType('新築');
@@ -81,7 +97,7 @@ async function saveCurrentAsDefault(){
 function loadEstimate(est){
   editingEstId=est.id;
   const sv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
-  sv('est-no',est.no);sv('est-date',est.date);sv('est-expire',est.expire);sv('est-status',est.status);sv('est-type',est.type);
+  sv('est-title',est.title);sv('est-no',est.no);sv('est-date',est.date);sv('est-expire',est.expire);sv('est-status',est.status);sv('est-type',est.type);
   sv('est-start-date',est.startDate);sv('est-end-date',est.endDate);
   sv('est-client',est.clientName);sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
   sv('discount-amount',est.discountAmount);sv('tax-rate',est.taxRate);
@@ -104,7 +120,7 @@ function showEstList(){
   el.innerHTML=estimates.length?estimates.map(e=>`
     <div class="list-item" onclick="loadEstimate(estimates.find(x=>x.id===${e.id}));closeEstList()">
       <div class="li-info">
-        <div class="li-name">${e.projectName||e.siteName||e.no||'無題の見積'}</div>
+        <div class="li-name">${e.title||e.projectName||e.siteName||e.no||'無題の見積'}</div>
         <div class="li-meta">${e.no} · ${e.type} · ${e.date||'日付未設定'} <span class="badge ${e.status}" style="margin-left:4px">${e.status==='draft'?'下書き':e.status==='sent'?'提出済み':'受注'}</span></div>
       </div>
       <div class="li-amt">¥${fmt(calcEstTotal(e))}</div>
