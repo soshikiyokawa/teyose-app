@@ -42,12 +42,16 @@ async function markReceived(i){
   renderOrders();renderCost();
 }
 
+const COST_TYPES=['材料費','外注費','労務費','諸経費'];
+
 function renderCost(){
   const total=costEntries.reduce((s,e)=>s+e.amount,0);
   const pending=costEntries.filter(e=>e.status==='pending').length;
   document.getElementById('c-total').textContent='¥'+fmt(total);
   document.getElementById('c-count').textContent=costEntries.length+'件';
   document.getElementById('c-pending').textContent=pending+'件';
+  renderCostByProject();
+  renderCostBySupplier();
   const el=document.getElementById('cost-list');
   el.innerHTML=costEntries.length?costEntries.map(e=>`
     <div class="cost-row">
@@ -56,6 +60,58 @@ function renderCost(){
         <button class="btn danger xs" onclick="deleteCostEntry(${e.id})" style="margin-left:auto">削除</button>
       </div>
     </div>`).join(''):'<div class="empty">発注データがありません</div>';
+}
+
+// 現場（物件）ごとに、費目区分（材料費／外注費／労務費／諸経費）別の合計を一覧表示
+function renderCostByProject(){
+  const el=document.getElementById('cost-by-project');
+  if(!costEntries.length){el.innerHTML='<div class="empty">発注データがありません</div>';return;}
+  const byProject={};
+  costEntries.forEach(e=>{
+    const p=e.project||'（物件未設定）';
+    if(!byProject[p]) byProject[p]={};
+    const t=e.costType||'未分類';
+    byProject[p][t]=(byProject[p][t]||0)+e.amount;
+  });
+  const projects=Object.keys(byProject).sort();
+  const grand={};
+  let grandTotal=0;
+  const rows=projects.map(p=>{
+    const rowTotal=Object.values(byProject[p]).reduce((s,v)=>s+v,0);
+    grandTotal+=rowTotal;
+    const cells=COST_TYPES.map(t=>{
+      grand[t]=(grand[t]||0)+(byProject[p][t]||0);
+      return `<td class="num">${byProject[p][t]?'¥'+fmt(byProject[p][t]):'—'}</td>`;
+    }).join('');
+    return `<tr><td>${p}</td>${cells}<td class="num" style="font-weight:700;color:var(--wood-t)">¥${fmt(rowTotal)}</td></tr>`;
+  }).join('');
+  const grandCells=COST_TYPES.map(t=>`<td class="num" style="font-weight:700">¥${fmt(grand[t]||0)}</td>`).join('');
+  el.innerHTML=`<table class="items-table" style="width:100%;min-width:560px">
+    <thead><tr><th>現場（物件）</th>${COST_TYPES.map(t=>`<th class="r">${t}</th>`).join('')}<th class="r">合計</th></tr></thead>
+    <tbody>${rows}
+      <tr style="background:var(--surface2)"><td style="font-weight:700">総合計</td>${grandCells}<td class="num" style="font-weight:800;color:var(--wood-t)">¥${fmt(grandTotal)}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+// 発注先（業者）ごとに、現時点での発注金額の合計を一覧表示
+function renderCostBySupplier(){
+  const el=document.getElementById('cost-by-supplier');
+  if(!costEntries.length){el.innerHTML='<div class="empty">発注データがありません</div>';return;}
+  const bySupplier={};
+  costEntries.forEach(e=>{
+    const s=e.supplier||'（発注先未設定）';
+    bySupplier[s]=(bySupplier[s]||0)+e.amount;
+  });
+  const rows=Object.entries(bySupplier).sort((a,b)=>b[1]-a[1]);
+  const total=rows.reduce((s,[,v])=>s+v,0);
+  el.innerHTML=rows.map(([name,amount])=>`
+    <div class="cost-row">
+      <div class="cost-row-top"><div class="cost-row-name">🏪 ${name}</div><div class="cost-row-amt">¥${fmt(amount)}</div></div>
+    </div>`).join('')+`
+    <div class="cost-row" style="background:var(--surface2)">
+      <div class="cost-row-top"><div class="cost-row-name" style="font-weight:700">総合計</div><div class="cost-row-amt" style="font-weight:800;color:var(--wood-t)">¥${fmt(total)}</div></div>
+    </div>`;
 }
 
 async function deleteCostEntry(id){
