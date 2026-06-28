@@ -7,7 +7,7 @@ function renderOrders(){
       <div class="order-hd"><span class="order-no">${o.no}</span><span class="order-name">${o.project}</span>
         <span class="badge ${o.status==='received'?'received':'pending'}">${o.status==='received'?'受領済み':'発注済み'}</span>
       </div>
-      <div class="order-meta"><span>📅 ${o.date}</span><span>🏪 ${o.suppliers}</span><span>📦 ${o.items.length}品目</span><span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
+      <div class="order-meta"><span>📅 ${o.date}</span><span>🏪 ${o.suppliers}</span><span>📦 ${o.items.length}品目</span>${o.costType?`<span>🏷️ ${o.costType}</span>`:''}<span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
       <div class="order-actions">
         <button class="btn sm" onclick="reShowOrder(${i})"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 発注書</button>
         ${o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`:''}
@@ -52,7 +52,7 @@ function renderCost(){
   el.innerHTML=costEntries.length?costEntries.map(e=>`
     <div class="cost-row">
       <div class="cost-row-top"><div class="cost-row-name">${e.name}</div><div class="cost-row-amt">¥${fmt(e.amount)}</div></div>
-      <div class="cost-row-meta"><span>${e.date}</span><span>${e.project}</span><span>${e.qty}${e.unit}</span><span>${e.supplier}</span><span class="badge ${e.status==='received'?'received':'pending'}">${e.status==='received'?'受領済み':'発注済み'}</span>
+      <div class="cost-row-meta"><span>${e.date}</span><span>${e.project}</span><span>${e.qty}${e.unit}</span><span>${e.supplier}</span>${e.costType?`<span>🏷️ ${e.costType}</span>`:''}<span class="badge ${e.status==='received'?'received':'pending'}">${e.status==='received'?'受領済み':'発注済み'}</span>
         <button class="btn danger xs" onclick="deleteCostEntry(${e.id})" style="margin-left:auto">削除</button>
       </div>
     </div>`).join(''):'<div class="empty">発注データがありません</div>';

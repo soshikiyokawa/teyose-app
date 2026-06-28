@@ -77,6 +77,7 @@ create table public.orders (
   project text,
   date date,
   due_date date,
+  cost_type text,
   supplier_id bigint references public.suppliers(id) on delete set null,
   items jsonb default '[]',
   subtotal numeric default 0,
@@ -96,6 +97,7 @@ create table public.cost_entries (
   amount numeric,
   supplier_id bigint references public.suppliers(id) on delete set null,
   order_no text,
+  cost_type text,
   status text default 'pending',
   created_at timestamptz default now()
 );

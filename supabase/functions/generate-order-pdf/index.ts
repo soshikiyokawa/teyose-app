@@ -128,13 +128,15 @@ async function buildOrderPdf(o: any): Promise<Uint8Array> {
   drawRight(COMPANY.url, y - 34, 8, font, green);
 
   y -= 60;
-  const boxH = 70;
+  const boxH = 86;
   page.drawRectangle({ x: marginX, y: y - boxH, width: tableW, height: boxH, color: lightBg });
   let iy = y - 16;
   page.drawText(`発注先：${o.suppliers || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   iy -= 16;
   page.drawText(`発注番号：${o.no || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   page.drawText(`発注日：${o.date || ""}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
+  iy -= 16;
+  page.drawText(`費目区分：${o.costType || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   iy -= 16;
   page.drawText(`物件名：${o.project || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   page.drawText(`納品希望日：${o.dueDate || "未指定"}`, { x: marginX + 260, y: iy, size: 10, font, color: black });

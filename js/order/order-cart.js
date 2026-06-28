@@ -118,7 +118,7 @@ function confirmQty(){
 function renderCart(){
   const card=document.getElementById('cart-card');
   const ci=document.getElementById('cart-items');
-  if(!cart.length){card.style.display='none';return;}
+  if(!cart.length){card.style.display='none';updateOrderPreviewBtnState();return;}
   card.style.display='block';
   ci.innerHTML=cart.map((c,i)=>`
     <div class="cart-item">
@@ -136,6 +136,7 @@ function renderCart(){
       <button class="btn danger xs" onclick="removeCartItem(${i})" style="margin-left:4px">×</button>
     </div>`).join('');
   document.getElementById('cart-total').textContent=fmt(cart.reduce((s,c)=>s+c.price*c.qty,0));
+  updateOrderPreviewBtnState();
 }
 function changeQty(i,d){
   cart[i].qty=Math.max(1,cart[i].qty+d);

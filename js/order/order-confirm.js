@@ -1,7 +1,20 @@
 // ════ 受発注：発注書プレビュー・発注確定 ════
 
+// カートの内容・費目区分・納品希望日がすべて揃うまで「発注書作成」ボタンを押せないようにする
+function updateOrderPreviewBtnState(){
+  const btn=document.getElementById('order-preview-btn');
+  if(!btn) return;
+  const costType=document.getElementById('order-cost-type')?.value;
+  const dueDate=document.getElementById('order-due-date')?.value;
+  btn.disabled = !(cart.length && costType && dueDate);
+}
+
 function openOrderPreview(){
   if(!cart.length){alert('カートが空です。');return;}
+  const costType=document.getElementById('order-cost-type').value;
+  const dueDate=document.getElementById('order-due-date').value;
+  if(!costType){alert('費目区分を選択してください。');return;}
+  if(!dueDate){alert('納品希望日を入力してください。');return;}
   const project=document.getElementById('g-project').value;
   const now=new Date();
   const date=now.toISOString().slice(0,10);
@@ -9,8 +22,7 @@ function openOrderPreview(){
   const sup=selectedSupplier||{name:'—',tel:'',email:''};
   const subtotal=cart.reduce((s,c)=>s+c.price*c.qty,0);
   const tax=Math.round(subtotal*.1);
-  const dueDate=document.getElementById('order-due-date').value;
-  currentOrder={no,project,date,dueDate,suppliers:sup.name,supplierObj:sup,items:[...cart.map(c=>({...c}))],subtotal,tax,total:subtotal+tax};
+  currentOrder={no,project,date,dueDate,costType,suppliers:sup.name,supplierObj:sup,items:[...cart.map(c=>({...c}))],subtotal,tax,total:subtotal+tax};
 
   document.getElementById('order-pdf-body').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
@@ -20,6 +32,7 @@ function openOrderPreview(){
     <div style="background:#f7f3eb;border-radius:7px;padding:10px 12px;margin-bottom:16px;font-size:12px">
       <div style="margin-bottom:4px"><span style="color:#888">発注先：</span><strong>${sup.name}</strong>${sup.contact&&sup.contact!=='—'?`　担当：${sup.contact}`:''}</div>
       <div style="display:flex;gap:16px;margin-bottom:4px"><div style="flex:1"><span style="color:#888">発注番号：</span><strong>${no}</strong></div><div style="flex:1"><span style="color:#888">発注日：</span><strong>${date}</strong></div></div>
+      <div style="display:flex;gap:16px;margin-bottom:4px"><div style="flex:1"><span style="color:#888">費目区分：</span><strong>${costType}</strong></div></div>
       <div style="display:flex;gap:16px"><div style="flex:1"><span style="color:#888">物件名：</span><strong>${project}</strong></div><div style="flex:1"><span style="color:#888">納品希望日：</span><strong>${dueDate||'未指定'}</strong></div></div>
       ${sup.tel?`<div style="margin-top:4px"><span style="color:#888">TEL：</span><strong>${sup.tel}</strong></div>`:''}
     </div>
@@ -76,14 +89,16 @@ async function confirmOrder(){
       date:currentOrder.date, project:currentOrder.project,
       name:item.name, qty:item.qty, unit:item.unit,
       amount:item.cost*item.qty, supplier:item.supplier,
-      orderNo:currentOrder.no, status:'pending'
+      orderNo:currentOrder.no, costType:currentOrder.costType, status:'pending'
     });
   });
 
   // UI後処理
   cart = []; currentOrder = null;
   document.getElementById('order-due-date').value = '';
+  document.getElementById('order-cost-type').value = '';
   renderCart();
+  updateOrderPreviewBtnState();
   if(selectedSupplier) renderItemSelectList();
   closeOrderPdf();
   if(btn){btn.disabled=false;btn.textContent='✓ 発注確定・PDF保存';}
