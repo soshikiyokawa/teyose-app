@@ -43,7 +43,15 @@
 </div>
 
 <!-- ════ 見積ページ ════ -->
-<div class="page active staff-only" id="page-estimate">
+<div class="page active staff-only" id="page-estimate" style="display:flex;gap:0;align-items:flex-start">
+
+  <!-- 案件一覧（左サイドバー） -->
+  <div id="est-project-sidebar" style="width:160px;flex:0 0 160px;border-right:1px solid var(--border);max-height:calc(100vh - 56px);overflow-y:auto">
+    <div class="section-lbl" style="margin:10px 10px 4px">案件一覧</div>
+    <div id="est-project-sidebar-list"></div>
+  </div>
+
+  <div style="flex:1;min-width:0">
   <div class="sub-tab-bar">
     <button class="sub-tab-btn active" onclick="estSubTab('info')">案件情報</button>
     <button class="sub-tab-btn" onclick="estSubTab('items')">明細入力</button>
@@ -196,6 +204,7 @@
       </div>
       <div id="estpreset-master-list" style="padding:0;overflow:hidden"></div>
     </div>
+  </div>
   </div>
 </div>
 

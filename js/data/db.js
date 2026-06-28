@@ -50,7 +50,7 @@ async function fetchAllData(){
 
     renderPresetDatalists();
 
-    const { data: estRows } = await sb.from('estimates').select('*').order('created_at',{ascending:false});
+    const { data: estRows } = await sb.from('estimates').select('*').order('updated_at',{ascending:false});
     estimates = (estRows||[]).map(rowToEstimate);
     estSeq = estimates.length+1;
 
@@ -65,7 +65,8 @@ async function fetchAllData(){
 function rowToEstimate(r){
   return {id:r.id,title:r.title,no:r.no,date:r.date,expire:r.expire,status:r.status,type:r.type,
     startDate:r.start_date,endDate:r.end_date,clientName:r.client_name,projectName:r.project_name,siteName:r.site_name,
-    note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[]};
+    note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[],
+    updatedAt:r.updated_at};
 }
 
 // ── 見積：工事区分マスタ ──
@@ -182,7 +183,8 @@ async function dbSaveEstimate(data){
     title:data.title,no:data.no,date:data.date||null,expire:data.expire||null,status:data.status,type:data.type,
     start_date:data.startDate||null,end_date:data.endDate||null,
     client_name:data.clientName,project_name:data.projectName,site_name:data.siteName,note:data.note,
-    discount_amount:data.discountAmount,tax_rate:data.taxRate,payments:data.payments,sections:data.sections
+    discount_amount:data.discountAmount,tax_rate:data.taxRate,payments:data.payments,sections:data.sections,
+    updated_at:new Date().toISOString()
   };
   if(typeof data.id==='number' && estimates.some(e=>e.id===data.id)){
     const { error } = await sb.from('estimates').update(row).eq('id',data.id);

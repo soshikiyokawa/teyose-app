@@ -81,7 +81,8 @@ create table public.estimates (
   tax_rate numeric default 10,
   payments jsonb default '[]',
   sections jsonb default '[]',
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 create table public.orders (
@@ -316,6 +317,11 @@ create policy push_subscriptions_delete on public.push_subscriptions
 -- create policy estimate_types_insert on public.estimate_types for insert with check (app_user_role() = 'staff');
 -- create policy estimate_types_update on public.estimate_types for update using (app_user_role() = 'staff');
 -- create policy estimate_types_delete on public.estimate_types for delete using (app_user_role() = 'staff');
+
+-- ════ マイグレーション：見積に更新日時を追加（案件一覧の並び替え用） ════
+-- 既存環境では以下を実行してください
+-- alter table public.estimates add column if not exists updated_at timestamptz default now();
+-- update public.estimates set updated_at = created_at where updated_at is null;
 
 -- ════ Realtime（複数端末への即時反映） ════
 alter publication supabase_realtime add table public.suppliers;

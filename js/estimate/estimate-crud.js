@@ -25,10 +25,12 @@ async function saveEstimate(){
     savedId = await dbSaveEstimate(data);
   }catch(e){return;}
   data.id = savedId;
+  data.updatedAt = new Date().toISOString();
   if(editingEstId){const i=estimates.findIndex(e=>e.id===editingEstId);if(i>=0)estimates[i]=data;}
   else{estimates.unshift(data);}
   editingEstId = savedId;
   updateEstBadge();
+  renderProjectSidebar();
   alert('保存しました：'+(data.title||data.projectName||data.siteName||data.no||'無題'));
 }
 
@@ -61,6 +63,7 @@ function newEstimate(){
   loadDefaultSectionsForType('新築');
   renderPresetDatalists();
   updateEstBadge();renderSections();estSubTab('info');
+  renderProjectSidebar();
 }
 
 function cloneSections(list){
@@ -114,12 +117,41 @@ function loadEstimate(est){
   sections=est.sections.map(s=>({...s,items:[...s.items]}));
   renderPresetDatalists();
   updateEstBadge();renderSections();estSubTab('info');
+  selectedProjectName = est.projectName || null;
+  renderProjectSidebar();
 }
 
 function calcEstTotal(e){
   const w=(e.sections||[]).reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
   const sub=Math.max(0,w-(e.discountAmount||0));
   return sub+Math.round(sub*(e.taxRate||10)/100);
+}
+
+// ── 左サイドバー：案件一覧（物件名でグループ化、更新の新しい順） ──
+function renderProjectSidebar(){
+  const el=document.getElementById('est-project-sidebar-list');
+  if(!el) return;
+  const groups={};
+  estimates.forEach(e=>{
+    const name=e.projectName||'（物件名未設定）';
+    const t=e.updatedAt?new Date(e.updatedAt).getTime():0;
+    if(!groups[name]) groups[name]={latest:t,count:0};
+    groups[name].count++;
+    if(t>groups[name].latest) groups[name].latest=t;
+  });
+  const list=Object.keys(groups).map(name=>({name,...groups[name]})).sort((a,b)=>b.latest-a.latest);
+  if(!list.length){el.innerHTML='<div class="empty" style="padding:10px;font-size:12px">案件がありません</div>';return;}
+  el.innerHTML=list.map(g=>`
+    <div onclick="selectProjectSidebar('${g.name.replace(/'/g,"\\'")}')"
+      style="padding:8px 10px;font-size:12px;cursor:pointer;border-radius:6px;margin:2px 8px;${selectedProjectName===g.name?'background:var(--wood);color:#fff;font-weight:700':'color:var(--text-sub)'}">
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)}</div>
+      <div style="font-size:10px;opacity:.75;margin-top:1px">${g.count}件</div>
+    </div>`).join('');
+}
+
+function selectProjectSidebar(name){
+  selectedProjectName = (selectedProjectName===name) ? null : name;
+  renderProjectSidebar();
 }
 
 function showEstList(){
@@ -132,17 +164,29 @@ function showEstList(){
 
 function filterEstList(){ renderEstListBody(); }
 
+function clearProjectFilterInList(){
+  selectedProjectName=null;
+  renderProjectSidebar();
+  renderEstListBody();
+}
+
 function renderEstListBody(){
   const kw=(document.getElementById('est-list-search')?.value||'').trim().toLowerCase();
   const typeFilter=document.getElementById('est-list-type-filter')?.value||'';
   const list=estimates.filter(e=>{
+    if(selectedProjectName && (e.projectName||'（物件名未設定）')!==selectedProjectName) return false;
     if(typeFilter && e.type!==typeFilter) return false;
     if(!kw) return true;
     const hay=[e.title,e.clientName,e.projectName,e.siteName,e.no].filter(Boolean).join(' ').toLowerCase();
     return hay.includes(kw);
   });
+  const chip = selectedProjectName ? `
+    <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:11px;color:var(--text-sub);background:var(--surface2)">
+      案件で絞り込み中：<strong>${esc(selectedProjectName)}</strong>
+      <button class="btn xs" onclick="clearProjectFilterInList()" style="margin-left:auto">✕ 解除</button>
+    </div>` : '';
   const el=document.getElementById('est-list-body');
-  el.innerHTML=list.length?list.map(e=>`
+  el.innerHTML=chip+(list.length?list.map(e=>`
     <div class="list-item" onclick="loadEstimate(estimates.find(x=>x.id===${e.id}));closeEstList()">
       <div class="li-info">
         <div class="li-name">${e.title||e.projectName||e.siteName||e.no||'無題の見積'}</div>
@@ -150,7 +194,7 @@ function renderEstListBody(){
       </div>
       <div class="li-amt">¥${fmt(calcEstTotal(e))}</div>
       <button class="btn danger xs" onclick="event.stopPropagation();deleteEstimateFromList(${e.id})" style="margin-left:8px">削除</button>
-    </div>`).join(''):'<div class="empty">該当する見積はありません</div>';
+    </div>`).join(''):'<div class="empty">該当する見積はありません</div>');
 }
 
 async function deleteEstimateFromList(id){
@@ -163,6 +207,7 @@ async function deleteEstimateFromList(id){
   estimates=estimates.filter(x=>x.id!==id);
   if(editingEstId===id) editingEstId=null;
   renderEstListBody();
+  renderProjectSidebar();
   showToast('見積を削除しました');
 }
 function closeEstList(){document.getElementById('est-list-overlay').classList.remove('open');}

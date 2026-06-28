@@ -16,6 +16,7 @@ let cart=[], orders=[], orderSeq=1, costEntries=[], currentOrder=null;
 
 // 見積
 let estimates=[],estSeq=1,editingEstId=null;
+let selectedProjectName=null; // 左サイドバーで選択中の案件（物件名）。一覧の絞り込みに使う
 let sections=[],secSeq=1,itemSeq=1;
 let estimatePresets=[]; // 工事品目マスタ（工種ごとの明細・単位・原価の選択候補）
 let estimateCategories=[]; // 工種マスタ
