@@ -251,6 +251,8 @@ create policy push_subscriptions_select on public.push_subscriptions
   for select using (auth.uid() = user_id);
 create policy push_subscriptions_insert on public.push_subscriptions
   for insert with check (auth.uid() = user_id);
+create policy push_subscriptions_update on public.push_subscriptions
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy push_subscriptions_delete on public.push_subscriptions
   for delete using (auth.uid() = user_id);
 
