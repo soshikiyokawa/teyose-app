@@ -32,6 +32,10 @@ async function fetchAllData(){
   });
 
   if(currentUserRole==='staff'){
+    const { data: typeRows } = await sb.from('estimate_types').select('*').order('sort_order').order('id');
+    estimateTypes = (typeRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
+    estTypeIdSeq = Math.max(0,...estimateTypes.map(t=>t.id))+1;
+
     const { data: catRows } = await sb.from('estimate_categories').select('*').order('sort_order').order('id');
     estimateCategories = (catRows||[]).map(r=>({id:r.id,name:r.name,workType:r.work_type||'新築',sortOrder:r.sort_order}));
     estCatIdSeq = Math.max(0,...estimateCategories.map(c=>c.id))+1;
@@ -62,6 +66,17 @@ function rowToEstimate(r){
   return {id:r.id,title:r.title,no:r.no,date:r.date,expire:r.expire,status:r.status,type:r.type,
     startDate:r.start_date,endDate:r.end_date,clientName:r.client_name,projectName:r.project_name,siteName:r.site_name,
     note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[]};
+}
+
+// ── 見積：工事区分マスタ ──
+async function dbAddEstimateType(name){
+  const { data, error } = await sb.from('estimate_types').insert({name,sort_order:estimateTypes.length}).select().single();
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
+async function dbDeleteEstimateType(id){
+  const { error } = await sb.from('estimate_types').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
 }
 
 // ── 見積：工種マスタ ──

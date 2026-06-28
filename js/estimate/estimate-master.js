@@ -4,9 +4,12 @@
 function renderMasterWorkTypeTabs(){
   const el=document.getElementById('estmaster-worktype-tabs');
   if(!el) return;
-  el.innerHTML=ESTIMATE_TYPES.map(t=>`
-    <button class="cat-pill${activeMasterWorkType===t?' active':''}" onclick="setMasterWorkType('${t}')">${esc(t)}</button>`
-  ).join('');
+  el.innerHTML=estimateTypes.map(t=>`
+    <span class="cat-pill${activeMasterWorkType===t.name?' active':''}" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer" onclick="setMasterWorkType('${esc(t.name).replace(/'/g,"\\'")}')">
+      ${esc(t.name)}
+      <span onclick="event.stopPropagation();deleteEstimateType(${t.id})" title="この工事区分を削除" style="font-size:11px;opacity:.6">✕</span>
+    </span>`
+  ).join('') + `<button class="cat-pill" onclick="addEstimateTypePrompt()" style="font-weight:700">＋ 工事区分を追加</button>`;
 }
 function setMasterWorkType(type){
   activeMasterWorkType=type;
@@ -14,6 +17,45 @@ function setMasterWorkType(type){
   renderMasterWorkTypeTabs();
   renderEstCategoryMaster();
   renderEstPresetMaster();
+}
+
+// 見積入力画面の「工事区分」セレクトに、登録済みの工事区分を反映する
+function renderEstTypeSelect(){
+  const sel=document.getElementById('est-type');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML=estimateTypes.map(t=>`<option>${esc(t.name)}</option>`).join('');
+  if(estimateTypes.some(t=>t.name===cur)) sel.value=cur;
+}
+
+async function addEstimateTypePrompt(){
+  const name=(prompt('追加する工事区分名を入力してください（例：トイレ交換工事）')||'').trim();
+  if(!name) return;
+  if(estimateTypes.some(t=>t.name===name)){alert('すでに登録されています');return;}
+  try{
+    const id=await dbAddEstimateType(name);
+    estimateTypes.push({id,name,sortOrder:estimateTypes.length});
+  }catch(e){return;}
+  renderEstTypeSelect();
+  activeMasterWorkType=name;
+  renderMasterWorkTypeTabs();
+  renderEstCategoryMaster();
+  renderEstPresetMaster();
+  showToast('工事区分を追加しました');
+}
+async function deleteEstimateType(id){
+  const t=estimateTypes.find(x=>x.id===id);
+  if(!t) return;
+  if(estimateTypes.length<=1){alert('工事区分は最低1つ必要です');return;}
+  if(!confirm(`工事区分「${t.name}」を削除しますか？\nこの区分に登録された工種・工事品目はそのまま残りますが、選択肢には出なくなります。`)) return;
+  try{ await dbDeleteEstimateType(id); }catch(e){return;}
+  estimateTypes=estimateTypes.filter(x=>x.id!==id);
+  if(activeMasterWorkType===t.name) activeMasterWorkType=estimateTypes[0]?.name||'';
+  renderEstTypeSelect();
+  renderMasterWorkTypeTabs();
+  renderEstCategoryMaster();
+  renderEstPresetMaster();
+  showToast('工事区分を削除しました');
 }
 
 // ── 工種マスタ ──

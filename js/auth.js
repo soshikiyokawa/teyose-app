@@ -60,6 +60,7 @@ async function bootstrapApp(){
   document.getElementById('app-nav').style.display='';
 
   if(currentUserRole==='staff'){
+    renderEstTypeSelect();
     newEstimate();
     renderSupplierSelectList();
     mainTab('estimate');

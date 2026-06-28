@@ -27,6 +27,17 @@ create table public.master_items (
   created_at timestamptz default now()
 );
 
+-- 工事区分（新築／リフォーム等）。追加・削除可能なマスタ
+create table public.estimate_types (
+  id bigint generated always as identity primary key,
+  name text not null unique,
+  sort_order integer not null default 0,
+  created_at timestamptz default now()
+);
+insert into public.estimate_types (name, sort_order) values
+  ('新築',0),('リフォーム',1),('増築',2),('外構',3),('その他',4)
+on conflict (name) do nothing;
+
 create table public.estimate_categories (
   id bigint generated always as identity primary key,
   name text not null,
@@ -154,6 +165,7 @@ $$;
 
 alter table public.suppliers enable row level security;
 alter table public.master_items enable row level security;
+alter table public.estimate_types enable row level security;
 alter table public.estimate_categories enable row level security;
 alter table public.estimate_presets enable row level security;
 alter table public.estimate_defaults enable row level security;
@@ -210,6 +222,11 @@ create trigger trg_restrict_supplier_item_update
   for each row execute function public.restrict_supplier_item_update();
 
 -- ════ estimates / orders / cost_entries（社内のみ） ════
+create policy estimate_types_select on public.estimate_types for select using (app_user_role() = 'staff');
+create policy estimate_types_insert on public.estimate_types for insert with check (app_user_role() = 'staff');
+create policy estimate_types_update on public.estimate_types for update using (app_user_role() = 'staff');
+create policy estimate_types_delete on public.estimate_types for delete using (app_user_role() = 'staff');
+
 create policy estimate_categories_select on public.estimate_categories for select using (app_user_role() = 'staff');
 create policy estimate_categories_insert on public.estimate_categories for insert with check (app_user_role() = 'staff');
 create policy estimate_categories_update on public.estimate_categories for update using (app_user_role() = 'staff');
@@ -282,6 +299,23 @@ create policy push_subscriptions_delete on public.push_subscriptions
 -- （既存の行はすべてデフォルト値「新築」になります）
 -- alter table public.estimate_categories add column if not exists work_type text not null default '新築';
 -- alter table public.estimate_presets add column if not exists work_type text not null default '新築';
+
+-- ════ マイグレーション：工事区分マスタ（追加・削除可能化） ════
+-- 既存環境では以下を実行してください
+-- create table public.estimate_types (
+--   id bigint generated always as identity primary key,
+--   name text not null unique,
+--   sort_order integer not null default 0,
+--   created_at timestamptz default now()
+-- );
+-- insert into public.estimate_types (name, sort_order) values
+--   ('新築',0),('リフォーム',1),('増築',2),('外構',3),('その他',4)
+-- on conflict (name) do nothing;
+-- alter table public.estimate_types enable row level security;
+-- create policy estimate_types_select on public.estimate_types for select using (app_user_role() = 'staff');
+-- create policy estimate_types_insert on public.estimate_types for insert with check (app_user_role() = 'staff');
+-- create policy estimate_types_update on public.estimate_types for update using (app_user_role() = 'staff');
+-- create policy estimate_types_delete on public.estimate_types for delete using (app_user_role() = 'staff');
 
 -- ════ Realtime（複数端末への即時反映） ════
 alter publication supabase_realtime add table public.suppliers;
