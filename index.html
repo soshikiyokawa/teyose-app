@@ -43,18 +43,18 @@
 </div>
 
 <!-- ════ 見積ページ ════ -->
-<div class="page active staff-only" id="page-estimate" style="display:flex;gap:0;align-items:flex-start">
+<div class="page active staff-only" id="page-estimate" style="display:flex;gap:0;align-items:flex-start;padding:0">
 
   <!-- 案件一覧（左サイドバー） -->
-  <div id="est-project-sidebar" style="width:160px;flex:0 0 160px;border-right:1px solid var(--border);max-height:calc(100vh - 56px);overflow-y:auto">
-    <div class="section-lbl" style="margin:10px 10px 4px">案件一覧</div>
-    <div style="padding:0 8px 8px">
-      <input id="est-sidebar-search" placeholder="案件名・施主名で検索" oninput="filterProjectSidebar()" style="width:100%;font-size:12px;padding:6px 8px">
+  <div id="est-project-sidebar" style="width:160px;flex:0 0 160px;border-right:1px solid var(--border);max-height:calc(100vh - 56px);overflow-y:auto;padding-top:14px">
+    <div class="section-lbl" style="margin:0 10px 6px">案件一覧</div>
+    <div style="padding:0 10px 8px">
+      <input id="est-sidebar-search" placeholder="案件名・施主名で検索" oninput="filterProjectSidebar()" style="width:100%;font-size:12px;padding:6px 8px;box-sizing:border-box">
     </div>
     <div id="est-project-sidebar-list"></div>
   </div>
 
-  <div style="flex:1;min-width:0">
+  <div style="flex:1;min-width:0;padding:14px 16px 0">
   <div class="sub-tab-bar">
     <button class="sub-tab-btn active" onclick="estSubTab('info')">案件情報</button>
     <button class="sub-tab-btn" onclick="estSubTab('items')">明細入力</button>
