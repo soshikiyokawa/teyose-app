@@ -71,6 +71,7 @@ async function confirmOrder(){
     await dbConfirmOrder(currentOrder);
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='✓ 発注確定・PDF保存';}
+    showToast('発注確定に失敗しました：'+e.message);
     return;
   }
 
