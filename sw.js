@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v28';
+const CACHE_NAME = 'teyose-v29';
 const ASSETS = [
   './',
   './index.html',
@@ -32,6 +32,7 @@ const ASSETS = [
   './js/order/order-cart.js',
   './js/order/order-confirm.js',
   './js/order/order-history.js',
+  './js/push.js',
   './icon-192.png',
   './icon-512.png',
   './favicon.png'
@@ -51,5 +52,28 @@ self.addEventListener('activate', e=>{
 self.addEventListener('fetch', e=>{
   e.respondWith(
     caches.match(e.request).then(cached=>cached || fetch(e.request))
+  );
+});
+
+// ── プッシュ通知 ──
+self.addEventListener('push', e=>{
+  let data = {};
+  try{ data = e.data.json(); }catch(_){}
+  const title = data.title || '手寄';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: data.body || '',
+    icon: './icon-192.png',
+    badge: './icon-192.png'
+  }));
+});
+
+self.addEventListener('notificationclick', e=>{
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({type:'window'}).then(list=>{
+      const existing = list.find(c=>'focus' in c);
+      if(existing) return existing.focus();
+      if(self.clients.openWindow) return self.clients.openWindow('./');
+    })
   );
 });

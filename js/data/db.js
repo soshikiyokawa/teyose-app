@@ -246,6 +246,28 @@ async function dbAddChatMessage(supplierName, msg){
   if(error){showToast('送信に失敗しました：'+error.message);throw error;}
   if(!talkThreads[supplierName]) talkThreads[supplierName]=[];
   talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,ts:new Date(data.created_at).getTime(),unread:false});
+
+  // 通知の送信（社内→発注先 or 発注先→社内）。失敗してもチャット送信自体は成立させる
+  const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}` : (msg.text||'');
+  if(msg.role==='me'){
+    dbSendPush('supplier', supplier_id, supplierName, preview).catch(()=>{});
+  } else {
+    dbSendPush('staff', null, supplierName, preview).catch(()=>{});
+  }
+}
+
+// ── プッシュ通知 ──
+async function dbSavePushSubscription(sub){
+  const { data: userData } = await sb.auth.getUser();
+  if(!userData?.user) return;
+  const json = sub.toJSON();
+  const { error } = await sb.from('push_subscriptions').upsert({
+    user_id: userData.user.id, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth
+  }, { onConflict: 'endpoint' });
+  if(error){showToast('通知設定の保存に失敗しました：'+error.message);throw error;}
+}
+async function dbSendPush(targetRole, targetSupplierId, title, body){
+  await sb.functions.invoke('send-push', { body: { targetRole, targetSupplierId, title, body } });
 }
 
 // ── リアルタイム同期（他端末の変更を反映） ──

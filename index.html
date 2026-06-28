@@ -367,7 +367,10 @@
             <div style="font-size:10px;color:var(--text-muted)">発注先とのトーク記録</div>
           </div>
         </div>
-        <button onclick="toggleTalkPanel()" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:20px;line-height:1;padding:2px">×</button>
+        <div style="display:flex;align-items:center;gap:4px">
+          <button onclick="enablePushNotifications()" title="この端末で通知を有効にする" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:16px;line-height:1;padding:2px">🔔</button>
+          <button onclick="toggleTalkPanel()" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:20px;line-height:1;padding:2px">×</button>
+        </div>
       </div>
       <div id="talk-panel-thread-list" style="flex:1;overflow-y:auto;padding:8px 0"></div>
     </div>
@@ -576,6 +579,9 @@
 
 <!-- やり取り（LINE風チャット） -->
 <script src="js/talk.js"></script>
+
+<!-- プッシュ通知 -->
+<script src="js/push.js"></script>
 
 <!-- 見積 -->
 <script src="js/estimate/estimate-tabs.js"></script>

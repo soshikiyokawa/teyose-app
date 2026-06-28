@@ -113,6 +113,16 @@ create table public.chat_messages (
   created_at timestamptz default now()
 );
 
+-- プッシュ通知の購読情報（端末ごとに1件）
+create table public.push_subscriptions (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz default now()
+);
+
 -- ユーザーのロール・所属発注先を管理するテーブル
 -- staff = 社内（全権限）/ supplier = 発注先（チャット＋自社品目の単価編集のみ）
 create table public.profiles (
@@ -234,6 +244,15 @@ create policy chat_messages_update on public.chat_messages
   for update using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
 create policy chat_messages_delete on public.chat_messages
   for delete using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
+
+-- ════ push_subscriptions（自分の端末の購読のみ操作可。送信処理はEdge Functionがservice roleで参照） ════
+alter table public.push_subscriptions enable row level security;
+create policy push_subscriptions_select on public.push_subscriptions
+  for select using (auth.uid() = user_id);
+create policy push_subscriptions_insert on public.push_subscriptions
+  for insert with check (auth.uid() = user_id);
+create policy push_subscriptions_delete on public.push_subscriptions
+  for delete using (auth.uid() = user_id);
 
 -- ════ Realtime（複数端末への即時反映） ════
 alter publication supabase_realtime add table public.suppliers;
