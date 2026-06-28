@@ -205,7 +205,8 @@ async function dbDeleteChatMessage(supplierName,msgId){
 
 // 発注書PDFをSupabase Storageにアップロードし、ダウンロード用URLを返す
 async function dbUploadOrderPdf(orderNo, blob){
-  const path = `${orderNo}.pdf`;
+  const yyyymm = orderNo.slice(0,6); // 発注番号（YYYYMMDDHHmm）の先頭6桁＝年月でフォルダ分け
+  const path = `${yyyymm}/${orderNo}.pdf`;
   const { error } = await sb.storage.from('order-pdfs').upload(path, blob, {
     contentType: 'application/pdf', upsert: true
   });

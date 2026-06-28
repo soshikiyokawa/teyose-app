@@ -61,7 +61,6 @@ async function confirmOrder(){
   if(btn){btn.disabled=true;btn.textContent='処理中…';}
 
   const bodyEl = document.getElementById('order-pdf-body');
-  const body = bodyEl.innerHTML;
   try{
     // ① 発注書PDFを生成してSupabase Storageに保存し、チャットに添付できるURLを得る
     const pdfBlob = await htmlToPdfBlob(`発注書_${currentOrder.no}`, bodyEl);
@@ -84,9 +83,6 @@ async function confirmOrder(){
       orderNo:currentOrder.no, status:'pending'
     });
   });
-
-  // 自分用にも印刷ダイアログを表示（ポップアップブロックされても発注確定は完了済み）
-  printHtml(`発注書 ${currentOrder.no}`, body);
 
   // UI後処理
   cart = []; currentOrder = null;
