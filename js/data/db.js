@@ -212,7 +212,8 @@ async function dbUploadOrderPdf(orderNo, blob){
   });
   if(error){showToast('発注書PDFの保存に失敗しました：'+error.message);throw error;}
   const { data } = sb.storage.from('order-pdfs').getPublicUrl(path);
-  return data.publicUrl;
+  // CDN・ブラウザに古い内容がキャッシュされたまま返されるのを防ぐため、毎回ユニークなURLにする
+  return data.publicUrl + '?t=' + Date.now();
 }
 
 // ── 発注確定（発注書・原価・チャット投稿） ──
