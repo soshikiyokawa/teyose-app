@@ -1,16 +1,34 @@
 // ════ 見積：工種マスタ・工事品目マスタ（ドラッグ並び替え対応） ════
+// 工種・工事品目は工事区分（新築／リフォーム等）ごとに別々に管理する
+
+function renderMasterWorkTypeTabs(){
+  const el=document.getElementById('estmaster-worktype-tabs');
+  if(!el) return;
+  el.innerHTML=ESTIMATE_TYPES.map(t=>`
+    <button class="cat-pill${activeMasterWorkType===t?' active':''}" onclick="setMasterWorkType('${t}')">${esc(t)}</button>`
+  ).join('');
+}
+function setMasterWorkType(type){
+  activeMasterWorkType=type;
+  activeEstPresetCat=null;
+  renderMasterWorkTypeTabs();
+  renderEstCategoryMaster();
+  renderEstPresetMaster();
+}
 
 // ── 工種マスタ ──
 function renderEstCategoryMaster(){
+  renderMasterWorkTypeTabs();
   const saveBtn=document.getElementById('estcat-order-save-btn');
   if(saveBtn) saveBtn.style.cssText = estCatDirty
     ? 'display:inline-flex;background:var(--wood);border-color:var(--wood)'
     : 'display:none';
 
+  const cats=estimateCategories.filter(c=>c.workType===activeMasterWorkType);
   const el=document.getElementById('estcat-master-list');
-  if(!estimateCategories.length){el.innerHTML='<div class="empty">工種が登録されていません</div>';return;}
+  if(!cats.length){el.innerHTML='<div class="empty">工種が登録されていません</div>';return;}
   el.innerHTML='';
-  estimateCategories.forEach(c=>{
+  cats.forEach(c=>{
     const row=document.createElement('div');
     row.className='draggable';
     row.draggable=true;
@@ -56,7 +74,8 @@ function renderEstCategoryMaster(){
 
 async function saveEstCatOrder(){
   estCatDirty = false;
-  try{ await dbReorderEstCategories(estimateCategories); }catch(e){return;}
+  const cats=estimateCategories.filter(c=>c.workType===activeMasterWorkType);
+  try{ await dbReorderEstCategories(cats); }catch(e){return;}
   renderEstCategoryMaster();
   showToast('並び順を保存しました');
 }
@@ -74,8 +93,8 @@ async function saveEstCat(){
   if(!name){alert('工種名を入力してください');return;}
   try{
     if(editingEstCatId===-1){
-      const id=await dbAddEstCategory(name);
-      estimateCategories.push({id,name,sortOrder:estimateCategories.length});
+      const id=await dbAddEstCategory(name,activeMasterWorkType);
+      estimateCategories.push({id,name,workType:activeMasterWorkType,sortOrder:estimateCategories.filter(c=>c.workType===activeMasterWorkType).length});
     } else {
       await dbUpdateEstCategory(editingEstCatId,name);
       const c=estimateCategories.find(x=>x.id===editingEstCatId);
@@ -102,11 +121,12 @@ async function deleteEstCat(){
 
 // ── 工事品目マスタ ──
 function buildEstCatOptions(selected=''){
-  return estimateCategories.map(c=>`<option${c.name===selected?' selected':''}>${esc(c.name)}</option>`).join('');
+  return estimateCategories.filter(c=>c.workType===activeMasterWorkType).map(c=>`<option${c.name===selected?' selected':''}>${esc(c.name)}</option>`).join('');
 }
 
 function renderEstPresetMaster(){
-  const catNames=[...new Set(estimatePresets.map(p=>p.cat))];
+  const presetsInType=estimatePresets.filter(p=>p.workType===activeMasterWorkType);
+  const catNames=[...new Set(presetsInType.map(p=>p.cat))];
   if(!activeEstPresetCat || !catNames.includes(activeEstPresetCat)){
     activeEstPresetCat = catNames[0] || null;
   }
@@ -123,8 +143,8 @@ function renderEstPresetMaster(){
     : 'display:none';
 
   const items = activeEstPresetCat
-    ? estimatePresets.filter(p=>p.cat===activeEstPresetCat)
-    : estimatePresets;
+    ? presetsInType.filter(p=>p.cat===activeEstPresetCat)
+    : presetsInType;
 
   const el=document.getElementById('estpreset-master-list');
   el.innerHTML='';
@@ -185,7 +205,8 @@ function setEstPresetCat(name){
 
 async function saveEstPresetOrder(){
   estPresetDirty = false;
-  try{ await dbReorderEstPresets(estimatePresets); }catch(e){return;}
+  const items=estimatePresets.filter(p=>p.workType===activeMasterWorkType && (!activeEstPresetCat||p.cat===activeEstPresetCat));
+  try{ await dbReorderEstPresets(items); }catch(e){return;}
   renderEstPresetMaster();
   showToast('並び順を保存しました');
 }
@@ -198,7 +219,7 @@ function openEstPresetEdit(id){
     document.getElementById('ep-name').value='';
     document.getElementById('ep-unit').value='式';
     document.getElementById('ep-cost').value='';
-    document.getElementById('ep-cat-sel').value = activeEstPresetCat || (estimateCategories[0]?.name||'');
+    document.getElementById('ep-cat-sel').value = activeEstPresetCat || (estimateCategories.find(c=>c.workType===activeMasterWorkType)?.name||'');
   } else {
     const p=estimatePresets.find(x=>x.id===editingEstPresetId);
     if(!p)return;
@@ -234,19 +255,20 @@ async function saveEstPreset(){
     cat: document.getElementById('ep-cat-sel').value,
     name: document.getElementById('ep-name').value.trim(),
     unit: document.getElementById('ep-unit').value.trim()||'式',
-    cost: parseInt(document.getElementById('ep-cost').value)||0
+    cost: parseInt(document.getElementById('ep-cost').value)||0,
+    workType: activeMasterWorkType
   };
   if(!item.name){alert('品目名を入力してください');return;}
   if(!item.cat){alert('先に工種マスタで工種を登録してください');return;}
   try{
     if(editingEstPresetId===-1){
       const id=await dbAddEstPreset(item);
-      estimatePresets.push({id,...item,sortOrder:estimatePresets.length});
+      estimatePresets.push({id,...item,sortOrder:estimatePresets.filter(p=>p.workType===activeMasterWorkType).length});
       activeEstPresetCat = item.cat;
     } else {
       await dbUpdateEstPreset(editingEstPresetId,item);
       const p=estimatePresets.find(x=>x.id===editingEstPresetId);
-      if(p) Object.assign(p,item);
+      if(p) Object.assign(p,{cat:item.cat,name:item.name,unit:item.unit,cost:item.cost});
       activeEstPresetCat = item.cat;
     }
     closeEstPresetModal();

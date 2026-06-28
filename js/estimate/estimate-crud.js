@@ -59,6 +59,7 @@ function newEstimate(){
   expire.setMonth(expire.getMonth()+1);
   document.getElementById('est-expire').value=expire.toISOString().slice(0,10);
   loadDefaultSectionsForType('新築');
+  renderPresetDatalists();
   updateEstBadge();renderSections();estSubTab('info');
 }
 
@@ -84,6 +85,7 @@ function applyDefaultForCurrentType(){
   const type=document.getElementById('est-type').value;
   if(sections.length && !confirm(`現在の明細を消して「${type}」のデフォルトを読み込みますか？`)) return;
   loadDefaultSectionsForType(type);
+  renderPresetDatalists();
   renderSections();
 }
 
@@ -110,6 +112,7 @@ function loadEstimate(est){
   sv('est-pay2-date',pays[1]?.date);sv('est-pay2-amount',pays[1]?.amount);
   sv('est-pay3-date',pays[2]?.date);sv('est-pay3-amount',pays[2]?.amount);
   sections=est.sections.map(s=>({...s,items:[...s.items]}));
+  renderPresetDatalists();
   updateEstBadge();renderSections();estSubTab('info');
 }
 

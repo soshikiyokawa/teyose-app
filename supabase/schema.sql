@@ -30,6 +30,7 @@ create table public.master_items (
 create table public.estimate_categories (
   id bigint generated always as identity primary key,
   name text not null,
+  work_type text not null default '新築', -- 工事区分（新築／リフォーム等）。区分ごとに工種を分けて管理する
   sort_order integer not null default 0,
   created_at timestamptz default now()
 );
@@ -40,6 +41,7 @@ create table public.estimate_presets (
   name text not null,
   unit text not null default '式',
   cost numeric not null default 0,
+  work_type text not null default '新築', -- 工事区分（新築／リフォーム等）。区分ごとに品目を分けて管理する
   sort_order integer not null default 0,
   created_at timestamptz default now()
 );
@@ -274,6 +276,12 @@ create policy push_subscriptions_update on public.push_subscriptions
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy push_subscriptions_delete on public.push_subscriptions
   for delete using (auth.uid() = user_id);
+
+-- ════ マイグレーション：工種・工事品目マスタに工事区分（新築／リフォーム等）を追加 ════
+-- 既存環境にこのテーブルが既に存在する場合は、SQL Editorで以下を実行してください
+-- （既存の行はすべてデフォルト値「新築」になります）
+-- alter table public.estimate_categories add column if not exists work_type text not null default '新築';
+-- alter table public.estimate_presets add column if not exists work_type text not null default '新築';
 
 -- ════ Realtime（複数端末への即時反映） ════
 alter publication supabase_realtime add table public.suppliers;

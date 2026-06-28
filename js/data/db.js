@@ -33,11 +33,11 @@ async function fetchAllData(){
 
   if(currentUserRole==='staff'){
     const { data: catRows } = await sb.from('estimate_categories').select('*').order('sort_order').order('id');
-    estimateCategories = (catRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
+    estimateCategories = (catRows||[]).map(r=>({id:r.id,name:r.name,workType:r.work_type||'新築',sortOrder:r.sort_order}));
     estCatIdSeq = Math.max(0,...estimateCategories.map(c=>c.id))+1;
 
     const { data: presetRows } = await sb.from('estimate_presets').select('*').order('sort_order').order('id');
-    estimatePresets = (presetRows||[]).map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,cost:Number(r.cost),sortOrder:r.sort_order}));
+    estimatePresets = (presetRows||[]).map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,cost:Number(r.cost),workType:r.work_type||'新築',sortOrder:r.sort_order}));
     estPresetIdSeq = Math.max(0,...estimatePresets.map(p=>p.id))+1;
 
     const { data: defRows } = await sb.from('estimate_defaults').select('*');
@@ -65,8 +65,8 @@ function rowToEstimate(r){
 }
 
 // ── 見積：工種マスタ ──
-async function dbAddEstCategory(name){
-  const { data, error } = await sb.from('estimate_categories').insert({name}).select().single();
+async function dbAddEstCategory(name,workType){
+  const { data, error } = await sb.from('estimate_categories').insert({name,work_type:workType}).select().single();
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   return data.id;
 }
@@ -88,7 +88,7 @@ async function dbReorderEstCategories(orderedCats){
 
 // ── 見積：工事品目マスタ ──
 async function dbAddEstPreset(item){
-  const { data, error } = await sb.from('estimate_presets').insert({cat:item.cat,name:item.name,unit:item.unit,cost:item.cost}).select().single();
+  const { data, error } = await sb.from('estimate_presets').insert({cat:item.cat,name:item.name,unit:item.unit,cost:item.cost,work_type:item.workType}).select().single();
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   return data.id;
 }

@@ -38,18 +38,25 @@ function updateItem(secId,itemId,field,val){
   else item[field]=val;
   if(field==='name'){
     // 同じ工種のリストから選択された場合、単位・原価を自動入力
-    const preset=(estimatePresets||[]).find(p=>p.cat===sec.name && p.name===val);
+    const preset=(estimatePresets||[]).find(p=>p.cat===sec.name && p.name===val && p.workType===currentEstWorkType());
     if(preset){item.unit=preset.unit;item.cost=Number(preset.cost);}
   }
   if(field==='cost'||field==='margin'||field==='name') item.price=calcPrice(item.cost,item.margin);
   renderSections();
 }
 
+// 編集中の見積の工事区分（新築／リフォーム等）。未取得時は「新築」扱い
+function currentEstWorkType(){
+  return document.getElementById('est-type')?.value || '新築';
+}
+
 // 工種名のリスト候補（datalist）を更新。リストに無いものは自由記述可。
+// 編集中の見積の工事区分に登録された工種・工事品目だけを候補にする
 function renderPresetDatalists(){
   const catEl=document.getElementById('sec-cat-list');
   if(!catEl) return;
-  catEl.innerHTML=(estimateCategories||[]).map(c=>`<option value="${esc(c.name)}">`).join('');
+  const type=currentEstWorkType();
+  catEl.innerHTML=(estimateCategories||[]).filter(c=>c.workType===type).map(c=>`<option value="${esc(c.name)}">`).join('');
 }
 
 function updateSecName(secId,val){const sec=sections.find(s=>s.id===secId);if(sec)sec.name=val;}
@@ -90,7 +97,7 @@ function renderSections(){
     const sCost=sec.items.reduce((s,i)=>s+i.qty*i.cost,0);
     gTotal+=sTotal;gCost+=sCost;
     const sMargin=sTotal>0?((sTotal-sCost)/sTotal*100):0;
-    const secPresets=(estimatePresets||[]).filter(p=>p.cat===sec.name);
+    const secPresets=(estimatePresets||[]).filter(p=>p.cat===sec.name && p.workType===currentEstWorkType());
     const secDatalistId=`item-presets-list-${sec.id}`;
     const rows=sec.items.map(item=>{
       const mc=item.price>0?((item.price-item.cost)/item.price*100):0;
