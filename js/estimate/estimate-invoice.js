@@ -50,8 +50,7 @@ function renderInvoicePdfBody(){
         <div>${COMPANY.address}</div>
         <div>TEL：${COMPANY.tel}</div>
         <div>FAX：${COMPANY.fax}</div>
-        <div style="font-size:10px;color:#888">登録番号：${COMPANY.regNo}</div>
-        <div style="color:${EST_PDF_GREEN};margin:2px 0 6px">${COMPANY.url}</div>
+        <div style="margin-bottom:6px">登録番号：${COMPANY.regNo}</div>
         <div style="text-align:left;border:1px solid ${EST_PDF_BORDER};border-radius:4px;padding:9px 10px;font-size:10px;color:#444;line-height:1.7">
           <div style="font-weight:700;color:#222;margin-bottom:3px">【振込先】</div>
           ${BANK_INFO.bank}　${BANK_INFO.type}<br>${BANK_INFO.no}<br>${BANK_INFO.holder}

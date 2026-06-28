@@ -46,8 +46,7 @@ function estPdfHeaderHtml(data){
         <div>${COMPANY.address}</div>
         <div>TEL：${COMPANY.tel}</div>
         <div>FAX：${COMPANY.fax}</div>
-        <div style="font-size:10px;color:#888">登録番号：${COMPANY.regNo}</div>
-        <div style="color:${EST_PDF_GREEN};margin-top:2px">${COMPANY.url}</div>
+        <div>登録番号：${COMPANY.regNo}</div>
         <div style="margin-top:10px;color:#888">工事区分：${data.type}</div>
       </div>
     </div>`;
