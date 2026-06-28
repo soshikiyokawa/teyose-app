@@ -5,8 +5,7 @@ function openOrderPreview(){
   const project=document.getElementById('g-project').value;
   const now=new Date();
   const date=now.toISOString().slice(0,10);
-  const no='PO-'+now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(orderSeq).padStart(3,'0');
-  orderSeq++;
+  const no=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
   const sup=selectedSupplier||{name:'—',tel:'',email:''};
   const subtotal=cart.reduce((s,c)=>s+c.price*c.qty,0);
   const tax=Math.round(subtotal*.1);
@@ -63,8 +62,9 @@ async function confirmOrder(){
 
   try{
     // ① 発注書PDFを生成してSupabase Storageに保存し、チャットに添付できるURLを得る
-    const body = document.getElementById('order-pdf-body').innerHTML;
-    const pdfBlob = await htmlToPdfBlob(`発注書_${currentOrder.no}`, body);
+    const bodyEl = document.getElementById('order-pdf-body');
+    const body = bodyEl.innerHTML;
+    const pdfBlob = await htmlToPdfBlob(`発注書_${currentOrder.no}`, bodyEl);
     currentOrder.pdfUrl = await dbUploadOrderPdf(currentOrder.no, pdfBlob);
 
     // ② 発注データ・原価・チャットへの投稿をまとめて確定（Supabaseに保存）

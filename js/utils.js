@@ -30,27 +30,17 @@ function splitNameSpec(name){
   return {n: name, s: ''};
 }
 
-// HTML断片から実際のPDFファイル（Blob）を生成する（チャットへの添付用）
-async function htmlToPdfBlob(title, body){
-  const wrap=document.createElement('div');
-  // bodyの末尾（通常のドキュメントフロー）にそのまま追加する。
-  // position:fixedでの画面外配置やopacityでの隠蔽はhtml2canvasが正しく
-  // 撮影できず白紙になることがあるため、普通に追加してページ最下部に
-  // 一瞬だけ存在させる（ユーザーがスクロールしていない限り見えない）。
-  wrap.style.cssText='width:800px;background:#fff';
-  wrap.innerHTML=`<div style="font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px">${body}</div>`;
-  document.body.appendChild(wrap);
-  try{
-    const blob=await html2pdf().from(wrap).set({
-      margin:10,
-      filename:`${title}.pdf`,
-      html2canvas:{scale:2},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
-    }).outputPdf('blob');
-    return blob;
-  }finally{
-    wrap.remove();
-  }
+// 画面に実際に表示されているDOM要素から、そのままPDFファイル（Blob）を生成する（チャットへの添付用）
+// 複製した要素やHTML文字列を渡すとhtml2canvasが正しく撮影できず白紙になることがあるため、
+// 表示中の本物の要素（element）を直接渡すこと。
+async function htmlToPdfBlob(title, element){
+  const blob=await html2pdf().from(element).set({
+    margin:10,
+    filename:`${title}.pdf`,
+    html2canvas:{scale:2},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).outputPdf('blob');
+  return blob;
 }
 
 // PDF印刷ユーティリティ（ポップアップブロック対応）
