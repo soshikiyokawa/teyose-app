@@ -88,8 +88,10 @@ async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const FONTS_BASE = `${SUPABASE_URL}/storage/v1/object/public/assets/fonts`;
   const regularBytes = new Uint8Array(await (await fetch(`${FONTS_BASE}/NotoSansJP-Regular.ttf`)).arrayBuffer());
   const boldBytes = new Uint8Array(await (await fetch(`${FONTS_BASE}/NotoSansJP-Bold.ttf`)).arrayBuffer());
-  const font = await pdfDoc.embedFont(regularBytes, { subset: true });
-  const fontBold = await pdfDoc.embedFont(boldBytes, { subset: true });
+  // subset:trueにすると日本語のような文字数の多いフォントで文字が欠ける不具合があるため、
+  // サブセット化せずフォント全体をそのまま埋め込む
+  const font = await pdfDoc.embedFont(regularBytes, { subset: false });
+  const fontBold = await pdfDoc.embedFont(boldBytes, { subset: false });
 
   const PAGE_W = 595.28, PAGE_H = 841.89; // A4 (pt)
   const marginX = 42;
