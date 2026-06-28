@@ -178,6 +178,30 @@ async function dbSaveEstimate(data){
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   return inserted.id;
 }
+async function dbDeleteEstimate(id){
+  const { error } = await sb.from('estimates').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+// ── 発注履歴・原価管理 ──
+async function dbDeleteOrder(orderNo,supplierName){
+  const supplier_id = supplierIdByName(supplierName);
+  const { error: e1 } = await sb.from('cost_entries').delete().eq('order_no',orderNo).eq('supplier_id',supplier_id);
+  if(e1){showToast('削除に失敗しました：'+e1.message);throw e1;}
+  const { error: e2 } = await sb.from('orders').delete().eq('no',orderNo).eq('supplier_id',supplier_id);
+  if(e2){showToast('削除に失敗しました：'+e2.message);throw e2;}
+}
+async function dbDeleteCostEntry(id){
+  const { error } = await sb.from('cost_entries').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+// ── チャット ──
+async function dbDeleteChatMessage(supplierName,msgId){
+  const { error } = await sb.from('chat_messages').delete().eq('id',msgId);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+  if(talkThreads[supplierName]) talkThreads[supplierName]=talkThreads[supplierName].filter(m=>m.id!==msgId);
+}
 
 // 発注書PDFをSupabase Storageにアップロードし、ダウンロード用URLを返す
 async function dbUploadOrderPdf(orderNo, blob){

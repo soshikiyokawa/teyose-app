@@ -98,13 +98,13 @@ function renderTalkPanelMessages(){
             </button>`}
           </div>
         </div>
-        <div class="ts">${time}</div>
+        <div class="ts">${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
       </div>`;
     }
     const isMe=m.role==='me';
     return `${sep}<div class="talk-bubble ${isMe?'me':'them'}">
       <div class="bbl">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
-      <div class="ts">${isMe?'きよかわ':activeTalkPanelSupplier}　${time}</div>
+      <div class="ts">${isMe?'きよかわ':activeTalkPanelSupplier}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
     </div>`;
   }).join('');
   el.scrollTop=el.scrollHeight;
@@ -120,6 +120,15 @@ function sendTalkPanelMsg(){
   dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text})
     .then(renderTalkPanelMessages)
     .catch(()=>{});
+}
+
+async function deleteTalkMessage(msgId){
+  if(!confirm('このメッセージを削除しますか？')) return;
+  try{
+    await dbDeleteChatMessage(activeTalkPanelSupplier,msgId);
+  }catch(e){return;}
+  renderTalkPanelMessages();
+  // 一覧画面のプレビュー文言は、一覧に戻った際に再描画される
 }
 
 function downloadOrderPdf(msgId){

@@ -230,6 +230,8 @@ create policy chat_messages_insert on public.chat_messages
   for insert with check (app_user_role() = 'staff' or supplier_id = app_supplier_id());
 create policy chat_messages_update on public.chat_messages
   for update using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
+create policy chat_messages_delete on public.chat_messages
+  for delete using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
 
 -- ════ Realtime（複数端末への即時反映） ════
 alter publication supabase_realtime add table public.suppliers;

@@ -124,7 +124,21 @@ function showEstList(){
         <div class="li-meta">${e.no} · ${e.type} · ${e.date||'日付未設定'} <span class="badge ${e.status}" style="margin-left:4px">${e.status==='draft'?'下書き':e.status==='sent'?'提出済み':'受注'}</span></div>
       </div>
       <div class="li-amt">¥${fmt(calcEstTotal(e))}</div>
+      <button class="btn danger xs" onclick="event.stopPropagation();deleteEstimateFromList(${e.id})" style="margin-left:8px">削除</button>
     </div>`).join(''):'<div class="empty">保存された見積はありません</div>';
   document.getElementById('est-list-overlay').classList.add('open');
+}
+
+async function deleteEstimateFromList(id){
+  const e=estimates.find(x=>x.id===id);
+  if(!e) return;
+  if(!confirm(`「${e.title||e.projectName||e.no||'無題の見積'}」を削除しますか？`)) return;
+  try{
+    await dbDeleteEstimate(id);
+  }catch(err){return;}
+  estimates=estimates.filter(x=>x.id!==id);
+  if(editingEstId===id) editingEstId=null;
+  showEstList();
+  showToast('見積を削除しました');
 }
 function closeEstList(){document.getElementById('est-list-overlay').classList.remove('open');}
