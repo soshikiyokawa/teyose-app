@@ -33,14 +33,16 @@ function splitNameSpec(name){
 // HTML断片から実際のPDFファイル（Blob）を生成する（チャットへの添付用）
 async function htmlToPdfBlob(title, body){
   const wrap=document.createElement('div');
-  wrap.style.cssText='position:fixed;left:-9999px;top:0;width:800px;background:#fff';
+  // 画面内（左上）に実体として配置しつつ、ユーザーには見えないようにする
+  // （html2canvasは画面外＝負の座標に置かれた要素を正しく撮影できず、白紙になることがあるため）
+  wrap.style.cssText='position:fixed;left:0;top:0;width:800px;background:#fff;opacity:0.01;pointer-events:none;z-index:-1';
   wrap.innerHTML=`<div style="font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px">${body}</div>`;
   document.body.appendChild(wrap);
   try{
     const blob=await html2pdf().from(wrap).set({
       margin:10,
       filename:`${title}.pdf`,
-      html2canvas:{scale:2},
+      html2canvas:{scale:2,x:0,y:0,scrollX:0,scrollY:0},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
     }).outputPdf('blob');
     return blob;
