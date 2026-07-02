@@ -16,7 +16,7 @@ function openOrderPreview(){
   const costType=document.getElementById('order-cost-type').value;
   const dueDate=document.getElementById('order-due-date').value;
   if(!costType || !dueDate){alert('必須項目を入力してください。');return;}
-  const project=document.getElementById('g-project').value;
+  const project=selectedProjectName||'';
   const now=new Date();
   const date=now.toISOString().slice(0,10);
   const no=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');

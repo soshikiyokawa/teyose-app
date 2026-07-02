@@ -127,26 +127,8 @@ function calcEstTotal(e){
   return sub+Math.round(sub*(e.taxRate||10)/100);
 }
 
-// トップバーの「物件選択」（発注書に記録する物件名）を、登録済みの案件名から動的に表示する
-function renderGlobalProjectSelect(){
-  const sel=document.getElementById('g-project');
-  if(!sel) return;
-  const cur=sel.value;
-  const names=[...new Set(estimates.map(e=>e.projectName).filter(Boolean))]
-    .sort((a,b)=>{
-      const la=Math.max(...estimates.filter(e=>e.projectName===a).map(e=>e.updatedAt?new Date(e.updatedAt).getTime():0));
-      const lb=Math.max(...estimates.filter(e=>e.projectName===b).map(e=>e.updatedAt?new Date(e.updatedAt).getTime():0));
-      return lb-la;
-    });
-  sel.innerHTML = names.length
-    ? names.map(n=>`<option>${esc(n)}</option>`).join('')
-    : '<option>物件未選択</option>';
-  if(names.includes(cur)) sel.value=cur;
-}
-
 // ── 左サイドバー＋モバイル案件セレクト：案件一覧（物件名でグループ化、更新の新しい順） ──
 function renderProjectSidebar(){
-  renderGlobalProjectSelect();
   const kw=(document.getElementById('est-sidebar-search')?.value||'').trim().toLowerCase();
   const groups={};
   estimates.forEach(e=>{
