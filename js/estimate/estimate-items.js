@@ -97,6 +97,16 @@ function renderPresetDatalists(){
 }
 
 function updateSecName(secId,val){const sec=sections.find(s=>s.id===secId);if(sec){sec.name=val;estDirty=true;}}
+
+// 工種内の全行の粗利率を一括変更
+function setSecMargin(secId,val){
+  const margin=parseFloat(val);
+  if(isNaN(margin)||margin<0||margin>=100) return;
+  const sec=sections.find(s=>s.id===secId);if(!sec)return;
+  sec.items.forEach(item=>{item.margin=margin;item.price=calcPrice(item.cost,margin);});
+  estDirty=true;
+  renderSections();
+}
 function toggleSec(secId){const sec=sections.find(s=>s.id===secId);if(sec){sec.open=!sec.open;renderSections();}}
 
 // 工種（セクション）の並び替え
@@ -156,9 +166,17 @@ function renderSections(){
         <span draggable="true" ondragstart="estDragStartSec(${sec.id})" style="cursor:grab;color:var(--text-muted);padding:0 2px" title="ドラッグで工種の順序を変更">⠿</span>
         <button class="sec-toggle" onclick="toggleSec(${sec.id})">${sec.open?'▾':'▸'}</button>
         <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateSecName(${sec.id},this.value)">
-        <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap;margin-right:4px">粗利 ${sMargin.toFixed(1)}%</span>
+        <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap">粗利 ${sMargin.toFixed(1)}%</span>
+        <label style="display:flex;align-items:center;gap:2px;font-size:11px;color:var(--text-muted);white-space:nowrap;margin:0 4px">
+          <input type="number" min="0" max="99" step="1" placeholder="${sMargin.toFixed(0)}"
+            style="width:38px;text-align:right;font-size:11px;padding:1px 3px"
+            title="この工種の粗利率を一括変更"
+            ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()"
+            onchange="setSecMargin(${sec.id},this.value);this.value=''">
+          <span>%一括</span>
+        </label>
         <span style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
-        <button class="btn danger xs" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
+        <button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
       </div>
       <datalist id="${secDatalistId}">${secPresets.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
       ${sec.open?`<div class="items-wrap">
