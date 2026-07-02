@@ -42,15 +42,14 @@ function updateItem(secId,itemId,field,val){
   if(['qty','cost','margin','price'].includes(field)) item[field]=parseFloat(val)||0;
   else item[field]=val;
   if(field==='name'){
-    // 同じ工種のリストから選択された場合、単位・原価を自動入力
     const preset=(estimatePresets||[]).find(p=>p.cat===sec.name && p.name===val && p.workType===currentEstWorkType());
     if(preset){item.unit=preset.unit;item.cost=Number(preset.cost);}
   }
   if(field==='cost'||field==='margin'||field==='name') item.price=calcPrice(item.cost,item.margin);
-  setTimeout(renderSections,150);
+  renderSections();
 }
 
-// テキスト入力中はデータだけ更新。品目名がプリセットと一致した場合のみ再描画する
+// テキスト入力中はデータだけ更新（再描画なし）。プリセット一致時のみ再描画
 function updateItemText(secId,itemId,field,val){
   const sec=sections.find(s=>s.id===secId);if(!sec)return;
   const item=sec.items.find(i=>i.id===itemId);if(!item)return;
@@ -58,11 +57,7 @@ function updateItemText(secId,itemId,field,val){
   estDirty=true;
   if(field==='name'){
     const preset=(estimatePresets||[]).find(p=>p.cat===sec.name && p.name===val && p.workType===currentEstWorkType());
-    if(preset){
-      item.unit=preset.unit;item.cost=Number(preset.cost);
-      item.price=calcPrice(item.cost,item.margin);
-      renderSections();
-    }
+    if(preset){item.unit=preset.unit;item.cost=Number(preset.cost);item.price=calcPrice(item.cost,item.margin);renderSections();}
   }
 }
 
@@ -133,7 +128,7 @@ function renderSections(){
         <td class="num"><input type="number" value="${item.margin}" min="0" max="99" step="1" onchange="updateItem(${sec.id},${item.id},'margin',this.value)" style="width:42px;text-align:right;color:${mc_col};font-weight:700"><span style="font-size:10px;color:var(--text-muted)">%</span></td>
         <td class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
         <td class="amt">¥${fmt(item.qty*item.price)}</td>
-        <td style="width:24px;text-align:center"><button class="btn danger xs" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
+        <td style="width:24px;text-align:center"><button class="btn danger xs" onmousedown="event.preventDefault()" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
       </tr>`;}).join('');
     return `<div class="section-block">
       <div class="section-head" ondragover="event.preventDefault()" ondrop="estDropSec(${sec.id})">
@@ -142,7 +137,7 @@ function renderSections(){
         <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" oninput="updateSecName(${sec.id},this.value)">
         <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap;margin-right:4px">粗利 ${sMargin.toFixed(1)}%</span>
         <span style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
-        <button class="btn danger xs" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
+        <button class="btn danger xs" onmousedown="event.preventDefault()" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
       </div>
       <datalist id="${secDatalistId}">${secPresets.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
       ${sec.open?`<div class="items-wrap">
@@ -158,7 +153,7 @@ function renderSections(){
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        <button class="add-row-btn" onclick="addItem(${sec.id})">＋ 行を追加</button>
+        <button class="add-row-btn" onmousedown="event.preventDefault()" onclick="addItem(${sec.id})">＋ 行を追加</button>
       </div>
       <div class="sec-foot">
         <span class="muted">原価：¥${fmt(sCost)}</span>
