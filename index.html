@@ -84,7 +84,7 @@
         <div style="display:flex;gap:6px;align-items:center">
           <span class="badge draft" id="est-badge">下書き</span>
           <button class="btn sm" onclick="showEstList()">一覧</button>
-          <button class="btn sm primary" onclick="newEstimate()">＋ 新規</button>
+          <button class="btn sm primary" onclick="newEstimateChecked()">＋ 新規</button>
         </div>
       </div>
       <div class="form-grid">
@@ -463,6 +463,17 @@
 
   </div>
 </div>
+<div class="overlay" id="est-dirty-modal">
+  <div class="sheet" style="max-width:300px;padding:24px 20px">
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px">変更内容を保存しますか？</div>
+    <div style="font-size:13px;color:var(--text-sub);margin-bottom:20px">保存していない変更があります。</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn wood" style="justify-content:center" onclick="estDirtyConfirm('save')">変更を保存する</button>
+      <button class="btn" style="justify-content:center" onclick="estDirtyConfirm('discard')">保存しない</button>
+      <button class="btn" style="justify-content:center" onclick="estDirtyConfirm('cancel')">キャンセル</button>
+    </div>
+  </div>
+</div>
 <div class="overlay" id="est-list-overlay" onclick="if(event.target.id==='est-list-overlay')closeEstList()">
   <div class="sheet" style="max-width:560px">
     <div class="sheet-toolbar"><span>見積一覧</span><button class="btn sm" onclick="closeEstList()">閉じる</button></div>
@@ -471,7 +482,7 @@
     </div>
     <div id="est-list-body" style="padding:8px 0;min-height:100px"></div>
     <div style="padding:12px 14px;border-top:1px solid #e0d8c8">
-      <button class="btn primary" style="width:100%;justify-content:center" onclick="newEstimate();closeEstList()">＋ 新規作成</button>
+      <button class="btn primary" style="width:100%;justify-content:center" onclick="confirmEstDiscard(()=>{newEstimate();closeEstList();})">＋ 新規作成</button>
     </div>
   </div>
 </div>

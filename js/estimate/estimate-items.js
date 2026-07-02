@@ -10,28 +10,33 @@ function addSection(name=''){
   sections.push({id:secSeq++,name:name||'',open:true,items:[]});
   const sec=sections[sections.length-1];
   sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0});
+  estDirty=true;
   renderSections();
 }
 
 function addItem(secId){
   const sec=sections.find(s=>s.id===secId);
   if(sec) sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0});
+  estDirty=true;
   renderSections();
 }
 
 function removeItem(secId,itemId){
   const sec=sections.find(s=>s.id===secId);
   if(sec) sec.items=sec.items.filter(i=>i.id!==itemId);
+  estDirty=true;
   renderSections();
 }
 
 function removeSection(secId){
   if(!confirm('このセクションを削除しますか？')) return;
   sections=sections.filter(s=>s.id!==secId);
+  estDirty=true;
   renderSections();
 }
 
 function updateItem(secId,itemId,field,val){
+  estDirty=true;
   const sec=sections.find(s=>s.id===secId);if(!sec)return;
   const item=sec.items.find(i=>i.id===itemId);if(!item)return;
   if(['qty','cost','margin','price'].includes(field)) item[field]=parseFloat(val)||0;
@@ -45,11 +50,12 @@ function updateItem(secId,itemId,field,val){
   renderSections();
 }
 
-// テキスト入力中はデータだけ更新（再描画なし）。onblur/onchangeでupdateItemを呼ぶ
+// テキスト入力中はデータだけ更新（再描画なし）。onchangeでupdateItemを呼ぶ
 function updateItemText(secId,itemId,field,val){
   const sec=sections.find(s=>s.id===secId);if(!sec)return;
   const item=sec.items.find(i=>i.id===itemId);if(!item)return;
   item[field]=val;
+  estDirty=true;
 }
 
 // 編集中の見積の工事区分（新築／リフォーム等）。未取得時は「新築」扱い
@@ -66,7 +72,7 @@ function renderPresetDatalists(){
   catEl.innerHTML=(estimateCategories||[]).filter(c=>c.workType===type).map(c=>`<option value="${esc(c.name)}">`).join('');
 }
 
-function updateSecName(secId,val){const sec=sections.find(s=>s.id===secId);if(sec)sec.name=val;}
+function updateSecName(secId,val){const sec=sections.find(s=>s.id===secId);if(sec){sec.name=val;estDirty=true;}}
 function toggleSec(secId){const sec=sections.find(s=>s.id===secId);if(sec){sec.open=!sec.open;renderSections();}}
 
 // 工種（セクション）の並び替え

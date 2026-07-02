@@ -29,6 +29,7 @@ async function saveEstimate(){
   if(editingEstId){const i=estimates.findIndex(e=>e.id===editingEstId);if(i>=0)estimates[i]=data;}
   else{estimates.unshift(data);}
   editingEstId = savedId;
+  estDirty = false;
   updateEstBadge();
   renderProjectSidebar();
   alert('保存しました：'+(data.title||data.projectName||data.siteName||data.no||'無題'));
@@ -43,6 +44,23 @@ async function saveEstimateAs(){
   editingEstId=null; // 新規保存させる
   await saveEstimate();
 }
+
+// ── 未保存確認ダイアログ ──
+let _estDirtyCallback=null;
+function confirmEstDiscard(cb){
+  if(!estDirty){cb();return;}
+  _estDirtyCallback=cb;
+  document.getElementById('est-dirty-modal').classList.add('open');
+}
+async function estDirtyConfirm(action){
+  document.getElementById('est-dirty-modal').classList.remove('open');
+  if(action==='cancel'){_estDirtyCallback=null;return;}
+  if(action==='save') await saveEstimate();
+  if(_estDirtyCallback){_estDirtyCallback();_estDirtyCallback=null;}
+}
+
+// 新規作成（未保存確認あり）
+function newEstimateChecked(){confirmEstDiscard(()=>newEstimate());}
 
 function newEstimate(){
   editingEstId=null;
@@ -70,6 +88,7 @@ function newEstimate(){
   }
   loadDefaultSectionsForType(initType);
   renderPresetDatalists();
+  estDirty=false;
   updateEstBadge();renderSections();estSubTab('info');
   renderProjectSidebar();
 }
@@ -124,6 +143,7 @@ function loadEstimate(est){
   sv('est-pay3-date',pays[2]?.date);sv('est-pay3-amount',pays[2]?.amount);
   sections=est.sections.map(s=>({...s,items:[...s.items]}));
   renderPresetDatalists();
+  estDirty=false;
   updateEstBadge();renderSections();estSubTab('info');
   selectedProjectName = est.projectName || null;
   selectedProject = projects.find(p=>p.name===est.projectName)||null;
@@ -176,6 +196,9 @@ function selectProjectSidebarMobile(val){
 
 // 案件を選択 → その案件の最新見積を読み込む
 function selectProjectSidebar(id){
+  confirmEstDiscard(()=>_selectProjectSidebarGo(id));
+}
+function _selectProjectSidebarGo(id){
   selectedProject=projects.find(p=>p.id===id)||null;
   selectedProjectName=selectedProject?.name||null;
   const matches=estimates.filter(e=>e.projectName===selectedProject?.name);
@@ -284,7 +307,7 @@ function renderEstListBody(){
     </div>` : '';
   const el=document.getElementById('est-list-body');
   el.innerHTML=chip+(list.length?list.map(e=>`
-    <div class="list-item" onclick="loadEstimate(estimates.find(x=>x.id===${e.id}));closeEstList()">
+    <div class="list-item" onclick="confirmEstDiscard(()=>{loadEstimate(estimates.find(x=>x.id===${e.id}));closeEstList();})">
       <div class="li-info">
         <div class="li-name">${e.title||e.projectName||e.siteName||e.no||'無題の見積'}</div>
         <div class="li-meta">${e.no} · ${e.type} · ${e.date||'日付未設定'} <span class="badge ${e.status}" style="margin-left:4px">${e.status==='draft'?'下書き':e.status==='sent'?'提出済み':'受注'}</span></div>
