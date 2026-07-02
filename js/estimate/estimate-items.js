@@ -47,7 +47,7 @@ function updateItem(secId,itemId,field,val){
     if(preset){item.unit=preset.unit;item.cost=Number(preset.cost);}
   }
   if(field==='cost'||field==='margin'||field==='name') item.price=calcPrice(item.cost,item.margin);
-  renderSections();
+  setTimeout(renderSections, 0);
 }
 
 // テキスト入力中はデータだけ更新（再描画なし）。onchangeでupdateItemを呼ぶ
