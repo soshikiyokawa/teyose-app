@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v51';
+const CACHE_NAME = 'teyose-v52';
 const ASSETS = [
   './',
   './index.html',
@@ -36,7 +36,8 @@ const ASSETS = [
   './js/push.js',
   './icon-192.png',
   './icon-512.png',
-  './favicon.png'
+  './favicon.png',
+  './logo.png'
 ];
 
 self.addEventListener('install', e=>{
