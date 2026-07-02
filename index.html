@@ -42,6 +42,14 @@
   </button>
 </div>
 
+<!-- モバイル：案件選択バー（サイドバーの代わり。600px未満で表示） -->
+<div id="est-project-mobile-bar" class="staff-only">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2" style="flex-shrink:0;opacity:.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+  <select id="est-sidebar-mobile-select" onchange="selectProjectSidebarMobile(this.value)" style="flex:1;font-size:13px;padding:5px 8px;border:0.5px solid var(--border-s);border-radius:6px;background:var(--surface2);color:var(--text);font-family:inherit;min-width:0">
+    <option value="">案件を選択...</option>
+  </select>
+</div>
+
 <!-- ════ メイン表示エリア（案件一覧サイドバーは見積・原価管理・受発注の全画面で常時表示） ════ -->
 <div style="display:flex;align-items:flex-start">
 

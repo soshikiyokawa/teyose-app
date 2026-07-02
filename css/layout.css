@@ -25,3 +25,10 @@
 
 /* 発注先（supplier）ロールでは社内専用UIを隠す */
 .role-supplier .staff-only{display:none !important}
+
+/* ── モバイル案件選択バー（スマートフォンでサイドバーの代わりに表示） ── */
+#est-project-mobile-bar{display:none;padding:7px 12px;border-bottom:0.5px solid var(--border);background:var(--surface);gap:8px;align-items:center}
+@media(max-width:599px){
+  #est-project-sidebar{display:none !important}
+  #est-project-mobile-bar{display:flex !important}
+}

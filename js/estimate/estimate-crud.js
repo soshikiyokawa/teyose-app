@@ -144,11 +144,9 @@ function renderGlobalProjectSelect(){
   if(names.includes(cur)) sel.value=cur;
 }
 
-// ── 左サイドバー：案件一覧（物件名でグループ化、更新の新しい順） ──
+// ── 左サイドバー＋モバイル案件セレクト：案件一覧（物件名でグループ化、更新の新しい順） ──
 function renderProjectSidebar(){
   renderGlobalProjectSelect();
-  const el=document.getElementById('est-project-sidebar-list');
-  if(!el) return;
   const kw=(document.getElementById('est-sidebar-search')?.value||'').trim().toLowerCase();
   const groups={};
   estimates.forEach(e=>{
@@ -159,7 +157,19 @@ function renderProjectSidebar(){
     if(e.clientName) groups[name].clientNames.add(e.clientName);
     if(t>groups[name].latest) groups[name].latest=t;
   });
-  let list=Object.keys(groups).map(name=>({name,...groups[name]})).sort((a,b)=>b.latest-a.latest);
+  const fullList=Object.keys(groups).map(name=>({name,...groups[name]})).sort((a,b)=>b.latest-a.latest);
+
+  // モバイル用セレクト（全件、絞り込みなし）
+  const msel=document.getElementById('est-sidebar-mobile-select');
+  if(msel){
+    msel.innerHTML='<option value="">案件を選択...</option>'+
+      fullList.map(g=>`<option value="${g.name.replace(/"/g,'&quot;')}"${selectedProjectName===g.name?' selected':''}>${esc(g.name)}（${g.count}件）</option>`).join('');
+  }
+
+  // デスクトップ用サイドバーリスト
+  const el=document.getElementById('est-project-sidebar-list');
+  if(!el) return;
+  let list=fullList;
   if(kw){
     list=list.filter(g=>g.name.toLowerCase().includes(kw) || [...g.clientNames].some(c=>c.toLowerCase().includes(kw)));
   }
@@ -173,6 +183,12 @@ function renderProjectSidebar(){
 }
 
 function filterProjectSidebar(){ renderProjectSidebar(); }
+
+// モバイル案件セレクト：選択時に案件を読み込む（空選択で絞り込み解除）
+function selectProjectSidebarMobile(name){
+  if(!name){ selectedProjectName=null; renderProjectSidebar(); renderEstListBody(); return; }
+  selectProjectSidebar(name);
+}
 
 // 案件を選択したら、その案件の最新の見積情報を案件情報タブに読み込んで表示する
 function selectProjectSidebar(name){
