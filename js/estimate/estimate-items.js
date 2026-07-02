@@ -155,7 +155,7 @@ function renderSections(){
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItemText(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
         <td><select onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
-        <td class="num"><input type="number" value="${item.cost}" min="0" step="100" onchange="updateItem(${sec.id},${item.id},'cost',this.value)" style="width:78px;text-align:right"></td>
+        <td class="num"><input type="text" inputmode="numeric" value="${item.cost?fmt(item.cost):0}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=fmt(parseFloat(this.value.replace(/,/g,''))||0)" onchange="updateItem(${sec.id},${item.id},'cost',this.value.replace(/,/g,''))" style="width:78px;text-align:right"></td>
         <td class="num"><input type="number" value="${item.margin}" min="0" max="99" step="1" onchange="updateItem(${sec.id},${item.id},'margin',this.value)" style="width:42px;text-align:right;color:${mc_col};font-weight:700"><span style="font-size:10px;color:var(--text-muted)">%</span></td>
         <td class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
         <td class="amt">¥${fmt(item.qty*item.price)}</td>
