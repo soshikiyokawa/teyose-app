@@ -57,6 +57,19 @@ function updateItem(secId,itemId,field,val){
   renderSections();
 }
 
+// 品目名inputのフォーカス時：一時的にクリアして全候補を表示
+function itemNameFocus(el){
+  el.dataset.prev = el.value;
+  el.value = '';
+}
+// 品目名inputのブラー時：何も入力しなかった場合は元の値に戻す
+function itemNameBlur(el){
+  if(el.value === '' && el.dataset.prev !== undefined){
+    el.value = el.dataset.prev;
+  }
+  delete el.dataset.prev;
+}
+
 // テキスト入力中はデータだけ更新（再描画なし）。プリセット一致時のみ再描画
 function updateItemText(secId,itemId,field,val){
   const sec=sections.find(s=>s.id===secId);if(!sec)return;
@@ -128,7 +141,7 @@ function renderSections(){
       const mc_col=mc>=25?'var(--accent-t)':mc>=15?'var(--warn-t)':'var(--danger)';
       return `<tr ondragover="event.preventDefault()" ondrop="estDropItem(${sec.id},${item.id})">
         <td draggable="true" ondragstart="estDragStartItem(${sec.id},${item.id})" style="width:18px;text-align:center;cursor:grab;color:var(--text-muted)" title="ドラッグで並び替え">⠿</td>
-        <td><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
+        <td><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItemText(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
         <td><select onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
@@ -142,7 +155,7 @@ function renderSections(){
       <div class="section-head" ondragover="event.preventDefault()" ondrop="estDropSec(${sec.id})">
         <span draggable="true" ondragstart="estDragStartSec(${sec.id})" style="cursor:grab;color:var(--text-muted);padding:0 2px" title="ドラッグで工種の順序を変更">⠿</span>
         <button class="sec-toggle" onclick="toggleSec(${sec.id})">${sec.open?'▾':'▸'}</button>
-        <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" oninput="updateSecName(${sec.id},this.value)">
+        <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateSecName(${sec.id},this.value)">
         <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap;margin-right:4px">粗利 ${sMargin.toFixed(1)}%</span>
         <span style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
         <button class="btn danger xs" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
