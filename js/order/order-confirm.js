@@ -70,13 +70,16 @@ async function confirmOrder(){
   const btn = document.querySelector('#order-pdf-foot .btn.wood');
   if(btn){btn.disabled=true;btn.textContent='処理中…';}
 
+  // ① PDF生成（失敗しても発注確定は続行する。フォント取得エラー等で落ちることがあるため）
   try{
-    // ① 発注書PDFをサーバー側（Edge Function）で生成・保存し、チャットに添付できるURLを得る
-    //    （ブラウザのCanvas読み取りがセキュリティソフト等でブロックされる端末があるため、
-    //     画面の画像化ではなくサーバー側で直接PDFを組み立てる方式にしている）
     currentOrder.pdfUrl = await dbGenerateOrderPdf(currentOrder);
+  }catch(pdfErr){
+    console.warn('PDF生成に失敗しました（発注確定は続行）:', pdfErr);
+    currentOrder.pdfUrl = null;
+  }
 
-    // ② 発注データ・原価・チャットへの投稿をまとめて確定（Supabaseに保存）
+  // ② 発注データ・原価・チャットへの投稿をまとめて確定（Supabaseに保存）
+  try{
     await dbConfirmOrder(currentOrder);
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='✓ 発注確定・PDF保存';}
