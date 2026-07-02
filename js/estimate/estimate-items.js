@@ -111,8 +111,8 @@ function renderSections(){
       const mc_col=mc>=25?'var(--accent-t)':mc>=15?'var(--warn-t)':'var(--danger)';
       return `<tr ondragover="event.preventDefault()" ondrop="estDropItem(${sec.id},${item.id})">
         <td draggable="true" ondragstart="estDragStartItem(${sec.id},${item.id})" style="width:18px;text-align:center;cursor:grab;color:var(--text-muted)" title="ドラッグで並び替え">⠿</td>
-        <td><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" onchange="updateItem(${sec.id},${item.id},'name',this.value)" onblur="updateItem(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
-        <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItemText(${sec.id},${item.id},'spec',this.value)" onblur="updateItem(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
+        <td><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" onchange="updateItem(${sec.id},${item.id},'name',this.value)" style="min-width:100px"></td>
+        <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItemText(${sec.id},${item.id},'spec',this.value)" onchange="updateItemText(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
         <td><select onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
         <td class="num"><input type="number" value="${item.cost}" min="0" step="100" onchange="updateItem(${sec.id},${item.id},'cost',this.value)" style="width:78px;text-align:right"></td>
