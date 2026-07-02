@@ -76,8 +76,16 @@ function rowToEstimate(r){
 async function dbSaveProject(proj){
   const row={name:proj.name,client_name:proj.clientName,type:proj.type,address:proj.address,note:proj.note,updated_at:new Date().toISOString()};
   if(proj.id){
+    // 案件名が変わった場合、紐づく見積のproject_nameも一括更新する
+    const oldProject=projects.find(p=>p.id===proj.id);
+    const oldName=oldProject?.name;
     const {error}=await sb.from('projects').update(row).eq('id',proj.id);
     if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+    if(oldName && oldName!==proj.name){
+      const {error:estErr}=await sb.from('estimates').update({project_name:proj.name}).eq('project_name',oldName);
+      if(estErr) console.warn('見積の案件名更新に失敗：',estErr.message);
+      else estimates.forEach(e=>{if(e.projectName===oldName)e.projectName=proj.name;});
+    }
     return proj.id;
   }
   const {data,error}=await sb.from('projects').insert(row).select().single();
