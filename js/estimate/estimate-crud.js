@@ -60,7 +60,15 @@ function newEstimate(){
   const expire=new Date(now);
   expire.setMonth(expire.getMonth()+1);
   document.getElementById('est-expire').value=expire.toISOString().slice(0,10);
-  loadDefaultSectionsForType('新築');
+  // 案件が選択されていれば、その情報を自動入力する
+  const initType = selectedProject?.type||'新築';
+  if(selectedProject){
+    document.getElementById('est-project').value=selectedProject.name;
+    document.getElementById('est-client').value=selectedProject.clientName;
+    document.getElementById('est-type').value=initType;
+    document.getElementById('est-site').value=selectedProject.address;
+  }
+  loadDefaultSectionsForType(initType);
   renderPresetDatalists();
   updateEstBadge();renderSections();estSubTab('info');
   renderProjectSidebar();
@@ -118,6 +126,7 @@ function loadEstimate(est){
   renderPresetDatalists();
   updateEstBadge();renderSections();estSubTab('info');
   selectedProjectName = est.projectName || null;
+  selectedProject = projects.find(p=>p.name===est.projectName)||null;
   renderProjectSidebar();
 }
 
@@ -127,58 +136,123 @@ function calcEstTotal(e){
   return sub+Math.round(sub*(e.taxRate||10)/100);
 }
 
-// ── 左サイドバー＋モバイル案件セレクト：案件一覧（物件名でグループ化、更新の新しい順） ──
+// ── 左サイドバー＋モバイル案件セレクト：案件マスタをベースに表示 ──
 function renderProjectSidebar(){
   const kw=(document.getElementById('est-sidebar-search')?.value||'').trim().toLowerCase();
-  const groups={};
-  estimates.forEach(e=>{
-    const name=e.projectName||'（物件名未設定）';
-    const t=e.updatedAt?new Date(e.updatedAt).getTime():0;
-    if(!groups[name]) groups[name]={latest:t,count:0,clientNames:new Set()};
-    groups[name].count++;
-    if(e.clientName) groups[name].clientNames.add(e.clientName);
-    if(t>groups[name].latest) groups[name].latest=t;
-  });
-  const fullList=Object.keys(groups).map(name=>({name,...groups[name]})).sort((a,b)=>b.latest-a.latest);
 
-  // モバイル用セレクト（全件、絞り込みなし）
+  // モバイル用セレクト（全件）
   const msel=document.getElementById('est-sidebar-mobile-select');
   if(msel){
     msel.innerHTML='<option value="">案件を選択...</option>'+
-      fullList.map(g=>`<option value="${g.name.replace(/"/g,'&quot;')}"${selectedProjectName===g.name?' selected':''}>${esc(g.name)}（${g.count}件）</option>`).join('');
+      projects.map(p=>`<option value="${p.id}"${selectedProject?.id===p.id?' selected':''}>${esc(p.name)}${p.clientName?'（'+esc(p.clientName)+'）':''}</option>`).join('');
   }
 
   // デスクトップ用サイドバーリスト
   const el=document.getElementById('est-project-sidebar-list');
   if(!el) return;
-  let list=fullList;
-  if(kw){
-    list=list.filter(g=>g.name.toLowerCase().includes(kw) || [...g.clientNames].some(c=>c.toLowerCase().includes(kw)));
-  }
-  if(!list.length){el.innerHTML='<div class="empty" style="padding:10px;font-size:12px">該当する案件がありません</div>';return;}
-  el.innerHTML=list.map(g=>`
-    <div onclick="selectProjectSidebar('${g.name.replace(/'/g,"\\'")}')"
-      style="padding:8px 10px;font-size:12px;cursor:pointer;border-radius:6px;margin:2px 8px;${selectedProjectName===g.name?'background:var(--wood);color:#fff;font-weight:700':'color:var(--text-sub)'}">
-      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)}</div>
-      <div style="font-size:10px;opacity:.75;margin-top:1px">${g.count}件</div>
+  let list=projects;
+  if(kw) list=list.filter(p=>p.name.toLowerCase().includes(kw)||p.clientName.toLowerCase().includes(kw));
+  if(!list.length){el.innerHTML='<div style="padding:10px;font-size:12px;color:var(--text-muted)">案件がありません</div>';return;}
+  el.innerHTML=list.map(p=>`
+    <div onclick="selectProjectSidebar(${p.id})"
+      style="padding:8px 10px;font-size:12px;cursor:pointer;border-radius:6px;margin:2px 6px;${selectedProject?.id===p.id?'background:var(--wood);color:#fff;font-weight:700':'color:var(--text-sub)'}">
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</span>
+        <button onclick="event.stopPropagation();openEditProject(${p.id})"
+          style="flex-shrink:0;background:none;border:none;cursor:pointer;font-size:10px;padding:1px 3px;border-radius:3px;opacity:.6;${selectedProject?.id===p.id?'color:#fff':'color:var(--text-muted)'}"
+          title="編集">編集</button>
+      </div>
+      ${p.clientName?`<div style="font-size:10px;opacity:.7;margin-top:1px">${esc(p.clientName)}</div>`:''}
     </div>`).join('');
 }
 
 function filterProjectSidebar(){ renderProjectSidebar(); }
 
-// モバイル案件セレクト：選択時に案件を読み込む（空選択で絞り込み解除）
-function selectProjectSidebarMobile(name){
-  if(!name){ selectedProjectName=null; renderProjectSidebar(); renderEstListBody(); return; }
-  selectProjectSidebar(name);
+// モバイル案件セレクト：id で選択（空選択で解除）
+function selectProjectSidebarMobile(val){
+  if(!val){ selectedProject=null; selectedProjectName=null; renderProjectSidebar(); renderEstListBody(); return; }
+  selectProjectSidebar(parseInt(val,10));
 }
 
-// 案件を選択したら、その案件の最新の見積情報を案件情報タブに読み込んで表示する
-function selectProjectSidebar(name){
-  selectedProjectName = name;
-  const matches=estimates.filter(e=>(e.projectName||'（物件名未設定）')===name);
+// 案件を選択 → その案件の最新見積を読み込む
+function selectProjectSidebar(id){
+  selectedProject=projects.find(p=>p.id===id)||null;
+  selectedProjectName=selectedProject?.name||null;
+  const matches=estimates.filter(e=>e.projectName===selectedProject?.name);
   matches.sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));
   if(matches.length) loadEstimate(matches[0]);
   else renderProjectSidebar();
+  renderEstListBody();
+}
+
+// ── 案件作成・編集モーダル ──
+function showNewProjectModal(){
+  editingProjectId=null;
+  document.getElementById('project-modal-title').textContent='案件を作成';
+  ['proj-name','proj-client','proj-address','proj-note'].forEach(id=>document.getElementById(id).value='');
+  const sel=document.getElementById('proj-type');
+  sel.innerHTML=estimateTypes.map(t=>`<option>${esc(t.name)}</option>`).join('');
+  document.getElementById('proj-delete-btn').style.display='none';
+  document.getElementById('project-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('proj-name').focus(),50);
+}
+
+function openEditProject(id){
+  const p=projects.find(x=>x.id===id);
+  if(!p) return;
+  editingProjectId=id;
+  document.getElementById('project-modal-title').textContent='案件を編集';
+  document.getElementById('proj-name').value=p.name;
+  document.getElementById('proj-client').value=p.clientName;
+  document.getElementById('proj-address').value=p.address;
+  document.getElementById('proj-note').value=p.note;
+  const sel=document.getElementById('proj-type');
+  sel.innerHTML=estimateTypes.map(t=>`<option${t.name===p.type?' selected':''}>${esc(t.name)}</option>`).join('');
+  document.getElementById('proj-delete-btn').style.display='';
+  document.getElementById('project-modal').classList.add('open');
+}
+
+function closeProjectModal(){ document.getElementById('project-modal').classList.remove('open'); }
+
+async function saveProject(){
+  const name=document.getElementById('proj-name').value.trim();
+  if(!name){alert('物件名を入力してください');return;}
+  const proj={
+    id:editingProjectId||undefined,
+    name,
+    clientName:document.getElementById('proj-client').value.trim(),
+    type:document.getElementById('proj-type').value,
+    address:document.getElementById('proj-address').value.trim(),
+    note:document.getElementById('proj-note').value.trim()
+  };
+  try{
+    const savedId=await dbSaveProject(proj);
+    proj.id=savedId; proj.updatedAt=new Date().toISOString();
+    if(editingProjectId){
+      const i=projects.findIndex(p=>p.id===editingProjectId);
+      if(i>=0) projects[i]={...projects[i],...proj};
+      if(selectedProject?.id===editingProjectId){ selectedProject={...selectedProject,...proj}; selectedProjectName=proj.name; }
+    } else {
+      projects.unshift(proj);
+    }
+    closeProjectModal();
+    renderProjectSidebar();
+    showToast(editingProjectId?'案件を更新しました':'案件を作成しました');
+  }catch(e){}
+}
+
+async function deleteProject(){
+  const p=projects.find(x=>x.id===editingProjectId);
+  if(!p) return;
+  if(!confirm(`「${p.name}」を削除しますか？\n（関連する見積・発注書は残ります）`)) return;
+  try{
+    await dbDeleteProject(editingProjectId);
+    projects=projects.filter(x=>x.id!==editingProjectId);
+    if(selectedProject?.id===editingProjectId){ selectedProject=null; selectedProjectName=null; }
+    closeProjectModal();
+    renderProjectSidebar();
+    showToast('案件を削除しました');
+  }catch(e){}
 }
 
 function showEstList(){
@@ -191,7 +265,7 @@ function showEstList(){
 function filterEstList(){ renderEstListBody(); }
 
 function clearProjectFilterInList(){
-  selectedProjectName=null;
+  selectedProject=null; selectedProjectName=null;
   renderProjectSidebar();
   renderEstListBody();
 }

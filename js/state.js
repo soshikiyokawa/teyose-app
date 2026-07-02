@@ -14,9 +14,14 @@ let talkThreads = {};
 // 受発注
 let cart=[], orders=[], orderSeq=1, costEntries=[], currentOrder=null;
 
+// 案件マスタ（物件名・施主名・工事区分・現場住所・備考）。見積・受発注の親となるエンティティ
+let projects=[];
+let selectedProject=null;  // 左サイドバーで選択中の案件オブジェクト
+let editingProjectId=null; // 案件モーダルで編集中のID（nullなら新規作成）
+
 // 見積
 let estimates=[],estSeq=1,editingEstId=null;
-let selectedProjectName=null; // 左サイドバーで選択中の案件（物件名）。一覧の絞り込みに使う
+let selectedProjectName=null; // 選択中の案件名（selectedProject?.name と同期。後方互換用）
 let sections=[],secSeq=1,itemSeq=1;
 let estimatePresets=[]; // 工事品目マスタ（工種ごとの明細・単位・原価の選択候補）
 let estimateCategories=[]; // 工種マスタ

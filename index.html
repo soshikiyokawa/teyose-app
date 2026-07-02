@@ -48,16 +48,20 @@
   <select id="est-sidebar-mobile-select" onchange="selectProjectSidebarMobile(this.value)" style="flex:1;font-size:13px;padding:5px 8px;border:0.5px solid var(--border-s);border-radius:6px;background:var(--surface2);color:var(--text);font-family:inherit;min-width:0">
     <option value="">案件を選択...</option>
   </select>
+  <button class="btn xs" onclick="showNewProjectModal()" style="flex-shrink:0;font-size:12px;padding:5px 8px">＋ 案件</button>
 </div>
 
 <!-- ════ メイン表示エリア（案件一覧サイドバーは見積・原価管理・受発注の全画面で常時表示） ════ -->
 <div style="display:flex;align-items:flex-start">
 
   <!-- 案件一覧（左サイドバー） -->
-  <div id="est-project-sidebar" class="staff-only" style="width:160px;flex:0 0 160px;border-right:1px solid var(--border);max-height:calc(100vh - 56px);overflow-y:auto;position:sticky;top:0;padding-top:14px">
-    <div class="section-lbl" style="margin:0 10px 6px">案件一覧</div>
-    <div style="padding:0 10px 8px">
-      <input id="est-sidebar-search" placeholder="案件名・施主名で検索" oninput="filterProjectSidebar()" style="width:100%;font-size:12px;padding:6px 8px;box-sizing:border-box">
+  <div id="est-project-sidebar" class="staff-only" style="width:160px;flex:0 0 160px;border-right:1px solid var(--border);max-height:calc(100vh - 56px);overflow-y:auto;position:sticky;top:0;padding-top:8px">
+    <div style="display:flex;align-items:center;padding:0 8px 6px">
+      <span class="section-lbl" style="margin:0;flex:1">案件一覧</span>
+      <button class="btn xs" onclick="showNewProjectModal()" style="font-size:11px;padding:3px 6px">＋</button>
+    </div>
+    <div style="padding:0 8px 8px">
+      <input id="est-sidebar-search" placeholder="案件名・施主名で検索" oninput="filterProjectSidebar()" style="width:100%;font-size:12px;padding:5px 7px;box-sizing:border-box">
     </div>
     <div id="est-project-sidebar-list"></div>
   </div>
@@ -363,6 +367,27 @@
 
 </div><!-- /shell -->
 <div class="toast" id="toast"></div>
+
+<!-- ════ 案件作成・編集モーダル ════ -->
+<div class="modal-overlay" id="project-modal">
+  <div class="modal-sheet" style="max-width:420px">
+    <h3 id="project-modal-title">案件を作成</h3>
+    <div class="form-grid">
+      <div class="fg full"><label>物件名 <span style="color:var(--danger)">*</span></label><input id="proj-name" placeholder="〇〇邸 新築工事"></div>
+      <div class="fg"><label>施主名</label><input id="proj-client" placeholder="山田 太郎"></div>
+      <div class="fg"><label>工事区分</label><select id="proj-type"></select></div>
+      <div class="fg full"><label>現場住所</label><input id="proj-address" placeholder="〇〇県〇〇市..."></div>
+      <div class="fg full"><label>備考</label><textarea id="proj-note" rows="2" style="resize:vertical;width:100%;box-sizing:border-box"></textarea></div>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between">
+      <button class="btn danger" id="proj-delete-btn" onclick="deleteProject()" style="display:none">削除</button>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn" onclick="closeProjectModal()">キャンセル</button>
+        <button class="btn primary" onclick="saveProject()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- bottom nav -->
 <nav class="main-nav" id="app-nav" style="display:none">

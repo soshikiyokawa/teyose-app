@@ -27,6 +27,18 @@ create table public.master_items (
   created_at timestamptz default now()
 );
 
+-- 案件マスタ（物件名・施主名・工事区分・現場住所・備考）。見積・受発注の親となるエンティティ
+create table public.projects (
+  id bigint generated always as identity primary key,
+  name text not null,
+  client_name text default '',
+  type text default '新築',
+  address text default '',
+  note text default '',
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- 工事区分（新築／リフォーム等）。追加・削除可能なマスタ
 create table public.estimate_types (
   id bigint generated always as identity primary key,
@@ -164,6 +176,7 @@ $$;
 
 -- ════ RLS（行レベルセキュリティ）有効化 ════
 
+alter table public.projects enable row level security;
 alter table public.suppliers enable row level security;
 alter table public.master_items enable row level security;
 alter table public.estimate_types enable row level security;
@@ -175,6 +188,12 @@ alter table public.orders enable row level security;
 alter table public.cost_entries enable row level security;
 alter table public.chat_messages enable row level security;
 alter table public.profiles enable row level security;
+
+-- ════ projects（社内のみ） ════
+create policy projects_select on public.projects for select using (app_user_role() = 'staff');
+create policy projects_insert on public.projects for insert with check (app_user_role() = 'staff');
+create policy projects_update on public.projects for update using (app_user_role() = 'staff');
+create policy projects_delete on public.projects for delete using (app_user_role() = 'staff');
 
 -- ════ profiles ════
 create policy profiles_select on public.profiles
@@ -322,6 +341,24 @@ create policy push_subscriptions_delete on public.push_subscriptions
 -- 既存環境では以下を実行してください
 -- alter table public.estimates add column if not exists updated_at timestamptz default now();
 -- update public.estimates set updated_at = created_at where updated_at is null;
+
+-- ════ マイグレーション：案件マスタテーブルを追加 ════
+-- 既存環境では以下を実行してください
+-- create table public.projects (
+--   id bigint generated always as identity primary key,
+--   name text not null,
+--   client_name text default '',
+--   type text default '新築',
+--   address text default '',
+--   note text default '',
+--   created_at timestamptz default now(),
+--   updated_at timestamptz default now()
+-- );
+-- alter table public.projects enable row level security;
+-- create policy projects_select on public.projects for select using (app_user_role() = 'staff');
+-- create policy projects_insert on public.projects for insert with check (app_user_role() = 'staff');
+-- create policy projects_update on public.projects for update using (app_user_role() = 'staff');
+-- create policy projects_delete on public.projects for delete using (app_user_role() = 'staff');
 
 -- ════ Realtime（複数端末への即時反映） ════
 alter publication supabase_realtime add table public.suppliers;

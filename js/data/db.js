@@ -32,6 +32,9 @@ async function fetchAllData(){
   });
 
   if(currentUserRole==='staff'){
+    const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
+    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',updatedAt:r.updated_at}));
+
     const { data: typeRows } = await sb.from('estimate_types').select('*').order('sort_order').order('id');
     estimateTypes = (typeRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
     estTypeIdSeq = Math.max(0,...estimateTypes.map(t=>t.id))+1;
@@ -67,6 +70,23 @@ function rowToEstimate(r){
     startDate:r.start_date,endDate:r.end_date,clientName:r.client_name,projectName:r.project_name,siteName:r.site_name,
     note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[],
     updatedAt:r.updated_at};
+}
+
+// ── 案件マスタ ──
+async function dbSaveProject(proj){
+  const row={name:proj.name,client_name:proj.clientName,type:proj.type,address:proj.address,note:proj.note,updated_at:new Date().toISOString()};
+  if(proj.id){
+    const {error}=await sb.from('projects').update(row).eq('id',proj.id);
+    if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+    return proj.id;
+  }
+  const {data,error}=await sb.from('projects').insert(row).select().single();
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
+async function dbDeleteProject(id){
+  const {error}=await sb.from('projects').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
 }
 
 // ── 見積：工事区分マスタ ──
