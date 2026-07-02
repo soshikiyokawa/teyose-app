@@ -107,6 +107,18 @@ function setSecMargin(secId,val){
   estDirty=true;
   renderSections();
 }
+// 工種内の全行の粗利率を±stepで一括増減
+function stepSecMargin(secId,step){
+  const sec=sections.find(s=>s.id===secId);if(!sec||!sec.items.length)return;
+  const base=sec.items[0].margin;
+  setSecMargin(secId,Math.min(99,Math.max(0,base+step)));
+}
+// 行の粗利率を±stepで増減
+function stepItemMargin(secId,itemId,step){
+  const sec=sections.find(s=>s.id===secId);if(!sec)return;
+  const item=sec.items.find(i=>i.id===itemId);if(!item)return;
+  updateItem(secId,itemId,'margin',Math.min(99,Math.max(0,item.margin+step)));
+}
 function toggleSec(secId){const sec=sections.find(s=>s.id===secId);if(sec){sec.open=!sec.open;renderSections();}}
 
 // 工種（セクション）の並び替え
@@ -156,7 +168,11 @@ function renderSections(){
         <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
         <td><select onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
         <td class="num"><input type="text" inputmode="numeric" value="${item.cost?fmt(item.cost):0}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=fmt(parseFloat(this.value.replace(/,/g,''))||0)" onchange="updateItem(${sec.id},${item.id},'cost',this.value.replace(/,/g,''))" style="width:78px;text-align:right"></td>
-        <td class="num"><input type="number" value="${item.margin}" min="0" max="99" step="1" onchange="updateItem(${sec.id},${item.id},'margin',this.value)" style="width:42px;text-align:right;color:${mc_col};font-weight:700"><span style="font-size:10px;color:var(--text-muted)">%</span></td>
+        <td class="num" style="white-space:nowrap">
+          <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},-1)" style="padding:1px 4px;font-size:12px">－</button>
+          <input type="text" inputmode="numeric" value="${item.margin}" onchange="updateItem(${sec.id},${item.id},'margin',this.value)" style="width:30px;text-align:center;color:${mc_col};font-weight:700">
+          <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},1)" style="padding:1px 4px;font-size:12px">＋</button>
+        </td>
         <td class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
         <td class="amt">¥${fmt(item.qty*item.price)}</td>
         <td style="width:24px;text-align:center"><button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
@@ -167,14 +183,13 @@ function renderSections(){
         <button class="sec-toggle" onclick="toggleSec(${sec.id})">${sec.open?'▾':'▸'}</button>
         <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateSecName(${sec.id},this.value)">
         <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap">粗利 ${sMargin.toFixed(1)}%</span>
-        <label style="display:flex;align-items:center;gap:2px;font-size:11px;color:var(--text-muted);white-space:nowrap;margin:0 4px">
-          <input type="number" min="0" max="99" step="1" placeholder="${sMargin.toFixed(0)}"
-            style="width:38px;text-align:right;font-size:11px;padding:1px 3px"
-            title="この工種の粗利率を一括変更"
-            ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()"
-            onchange="setSecMargin(${sec.id},this.value);this.value=''">
-          <span>%一括</span>
-        </label>
+        <div style="display:flex;align-items:center;gap:2px;margin:0 4px;white-space:nowrap">
+          <span style="font-size:10px;color:var(--text-muted)">一括</span>
+          <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepSecMargin(${sec.id},-1)" style="padding:1px 5px;font-size:13px">－</button>
+          <input type="text" inputmode="numeric" id="sec-margin-input-${sec.id}" placeholder="${sMargin.toFixed(0)}" style="width:34px;text-align:center;font-size:11px;padding:1px 3px" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onchange="setSecMargin(${sec.id},this.value);this.value=''">
+          <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepSecMargin(${sec.id},1)" style="padding:1px 5px;font-size:13px">＋</button>
+          <span style="font-size:10px;color:var(--text-muted)">%</span>
+        </div>
         <span style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
         <button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
       </div>
