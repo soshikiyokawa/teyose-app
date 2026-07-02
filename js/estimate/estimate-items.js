@@ -6,7 +6,16 @@ function calcPrice(cost,margin){
   return Math.ceil(cost/(1-margin/100)/10)*10;
 }
 
+// 再描画前にフォーカス中テキスト入力の値をモデルに確実に反映する
+function syncActiveTextInput(){
+  const el=document.activeElement;
+  if(el && el.tagName==='INPUT' && el.type==='text'){
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+}
+
 function addSection(name=''){
+  syncActiveTextInput();
   sections.push({id:secSeq++,name:name||'',open:true,items:[]});
   const sec=sections[sections.length-1];
   sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0});
@@ -15,6 +24,7 @@ function addSection(name=''){
 }
 
 function addItem(secId){
+  syncActiveTextInput();
   const sec=sections.find(s=>s.id===secId);
   if(sec) sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0});
   estDirty=true;
@@ -22,6 +32,7 @@ function addItem(secId){
 }
 
 function removeItem(secId,itemId){
+  syncActiveTextInput();
   const sec=sections.find(s=>s.id===secId);
   if(sec) sec.items=sec.items.filter(i=>i.id!==itemId);
   estDirty=true;
@@ -29,6 +40,7 @@ function removeItem(secId,itemId){
 }
 
 function removeSection(secId){
+  syncActiveTextInput();
   if(!confirm('このセクションを削除しますか？')) return;
   sections=sections.filter(s=>s.id!==secId);
   estDirty=true;
@@ -128,7 +140,7 @@ function renderSections(){
         <td class="num"><input type="number" value="${item.margin}" min="0" max="99" step="1" onchange="updateItem(${sec.id},${item.id},'margin',this.value)" style="width:42px;text-align:right;color:${mc_col};font-weight:700"><span style="font-size:10px;color:var(--text-muted)">%</span></td>
         <td class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
         <td class="amt">¥${fmt(item.qty*item.price)}</td>
-        <td style="width:24px;text-align:center"><button class="btn danger xs" onmousedown="event.preventDefault()" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
+        <td style="width:24px;text-align:center"><button class="btn danger xs" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
       </tr>`;}).join('');
     return `<div class="section-block">
       <div class="section-head" ondragover="event.preventDefault()" ondrop="estDropSec(${sec.id})">
@@ -137,7 +149,7 @@ function renderSections(){
         <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" oninput="updateSecName(${sec.id},this.value)">
         <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap;margin-right:4px">粗利 ${sMargin.toFixed(1)}%</span>
         <span style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
-        <button class="btn danger xs" onmousedown="event.preventDefault()" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
+        <button class="btn danger xs" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
       </div>
       <datalist id="${secDatalistId}">${secPresets.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
       ${sec.open?`<div class="items-wrap">
@@ -153,7 +165,7 @@ function renderSections(){
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        <button class="add-row-btn" onmousedown="event.preventDefault()" onclick="addItem(${sec.id})">＋ 行を追加</button>
+        <button class="add-row-btn" onclick="addItem(${sec.id})">＋ 行を追加</button>
       </div>
       <div class="sec-foot">
         <span class="muted">原価：¥${fmt(sCost)}</span>
