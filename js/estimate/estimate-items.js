@@ -70,7 +70,7 @@ function itemNameBlur(el){
   delete el.dataset.prev;
 }
 
-// テキスト入力中はデータだけ更新（再描画なし）。プリセット一致時のみ再描画
+// テキスト入力中はデータだけ更新（再描画なし）。プリセット一致時はDOM直接更新
 function updateItemText(secId,itemId,field,val){
   const sec=sections.find(s=>s.id===secId);if(!sec)return;
   const item=sec.items.find(i=>i.id===itemId);if(!item)return;
@@ -78,7 +78,18 @@ function updateItemText(secId,itemId,field,val){
   estDirty=true;
   if(field==='name'){
     const preset=(estimatePresets||[]).find(p=>p.cat===sec.name && p.name===val && p.workType===currentEstWorkType());
-    if(preset){item.unit=preset.unit;item.cost=Number(preset.cost);item.price=calcPrice(item.cost,item.margin);renderSections();}
+    if(preset){
+      item.unit=preset.unit;item.cost=Number(preset.cost);item.price=calcPrice(item.cost,item.margin);
+      // 全再描画せず対象行のDOMだけ更新（フォーカスを奪わないため）
+      const unitEl=document.getElementById('item-unit-'+itemId);
+      const costEl=document.getElementById('item-cost-'+itemId);
+      const priceEl=document.getElementById('item-price-'+itemId);
+      const amtEl=document.getElementById('item-amt-'+itemId);
+      if(unitEl) unitEl.value=item.unit;
+      if(costEl) costEl.value=fmt(item.cost);
+      if(priceEl) priceEl.textContent='¥'+fmt(item.price);
+      if(amtEl) amtEl.textContent='¥'+fmt(item.qty*item.price);
+    }
   }
 }
 
@@ -166,15 +177,15 @@ function renderSections(){
         <td style="width:100%"><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" style="width:100%;min-width:160px"></td>
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItemText(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
-        <td><select onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
-        <td class="num"><input type="text" inputmode="numeric" value="${item.cost?fmt(item.cost):0}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=fmt(parseFloat(this.value.replace(/,/g,''))||0)" onchange="updateItem(${sec.id},${item.id},'cost',this.value.replace(/,/g,''))" style="width:78px;text-align:right"></td>
+        <td><select id="item-unit-${item.id}" onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
+        <td class="num"><input id="item-cost-${item.id}" type="text" inputmode="numeric" value="${item.cost?fmt(item.cost):0}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=fmt(parseFloat(this.value.replace(/,/g,''))||0)" onchange="updateItem(${sec.id},${item.id},'cost',this.value.replace(/,/g,''))" style="width:78px;text-align:right"></td>
         <td class="num" style="white-space:nowrap">
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},-1)" style="padding:1px 4px;font-size:12px">－</button>
           <input type="text" inputmode="numeric" value="${item.margin}" onchange="updateItem(${sec.id},${item.id},'margin',this.value)" style="width:30px;text-align:center;color:${mc_col};font-weight:700">
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},1)" style="padding:1px 4px;font-size:12px">＋</button>
         </td>
-        <td class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
-        <td class="amt">¥${fmt(item.qty*item.price)}</td>
+        <td id="item-price-${item.id}" class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
+        <td id="item-amt-${item.id}" class="amt">¥${fmt(item.qty*item.price)}</td>
         <td style="width:24px;text-align:center"><button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
       </tr>`;}).join('');
     return `<div class="section-block">
