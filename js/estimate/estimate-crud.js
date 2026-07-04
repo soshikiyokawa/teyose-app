@@ -142,6 +142,8 @@ function loadEstimate(est){
   sv('est-pay2-date',pays[1]?.date);sv('est-pay2-amount',pays[1]?.amount);
   sv('est-pay3-date',pays[2]?.date);sv('est-pay3-amount',pays[2]?.amount);
   sections=est.sections.map(s=>({...s,items:[...s.items]}));
+  secSeq=Math.max(secSeq,...sections.map(s=>s.id))+1;
+  itemSeq=Math.max(itemSeq,1,...sections.flatMap(s=>s.items.map(i=>i.id)))+1;
   renderPresetDatalists();
   estDirty=false;
   updateEstBadge();renderSections();estSubTab('info');
