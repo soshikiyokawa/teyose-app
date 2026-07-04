@@ -409,6 +409,16 @@ function _loadXLSX() {
   return _xlsxPromise;
 }
 
+// ─ 今日ボタン ─
+function ganttScrollToToday() {
+  const bodyR = document.getElementById('gantt-body-right');
+  if (!bodyR || !ganttD0str) return;
+  const todayOff = diffDays(ganttD0str, todayStr());
+  const scrollTo = Math.max(0, (todayOff - 5) * GANTT_CELL_W);
+  bodyR.scrollLeft = scrollTo;
+  ganttScrollLeft  = scrollTo;
+}
+
 // ─ Hook: called when selected project changes ─
 function onProjectChanged() {
   if (document.getElementById('page-schedule')?.classList.contains('active')) {
