@@ -1,6 +1,8 @@
 /* ════ 工程表・ガントチャート ════ */
 
-#page-schedule { padding: 0; display: flex; flex-direction: column; height: calc(100vh - 112px); }
+#page-schedule { padding: 0; display: none; }
+#page-schedule.active { display: flex; flex-direction: column; height: calc(100vh - 112px); }
+body.sch-preview #page-schedule { display: flex; flex-direction: column; height: 220px; }
 
 .sch-toolbar {
   display: flex;
