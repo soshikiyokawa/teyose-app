@@ -61,6 +61,11 @@ self.addEventListener('fetch', e=>{
   );
 });
 
+// ── バージョン取得 ──
+self.addEventListener('message', e=>{
+  if(e.data?.type==='GET_VERSION') e.ports[0]?.postMessage({version:CACHE_NAME});
+});
+
 // ── プッシュ通知 ──
 self.addEventListener('push', e=>{
   let data = {};
