@@ -12,6 +12,23 @@ if('serviceWorker' in navigator){
   });
 }
 
+// SW・キャッシュを完全消去してリロード
+function hardUpdate(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations().then(regs=>{
+      return Promise.all(regs.map(r=>r.unregister()));
+    }).then(()=>{
+      return caches.keys();
+    }).then(keys=>{
+      return Promise.all(keys.map(k=>caches.delete(k)));
+    }).then(()=>{
+      location.reload();
+    });
+  } else {
+    location.reload();
+  }
+}
+
 // 見積フォームフィールドの変更を検知してestDirtyをセット
 window.addEventListener('DOMContentLoaded', ()=>{
   document.getElementById('page-estimate').addEventListener('input', e=>{
