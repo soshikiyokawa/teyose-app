@@ -208,6 +208,7 @@ function _selectProjectSidebarGo(id){
   if(matches.length) loadEstimate(matches[0]);
   else renderProjectSidebar();
   renderEstListBody();
+  onProjectChanged && onProjectChanged();
 }
 
 // ── 案件作成・編集モーダル ──

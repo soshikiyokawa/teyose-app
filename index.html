@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
 <link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/schedule.css">
 </head>
 <body>
 
@@ -33,7 +34,7 @@
 <!-- topbar -->
 <div class="topbar">
   <div class="logo"><img src="logo.png" width="30" height="30" style="display:block;filter:invert(1);" alt="きよかわ"></div>
-  <div class="topbar-title"><h1>手寄</h1><small>てよせ | きよかわ</small><span style="font-size:9px;color:var(--text-muted);margin-left:6px;letter-spacing:0.03em">202607041636</span></div>
+  <div class="topbar-title"><h1>手寄</h1><small>てよせ | きよかわ</small><span style="font-size:9px;color:var(--text-muted);margin-left:6px;letter-spacing:0.03em">202607042250</span></div>
 <button class="btn sm" onclick="location.reload()" title="画面を更新" style="padding:5px 8px">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
   </button>
@@ -362,6 +363,27 @@
   </div>
 </div>
 
+<!-- ════ 工程表ページ ════ -->
+<div class="page staff-only" id="page-schedule">
+  <div class="sch-toolbar">
+    <h2>工程表</h2>
+    <span class="sch-proj-badge" id="sch-proj-name">（案件未選択）</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">
+      <button class="btn xs" onclick="schAddTask(0,null)">＋ 大工程</button>
+      <button class="btn xs" onclick="openBulkShift()">一括変更</button>
+      <button class="btn xs" onclick="exportScheduleExcel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Excel出力
+      </button>
+      <button class="btn xs primary" onclick="saveSchedule()" style="background:var(--wood);border-color:var(--wood);color:#fff">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="12" height="12" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        保存
+      </button>
+    </div>
+  </div>
+  <div id="gantt-wrap" style="flex:1;overflow:hidden"></div>
+</div>
+
   </div><!-- /main content -->
 </div><!-- /sidebar flex wrap -->
 
@@ -402,6 +424,10 @@
   <button class="main-nav-btn" id="nav-order" onclick="mainTab('order')">
     <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     受発注
+  </button>
+  <button class="main-nav-btn staff-only" id="nav-schedule" onclick="mainTab('schedule')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
+    工程表
   </button>
   <button class="main-nav-btn" id="nav-talk" onclick="toggleTalkPanel()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -502,6 +528,34 @@
     <div class="sheet-foot" id="est-pdf-foot">
       <button class="btn" onclick="closeEstPdf()">閉じる</button>
       <button class="btn wood" onclick="printEstPdf()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" width="14" height="14"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> 印刷・PDF保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 一括工程変更モーダル -->
+<div class="modal-overlay" id="bulk-shift-modal" onclick="if(event.target.id==='bulk-shift-modal')document.getElementById('bulk-shift-modal').classList.remove('open')">
+  <div class="modal-sheet" style="max-width:340px">
+    <h3>工程の一括変更</h3>
+    <div class="bulk-shift-form">
+      <div class="fg">
+        <label>この日付以降の工程を移動</label>
+        <input type="date" id="bulk-shift-from">
+      </div>
+      <div class="fg">
+        <label>移動日数</label>
+        <input type="number" id="bulk-shift-days" min="1" placeholder="例: 7">
+      </div>
+      <div class="fg">
+        <label>方向</label>
+        <select id="bulk-shift-dir">
+          <option value="later">後ろへ（遅らせる）</option>
+          <option value="earlier">前へ（早める）</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('bulk-shift-modal').classList.remove('open')">キャンセル</button>
+      <button class="btn primary" onclick="applyBulkShift()">変更する</button>
     </div>
   </div>
 </div>
@@ -684,6 +738,9 @@
 <script src="js/estimate/estimate-crud.js"></script>
 <script src="js/estimate/estimate-pdf.js"></script>
 <script src="js/estimate/estimate-invoice.js"></script>
+
+<!-- 工程表 -->
+<script src="js/schedule.js"></script>
 
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js"></script>
