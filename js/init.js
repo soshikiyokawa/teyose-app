@@ -3,7 +3,13 @@
 
 // PWA: ホーム画面追加・オフライン表示に対応
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js'));
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js');
+    // SW更新時に自動リロード（新バージョン反映）
+    navigator.serviceWorker.addEventListener('message', e=>{
+      if(e.data?.type==='SW_UPDATED') location.reload();
+    });
+  });
 }
 
 // 見積フォームフィールドの変更を検知してestDirtyをセット
