@@ -2,7 +2,15 @@
 
 #page-schedule { padding: 0; display: none; }
 #page-schedule.active { display: flex; flex-direction: column; height: calc(100vh - 112px); }
-body.sch-preview #page-schedule { display: flex; flex-direction: column; height: 220px; }
+body.sch-preview #page-schedule { display: flex; flex-direction: column; }
+body.sch-preview #gantt-wrap { overflow: visible; min-height: 0; height: auto; }
+body.sch-preview #gantt-inner { overflow: visible; min-height: 0; height: auto; }
+body.sch-preview .gantt-container { height: auto; overflow: visible; }
+body.sch-preview .gantt-body-left { overflow: visible; height: auto; }
+body.sch-preview .gantt-body-right { overflow-x: auto; overflow-y: visible; height: auto; }
+body.sch-preview .gantt-left-panel { height: auto; }
+body.sch-preview .gantt-right-panel { height: auto; }
+body.sch-preview #task-edit-sheet { display: none !important; }
 
 .sch-toolbar {
   display: flex;
