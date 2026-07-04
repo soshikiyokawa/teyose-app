@@ -12,6 +12,7 @@ let scheduleTasks   = [];
 let scheduleTaskSeq = 1;
 let editingScheduleId = null;
 let scheduleDirty   = false;
+let editingTaskId   = null; // currently selected task for edit panel
 
 // ─ Date helpers ─
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -31,15 +32,14 @@ async function loadScheduleForProject() {
   if (badge) badge.textContent = pName || '（案件未選択）';
   scheduleTasks = [];
   editingScheduleId = null;
+  editingTaskId = null;
   scheduleDirty = false;
   scheduleTaskSeq = 1;
 
   if (!pName) { renderGantt(); return; }
 
   const { data, error } = await sb.from('schedules')
-    .select('*')
-    .eq('project_name', pName)
-    .maybeSingle();
+    .select('*').eq('project_name', pName).maybeSingle();
 
   if (error) { showToast('工程表の読み込みに失敗しました'); renderGantt(); return; }
 
@@ -47,8 +47,7 @@ async function loadScheduleForProject() {
     editingScheduleId = data.id;
     scheduleTasks = data.tasks || [];
     scheduleTaskSeq = scheduleTasks.length
-      ? Math.max(...scheduleTasks.map(t => t.id)) + 1
-      : 1;
+      ? Math.max(...scheduleTasks.map(t => t.id)) + 1 : 1;
   }
   renderGantt();
 }
@@ -95,18 +94,19 @@ function schAddTask(level, parentId) {
   const color = GANTT_COLORS[sameLevel.length % GANTT_COLORS.length];
   const start = todayStr();
   const end   = addDaysStr(start, level === 0 ? 14 : 7);
+  const newId = scheduleTaskSeq++;
 
-  scheduleTasks.push({ id: scheduleTaskSeq++, level, parentId, name: '', start, end, person: '', color, collapsed: false });
+  scheduleTasks.push({ id: newId, level, parentId, name: '', start, end, person: '', color, collapsed: false });
   scheduleDirty = true;
+  editingTaskId = newId;
   renderGantt();
-  setTimeout(() => {
-    const inputs = document.querySelectorAll('.gantt-name-inp');
-    if (inputs.length) inputs[inputs.length - 1].focus();
-  }, 60);
 }
 
 function schRemoveTask(id) {
   scheduleTasks = scheduleTasks.filter(t => t.id !== id && t.parentId !== id);
+  if (editingTaskId === id || scheduleTasks.some(t => t.parentId === id)) {
+    editingTaskId = null;
+  }
   scheduleDirty = true;
   renderGantt();
 }
@@ -116,12 +116,101 @@ function schUpdateTask(id, field, val) {
   if (!t) return;
   t[field] = val;
   scheduleDirty = true;
-  if (field === 'start' || field === 'end') renderGantt();
+}
+
+// Called from edit panel — updates model then re-renders affected parts
+function schUpdateTaskEdit(id, field, val) {
+  const t = scheduleTasks.find(t => t.id === id);
+  if (!t) return;
+  t[field] = val;
+  scheduleDirty = true;
+
+  if (field === 'start' || field === 'end' || field === 'color') {
+    // Re-render everything (gantt bars change), keep edit panel open
+    renderGantt();
+  } else {
+    // Just update the compact row label and edit sheet header
+    const nameEl = document.getElementById('grl-name-' + id);
+    if (nameEl) nameEl.textContent = val || '（工程名未入力）';
+    const hdrEl = document.querySelector('.tes-title');
+    if (hdrEl) hdrEl.textContent = val || '（工程名未入力）';
+  }
 }
 
 function schToggleCollapse(id) {
   const t = scheduleTasks.find(t => t.id === id);
   if (t) { t.collapsed = !t.collapsed; renderGantt(); }
+}
+
+// ─ Edit panel ─
+function openTaskEdit(id) {
+  editingTaskId = id;
+  _renderEditSheet();
+  // Highlight active row
+  document.querySelectorAll('.gantt-row-left').forEach(r =>
+    r.classList.toggle('tes-active-row', r.id === 'grl-' + id)
+  );
+}
+
+function closeTaskEdit() {
+  editingTaskId = null;
+  const sheet = document.getElementById('task-edit-sheet');
+  if (sheet) sheet.style.display = 'none';
+  document.querySelectorAll('.gantt-row-left').forEach(r => r.classList.remove('tes-active-row'));
+}
+
+function _renderEditSheet() {
+  const sheet = document.getElementById('task-edit-sheet');
+  if (!sheet) return;
+  const t = scheduleTasks.find(t => t.id === editingTaskId);
+  if (!t) { closeTaskEdit(); return; }
+
+  const isMaj = t.level === 0;
+  const dur   = t.start && t.end ? diffDays(t.start, t.end) + 1 : '?';
+
+  sheet.innerHTML = `
+    <div class="tes-row">
+      <span class="gantt-badge ${isMaj ? 'gantt-badge-maj' : 'gantt-badge-min'}">${isMaj ? '大' : '小'}</span>
+      <span class="tes-title">${esc(t.name) || '（工程名未入力）'}</span>
+      <button class="tes-close-btn" onclick="closeTaskEdit()" title="閉じる">×</button>
+    </div>
+    <div class="tes-fields">
+      <div class="tes-field tes-name-field">
+        <label>工程名</label>
+        <input type="text" value="${esc(t.name)}" placeholder="${isMaj ? '大工程名' : '小工程名'}"
+          oninput="schUpdateTaskEdit(${t.id},'name',this.value)" autofocus>
+      </div>
+      <div class="tes-field">
+        <label>担当者</label>
+        <input type="text" value="${esc(t.person)}" placeholder="担当者名"
+          oninput="schUpdateTaskEdit(${t.id},'person',this.value)">
+      </div>
+      <div class="tes-field">
+        <label>色</label>
+        <input type="color" value="${t.color || '#3b82f6'}"
+          oninput="schUpdateTaskEdit(${t.id},'color',this.value)">
+      </div>
+      <div class="tes-field">
+        <label>開始日</label>
+        <input type="date" value="${t.start || ''}"
+          onchange="schUpdateTaskEdit(${t.id},'start',this.value)">
+      </div>
+      <div class="tes-field">
+        <label>終了日</label>
+        <input type="date" value="${t.end || ''}"
+          onchange="schUpdateTaskEdit(${t.id},'end',this.value)">
+      </div>
+      <div class="tes-field tes-dur-field">
+        <label>日数</label>
+        <span class="tes-dur">${dur}日</span>
+      </div>
+      <div class="tes-field tes-actions">
+        ${isMaj ? `<button class="btn xs" onclick="schAddTask(1,${t.id})">＋ 小工程</button>` : ''}
+        <button class="btn danger xs" onclick="schRemoveTask(${t.id})">× 削除</button>
+      </div>
+    </div>
+  `;
+  sheet.style.display = 'flex';
 }
 
 // ─ Bulk shift ─
@@ -162,19 +251,11 @@ async function exportScheduleExcel() {
   const rows = [['階層', '工程名', '担当者', '開始日', '終了日', '日数']];
   scheduleTasks.forEach(t => {
     const days = t.start && t.end ? diffDays(t.start, t.end) + 1 : '';
-    rows.push([
-      t.level === 0 ? '大工程' : '　小工程',
-      t.name,
-      t.person,
-      t.start,
-      t.end,
-      days
-    ]);
+    rows.push([t.level === 0 ? '大工程' : '　小工程', t.name, t.person, t.start, t.end, days]);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [10, 28, 14, 12, 12, 6].map(w => ({ wch: w }));
-
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '工程表');
   const pName = selectedProject?.name || '工程表';
@@ -204,48 +285,48 @@ function onProjectChanged() {
 
 // ─ Gantt render ─
 function renderGantt() {
-  const wrap = document.getElementById('gantt-wrap');
-  if (!wrap) return;
+  // Target the inner div (task-edit-sheet is a sibling, not a child)
+  const inner = document.getElementById('gantt-inner');
+  if (!inner) return;
 
   const pName = selectedProject?.name;
   const badge = document.getElementById('sch-proj-name');
   if (badge) badge.textContent = pName || '（案件未選択）';
 
   if (!pName) {
-    wrap.innerHTML = `<div class="sch-empty"><p>左サイドバーで案件を選択してください</p></div>`;
+    inner.innerHTML = `<div class="sch-empty"><p>左サイドバーで案件を選択してください</p></div>`;
+    _hideEditSheet();
     return;
   }
   if (!scheduleTasks.length) {
-    wrap.innerHTML = `<div class="sch-empty">
+    inner.innerHTML = `<div class="sch-empty">
       <p>工程がまだありません</p>
       <button class="btn primary" onclick="schAddTask(0,null)">＋ 大工程を追加</button>
     </div>`;
+    _hideEditSheet();
     return;
   }
 
-  // Calculate date range
+  // Date range
   const allS = scheduleTasks.filter(t => t.start).map(t => t.start).sort();
   const allE = scheduleTasks.filter(t => t.end).map(t => t.end).sort();
   const minS = allS[0] || todayStr();
   const maxE = allE[allE.length - 1] || addDaysStr(todayStr(), 30);
 
-  // d0: start of display range (back 7 days, aligned to Monday)
   const d0 = new Date(addDaysStr(minS, -7) + 'T00:00:00');
   const dow = d0.getDay();
   d0.setDate(d0.getDate() - (dow === 0 ? 6 : dow - 1));
   const d0str = d0.toISOString().slice(0, 10);
-
   const totalDays = diffDays(d0str, addDaysStr(maxE, 21)) + 1;
   const W = totalDays * GANTT_CELL_W;
   const todayS = todayStr();
 
-  // Month groups
+  // Month header
   const months = [];
   const cur = new Date(d0);
   for (let i = 0; i < totalDays; i++) {
     const ym = `${cur.getFullYear()}年${cur.getMonth() + 1}月`;
-    if (!months.length || months[months.length - 1].label !== ym)
-      months.push({ label: ym, count: 0 });
+    if (!months.length || months[months.length - 1].label !== ym) months.push({ label: ym, count: 0 });
     months[months.length - 1].count++;
     cur.setDate(cur.getDate() + 1);
   }
@@ -258,17 +339,15 @@ function renderGantt() {
   let dayRow = '', wdRow = '';
   for (let i = 0; i < totalDays; i++) {
     const wd = c2.getDay();
-    const ds = c2.toISOString().slice(0, 10);
     const isWE = wd === 0 || wd === 6;
-    const isTD = ds === todayS;
+    const isTD = c2.toISOString().slice(0,10) === todayS;
     const cls = isTD ? 'gantt-td' : isWE ? 'gantt-we' : '';
-    const wdStr = ['日','月','火','水','木','金','土'][wd];
     dayRow += `<div class="gantt-day-cell ${cls}" style="width:${GANTT_CELL_W}px">${c2.getDate()}</div>`;
-    wdRow  += `<div class="gantt-wd-cell ${cls}" style="width:${GANTT_CELL_W}px">${wdStr}</div>`;
+    wdRow  += `<div class="gantt-wd-cell ${cls}" style="width:${GANTT_CELL_W}px">${['日','月','火','水','木','金','土'][wd]}</div>`;
     c2.setDate(c2.getDate() + 1);
   }
 
-  // Weekend stripes (reusable in each row)
+  // Weekend stripes
   const c3 = new Date(d0);
   let stripes = '';
   for (let i = 0; i < totalDays; i++) {
@@ -281,74 +360,60 @@ function renderGantt() {
   // Today line
   const todayOff = diffDays(d0str, todayS);
   const todayLine = (todayOff >= 0 && todayOff < totalDays)
-    ? `<div class="gantt-today-line" style="left:${todayOff * GANTT_CELL_W + Math.floor(GANTT_CELL_W / 2)}px"></div>`
+    ? `<div class="gantt-today-line" style="left:${todayOff * GANTT_CELL_W + Math.floor(GANTT_CELL_W/2)}px"></div>`
     : '';
 
-  // Visible tasks (respecting collapse)
-  const collapsedIds = new Set(
-    scheduleTasks.filter(t => t.level === 0 && t.collapsed).map(t => t.id)
-  );
+  // Visible tasks
+  const collapsedIds = new Set(scheduleTasks.filter(t => t.level === 0 && t.collapsed).map(t => t.id));
   const visible = scheduleTasks.filter(t => t.level === 0 || !collapsedIds.has(t.parentId));
 
-  let leftRows = '';
-  let rightRows = '';
+  let leftRows = '', rightRows = '';
 
   visible.forEach(task => {
-    const isMaj  = task.level === 0;
+    const isMaj   = task.level === 0;
     const hasKids = scheduleTasks.some(t => t.parentId === task.id);
     const dur = task.start && task.end ? diffDays(task.start, task.end) + 1 : '?';
+    const isActive = editingTaskId === task.id;
 
     const toggleBtn = (isMaj && hasKids)
-      ? `<button class="gantt-toggle-btn" onclick="schToggleCollapse(${task.id})">${task.collapsed ? '▸' : '▾'}</button>`
+      ? `<button class="gantt-toggle-btn" onclick="event.stopPropagation();schToggleCollapse(${task.id})">${task.collapsed ? '▸' : '▾'}</button>`
       : `<span style="display:inline-block;width:14px"></span>`;
 
     const badge = isMaj
       ? `<span class="gantt-badge gantt-badge-maj">大</span>`
-      : `<span class="gantt-badge gantt-badge-min" style="margin-left:8px">小</span>`;
+      : `<span class="gantt-badge gantt-badge-min" style="margin-left:6px">小</span>`;
 
-    const addSubBtn = isMaj
-      ? `<button class="btn xs" onclick="schAddTask(1,${task.id})" title="小工程を追加" style="padding:1px 4px;font-size:10px">＋小</button>`
-      : `<span style="width:30px;display:inline-block"></span>`;
-
-    leftRows += `<div class="gantt-row gantt-row-left ${isMaj ? 'gantt-row-major' : 'gantt-row-minor'}">
+    // Compact row: click to edit
+    leftRows += `<div class="gantt-row gantt-row-left ${isMaj ? 'gantt-row-major' : 'gantt-row-minor'} ${isActive ? 'tes-active-row' : ''}"
+      id="grl-${task.id}" onclick="openTaskEdit(${task.id})">
       <span class="gantt-drag-hdl">⠿</span>
       ${toggleBtn}
       ${badge}
-      <input type="text" class="gantt-name-inp ${isMaj ? 'major' : ''}"
-        value="${esc(task.name)}" placeholder="${isMaj ? '大工程名' : '小工程名'}"
-        oninput="schUpdateTask(${task.id},'name',this.value)">
-      <input type="text" class="gantt-person-inp"
-        value="${esc(task.person)}" placeholder="担当"
-        oninput="schUpdateTask(${task.id},'person',this.value)">
-      <input type="color" class="gantt-color-inp" value="${task.color || '#3b82f6'}"
-        oninput="schUpdateTask(${task.id},'color',this.value);renderGantt()">
-      <input type="date" class="gantt-date-inp" value="${task.start || ''}"
-        onchange="schUpdateTask(${task.id},'start',this.value)">
-      <input type="date" class="gantt-date-inp" value="${task.end || ''}"
-        onchange="schUpdateTask(${task.id},'end',this.value)">
-      <span class="gantt-days-lbl">${dur}日</span>
-      ${addSubBtn}
-      <button class="btn danger xs" onclick="schRemoveTask(${task.id})" style="padding:1px 5px">×</button>
+      <span class="grl-color-dot" style="background:${task.color || '#3b82f6'}"></span>
+      <span class="grl-name" id="grl-name-${task.id}">${esc(task.name) || '（工程名未入力）'}</span>
+      <span class="grl-days">${dur}日</span>
     </div>`;
 
-    // Gantt bar
+    // Bar
     const startOff = task.start ? diffDays(d0str, task.start) : 0;
     const endOff   = task.end   ? diffDays(d0str, task.end)   : 0;
     const barL = startOff * GANTT_CELL_W;
     const barW = Math.max(GANTT_CELL_W, (endOff - startOff + 1) * GANTT_CELL_W);
     const barCls = isMaj ? 'gantt-bar-major' : 'gantt-bar-minor';
+    const activeBorder = isActive ? `box-shadow:0 0 0 2px #fff,0 0 0 4px ${task.color || '#3b82f6'};` : '';
     const barHtml = task.start && task.end
-      ? `<div class="gantt-bar ${barCls}" style="left:${barL}px;width:${barW}px;background:${task.color || '#3b82f6'}">
+      ? `<div class="gantt-bar ${barCls}" style="left:${barL}px;width:${barW}px;background:${task.color || '#3b82f6'};${activeBorder}"
+           onclick="openTaskEdit(${task.id})">
            <span class="gantt-bar-text">${esc(task.name)}</span>
          </div>`
       : '';
 
-    rightRows += `<div class="gantt-row gantt-row-right" style="width:${W}px">
+    rightRows += `<div class="gantt-row gantt-row-right ${isActive ? 'tes-active-bg' : ''}" style="width:${W}px">
       ${stripes}${todayLine}${barHtml}
     </div>`;
   });
 
-  wrap.innerHTML = `
+  inner.innerHTML = `
     <div class="gantt-container">
       <div class="gantt-left-panel">
         <div class="gantt-head-left">
@@ -356,13 +421,9 @@ function renderGantt() {
             <span style="width:14px"></span>
             <span style="width:14px"></span>
             <span style="width:18px"></span>
-            <span class="glh-name">工程名</span>
-            <span class="glh-person">担当</span>
-            <span style="width:28px">色</span>
-            <span class="glh-date">開始日</span>
-            <span class="glh-date">終了日</span>
-            <span style="width:30px;text-align:right">日数</span>
-            <span style="width:72px"></span>
+            <span style="width:10px"></span>
+            <span class="glh-name" style="flex:1">工程名</span>
+            <span style="width:32px;text-align:right;font-size:10px">日数</span>
           </div>
         </div>
         <div class="gantt-body-left" id="gantt-body-left">${leftRows}</div>
@@ -378,11 +439,10 @@ function renderGantt() {
     </div>
   `;
 
-  // Sync scroll: right-body drives both vertical (left-body) and horizontal (right-head)
+  // Sync scroll
   const bodyL = document.getElementById('gantt-body-left');
   const bodyR = document.getElementById('gantt-body-right');
   const headR = document.getElementById('gantt-head-right');
-
   bodyR.addEventListener('scroll', () => {
     if (headR) headR.scrollLeft = bodyR.scrollLeft;
     if (bodyL) bodyL.scrollTop  = bodyR.scrollTop;
@@ -391,8 +451,18 @@ function renderGantt() {
     if (bodyR) bodyR.scrollTop = bodyL.scrollTop;
   });
 
-  // Scroll right panel to show today
-  if (todayOff > 5 && bodyR) {
-    bodyR.scrollLeft = Math.max(0, (todayOff - 5) * GANTT_CELL_W);
+  // Scroll to today
+  if (todayOff > 5) bodyR.scrollLeft = Math.max(0, (todayOff - 5) * GANTT_CELL_W);
+
+  // Restore edit sheet if a task was being edited
+  if (editingTaskId && scheduleTasks.find(t => t.id === editingTaskId)) {
+    _renderEditSheet();
+  } else {
+    _hideEditSheet();
   }
+}
+
+function _hideEditSheet() {
+  const sheet = document.getElementById('task-edit-sheet');
+  if (sheet) sheet.style.display = 'none';
 }
