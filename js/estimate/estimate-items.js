@@ -72,6 +72,14 @@ function itemNameBlur(el){
   delete el.dataset.prev;
 }
 
+// 単位選択変更：データだけ更新（再描画不要）
+function updateItemUnit(secId,itemId,val){
+  const sec=sections.find(s=>s.id===secId);if(!sec)return;
+  const item=sec.items.find(i=>i.id===itemId);if(!item)return;
+  item.unit=val;
+  estDirty=true;
+}
+
 // テキスト入力中はデータだけ更新（再描画なし）。プリセット一致時はDOM直接更新
 function updateItemText(secId,itemId,field,val){
   const sec=sections.find(s=>s.id===secId);if(!sec)return;
@@ -179,7 +187,7 @@ function renderSections(){
         <td style="width:100%"><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" onkeydown="if(event.key==='Enter'){updateItemText(${sec.id},${item.id},'name',this.value);this.blur();}" style="width:100%;min-width:160px"></td>
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItemText(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
-        <td><select id="item-unit-${item.id}" onchange="updateItem(${sec.id},${item.id},'unit',this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
+        <td><select id="item-unit-${item.id}" onchange="updateItemUnit(${sec.id},${item.id},this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
         <td class="num"><input id="item-cost-${item.id}" type="text" inputmode="numeric" value="${item.cost?fmt(item.cost):0}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=fmt(parseFloat(this.value.replace(/,/g,''))||0)" onchange="updateItem(${sec.id},${item.id},'cost',this.value.replace(/,/g,''))" style="width:78px;text-align:right"></td>
         <td class="num" style="white-space:nowrap">
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},-1)" style="padding:1px 4px;font-size:12px">－</button>
