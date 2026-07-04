@@ -280,6 +280,11 @@
 .tes-dur-field { min-width: 48px; }
 .tes-actions { display: flex; flex-direction: column; gap: 5px; justify-content: flex-end; }
 
+/* 完了ボタン */
+.tes-done-active { background: #6b7280 !important; border-color: #6b7280 !important; color: #fff !important; }
+/* 完了済み行の工程名 */
+.grl-done { color: var(--text-muted); text-decoration: line-through; }
+
 /* ─ Bulk shift modal ─ */
 .bulk-shift-form { display: flex; flex-direction: column; gap: 10px; }
 .bulk-shift-form .fg label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 3px; }

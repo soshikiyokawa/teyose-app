@@ -30,11 +30,20 @@ function diffDays(a, b) {
   return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
 }
 
-// ─ Color: 小工程は親（大工程）の色を使う ─
+// ─ Color: 小工程は親（大工程）の色を使う。完了済みはグレー ─
 function _getTaskColor(task) {
+  if (task.done) return '#a0a0a0';
   if (task.level === 0) return task.color || '#3b82f6';
   const parent = scheduleTasks.find(t => t.id === task.parentId);
   return parent ? (parent.color || '#3b82f6') : (task.color || '#3b82f6');
+}
+
+function schToggleDone(id) {
+  const t = scheduleTasks.find(t => t.id === id);
+  if (!t) return;
+  t.done = !t.done;
+  scheduleDirty = true;
+  renderGantt();
 }
 
 // ─ 親（大工程）の日付を子（小工程）の最小開始〜最大終了に合わせる ─
@@ -109,7 +118,7 @@ function schAddTask(level, parentId) {
   const start = todayStr();
   const end   = addDaysStr(start, level === 0 ? 14 : 7);
   const newId = scheduleTaskSeq++;
-  scheduleTasks.push({ id:newId, level, parentId, name:'', start, end, person:'', color, collapsed:false });
+  scheduleTasks.push({ id:newId, level, parentId, name:'', start, end, person:'', color, collapsed:false, done:false });
   scheduleDirty = true;
   editingTaskId = newId;
   renderGantt();
@@ -335,6 +344,9 @@ function _renderEditSheet() {
         <span id="tes-dur-lbl" class="tes-dur">${dur}日</span>
       </div>
       <div class="tes-field tes-actions">
+        ${!isMaj ? `<button class="btn xs ${t.done ? 'tes-done-active' : ''}" onclick="schToggleDone(${t.id})">
+          ${t.done ? '✓ 完了済み' : '完了'}
+        </button>` : ''}
         ${isMaj
           ? `<button class="btn xs" onclick="schAddTask(1,${t.id})">＋ 小工程を追加</button>`
           : `<button class="btn xs" onclick="schAddNextSubTask(${t.id})">＋ 次の小工程を追加</button>`
@@ -524,7 +536,7 @@ function renderGantt() {
       <span class="gantt-drag-hdl">⠿</span>
       ${toggleBtn}${badge}
       <span class="grl-color-dot" style="background:${_getTaskColor(task)}"></span>
-      <span class="grl-name" id="grl-name-${task.id}">${esc(task.name)||'（工程名未入力）'}</span>
+      <span class="grl-name ${task.done ? 'grl-done' : ''}" id="grl-name-${task.id}">${esc(task.name)||'（工程名未入力）'}</span>
       <span class="grl-days" id="grl-days-${task.id}">${dur}日</span>
     </div>`;
 
