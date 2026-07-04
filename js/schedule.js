@@ -29,6 +29,24 @@ function diffDays(a, b) {
   return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
 }
 
+// ─ Color: 小工程は親（大工程）の色を使う ─
+function _getTaskColor(task) {
+  if (task.level === 0) return task.color || '#3b82f6';
+  const parent = scheduleTasks.find(t => t.id === task.parentId);
+  return parent ? (parent.color || '#3b82f6') : (task.color || '#3b82f6');
+}
+
+// ─ 親（大工程）の日付を子（小工程）の最小開始〜最大終了に合わせる ─
+function _syncParentDates(parentId) {
+  if (!parentId) return;
+  const parent = scheduleTasks.find(t => t.id === parentId);
+  if (!parent) return;
+  const kids = scheduleTasks.filter(t => t.parentId === parentId && t.start && t.end);
+  if (!kids.length) return;
+  parent.start = kids.map(t => t.start).sort()[0];
+  parent.end   = kids.map(t => t.end).sort().reverse()[0];
+}
+
 // ─ DB ─
 async function loadScheduleForProject() {
   const pName = selectedProject?.name;
@@ -83,7 +101,10 @@ function _notifySchedulePersons(pName) {
 function schAddTask(level, parentId) {
   if (!selectedProject?.name) { showToast('案件を選択してください'); return; }
   level = level || 0; parentId = parentId || null;
-  const color = GANTT_COLORS[scheduleTasks.filter(t=>t.level===level).length % GANTT_COLORS.length];
+  const parent = scheduleTasks.find(t => t.id === parentId);
+  const color = (level === 1 && parent)
+    ? (parent.color || GANTT_COLORS[0])
+    : GANTT_COLORS[scheduleTasks.filter(t=>t.level===0).length % GANTT_COLORS.length];
   const start = todayStr();
   const end   = addDaysStr(start, level === 0 ? 14 : 7);
   const newId = scheduleTaskSeq++;
@@ -122,8 +143,15 @@ function schUpdateTaskEdit(id, field, val) {
   t[field] = val;
   scheduleDirty = true;
 
-  if (field === 'start' || field === 'end' || field === 'color') {
-    renderGantt(); // bars change — full re-render; edit sheet is restored inside
+  if (field === 'start' || field === 'end') {
+    if (t.parentId) _syncParentDates(t.parentId);
+    renderGantt();
+  } else if (field === 'color') {
+    // 大工程の色変更 → 小工程にも伝播
+    if (t.level === 0) {
+      scheduleTasks.filter(c => c.parentId === t.id).forEach(c => { c.color = val; });
+    }
+    renderGantt();
   } else {
     // Just update the name label in the compact row and edit sheet header
     const nameEl = document.getElementById('grl-name-' + id);
@@ -180,6 +208,12 @@ function _onDragMove(e) {
     if (e2 >= task.start) task.end = e2;
   }
   _updateBarVisual(_drag.taskId);
+  // 小工程ドラッグ中 → 親バーもリアルタイム更新
+  const draggingTask = scheduleTasks.find(t => t.id === _drag.taskId);
+  if (draggingTask?.parentId) {
+    _syncParentDates(draggingTask.parentId);
+    _updateBarVisual(draggingTask.parentId);
+  }
 }
 
 function _onDragEnd(e) {
@@ -196,6 +230,9 @@ function _onDragEnd(e) {
   if (!moved) {
     openTaskEdit(taskId); // treat as click
   } else {
+    // ドラッグ確定後に親日付を同期してから再描画
+    const movedTask = scheduleTasks.find(t => t.id === taskId);
+    if (movedTask?.parentId) _syncParentDates(movedTask.parentId);
     scheduleDirty = true;
     renderGantt();
   }
@@ -277,11 +314,11 @@ function _renderEditSheet() {
         <input type="text" value="${esc(t.person)}" placeholder="担当者名"
           oninput="schUpdateTaskEdit(${t.id},'person',this.value)">
       </div>
-      <div class="tes-field">
+      ${isMaj ? `<div class="tes-field">
         <label>色</label>
         <input type="color" value="${t.color || '#3b82f6'}"
           oninput="schUpdateTaskEdit(${t.id},'color',this.value)">
-      </div>
+      </div>` : ''}
       <div class="tes-field">
         <label>開始日</label>
         <input type="date" id="tes-start" value="${t.start || ''}"
@@ -475,7 +512,7 @@ function renderGantt() {
       id="grl-${task.id}" onclick="openTaskEdit(${task.id})">
       <span class="gantt-drag-hdl">⠿</span>
       ${toggleBtn}${badge}
-      <span class="grl-color-dot" style="background:${task.color||'#3b82f6'}"></span>
+      <span class="grl-color-dot" style="background:${_getTaskColor(task)}"></span>
       <span class="grl-name" id="grl-name-${task.id}">${esc(task.name)||'（工程名未入力）'}</span>
       <span class="grl-days" id="grl-days-${task.id}">${dur}日</span>
     </div>`;
@@ -490,7 +527,7 @@ function renderGantt() {
 
     const barHtml = task.start && task.end
       ? `<div class="gantt-bar ${barCls} ${selCls}" id="gantt-bar-${task.id}"
-           style="left:${barL}px;width:${barW}px;background:${task.color||'#3b82f6'}"
+           style="left:${barL}px;width:${barW}px;background:${_getTaskColor(task)}"
            onmousedown="onBarDragStart(event,${task.id},'move')"
            ontouchstart="onBarDragStart(event,${task.id},'move')">
            <div class="gantt-bar-hdl gantt-bar-hdl-l"
