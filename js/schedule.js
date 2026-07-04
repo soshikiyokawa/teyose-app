@@ -15,8 +15,9 @@ let scheduleDirty     = false;
 let editingTaskId     = null;
 
 // ─ Drag state ─
-let ganttD0str = ''; // leftmost date of current gantt view (for hit testing)
-let _drag = null;   // { type:'move'|'resize-start'|'resize-end', taskId, startX, origStart, origEnd, moved }
+let ganttD0str    = ''; // leftmost date of current gantt view (for hit testing)
+let _drag         = null; // { type:'move'|'resize-start'|'resize-end', taskId, startX, origStart, origEnd, moved }
+let ganttScrollLeft = -1; // -1 = 未設定（初回のみ今日へスクロール）
 
 // ─ Date helpers ─
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -53,7 +54,7 @@ async function loadScheduleForProject() {
   const badge = document.getElementById('sch-proj-name');
   if (badge) badge.textContent = pName || '（案件未選択）';
   scheduleTasks = []; editingScheduleId = null; editingTaskId = null;
-  scheduleDirty = false; scheduleTaskSeq = 1;
+  scheduleDirty = false; scheduleTaskSeq = 1; ganttScrollLeft = -1;
 
   if (!pName) { renderGantt(); return; }
 
@@ -573,11 +574,19 @@ function renderGantt() {
   const bodyL = document.getElementById('gantt-body-left');
   const bodyR = document.getElementById('gantt-body-right');
   const headR = document.getElementById('gantt-head-right');
-  bodyR.addEventListener('scroll', ()=>{ if(headR) headR.scrollLeft=bodyR.scrollLeft; if(bodyL) bodyL.scrollTop=bodyR.scrollTop; });
+  bodyR.addEventListener('scroll', ()=>{
+    ganttScrollLeft = bodyR.scrollLeft;
+    if(headR) headR.scrollLeft=bodyR.scrollLeft;
+    if(bodyL) bodyL.scrollTop=bodyR.scrollTop;
+  });
   bodyL.addEventListener('scroll', ()=>{ if(bodyR) bodyR.scrollTop=bodyL.scrollTop; });
 
-  // Scroll to today
-  if (todayOff > 5) bodyR.scrollLeft = Math.max(0, (todayOff - 5) * GANTT_CELL_W);
+  // 初回のみ今日へスクロール。以降は前回位置を維持
+  if (ganttScrollLeft >= 0) {
+    bodyR.scrollLeft = ganttScrollLeft;
+  } else if (todayOff > 5) {
+    bodyR.scrollLeft = Math.max(0, (todayOff - 5) * GANTT_CELL_W);
+  }
 
   // Restore edit sheet if a task was being edited
   if (editingTaskId && scheduleTasks.find(t => t.id === editingTaskId)) {
