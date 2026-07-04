@@ -12,6 +12,7 @@ function _mainTabGo(t){
     document.getElementById('page-'+n)?.classList.toggle('active',n===t);
     document.getElementById('nav-'+n)?.classList.toggle('active',n===t);
   });
+  document.body.classList.remove('sch-preview');
   if(t==='cost') renderCost();
   if(t==='order'&&document.getElementById('ordersub-master').classList.contains('active')) renderMaster();
   if(t==='schedule') loadScheduleForProject();
