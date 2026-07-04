@@ -157,13 +157,19 @@
   border-radius: 3px;
   display: flex;
   align-items: center;
-  padding: 0 5px;
-  overflow: hidden;
+  padding: 0 10px; /* room for handles */
+  overflow: visible;
   z-index: 1;
-  cursor: pointer;
-  transition: filter 0.1s;
+  cursor: grab;
+  user-select: none;
+  transition: filter 0.1s, box-shadow 0.1s;
 }
-.gantt-bar:hover { filter: brightness(1.12); }
+.gantt-bar:active { cursor: grabbing; }
+.gantt-bar:hover  { filter: brightness(1.10); }
+.gantt-bar-selected {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
+  z-index: 2;
+}
 .gantt-bar-major { height: 20px; }
 .gantt-bar-minor { height: 13px; opacity: 0.88; }
 .gantt-bar-text {
@@ -174,7 +180,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
   text-shadow: 0 1px 1px rgba(0,0,0,.4);
+  flex: 1;
+  pointer-events: none;
 }
+
+/* Resize handles at bar edges */
+.gantt-bar-hdl {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  cursor: ew-resize;
+  z-index: 3;
+  flex-shrink: 0;
+}
+.gantt-bar-hdl-l { left: 0; border-radius: 3px 0 0 3px; }
+.gantt-bar-hdl-r { right: 0; border-radius: 0 3px 3px 0; }
+.gantt-bar-hdl:hover { background: rgba(255,255,255,0.35); }
 
 /* Badge */
 .gantt-badge {
