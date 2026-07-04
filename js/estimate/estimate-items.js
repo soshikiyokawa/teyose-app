@@ -223,9 +223,9 @@ function renderSections(){
         <td><select id="item-unit-${item.id}" onchange="updateItemUnit(${sec.id},${item.id},this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
         <td class="num"><input id="item-cost-${item.id}" type="text" inputmode="numeric" value="${item.cost?fmt(item.cost):0}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=fmt(parseFloat(this.value.replace(/,/g,''))||0)" onchange="updateItemNumeric(${sec.id},${item.id},'cost',this.value)" style="width:78px;text-align:right"></td>
         <td class="num" style="white-space:nowrap">
-          <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},-1)" style="padding:1px 4px;font-size:12px">－</button>
+          <button class="btn xs" onclick="stepItemMargin(${sec.id},${item.id},-1)" style="padding:1px 4px;font-size:12px">－</button>
           <input id="item-margin-${item.id}" type="text" inputmode="numeric" value="${item.margin}" onchange="updateItemNumeric(${sec.id},${item.id},'margin',this.value)" style="width:30px;text-align:center;color:${mc_col};font-weight:700">
-          <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},1)" style="padding:1px 4px;font-size:12px">＋</button>
+          <button class="btn xs" onclick="stepItemMargin(${sec.id},${item.id},1)" style="padding:1px 4px;font-size:12px">＋</button>
         </td>
         <td id="item-price-${item.id}" class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
         <td id="item-amt-${item.id}" class="amt">¥${fmt(item.qty*item.price)}</td>
