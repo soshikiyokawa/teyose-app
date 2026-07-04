@@ -45,18 +45,47 @@ function removeSection(secId){
   renderSections();
 }
 
-function updateItem(secId,itemId,field,val){
-  estDirty=true;
+// 数量・原価・粗利率の変更：再描画せずDOM直接更新
+function updateItemNumeric(secId,itemId,field,rawVal){
   const sec=sections.find(s=>s.id===secId);if(!sec)return;
   const item=sec.items.find(i=>i.id===itemId);if(!item)return;
-  if(['qty','cost','margin','price'].includes(field)) item[field]=parseFloat(val)||0;
-  else item[field]=val;
-  if(field==='name'){
-    const preset=(estimatePresets||[]).find(p=>p.cat===sec.name && p.name===val && p.workType===currentEstWorkType());
-    if(preset){item.unit=preset.unit;item.cost=Number(preset.cost);}
-  }
-  if(field==='cost'||field==='margin'||field==='name') item.price=calcPrice(item.cost,item.margin);
-  renderSections();
+  item[field]=parseFloat(String(rawVal).replace(/,/g,''))||0;
+  if(field==='cost'||field==='margin') item.price=calcPrice(item.cost,item.margin);
+  estDirty=true;
+  // 単価・金額セルを更新
+  const priceEl=document.getElementById('item-price-'+itemId);
+  const amtEl=document.getElementById('item-amt-'+itemId);
+  if(priceEl) priceEl.textContent='¥'+fmt(item.price);
+  if(amtEl) amtEl.textContent='¥'+fmt(item.qty*item.price);
+  // 粗利率表示色を更新
+  const mc=item.price>0?((item.price-item.cost)/item.price*100):0;
+  const mc_col=mc>=25?'var(--accent-t)':mc>=15?'var(--warn-t)':'var(--danger)';
+  const marginEl=document.getElementById('item-margin-'+itemId);
+  if(marginEl) marginEl.style.color=mc_col;
+  // 工種小計・合計を更新
+  _updateSecTotals(secId);
+  _updateGrandTotal();
+}
+
+function _updateSecTotals(secId){
+  const sec=sections.find(s=>s.id===secId);if(!sec)return;
+  const sTotal=sec.items.reduce((s,i)=>s+i.qty*i.price,0);
+  const sCost=sec.items.reduce((s,i)=>s+i.qty*i.cost,0);
+  const sMargin=sTotal>0?((sTotal-sCost)/sTotal*100):0;
+  const mEl=document.getElementById('sec-margin-disp-'+secId);
+  if(mEl) mEl.textContent='粗利 '+sMargin.toFixed(1)+'%';
+  const tEl=document.getElementById('sec-total-disp-'+secId);
+  if(tEl) tEl.textContent='¥'+fmt(sTotal);
+  const fEl=document.getElementById('sec-foot-'+secId);
+  if(fEl) fEl.innerHTML=`<span class="muted">原価：¥${fmt(sCost)}</span><span style="color:var(--accent-t)">粗利：¥${fmt(sTotal-sCost)}（${sMargin.toFixed(1)}%）</span><span>小計：¥${fmt(sTotal)}</span>`;
+}
+
+function _updateGrandTotal(){
+  let gTotal=0,gCost=0;
+  sections.forEach(sec=>{sec.items.forEach(i=>{gTotal+=i.qty*i.price;gCost+=i.qty*i.cost;});});
+  const gMargin=gTotal>0?((gTotal-gCost)/gTotal*100):0;
+  const el=document.getElementById('est-grand');
+  if(el) el.textContent=`¥${fmt(gTotal)}　粗利 ${gMargin.toFixed(1)}%`;
 }
 
 // 品目名inputのフォーカス時：一時的にクリアして全候補を表示
@@ -90,7 +119,6 @@ function updateItemText(secId,itemId,field,val){
     const preset=(estimatePresets||[]).find(p=>p.cat===sec.name && p.name===val && p.workType===currentEstWorkType());
     if(preset){
       item.unit=preset.unit;item.cost=Number(preset.cost);item.price=calcPrice(item.cost,item.margin);
-      // 全再描画せず対象行のDOMだけ更新（フォーカスを奪わないため）
       const unitEl=document.getElementById('item-unit-'+itemId);
       const costEl=document.getElementById('item-cost-'+itemId);
       const priceEl=document.getElementById('item-price-'+itemId);
@@ -99,6 +127,8 @@ function updateItemText(secId,itemId,field,val){
       if(costEl) costEl.value=fmt(item.cost);
       if(priceEl) priceEl.textContent='¥'+fmt(item.price);
       if(amtEl) amtEl.textContent='¥'+fmt(item.qty*item.price);
+      _updateSecTotals(secId);
+      _updateGrandTotal();
     }
   }
 }
@@ -109,7 +139,6 @@ function currentEstWorkType(){
 }
 
 // 工種名のリスト候補（datalist）を更新。リストに無いものは自由記述可。
-// 編集中の見積の工事区分に登録された工種・工事品目だけを候補にする
 function renderPresetDatalists(){
   const catEl=document.getElementById('sec-cat-list');
   if(!catEl) return;
@@ -119,7 +148,7 @@ function renderPresetDatalists(){
 
 function updateSecName(secId,val){const sec=sections.find(s=>s.id===secId);if(sec){sec.name=val;estDirty=true;}}
 
-// 工種内の全行の粗利率を一括変更
+// 工種内の全行の粗利率を一括変更（全再描画）
 function setSecMargin(secId,val){
   const margin=parseFloat(val);
   if(isNaN(margin)||margin<0||margin>=100) return;
@@ -134,11 +163,15 @@ function stepSecMargin(secId,step){
   const base=sec.items[0].margin;
   setSecMargin(secId,Math.min(99,Math.max(0,base+step)));
 }
-// 行の粗利率を±stepで増減
+// 行の粗利率を±stepで増減（再描画なし）
 function stepItemMargin(secId,itemId,step){
   const sec=sections.find(s=>s.id===secId);if(!sec)return;
   const item=sec.items.find(i=>i.id===itemId);if(!item)return;
-  updateItem(secId,itemId,'margin',Math.min(99,Math.max(0,item.margin+step)));
+  const newMargin=Math.min(99,Math.max(0,item.margin+step));
+  updateItemNumeric(secId,itemId,'margin',newMargin);
+  // 粗利率入力欄の表示値も更新
+  const marginEl=document.getElementById('item-margin-'+itemId);
+  if(marginEl) marginEl.value=item.margin;
 }
 function toggleSec(secId){const sec=sections.find(s=>s.id===secId);if(sec){sec.open=!sec.open;renderSections();}}
 
@@ -186,12 +219,12 @@ function renderSections(){
         <td draggable="true" ondragstart="estDragStartItem(${sec.id},${item.id})" style="width:18px;text-align:center;cursor:grab;color:var(--text-muted)" title="ドラッグで並び替え">⠿</td>
         <td style="width:100%"><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" onkeydown="if(event.key==='Enter'){updateItemText(${sec.id},${item.id},'name',this.value);this.blur();}" style="width:100%;min-width:160px"></td>
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItemText(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
-        <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItem(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
+        <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItemNumeric(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
         <td><select id="item-unit-${item.id}" onchange="updateItemUnit(${sec.id},${item.id},this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
-        <td class="num"><input id="item-cost-${item.id}" type="text" inputmode="numeric" value="${item.cost?fmt(item.cost):0}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=fmt(parseFloat(this.value.replace(/,/g,''))||0)" onchange="updateItem(${sec.id},${item.id},'cost',this.value.replace(/,/g,''))" style="width:78px;text-align:right"></td>
+        <td class="num"><input id="item-cost-${item.id}" type="text" inputmode="numeric" value="${item.cost?fmt(item.cost):0}" onfocus="this.value=this.value.replace(/,/g,'')" onblur="this.value=fmt(parseFloat(this.value.replace(/,/g,''))||0)" onchange="updateItemNumeric(${sec.id},${item.id},'cost',this.value)" style="width:78px;text-align:right"></td>
         <td class="num" style="white-space:nowrap">
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},-1)" style="padding:1px 4px;font-size:12px">－</button>
-          <input type="text" inputmode="numeric" value="${item.margin}" onchange="updateItem(${sec.id},${item.id},'margin',this.value)" style="width:30px;text-align:center;color:${mc_col};font-weight:700">
+          <input id="item-margin-${item.id}" type="text" inputmode="numeric" value="${item.margin}" onchange="updateItemNumeric(${sec.id},${item.id},'margin',this.value)" style="width:30px;text-align:center;color:${mc_col};font-weight:700">
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepItemMargin(${sec.id},${item.id},1)" style="padding:1px 4px;font-size:12px">＋</button>
         </td>
         <td id="item-price-${item.id}" class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
@@ -203,7 +236,7 @@ function renderSections(){
         <span draggable="true" ondragstart="estDragStartSec(${sec.id})" style="cursor:grab;color:var(--text-muted);padding:0 2px" title="ドラッグで工種の順序を変更">⠿</span>
         <button class="sec-toggle" onclick="toggleSec(${sec.id})">${sec.open?'▾':'▸'}</button>
         <input class="sec-name" type="text" list="sec-cat-list" value="${esc(sec.name)}" placeholder="工種名（例：仮設工事）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateSecName(${sec.id},this.value)">
-        <span style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap">粗利 ${sMargin.toFixed(1)}%</span>
+        <span id="sec-margin-disp-${sec.id}" style="font-size:11px;color:var(--accent-t);font-weight:700;white-space:nowrap">粗利 ${sMargin.toFixed(1)}%</span>
         <div style="display:flex;align-items:center;gap:2px;margin:0 4px;white-space:nowrap">
           <span style="font-size:10px;color:var(--text-muted)">一括</span>
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepSecMargin(${sec.id},-1)" style="padding:1px 5px;font-size:13px">－</button>
@@ -211,7 +244,7 @@ function renderSections(){
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepSecMargin(${sec.id},1)" style="padding:1px 5px;font-size:13px">＋</button>
           <span style="font-size:10px;color:var(--text-muted)">%</span>
         </div>
-        <span style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
+        <span id="sec-total-disp-${sec.id}" style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
         <button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
       </div>
       <datalist id="${secDatalistId}">${secPresets.map(p=>`<option value="${esc(p.name)}">`).join('')}</datalist>
@@ -230,7 +263,7 @@ function renderSections(){
         </table>
         <button class="add-row-btn" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="addItem(${sec.id})">＋ 行を追加</button>
       </div>
-      <div class="sec-foot">
+      <div id="sec-foot-${sec.id}" class="sec-foot">
         <span class="muted">原価：¥${fmt(sCost)}</span>
         <span style="color:var(--accent-t)">粗利：¥${fmt(sTotal-sCost)}（${sMargin.toFixed(1)}%）</span>
         <span>小計：¥${fmt(sTotal)}</span>
