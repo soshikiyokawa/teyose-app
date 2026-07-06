@@ -57,6 +57,8 @@ function updateItemNumeric(secId,itemId,field,rawVal){
   const amtEl=document.getElementById('item-amt-'+itemId);
   if(priceEl) priceEl.textContent='¥'+fmt(item.price);
   if(amtEl) amtEl.textContent='¥'+fmt(item.qty*item.price);
+  const costTotEl=document.getElementById('item-cost-tot-'+itemId);
+  if(costTotEl) costTotEl.textContent='¥'+fmt(item.qty*item.cost);
   // 粗利率表示色を更新
   const mc=item.price>0?((item.price-item.cost)/item.price*100):0;
   const mc_col=mc>=25?'var(--accent-t)':mc>=15?'var(--warn-t)':'var(--danger)';
@@ -217,7 +219,7 @@ function renderSections(){
       const mc_col=mc>=25?'var(--accent-t)':mc>=15?'var(--warn-t)':'var(--danger)';
       return `<tr ondragover="event.preventDefault()" ondrop="estDropItem(${sec.id},${item.id})">
         <td draggable="true" ondragstart="estDragStartItem(${sec.id},${item.id})" style="width:18px;text-align:center;cursor:grab;color:var(--text-muted)" title="ドラッグで並び替え">⠿</td>
-        <td style="width:100%"><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名（リストから選択 または自由入力）" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" onkeydown="if(event.key==='Enter'){updateItemText(${sec.id},${item.id},'name',this.value);this.blur();}" style="width:100%;min-width:160px"></td>
+        <td style="width:130px"><input type="text" list="${secDatalistId}" value="${esc(item.name)}" placeholder="工事・品目名" onfocus="itemNameFocus(this)" onblur="itemNameBlur(this)" oninput="updateItemText(${sec.id},${item.id},'name',this.value)" onkeydown="if(event.key==='Enter'){updateItemText(${sec.id},${item.id},'name',this.value);this.blur();}" style="width:100%;min-width:80px"></td>
         <td><input type="text" value="${esc(item.spec)}" placeholder="規格・仕様" oninput="updateItemText(${sec.id},${item.id},'spec',this.value)" style="min-width:70px"></td>
         <td class="num"><input type="number" value="${item.qty}" min="0" step="1" onchange="updateItemNumeric(${sec.id},${item.id},'qty',this.value)" style="width:48px;text-align:right"></td>
         <td><select id="item-unit-${item.id}" onchange="updateItemUnit(${sec.id},${item.id},this.value)" style="width:48px">${['式','本','枚','坪','台','箱','袋','巻','梱','セット','ヶ所','個','m','㎡','m³','kg','t','人工'].map(u=>`<option${u===item.unit?' selected':''}>${u}</option>`).join('')}</select></td>
@@ -229,6 +231,7 @@ function renderSections(){
         </td>
         <td id="item-price-${item.id}" class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
         <td id="item-amt-${item.id}" class="amt">¥${fmt(item.qty*item.price)}</td>
+        <td id="item-cost-tot-${item.id}" class="amt" style="color:var(--text-muted)">¥${fmt(item.qty*item.cost)}</td>
         <td style="width:24px;text-align:center"><button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
       </tr>`;}).join('');
     return `<div class="section-block">
@@ -251,12 +254,13 @@ function renderSections(){
       ${sec.open?`<div class="items-wrap">
         <table class="items-table">
           <thead><tr>
-            <th style="width:18px"></th><th>工事・品目名</th><th>規格・仕様</th>
+            <th style="width:18px"></th><th style="width:130px">工事・品目名</th><th>規格・仕様</th>
             <th class="r" style="width:52px">数量</th><th style="width:50px">単位</th>
             <th class="r" style="width:86px">原価（円）</th>
             <th class="r" style="width:60px">粗利率</th>
             <th class="r" style="width:86px">単価（円）</th>
             <th class="r" style="width:86px">金額（円）</th>
+            <th class="r" style="width:86px">原価合計（円）</th>
             <th style="width:26px"></th>
           </tr></thead>
           <tbody>${rows}</tbody>
