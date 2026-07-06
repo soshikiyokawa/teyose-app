@@ -4,7 +4,7 @@
 // PWA: ホーム画面追加・オフライン表示に対応
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'});
     navigator.serviceWorker.addEventListener('message', e=>{
       if(e.data?.type==='SW_UPDATED') location.reload();
     });
