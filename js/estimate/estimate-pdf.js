@@ -147,4 +147,5 @@ function renderEstPdfBody(){
 function printEstPdf(){
   const body=document.getElementById('est-pdf-body').innerHTML;
   printHtml('御見積書', body);
+  savePdfBackup('見積書', _estPdfData?.projectName, body);
 }

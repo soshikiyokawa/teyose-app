@@ -80,4 +80,5 @@ function renderInvoicePdfBody(){
 function printInvoicePdf(){
   const body=document.getElementById('invoice-pdf-body').innerHTML;
   printHtml('御請求書', body);
+  savePdfBackup('請求書', _invoicePdfData?.projectName, body);
 }

@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=101">
-<link rel="stylesheet" href="css/schedule.css?v=101">
+<link rel="stylesheet" href="css/main.css?v=102">
+<link rel="stylesheet" href="css/schedule.css?v=102">
 </head>
 <body>
 
@@ -36,6 +36,9 @@
 <div class="topbar">
   <div class="logo"><img src="logo.png" width="30" height="30" style="display:block;filter:invert(1);" alt="きよかわ"></div>
   <div class="topbar-title"><h1>手寄</h1><small>てよせ | きよかわ</small><span id="app-version" style="font-size:9px;color:var(--text-muted);margin-left:6px;letter-spacing:0.03em"></span></div>
+<button class="btn sm staff-only" onclick="openPdfBackupList()" title="PDFバックアップ一覧" style="padding:5px 8px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+  </button>
 <button class="btn sm" onclick="hardUpdate()" title="強制更新" style="padding:5px 8px">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
   </button>
@@ -537,6 +540,17 @@
   </div>
 </div>
 
+<!-- PDFバックアップ一覧モーダル -->
+<div class="modal-overlay" id="pdf-backup-modal" onclick="if(event.target.id==='pdf-backup-modal')document.getElementById('pdf-backup-modal').classList.remove('open')">
+  <div class="modal-sheet" style="max-width:480px;max-height:80vh;display:flex;flex-direction:column">
+    <h3 style="flex-shrink:0">PDFバックアップ一覧</h3>
+    <div id="pdf-backup-list" style="overflow-y:auto;flex:1;padding-bottom:8px"></div>
+    <div class="modal-actions" style="flex-shrink:0">
+      <button class="btn" onclick="document.getElementById('pdf-backup-modal').classList.remove('open')">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <!-- 一括工程変更モーダル -->
 <div class="modal-overlay" id="bulk-shift-modal" onclick="if(event.target.id==='bulk-shift-modal')document.getElementById('bulk-shift-modal').classList.remove('open')">
   <div class="modal-sheet" style="max-width:340px">
@@ -714,50 +728,50 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=101"></script>
+<script src="js/supabase-client.js?v=102"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=101"></script>
+<script src="js/utils.js?v=102"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=101"></script>
+<script src="js/state.js?v=102"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=101"></script>
+<script src="js/data/db.js?v=102"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=101"></script>
+<script src="js/nav.js?v=102"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=101"></script>
+<script src="js/talk.js?v=102"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=101"></script>
+<script src="js/push.js?v=102"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=101"></script>
-<script src="js/estimate/estimate-items.js?v=101"></script>
-<script src="js/estimate/estimate-master.js?v=101"></script>
-<script src="js/estimate/estimate-summary.js?v=101"></script>
-<script src="js/estimate/estimate-crud.js?v=101"></script>
-<script src="js/estimate/estimate-pdf.js?v=101"></script>
-<script src="js/estimate/estimate-invoice.js?v=101"></script>
+<script src="js/estimate/estimate-tabs.js?v=102"></script>
+<script src="js/estimate/estimate-items.js?v=102"></script>
+<script src="js/estimate/estimate-master.js?v=102"></script>
+<script src="js/estimate/estimate-summary.js?v=102"></script>
+<script src="js/estimate/estimate-crud.js?v=102"></script>
+<script src="js/estimate/estimate-pdf.js?v=102"></script>
+<script src="js/estimate/estimate-invoice.js?v=102"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=101"></script>
+<script src="js/schedule.js?v=102"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=101"></script>
-<script src="js/order/item-master.js?v=101"></script>
-<script src="js/order/order-cart.js?v=101"></script>
-<script src="js/order/order-confirm.js?v=101"></script>
-<script src="js/order/order-history.js?v=101"></script>
+<script src="js/order/supplier-master.js?v=102"></script>
+<script src="js/order/item-master.js?v=102"></script>
+<script src="js/order/order-cart.js?v=102"></script>
+<script src="js/order/order-confirm.js?v=102"></script>
+<script src="js/order/order-history.js?v=102"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=101"></script>
+<script src="js/init.js?v=102"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=101"></script>
+<script src="js/auth.js?v=102"></script>
 </body>
 </html>
