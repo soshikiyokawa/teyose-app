@@ -592,10 +592,14 @@ function renderGantt() {
     </div>
   `;
 
+  // 左右ヘッダー高さを同期（行ズレ防止）
+  const headL = document.querySelector('.gantt-head-left');
+  const headR = document.getElementById('gantt-head-right');
+  if (headL && headR) headL.style.height = headR.offsetHeight + 'px';
+
   // Sync scroll
   const bodyL = document.getElementById('gantt-body-left');
   const bodyR = document.getElementById('gantt-body-right');
-  const headR = document.getElementById('gantt-head-right');
   bodyR.addEventListener('scroll', ()=>{
     ganttScrollLeft = bodyR.scrollLeft;
     if(headR) headR.scrollLeft=bodyR.scrollLeft;
