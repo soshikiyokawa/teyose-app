@@ -66,7 +66,6 @@ function renderOrdersList(){
       <td class="ol-r">¥${fmt(a2)}</td>
       <td class="ol-c" style="font-size:10px">${pays[2]?.actualDate||''}</td>
       <td class="ol-r">¥${fmt(a3)}</td>
-      <td class="ol-r" style="color:${zankin>0?'var(--danger)':'var(--success,#4a9)'}">¥${fmt(zankin)}</td>
       <td class="ol-c" style="padding:2px 4px">
         <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
           <input type="text" inputmode="numeric" value="${epr||''}" placeholder="0"
@@ -119,7 +118,6 @@ function renderOrdersTotals(list){
     <td class="ol-r">¥${fmt(totKai)}</td>
     <td class="ol-r" style="color:${totMi>0?'var(--danger)':'inherit'}">¥${fmt(totMi)}</td>
     <td colspan="6" style="padding:4px 6px"></td>
-    <td class="ol-r" style="color:${totMi>0?'var(--danger)':'inherit'}">¥${fmt(totMi)}</td>
     <td class="ol-r">${totEpRate}%</td>
     <td class="ol-r">¥${fmt(totEpAmt)}</td>
     <td class="ol-r">¥${fmt(totApAmt)}</td>
