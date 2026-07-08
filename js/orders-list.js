@@ -147,11 +147,9 @@ function printOrdersList(){
   });
   tbl.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
 
-  // 備考列（最終列）を削除
-  tbl.querySelectorAll('tr').forEach(tr => {
-    const cells = tr.querySelectorAll('th, td');
-    if(cells.length) cells[cells.length - 1].remove();
-  });
+  // 備考列を削除（.ol-memo のtd と ヘッダーの「備考」th のみ）
+  tbl.querySelectorAll('.ol-memo').forEach(el => el.remove());
+  tbl.querySelectorAll('th').forEach(th => { if(th.textContent.trim()==='備考') th.remove(); });
 
   // バッジを小さいテキストに置換
   tbl.querySelectorAll('.badge').forEach(b => {
