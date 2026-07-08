@@ -66,7 +66,14 @@
       <button class="btn xs" onclick="showNewProjectModal()" style="font-size:11px;padding:3px 6px">＋</button>
     </div>
     <div style="padding:0 8px 8px">
-      <input id="est-sidebar-search" placeholder="案件名・施主名で検索" oninput="filterProjectSidebar()" style="width:100%;font-size:12px;padding:5px 7px;box-sizing:border-box">
+      <input id="est-sidebar-search" placeholder="案件名・施主名で検索" oninput="filterProjectSidebar()" style="width:100%;font-size:12px;padding:5px 7px;box-sizing:border-box;margin-bottom:5px">
+      <div id="est-sidebar-status-filter" style="display:flex;flex-wrap:wrap;gap:3px">
+        <button class="sf-btn active" onclick="setSidebarStatusFilter('')">全て</button>
+        <button class="sf-btn" onclick="setSidebarStatusFilter('draft')">下書き</button>
+        <button class="sf-btn" onclick="setSidebarStatusFilter('sent')">提出済み</button>
+        <button class="sf-btn" onclick="setSidebarStatusFilter('approved')">受注</button>
+        <button class="sf-btn" onclick="setSidebarStatusFilter('completed')">完工</button>
+      </div>
     </div>
     <div id="est-project-sidebar-list"></div>
   </div>
@@ -102,7 +109,7 @@
         </div>
         <div class="fg"><label>ステータス</label>
           <select id="est-status" onchange="updateEstBadge()">
-            <option value="draft">下書き</option><option value="sent">提出済み</option><option value="approved">受注</option>
+            <option value="draft">下書き</option><option value="sent">提出済み</option><option value="approved">受注</option><option value="completed">完工</option>
           </select>
         </div>
         <div class="fg"><label>着工予定日</label><input type="date" id="est-start-date"></div>

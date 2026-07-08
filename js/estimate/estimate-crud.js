@@ -210,6 +210,13 @@ function calcEstTotal(e){
 }
 
 // ── 左サイドバー＋モバイル案件セレクト：案件マスタをベースに表示 ──
+let _sidebarStatusFilter='';
+function setSidebarStatusFilter(s){
+  _sidebarStatusFilter=s;
+  document.querySelectorAll('.sf-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()==={''：'全て','draft':'下書き','sent':'提出済み','approved':'受注','completed':'完工'}[s]||(!s&&b.textContent.trim()==='全て')));
+  renderProjectSidebar();
+}
+
 function renderProjectSidebar(){
   const kw=(document.getElementById('est-sidebar-search')?.value||'').trim().toLowerCase();
 
@@ -224,7 +231,11 @@ function renderProjectSidebar(){
   const el=document.getElementById('est-project-sidebar-list');
   if(!el) return;
   let list=projects;
-  if(kw) list=list.filter(p=>p.name.toLowerCase().includes(kw)||p.clientName.toLowerCase().includes(kw));
+  if(kw) list=list.filter(p=>p.name.toLowerCase().includes(kw)||(p.clientName||'').toLowerCase().includes(kw));
+  if(_sidebarStatusFilter){
+    const pids=new Set(estimates.filter(e=>e.status===_sidebarStatusFilter).map(e=>e.projectName));
+    list=list.filter(p=>pids.has(p.name));
+  }
   if(!list.length){el.innerHTML='<div style="padding:10px;font-size:12px;color:var(--text-muted)">案件がありません</div>';return;}
   el.innerHTML=list.map(p=>`
     <div onclick="selectProjectSidebar(${p.id})"
@@ -364,7 +375,7 @@ function renderEstListBody(){
     <div class="list-item" onclick="confirmEstDiscard(()=>{loadEstimate(estimates.find(x=>x.id===${e.id}));closeEstList();})">
       <div class="li-info">
         <div class="li-name">${e.title||e.projectName||e.siteName||e.no||'無題の見積'}</div>
-        <div class="li-meta">${e.no} · ${e.type} · ${e.date||'日付未設定'} <span class="badge ${e.status}" style="margin-left:4px">${e.status==='draft'?'下書き':e.status==='sent'?'提出済み':'受注'}</span></div>
+        <div class="li-meta">${e.no} · ${e.type} · ${e.date||'日付未設定'} <span class="badge ${e.status}" style="margin-left:4px">${e.status==='draft'?'下書き':e.status==='sent'?'提出済み':e.status==='approved'?'受注':'完工'}</span></div>
       </div>
       <div class="li-amt">¥${fmt(calcEstTotal(e))}</div>
       <button class="btn danger xs" onclick="event.stopPropagation();deleteEstimateFromList(${e.id})" style="margin-left:8px">削除</button>

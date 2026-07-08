@@ -2,7 +2,7 @@
 
 function renderOrdersList(){
   const list = (estimates||[])
-    .filter(e => e.status==='approved' || e.status==='sent')
+    .filter(e => e.status==='approved' || e.status==='sent' || e.status==='completed')
     .sort((a,b)=>((a.contractDate||a.date||'') < (b.contractDate||b.date||'') ? -1 : 1));
 
   const el = document.getElementById('orders-list-body');
@@ -40,9 +40,11 @@ function renderOrdersList(){
 
     const badge = e.status==='approved'
       ? '<span class="badge approved" style="font-size:9px;padding:1px 5px">受注</span>'
-      : '<span class="badge sent" style="font-size:9px;padding:1px 5px">提出済</span>';
+      : e.status==='completed'
+        ? '<span class="badge completed" style="font-size:9px;padding:1px 5px">完工</span>'
+        : '<span class="badge sent" style="font-size:9px;padding:1px 5px">提出済</span>';
 
-    return `<tr class="ol-row">
+    return `<tr class="ol-row status-${e.status}">
       <td class="ol-no">${i+1}</td>
       <td class="ol-c">${e.contractDate||''}</td>
       <td class="ol-c" style="white-space:nowrap">${esc(e.clientName||'')}</td>

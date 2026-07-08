@@ -31,6 +31,22 @@
 .ol-r   { padding: 4px 8px; text-align: right; white-space: nowrap; }
 .ol-memo { padding: 4px 6px; min-width: 60px; outline: none; }
 .ol-memo:focus { background: var(--surface2); }
+/* サイドバー ステータスフィルターボタン */
+.sf-btn {
+  font-size: 10px; padding: 2px 6px; border-radius: 10px;
+  border: 1px solid var(--border-s); background: var(--surface2);
+  color: var(--text-muted); cursor: pointer; white-space: nowrap;
+}
+.sf-btn.active { background: var(--wood); color: #fff; border-color: var(--wood); }
+
+/* 受注一覧 行色分け */
+.ol-row.status-approved { background: #f0faf3; }
+.ol-row.status-sent     { background: #f0f5ff; }
+.ol-row.status-completed{ background: #f5f0ff; }
+.ol-row.status-approved:hover  { background: #d8f5e0; }
+.ol-row.status-sent:hover      { background: #dceaff; }
+.ol-row.status-completed:hover { background: #ead8ff; }
+
 #orders-table input[type="text"] {
   border: 1px solid var(--border-s);
   border-radius: 3px;

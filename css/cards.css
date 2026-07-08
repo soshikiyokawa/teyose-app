@@ -6,6 +6,7 @@
 .badge.draft{background:var(--warn-bg);color:var(--warn-t)}
 .badge.sent{background:var(--accent-bg);color:var(--accent-t)}
 .badge.approved{background:var(--ok-bg);color:var(--ok-t)}
+.badge.completed{background:#e8e0f5;color:#6b3fa0}
 .badge.pending{background:var(--warn-bg);color:var(--warn-t)}
 .badge.received{background:var(--ok-bg);color:var(--ok-t)}
 
