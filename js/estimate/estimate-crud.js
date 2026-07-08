@@ -10,6 +10,12 @@ function collectEstData(){
   return {id:editingEstId||Date.now(),title:v('est-title')||defaultEstTitle(),no:v('est-no'),date:v('est-date'),expire:v('est-expire'),status:v('est-status'),type:v('est-type'),
     startDate:v('est-start-date'),endDate:v('est-end-date'),
     clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
+    contractDate:v('est-contract-date'),contractAmount:payAmtVal('est-contract-amount'),
+    extras:[
+      {date:v('est-extra1-date'),amount:payAmtVal('est-extra1-amount')},
+      {date:v('est-extra2-date'),amount:payAmtVal('est-extra2-amount')},
+      {date:v('est-extra3-date'),amount:payAmtVal('est-extra3-amount')}
+    ],
     payments:[
       {label:'着工金',date:v('est-pay1-date'),amount:payAmtVal('est-pay1-amount'),actualDate:v('est-pay1-actual-date'),actualAmount:payAmtVal('est-pay1-actual-amount')},
       {label:'上棟時金',date:v('est-pay2-date'),amount:payAmtVal('est-pay2-amount'),actualDate:v('est-pay2-actual-date'),actualAmount:payAmtVal('est-pay2-actual-amount')},
@@ -65,9 +71,11 @@ function newEstimateChecked(){confirmEstDiscard(()=>newEstimate());}
 function newEstimate(){
   editingEstId=null;
   ['est-no','est-date','est-expire','est-start-date','est-end-date','est-client','est-project','est-site','est-note',
+   'est-contract-date','est-extra1-date','est-extra2-date','est-extra3-date',
    'est-pay1-date','est-pay1-amount','est-pay2-date','est-pay2-amount','est-pay3-date','est-pay3-amount',
    'est-pay1-actual-date','est-pay1-actual-amount','est-pay2-actual-date','est-pay2-actual-amount','est-pay3-actual-date','est-pay3-actual-amount'
   ].forEach(id=>document.getElementById(id).value='');
+  ['est-contract-amount','est-extra1-amount','est-extra2-amount','est-extra3-amount'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('est-status').value='draft';
   document.getElementById('est-type').value='新築';
   document.getElementById('discount-amount').value='0';
@@ -139,6 +147,11 @@ function loadEstimate(est){
   sv('est-client',est.clientName);sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
   sv('discount-amount',est.discountAmount);sv('tax-rate',est.taxRate);
   const pays=est.payments||[];
+  sv('est-contract-date',est.contractDate);payAmtLoad('est-contract-amount',est.contractAmount);
+  const ex=est.extras||[];
+  sv('est-extra1-date',ex[0]?.date);payAmtLoad('est-extra1-amount',ex[0]?.amount);
+  sv('est-extra2-date',ex[1]?.date);payAmtLoad('est-extra2-amount',ex[1]?.amount);
+  sv('est-extra3-date',ex[2]?.date);payAmtLoad('est-extra3-amount',ex[2]?.amount);
   sv('est-pay1-date',pays[0]?.date);payAmtLoad('est-pay1-amount',pays[0]?.amount);sv('est-pay1-actual-date',pays[0]?.actualDate);payAmtLoad('est-pay1-actual-amount',pays[0]?.actualAmount);
   sv('est-pay2-date',pays[1]?.date);payAmtLoad('est-pay2-amount',pays[1]?.amount);sv('est-pay2-actual-date',pays[1]?.actualDate);payAmtLoad('est-pay2-actual-amount',pays[1]?.actualAmount);
   sv('est-pay3-date',pays[2]?.date);payAmtLoad('est-pay3-amount',pays[2]?.amount);sv('est-pay3-actual-date',pays[2]?.actualDate);payAmtLoad('est-pay3-actual-amount',pays[2]?.actualAmount);
