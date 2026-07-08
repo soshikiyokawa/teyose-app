@@ -71,8 +71,8 @@ function renderOrdersList(){
       <td class="ol-r">¥${fmt(a2)}</td>
       <td class="ol-c" style="font-size:10px">${pays[2]?.actualDate||''}</td>
       <td class="ol-r">¥${fmt(a3)}</td>
-      <td class="ol-r">${epr.toFixed(1)}%</td>
       <td class="ol-r">¥${fmt(epAmt)}</td>
+      <td class="ol-r">${epr.toFixed(1)}%</td>
       <td class="ol-c" style="padding:2px 4px">
         <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
           <input type="text" inputmode="numeric" value="${apAmt ? apAmt.toLocaleString('ja-JP') : ''}" placeholder="0"
@@ -125,8 +125,8 @@ function renderOrdersTotals(list){
     <td class="ol-r">¥${fmt(totKai)}</td>
     <td class="ol-r" style="color:${totMi>0?'var(--danger)':'inherit'}">¥${fmt(totMi)}</td>
     <td colspan="6" style="padding:4px 6px"></td>
-    <td class="ol-r">${totEpRate}%</td>
     <td class="ol-r">¥${fmt(totEpAmt)}</td>
+    <td class="ol-r">${totEpRate}%</td>
     <td class="ol-r">¥${fmt(totApAmt)}</td>
     <td class="ol-r">${totApRate}%</td>
     <td></td>
@@ -159,8 +159,14 @@ function printOrdersList(){
     b.replaceWith(t);
   });
 
-  // colgroup: 22列分の幅を明示（合計 ≈ 1050pt、A3横1147ptに収まる）
-  const colWidths = [14,44,56,88,56,42,8,42,28,54,54,54,40,50,40,50,40,50,28,54,54,28];
+  // 日付セルを短縮（YYYY-MM-DD → M/D）
+  tbl.querySelectorAll('td').forEach(td => {
+    td.innerHTML = td.innerHTML.replace(/(\d{4})-(\d{1,2})-(\d{1,2})/g,
+      (_,y,m,d) => parseInt(m)+'/'+parseInt(d));
+  });
+
+  // colgroup: 22列分の幅を明示（合計 ≈ 1048pt、A3横1147ptに収まる）
+  const colWidths = [14,44,65,100,65,42,8,42,28,60,60,60,40,52,40,52,40,52,60,32,60,32];
   const cg = document.createElement('colgroup');
   colWidths.forEach(w => {
     const c = document.createElement('col');
@@ -181,7 +187,7 @@ h2 { font-size: 10pt; margin: 0 0 2mm; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 th, td { border: 0.4pt solid #888; padding: 1pt 2pt; overflow: hidden; word-break: break-all; vertical-align: middle; }
 th { background: #dae3f3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 700; text-align: center; font-size: 6pt; }
-.ol-r { text-align: right; }
+.ol-r { text-align: right; white-space: nowrap; }
 .ol-c { text-align: left; }
 .ol-no { text-align: center; color: #666; font-size: 5.5pt; }
 tr:nth-child(even) td { background: #f5f5f5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
