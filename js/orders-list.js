@@ -56,9 +56,9 @@ function renderOrdersList(){
       <td class="ol-c" style="padding:2px 4px">
         <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
           <input type="text" inputmode="numeric" value="${comp||''}" placeholder="0"
+            data-est-id="${e.id}" data-field="completion"
             style="width:38px;text-align:right;font-size:11px;padding:2px 3px"
             onfocus="this.value=this.value.replace(/,/g,'')"
-            onblur="saveOlField(${e.id},'completion',parseFloat(this.value)||0);this.value=parseFloat(this.value)||0"
           ><span style="font-size:10px;color:var(--text-muted)">%</span>
         </div>
       </td>
@@ -75,16 +75,17 @@ function renderOrdersList(){
       <td class="ol-r">¥${fmt(epAmt)}</td>
       <td class="ol-c" style="padding:2px 4px">
         <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
-          <input type="text" inputmode="numeric" value="${apAmt||''}" placeholder="0"
+          <input type="text" inputmode="numeric" value="${apAmt ? apAmt.toLocaleString('ja-JP') : ''}" placeholder="0"
+            data-est-id="${e.id}" data-field="actualProfit"
             style="width:80px;text-align:right;font-size:11px;padding:2px 3px"
             onfocus="this.value=this.value.replace(/,/g,'')"
-            onblur="saveOlField(${e.id},'actualProfit',parseFloat(this.value)||0);this.value=(parseFloat(this.value)||0).toLocaleString('ja-JP')"
+            onblur="this.value=this.value?(parseFloat(this.value.replace(/,/g,''))||0).toLocaleString('ja-JP'):''"
           ><span style="font-size:10px;color:var(--text-muted)">円</span>
         </div>
       </td>
       <td class="ol-r">${apRate.toFixed(1)}%</td>
       <td class="ol-c ol-memo" contenteditable="true" spellcheck="false"
-        onblur="saveOlField(${e.id},'ordersMemo',this.textContent.trim())"
+        data-est-id="${e.id}" data-field="ordersMemo"
         >${esc(e.ordersMemo||'')}</td>
     </tr>`;
   }).join('');
@@ -130,6 +131,34 @@ function renderOrdersTotals(list){
     <td class="ol-r">${totApRate}%</td>
     <td></td>
   </tr>`;
+}
+
+async function saveOrdersList(){
+  const table = document.getElementById('orders-table');
+  if(!table) return;
+  const changes = {};
+  table.querySelectorAll('[data-est-id][data-field]').forEach(el=>{
+    const id = parseInt(el.dataset.estId);
+    const field = el.dataset.field;
+    if(!changes[id]) changes[id] = {};
+    if(el.tagName === 'TD'){
+      changes[id][field] = el.textContent.trim();
+    } else {
+      const raw = el.value.replace(/,/g,'');
+      changes[id][field] = field==='completion' ? (parseFloat(raw)||0) : (parseFloat(raw)||0);
+    }
+  });
+  const ids = Object.keys(changes);
+  if(!ids.length){ showToast('保存するデータがありません'); return; }
+  let ok = true;
+  for(const id of ids){
+    const est = estimates.find(e=>e.id===parseInt(id));
+    if(!est) continue;
+    Object.assign(est, changes[id]);
+    try{ await dbSaveEstimate(est); } catch(_){ ok=false; }
+  }
+  if(ok) showToast('受注一覧を保存しました');
+  renderOrdersList();
 }
 
 async function saveOlField(estId, field, value){
