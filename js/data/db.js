@@ -66,9 +66,12 @@ async function fetchAllData(){
 }
 
 function rowToEstimate(r){
+  const ci=r.contract_info||{};
   return {id:r.id,title:r.title,no:r.no,date:r.date,expire:r.expire,status:r.status,type:r.type,
     startDate:r.start_date,endDate:r.end_date,clientName:r.client_name,projectName:r.project_name,siteName:r.site_name,
     note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[],
+    contractDate:ci.contractDate||'',contractAmount:ci.contractAmount||0,extras:ci.extras||[],
+    completion:ci.completion||0,actualProfit:ci.actualProfit||0,ordersMemo:ci.ordersMemo||'',
     updatedAt:r.updated_at};
 }
 
@@ -212,6 +215,11 @@ async function dbSaveEstimate(data){
     start_date:data.startDate||null,end_date:data.endDate||null,
     client_name:data.clientName,project_name:data.projectName,site_name:data.siteName,note:data.note,
     discount_amount:data.discountAmount,tax_rate:data.taxRate,payments:data.payments,sections:data.sections,
+    contract_info:{
+      contractDate:data.contractDate||null,contractAmount:data.contractAmount||0,
+      extras:data.extras||[],
+      completion:data.completion||0,actualProfit:data.actualProfit||0,ordersMemo:data.ordersMemo||''
+    },
     updated_at:new Date().toISOString()
   };
   if(typeof data.id==='number' && estimates.some(e=>e.id===data.id)){
