@@ -7,7 +7,7 @@ function estSubTab(t){
   if(t==='items') renderSections();
   if(t==='summary'){recalcSum();renderSumBreakdown();}
   if(t==='master'){renderEstCategoryMaster();renderEstPresetMaster();}
-  if(t==='info'){
+  if(t==='info' && document.getElementById('page-estimate')?.classList.contains('active')){
     document.body.classList.add('sch-preview');
     loadScheduleForProject && loadScheduleForProject();
   } else {
