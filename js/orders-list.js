@@ -97,27 +97,31 @@ function renderOrdersList(){
 function renderOrdersTotals(list){
   const el = document.getElementById('orders-list-totals');
   if(!el) return;
-  const totCa    = list.reduce((s,e)=>{
+  const totCa     = list.reduce((s,e)=>{
     const ex=e.extras||[];
     return s+(e.contractAmount||0)+(ex[0]?.amount||0)+(ex[1]?.amount||0)+(ex[2]?.amount||0);
   },0);
-  const totKai   = list.reduce((s,e)=>(s+(e.payments||[]).reduce((s2,p)=>s2+(p.actualAmount||0),0)),0);
-  const totMi    = totCa - totKai;
-  const totEpAmt = list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.estProfitRate||0)/100),0);
-  const totApAmt = list.reduce((s,e)=>s+(e.actualProfit||0),0);
+  const totDeki   = list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.completion||0)/100),0);
+  const totKai    = list.reduce((s,e)=>(s+(e.payments||[]).reduce((s2,p)=>s2+(p.actualAmount||0),0)),0);
+  const totMi     = totCa - totKai;
+  const totEpAmt  = list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.estProfitRate||0)/100),0);
+  const totEpRate = totCa ? (totEpAmt/totCa*100).toFixed(1) : '—';
+  const totApAmt  = list.reduce((s,e)=>s+(e.actualProfit||0),0);
+  const totApRate = totCa ? (totApAmt/totCa*100).toFixed(1) : '—';
 
-  el.innerHTML = `<tr style="font-weight:700;background:var(--surface2)">
+  el.innerHTML = `<tr style="font-weight:700;background:var(--surface2);border-top:2px solid var(--border)">
     <td colspan="4" style="padding:5px 8px;text-align:center">合　　　計</td>
     <td class="ol-r">¥${fmt(totCa)}</td>
-    <td colspan="4"></td>
+    <td colspan="2" style="padding:4px 6px"></td>
+    <td class="ol-r">¥${fmt(totDeki)}</td>
+    <td class="ol-r">¥${fmt(totKai)}</td>
     <td class="ol-r" style="color:${totMi>0?'var(--danger)':'inherit'}">¥${fmt(totMi)}</td>
-    <td colspan="6"></td>
+    <td colspan="6" style="padding:4px 6px"></td>
     <td class="ol-r" style="color:${totMi>0?'var(--danger)':'inherit'}">¥${fmt(totMi)}</td>
-    <td colspan="2"></td>
+    <td class="ol-r">${totEpRate}%</td>
     <td class="ol-r">¥${fmt(totEpAmt)}</td>
-    <td colspan="1"></td>
     <td class="ol-r">¥${fmt(totApAmt)}</td>
-    <td class="ol-r"></td>
+    <td class="ol-r">${totApRate}%</td>
     <td></td>
   </tr>`;
 }
