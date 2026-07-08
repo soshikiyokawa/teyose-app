@@ -213,7 +213,8 @@ function calcEstTotal(e){
 let _sidebarStatusFilter='';
 function setSidebarStatusFilter(s){
   _sidebarStatusFilter=s;
-  document.querySelectorAll('.sf-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()==={''：'全て','draft':'下書き','sent':'提出済み','approved':'受注','completed':'完工'}[s]||(!s&&b.textContent.trim()==='全て')));
+  const label={'':'全て','draft':'下書き','sent':'提出済み','approved':'受注','completed':'完工'}[s]||'全て';
+  document.querySelectorAll('.sf-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===label));
   renderProjectSidebar();
 }
 
