@@ -45,7 +45,9 @@ function renderOrdersList(){
       <td class="ol-c" style="white-space:nowrap">${esc(e.clientName||'')}</td>
       <td class="ol-c">${esc(e.projectName||'')} ${badge}</td>
       <td class="ol-r">¥${fmt(totalCa)}</td>
-      <td class="ol-c" style="white-space:nowrap;font-size:10px">${e.startDate||''}〜${e.endDate||''}</td>
+      <td class="ol-c">${e.startDate||''}</td>
+      <td class="ol-c" style="text-align:center;padding:2px 0;color:var(--text-muted)">〜</td>
+      <td class="ol-c">${e.endDate||''}</td>
       <td class="ol-c" style="padding:2px 4px">
         <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
           <input type="text" inputmode="numeric" value="${comp||''}" placeholder="0"
@@ -112,7 +114,7 @@ function renderOrdersTotals(list){
   el.innerHTML = `<tr style="font-weight:700;background:var(--surface2);border-top:2px solid var(--border)">
     <td colspan="4" style="padding:5px 8px;text-align:center">合　　　計</td>
     <td class="ol-r">¥${fmt(totCa)}</td>
-    <td colspan="2" style="padding:4px 6px"></td>
+    <td colspan="4" style="padding:4px 6px"></td>
     <td class="ol-r">¥${fmt(totDeki)}</td>
     <td class="ol-r">¥${fmt(totKai)}</td>
     <td class="ol-r" style="color:${totMi>0?'var(--danger)':'inherit'}">¥${fmt(totMi)}</td>
