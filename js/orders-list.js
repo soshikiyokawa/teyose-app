@@ -133,6 +133,40 @@ function renderOrdersTotals(list){
   </tr>`;
 }
 
+function printOrdersList(){
+  // 印刷エリアを動的生成（テーブルのHTMLをコピーしinputを値テキストに変換）
+  let existing = document.getElementById('orders-print-area');
+  if(existing) existing.remove();
+
+  const src = document.getElementById('orders-table');
+  if(!src) return;
+
+  const wrap = document.createElement('div');
+  wrap.id = 'orders-print-area';
+
+  const title = document.createElement('div');
+  title.id = 'orders-print-title';
+  title.textContent = '受注一覧表　' + new Date().toLocaleDateString('ja-JP');
+  wrap.appendChild(title);
+
+  const tbl = src.cloneNode(true);
+  // input要素を値テキストに置換
+  tbl.querySelectorAll('input').forEach(inp => {
+    const span = document.createElement('span');
+    span.textContent = inp.value;
+    inp.replaceWith(span);
+  });
+  // contenteditable td はそのまま表示される
+  tbl.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+  wrap.appendChild(tbl);
+  document.body.appendChild(wrap);
+
+  window.print();
+
+  // 印刷後にクリーンアップ
+  setTimeout(() => { const el = document.getElementById('orders-print-area'); if(el) el.remove(); }, 1000);
+}
+
 async function saveOrdersList(){
   const table = document.getElementById('orders-table');
   if(!table) return;

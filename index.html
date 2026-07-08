@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=119">
-<link rel="stylesheet" href="css/schedule.css?v=119">
+<link rel="stylesheet" href="css/main.css?v=120">
+<link rel="stylesheet" href="css/schedule.css?v=120">
 </head>
 <body>
 
@@ -447,6 +447,10 @@
     <h2 style="margin:0;font-size:15px">受注一覧表</h2>
     <span style="font-size:11px;color:var(--text-muted)">ステータス：受注・提出済み・完工</span>
     <button class="btn xs" style="margin-left:auto" onclick="renderOrdersList()">更新</button>
+    <button class="btn xs" onclick="printOrdersList()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      A3印刷
+    </button>
     <button class="btn xs primary" onclick="saveOrdersList()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       保存
@@ -883,53 +887,53 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=119"></script>
+<script src="js/supabase-client.js?v=120"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=119"></script>
+<script src="js/utils.js?v=120"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=119"></script>
+<script src="js/state.js?v=120"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=119"></script>
+<script src="js/data/db.js?v=120"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=119"></script>
+<script src="js/nav.js?v=120"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=119"></script>
+<script src="js/talk.js?v=120"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=119"></script>
+<script src="js/push.js?v=120"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=119"></script>
-<script src="js/estimate/estimate-items.js?v=119"></script>
-<script src="js/estimate/estimate-master.js?v=119"></script>
-<script src="js/estimate/estimate-summary.js?v=119"></script>
-<script src="js/estimate/estimate-crud.js?v=119"></script>
-<script src="js/estimate/estimate-pdf.js?v=119"></script>
-<script src="js/estimate/estimate-invoice.js?v=119"></script>
+<script src="js/estimate/estimate-tabs.js?v=120"></script>
+<script src="js/estimate/estimate-items.js?v=120"></script>
+<script src="js/estimate/estimate-master.js?v=120"></script>
+<script src="js/estimate/estimate-summary.js?v=120"></script>
+<script src="js/estimate/estimate-crud.js?v=120"></script>
+<script src="js/estimate/estimate-pdf.js?v=120"></script>
+<script src="js/estimate/estimate-invoice.js?v=120"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=119"></script>
+<script src="js/orders-list.js?v=120"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=119"></script>
+<script src="js/schedule.js?v=120"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=119"></script>
-<script src="js/order/item-master.js?v=119"></script>
-<script src="js/order/order-cart.js?v=119"></script>
-<script src="js/order/order-confirm.js?v=119"></script>
-<script src="js/order/order-history.js?v=119"></script>
+<script src="js/order/supplier-master.js?v=120"></script>
+<script src="js/order/item-master.js?v=120"></script>
+<script src="js/order/order-cart.js?v=120"></script>
+<script src="js/order/order-confirm.js?v=120"></script>
+<script src="js/order/order-history.js?v=120"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=119"></script>
+<script src="js/init.js?v=120"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=119"></script>
+<script src="js/auth.js?v=120"></script>
 </body>
 </html>
