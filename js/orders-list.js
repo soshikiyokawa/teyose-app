@@ -129,7 +129,7 @@ function renderOrdersTotals(list){
     <td class="ol-r">${totEpRate}%</td>
     <td class="ol-r">¥${fmt(totApAmt)}</td>
     <td class="ol-r">${totApRate}%</td>
-    <td></td>
+    <td class="ol-memo"></td>
   </tr>`;
 }
 
