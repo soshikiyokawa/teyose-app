@@ -131,7 +131,5 @@ async function saveOlField(estId, field, value){
   if(!est) return;
   est[field] = value;
   try{ await dbSaveEstimate(est); } catch(_){}
-  renderOrdersTotals(
-    (estimates||[]).filter(e=>e.status==='approved'||e.status==='sent')
-  );
+  renderOrdersList();
 }
