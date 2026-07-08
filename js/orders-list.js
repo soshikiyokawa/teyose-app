@@ -25,8 +25,11 @@ function renderOrdersList(){
     const kaishuu = a1+a2+a3;
     const mishuu  = ca - kaishuu;
     const zankin  = ca - a1 - a2 - a3;
-    const epr  = e.estProfitRate||0;
-    const epAmt= Math.round(ca * epr / 100);
+    const secs = e.sections||[];
+    const sectTotal = secs.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
+    const sectCost  = secs.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.cost,0),0);
+    const epAmt= sectTotal - sectCost;
+    const epr  = sectTotal > 0 ? epAmt/sectTotal*100 : 0;
     const apAmt= e.actualProfit||0;
     const apRate = ca ? (apAmt/ca*100) : 0;
     const extras = e.extras||[];
@@ -66,15 +69,7 @@ function renderOrdersList(){
       <td class="ol-r">¥${fmt(a2)}</td>
       <td class="ol-c" style="font-size:10px">${pays[2]?.actualDate||''}</td>
       <td class="ol-r">¥${fmt(a3)}</td>
-      <td class="ol-c" style="padding:2px 4px">
-        <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
-          <input type="text" inputmode="numeric" value="${epr||''}" placeholder="0"
-            style="width:38px;text-align:right;font-size:11px;padding:2px 3px"
-            onfocus="this.value=this.value.replace(/,/g,'')"
-            onblur="saveOlField(${e.id},'estProfitRate',parseFloat(this.value)||0);this.value=parseFloat(this.value)||0"
-          ><span style="font-size:10px;color:var(--text-muted)">%</span>
-        </div>
-      </td>
+      <td class="ol-r">${epr.toFixed(1)}%</td>
       <td class="ol-r">¥${fmt(epAmt)}</td>
       <td class="ol-c" style="padding:2px 4px">
         <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
@@ -105,8 +100,17 @@ function renderOrdersTotals(list){
   const totDeki   = list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.completion||0)/100),0);
   const totKai    = list.reduce((s,e)=>(s+(e.payments||[]).reduce((s2,p)=>s2+(p.actualAmount||0),0)),0);
   const totMi     = totCa - totKai;
-  const totEpAmt  = list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.estProfitRate||0)/100),0);
-  const totEpRate = totCa ? (totEpAmt/totCa*100).toFixed(1) : '—';
+  const totEpAmt  = list.reduce((s,e)=>{
+    const secs=e.sections||[];
+    const t=secs.reduce((t2,sec)=>t2+sec.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
+    const c=secs.reduce((t2,sec)=>t2+sec.items.reduce((s2,i)=>s2+i.qty*i.cost,0),0);
+    return s+(t-c);
+  },0);
+  const totSectTotal = list.reduce((s,e)=>{
+    const secs=e.sections||[];
+    return s+secs.reduce((t,sec)=>t+sec.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
+  },0);
+  const totEpRate = totSectTotal ? (totEpAmt/totSectTotal*100).toFixed(1) : '—';
   const totApAmt  = list.reduce((s,e)=>s+(e.actualProfit||0),0);
   const totApRate = totCa ? (totApAmt/totCa*100).toFixed(1) : '—';
 
