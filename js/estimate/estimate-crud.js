@@ -27,6 +27,40 @@ function collectEstData(){
     sections:sections.map(s=>({...s,items:[...s.items]})),discountAmount:parseFloat(v('discount-amount'))||0,taxRate:parseFloat(v('tax-rate'))||10};
 }
 
+async function saveEstInfo(){
+  if(!editingEstId){ showToast('先に見積を選択してください'); return; }
+  const existing = estimates.find(e=>e.id===editingEstId);
+  if(!existing) return;
+  const v=id=>document.getElementById(id)?.value||'';
+  const updated = {...existing,
+    title:v('est-title')||defaultEstTitle(),no:v('est-no'),date:v('est-date'),expire:v('est-expire'),
+    status:v('est-status'),type:v('est-type'),
+    startDate:v('est-start-date'),endDate:v('est-end-date'),
+    clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
+    contractDate:v('est-contract-date'),contractAmount:payAmtVal('est-contract-amount'),
+    extras:[
+      {date:v('est-extra1-date'),amount:payAmtVal('est-extra1-amount')},
+      {date:v('est-extra2-date'),amount:payAmtVal('est-extra2-amount')},
+      {date:v('est-extra3-date'),amount:payAmtVal('est-extra3-amount')}
+    ],
+    payments:[
+      {label:'着工金',date:v('est-pay1-date'),amount:payAmtVal('est-pay1-amount'),actualDate:v('est-pay1-actual-date'),actualAmount:payAmtVal('est-pay1-actual-amount')},
+      {label:'上棟時金',date:v('est-pay2-date'),amount:payAmtVal('est-pay2-amount'),actualDate:v('est-pay2-actual-date'),actualAmount:payAmtVal('est-pay2-actual-amount')},
+      {label:'最終金',date:v('est-pay3-date'),amount:payAmtVal('est-pay3-amount'),actualDate:v('est-pay3-actual-date'),actualAmount:payAmtVal('est-pay3-actual-amount')}
+    ]
+  };
+  try{
+    await dbSaveEstimate(updated);
+  }catch(e){ return; }
+  const i=estimates.findIndex(e=>e.id===editingEstId);
+  if(i>=0) estimates[i]=updated;
+  updated.updatedAt=new Date().toISOString();
+  estDirty=false;
+  updateEstBadge();
+  renderProjectSidebar();
+  showToast('案件情報を保存しました');
+}
+
 async function saveEstimate(){
   const data=collectEstData();
   let savedId;
