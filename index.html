@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=105">
-<link rel="stylesheet" href="css/schedule.css?v=105">
+<link rel="stylesheet" href="css/main.css?v=106">
+<link rel="stylesheet" href="css/schedule.css?v=106">
 </head>
 <body>
 
@@ -93,17 +93,17 @@
         </div>
       </div>
       <div class="form-grid">
-        <div class="fg full"><label>保存名</label><input id="est-title" placeholder="御見積書20260628"></div>
+        <div class="fg"><label>保存名</label><input id="est-title" placeholder="御見積書20260628"></div>
         <div class="fg"><label>見積番号</label><input id="est-no" placeholder="E2025-001"></div>
         <div class="fg"><label>見積日</label><input type="date" id="est-date"></div>
         <div class="fg"><label>有効期限</label><input type="date" id="est-expire"></div>
+        <div class="fg"><label>工事区分</label>
+          <select id="est-type" onchange="applyDefaultForCurrentType()"></select>
+        </div>
         <div class="fg"><label>ステータス</label>
           <select id="est-status" onchange="updateEstBadge()">
             <option value="draft">下書き</option><option value="sent">提出済み</option><option value="approved">受注</option>
           </select>
-        </div>
-        <div class="fg"><label>工事区分</label>
-          <select id="est-type" onchange="applyDefaultForCurrentType()"></select>
         </div>
         <div class="fg"><label>着工予定日</label><input type="date" id="est-start-date"></div>
         <div class="fg"><label>完工予定日</label><input type="date" id="est-end-date"></div>
@@ -791,50 +791,50 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=105"></script>
+<script src="js/supabase-client.js?v=106"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=105"></script>
+<script src="js/utils.js?v=106"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=105"></script>
+<script src="js/state.js?v=106"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=105"></script>
+<script src="js/data/db.js?v=106"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=105"></script>
+<script src="js/nav.js?v=106"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=105"></script>
+<script src="js/talk.js?v=106"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=105"></script>
+<script src="js/push.js?v=106"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=105"></script>
-<script src="js/estimate/estimate-items.js?v=105"></script>
-<script src="js/estimate/estimate-master.js?v=105"></script>
-<script src="js/estimate/estimate-summary.js?v=105"></script>
-<script src="js/estimate/estimate-crud.js?v=105"></script>
-<script src="js/estimate/estimate-pdf.js?v=105"></script>
-<script src="js/estimate/estimate-invoice.js?v=105"></script>
+<script src="js/estimate/estimate-tabs.js?v=106"></script>
+<script src="js/estimate/estimate-items.js?v=106"></script>
+<script src="js/estimate/estimate-master.js?v=106"></script>
+<script src="js/estimate/estimate-summary.js?v=106"></script>
+<script src="js/estimate/estimate-crud.js?v=106"></script>
+<script src="js/estimate/estimate-pdf.js?v=106"></script>
+<script src="js/estimate/estimate-invoice.js?v=106"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=105"></script>
+<script src="js/schedule.js?v=106"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=105"></script>
-<script src="js/order/item-master.js?v=105"></script>
-<script src="js/order/order-cart.js?v=105"></script>
-<script src="js/order/order-confirm.js?v=105"></script>
-<script src="js/order/order-history.js?v=105"></script>
+<script src="js/order/supplier-master.js?v=106"></script>
+<script src="js/order/item-master.js?v=106"></script>
+<script src="js/order/order-cart.js?v=106"></script>
+<script src="js/order/order-confirm.js?v=106"></script>
+<script src="js/order/order-history.js?v=106"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=105"></script>
+<script src="js/init.js?v=106"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=105"></script>
+<script src="js/auth.js?v=106"></script>
 </body>
 </html>
