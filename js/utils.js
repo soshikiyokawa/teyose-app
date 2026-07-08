@@ -1,4 +1,16 @@
 const fmt = n => Math.round(n).toLocaleString('ja-JP');
+
+function payAmtFocus(el){ el.value = el.value.replace(/,/g,''); }
+function payAmtBlur(el){
+  const n = parseFloat(el.value.replace(/,/g,''));
+  el.value = isNaN(n)||n===0 ? '' : n.toLocaleString('ja-JP');
+}
+function payAmtLoad(id, val){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.value = val ? Number(val).toLocaleString('ja-JP') : '';
+}
+function payAmtVal(id){ return parseFloat((document.getElementById(id)?.value||'').replace(/,/g,''))||0; }
 const COMPANY = {name:'株式会社きよかわ',zip:'〒731-0221',address:'広島県広島市安佐北区可部2-13-31-1',tel:'082-815-6080',fax:'082-815-6081',regNo:'T9-2400-0101-8389',url:'kiyokawanoie.com'};
 
 function showToast(msg, duration=2000){

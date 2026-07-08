@@ -11,9 +11,9 @@ function collectEstData(){
     startDate:v('est-start-date'),endDate:v('est-end-date'),
     clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
     payments:[
-      {label:'着工金',date:v('est-pay1-date'),amount:parseFloat(v('est-pay1-amount'))||0,actualDate:v('est-pay1-actual-date'),actualAmount:parseFloat(v('est-pay1-actual-amount'))||0},
-      {label:'上棟時金',date:v('est-pay2-date'),amount:parseFloat(v('est-pay2-amount'))||0,actualDate:v('est-pay2-actual-date'),actualAmount:parseFloat(v('est-pay2-actual-amount'))||0},
-      {label:'最終金',date:v('est-pay3-date'),amount:parseFloat(v('est-pay3-amount'))||0,actualDate:v('est-pay3-actual-date'),actualAmount:parseFloat(v('est-pay3-actual-amount'))||0}
+      {label:'着工金',date:v('est-pay1-date'),amount:payAmtVal('est-pay1-amount'),actualDate:v('est-pay1-actual-date'),actualAmount:payAmtVal('est-pay1-actual-amount')},
+      {label:'上棟時金',date:v('est-pay2-date'),amount:payAmtVal('est-pay2-amount'),actualDate:v('est-pay2-actual-date'),actualAmount:payAmtVal('est-pay2-actual-amount')},
+      {label:'最終金',date:v('est-pay3-date'),amount:payAmtVal('est-pay3-amount'),actualDate:v('est-pay3-actual-date'),actualAmount:payAmtVal('est-pay3-actual-amount')}
     ],
     sections:sections.map(s=>({...s,items:[...s.items]})),discountAmount:parseFloat(v('discount-amount'))||0,taxRate:parseFloat(v('tax-rate'))||10};
 }
@@ -139,9 +139,9 @@ function loadEstimate(est){
   sv('est-client',est.clientName);sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
   sv('discount-amount',est.discountAmount);sv('tax-rate',est.taxRate);
   const pays=est.payments||[];
-  sv('est-pay1-date',pays[0]?.date);sv('est-pay1-amount',pays[0]?.amount);sv('est-pay1-actual-date',pays[0]?.actualDate);sv('est-pay1-actual-amount',pays[0]?.actualAmount);
-  sv('est-pay2-date',pays[1]?.date);sv('est-pay2-amount',pays[1]?.amount);sv('est-pay2-actual-date',pays[1]?.actualDate);sv('est-pay2-actual-amount',pays[1]?.actualAmount);
-  sv('est-pay3-date',pays[2]?.date);sv('est-pay3-amount',pays[2]?.amount);sv('est-pay3-actual-date',pays[2]?.actualDate);sv('est-pay3-actual-amount',pays[2]?.actualAmount);
+  sv('est-pay1-date',pays[0]?.date);payAmtLoad('est-pay1-amount',pays[0]?.amount);sv('est-pay1-actual-date',pays[0]?.actualDate);payAmtLoad('est-pay1-actual-amount',pays[0]?.actualAmount);
+  sv('est-pay2-date',pays[1]?.date);payAmtLoad('est-pay2-amount',pays[1]?.amount);sv('est-pay2-actual-date',pays[1]?.actualDate);payAmtLoad('est-pay2-actual-amount',pays[1]?.actualAmount);
+  sv('est-pay3-date',pays[2]?.date);payAmtLoad('est-pay3-amount',pays[2]?.amount);sv('est-pay3-actual-date',pays[2]?.actualDate);payAmtLoad('est-pay3-actual-amount',pays[2]?.actualAmount);
   sections=est.sections.map(s=>({...s,items:[...s.items]}));
   secSeq=Math.max(secSeq,...sections.map(s=>s.id))+1;
   itemSeq=Math.max(itemSeq,1,...sections.flatMap(s=>s.items.map(i=>i.id)))+1;

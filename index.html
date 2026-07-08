@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=103">
-<link rel="stylesheet" href="css/schedule.css?v=103">
+<link rel="stylesheet" href="css/main.css?v=104">
+<link rel="stylesheet" href="css/schedule.css?v=104">
 </head>
 <body>
 
@@ -129,23 +129,23 @@
             <tr>
               <td style="padding:5px 8px;font-weight:600;color:var(--text-sub)">着工金</td>
               <td style="padding:4px 6px;border-left:1px solid var(--border)"><input type="date" id="est-pay1-date" style="width:100%"></td>
-              <td style="padding:4px 6px"><input type="number" id="est-pay1-amount" placeholder="0" style="width:100%;min-width:90px"></td>
+              <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay1-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
               <td style="padding:4px 6px;border-left:1px solid var(--border-s)"><input type="date" id="est-pay1-actual-date" style="width:100%"></td>
-              <td style="padding:4px 6px"><input type="number" id="est-pay1-actual-amount" placeholder="0" style="width:100%;min-width:90px"></td>
+              <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay1-actual-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
             </tr>
             <tr>
               <td style="padding:5px 8px;font-weight:600;color:var(--text-sub)">上棟時金</td>
               <td style="padding:4px 6px;border-left:1px solid var(--border)"><input type="date" id="est-pay2-date" style="width:100%"></td>
-              <td style="padding:4px 6px"><input type="number" id="est-pay2-amount" placeholder="0" style="width:100%;min-width:90px"></td>
+              <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay2-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
               <td style="padding:4px 6px;border-left:1px solid var(--border-s)"><input type="date" id="est-pay2-actual-date" style="width:100%"></td>
-              <td style="padding:4px 6px"><input type="number" id="est-pay2-actual-amount" placeholder="0" style="width:100%;min-width:90px"></td>
+              <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay2-actual-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
             </tr>
             <tr>
               <td style="padding:5px 8px;font-weight:600;color:var(--text-sub)">最終金</td>
               <td style="padding:4px 6px;border-left:1px solid var(--border)"><input type="date" id="est-pay3-date" style="width:100%"></td>
-              <td style="padding:4px 6px"><input type="number" id="est-pay3-amount" placeholder="0" style="width:100%;min-width:90px"></td>
+              <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay3-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
               <td style="padding:4px 6px;border-left:1px solid var(--border-s)"><input type="date" id="est-pay3-actual-date" style="width:100%"></td>
-              <td style="padding:4px 6px"><input type="number" id="est-pay3-actual-amount" placeholder="0" style="width:100%;min-width:90px"></td>
+              <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay3-actual-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
             </tr>
           </tbody>
         </table>
@@ -754,50 +754,50 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=103"></script>
+<script src="js/supabase-client.js?v=104"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=103"></script>
+<script src="js/utils.js?v=104"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=103"></script>
+<script src="js/state.js?v=104"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=103"></script>
+<script src="js/data/db.js?v=104"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=103"></script>
+<script src="js/nav.js?v=104"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=103"></script>
+<script src="js/talk.js?v=104"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=103"></script>
+<script src="js/push.js?v=104"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=103"></script>
-<script src="js/estimate/estimate-items.js?v=103"></script>
-<script src="js/estimate/estimate-master.js?v=103"></script>
-<script src="js/estimate/estimate-summary.js?v=103"></script>
-<script src="js/estimate/estimate-crud.js?v=103"></script>
-<script src="js/estimate/estimate-pdf.js?v=103"></script>
-<script src="js/estimate/estimate-invoice.js?v=103"></script>
+<script src="js/estimate/estimate-tabs.js?v=104"></script>
+<script src="js/estimate/estimate-items.js?v=104"></script>
+<script src="js/estimate/estimate-master.js?v=104"></script>
+<script src="js/estimate/estimate-summary.js?v=104"></script>
+<script src="js/estimate/estimate-crud.js?v=104"></script>
+<script src="js/estimate/estimate-pdf.js?v=104"></script>
+<script src="js/estimate/estimate-invoice.js?v=104"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=103"></script>
+<script src="js/schedule.js?v=104"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=103"></script>
-<script src="js/order/item-master.js?v=103"></script>
-<script src="js/order/order-cart.js?v=103"></script>
-<script src="js/order/order-confirm.js?v=103"></script>
-<script src="js/order/order-history.js?v=103"></script>
+<script src="js/order/supplier-master.js?v=104"></script>
+<script src="js/order/item-master.js?v=104"></script>
+<script src="js/order/order-cart.js?v=104"></script>
+<script src="js/order/order-confirm.js?v=104"></script>
+<script src="js/order/order-history.js?v=104"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=103"></script>
+<script src="js/init.js?v=104"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=103"></script>
+<script src="js/auth.js?v=104"></script>
 </body>
 </html>
