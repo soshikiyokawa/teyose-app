@@ -12,20 +12,45 @@
 
 /* ── 受注一覧 A3印刷 ── */
 @media print {
-  @page { size: A3 landscape; margin: 10mm; }
-  body * { visibility: hidden; }
-  #orders-print-area, #orders-print-area * { visibility: visible; }
+  @page { size: A3 landscape; margin: 8mm; }
+  body * { visibility: hidden !important; }
+  #orders-print-area, #orders-print-area * { visibility: visible !important; }
   #orders-print-area {
-    position: fixed; top: 0; left: 0; width: 100%;
-    font-size: 9px;
+    position: fixed; top: 0; left: 0;
+    width: 404mm; /* A3横 420mm - 余白16mm */
+    transform-origin: top left;
   }
-  #orders-print-area table { width: 100%; border-collapse: collapse; }
+  #orders-print-title {
+    font-size: 11pt; font-weight: bold; margin-bottom: 3mm;
+    font-family: sans-serif;
+  }
+  #orders-print-area table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+    font-size: 6.5pt;
+    font-family: sans-serif;
+  }
+  #orders-print-area col { width: auto !important; }
   #orders-print-area th, #orders-print-area td {
-    border: 0.5px solid #aaa; padding: 2px 4px; white-space: nowrap;
+    border: 0.4pt solid #888;
+    padding: 1.5pt 2pt;
+    overflow: hidden;
+    word-break: break-all;
   }
-  #orders-print-area th { background: #dae3f3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  #orders-print-area input, #orders-print-area [contenteditable] { border: none; background: none; width: auto; }
-  #orders-print-title { font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+  #orders-print-area th {
+    background: #dae3f3 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: 700;
+    text-align: center;
+  }
+  #orders-print-area input {
+    border: none !important; background: none !important;
+    padding: 0 !important; width: auto !important;
+    font-size: inherit; font-family: inherit;
+  }
+  #orders-print-area [contenteditable] { outline: none; }
 }
 
 /* ── 受注一覧テーブル ── */

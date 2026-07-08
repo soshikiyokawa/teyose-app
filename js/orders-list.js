@@ -134,7 +134,6 @@ function renderOrdersTotals(list){
 }
 
 function printOrdersList(){
-  // 印刷エリアを動的生成（テーブルのHTMLをコピーしinputを値テキストに変換）
   let existing = document.getElementById('orders-print-area');
   if(existing) existing.remove();
 
@@ -150,21 +149,32 @@ function printOrdersList(){
   wrap.appendChild(title);
 
   const tbl = src.cloneNode(true);
-  // input要素を値テキストに置換
+  // input → span（値テキスト）に置換
   tbl.querySelectorAll('input').forEach(inp => {
     const span = document.createElement('span');
     span.textContent = inp.value;
     inp.replaceWith(span);
   });
-  // contenteditable td はそのまま表示される
   tbl.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+  // colgroup の固定幅を解除してtable-layout:fixedで均等配分
+  tbl.querySelectorAll('col').forEach(col => col.removeAttribute('style'));
+  tbl.style.width = '100%';
+  tbl.style.tableLayout = 'fixed';
   wrap.appendChild(tbl);
   document.body.appendChild(wrap);
 
-  window.print();
+  // A3横(420mm)から余白(16mm)を引いた幅をpxに換算してスケール算出
+  const a3px = (404 / 25.4) * 96; // 96dpi換算
+  const tableW = wrap.scrollWidth;
+  if(tableW > a3px){
+    const scale = a3px / tableW;
+    wrap.style.transform = `scale(${scale})`;
+    wrap.style.transformOrigin = 'top left';
+    wrap.style.width = (tableW) + 'px';
+  }
 
-  // 印刷後にクリーンアップ
-  setTimeout(() => { const el = document.getElementById('orders-print-area'); if(el) el.remove(); }, 1000);
+  window.print();
+  setTimeout(() => { const el = document.getElementById('orders-print-area'); if(el) el.remove(); }, 1500);
 }
 
 async function saveOrdersList(){
