@@ -9,3 +9,32 @@
 @import url('order.css');
 @import url('talk.css');
 @import url('overlay.css');
+
+/* ── 受注一覧テーブル ── */
+.ol-th {
+  padding: 5px 6px;
+  text-align: center;
+  background: #dae3f3;
+  border: 1px solid #b0bfd4;
+  font-weight: 600;
+  font-size: 10px;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.ol-row { border-bottom: 1px solid var(--border); }
+.ol-row:nth-child(even) { background: var(--surface2); }
+.ol-row:hover { background: var(--wood-lt, #f5ede0); }
+.ol-no  { padding: 4px 6px; text-align: center; color: var(--text-muted); font-size: 10px; }
+.ol-c   { padding: 4px 6px; }
+.ol-r   { padding: 4px 8px; text-align: right; white-space: nowrap; }
+.ol-memo { padding: 4px 6px; min-width: 60px; outline: none; }
+.ol-memo:focus { background: var(--surface2); }
+#orders-table input[type="text"] {
+  border: 1px solid var(--border-s);
+  border-radius: 3px;
+  background: var(--surface2);
+  color: var(--text);
+  font-family: inherit;
+}

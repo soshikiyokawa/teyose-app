@@ -11,6 +11,9 @@ function collectEstData(){
     startDate:v('est-start-date'),endDate:v('est-end-date'),
     clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
     contractDate:v('est-contract-date'),contractAmount:payAmtVal('est-contract-amount'),
+    completion:parseFloat(document.getElementById('est-completion')?.value)||0,
+    estProfitRate:parseFloat(document.getElementById('est-profit-rate')?.value)||0,
+    actualProfit:payAmtVal('est-actual-profit'),
     extras:[
       {date:v('est-extra1-date'),amount:payAmtVal('est-extra1-amount')},
       {date:v('est-extra2-date'),amount:payAmtVal('est-extra2-amount')},

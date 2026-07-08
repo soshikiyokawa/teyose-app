@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=106">
-<link rel="stylesheet" href="css/schedule.css?v=106">
+<link rel="stylesheet" href="css/main.css?v=107">
+<link rel="stylesheet" href="css/schedule.css?v=107">
 </head>
 <body>
 
@@ -430,6 +430,52 @@
   </div>
 </div>
 
+<!-- ════ 受注一覧ページ ════ -->
+<div class="page staff-only" id="page-orderslist" style="padding:0">
+  <div style="padding:10px 12px 6px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)">
+    <h2 style="margin:0;font-size:15px">受注一覧表</h2>
+    <span style="font-size:11px;color:var(--text-muted)">ステータス：受注・提出済み</span>
+    <button class="btn xs" style="margin-left:auto" onclick="renderOrdersList()">更新</button>
+  </div>
+  <div style="overflow:auto;max-height:calc(100vh - 130px)">
+    <table id="orders-table" style="border-collapse:collapse;font-size:11px;min-width:1200px;width:100%">
+      <thead>
+        <tr class="ol-head1">
+          <th class="ol-th" rowspan="2" style="width:30px">No.</th>
+          <th class="ol-th" rowspan="2" style="width:84px">契約日</th>
+          <th class="ol-th" rowspan="2" style="width:80px">売上先</th>
+          <th class="ol-th" rowspan="2" style="min-width:100px">工事名</th>
+          <th class="ol-th" rowspan="2" style="width:100px">請負金額</th>
+          <th class="ol-th" rowspan="2" style="width:120px">工期</th>
+          <th class="ol-th" rowspan="2" style="width:56px">完成度</th>
+          <th class="ol-th" rowspan="2" style="width:90px">出来高</th>
+          <th class="ol-th" rowspan="2" style="width:90px">回収済み金</th>
+          <th class="ol-th" rowspan="2" style="width:90px">未収金</th>
+          <th class="ol-th" colspan="6" style="background:var(--wood-lt,#f5ede0)">入金実績（備考・入金条件）</th>
+          <th class="ol-th" rowspan="2" style="width:90px">残金</th>
+          <th class="ol-th" colspan="2" style="background:#e8f0e8">見込み粗利</th>
+          <th class="ol-th" colspan="2" style="background:#e0ebe0">完成粗利</th>
+          <th class="ol-th" rowspan="2" style="min-width:80px">備考</th>
+        </tr>
+        <tr class="ol-head2">
+          <th class="ol-th" style="background:var(--wood-lt,#f5ede0);width:84px">着工金 日付</th>
+          <th class="ol-th" style="background:var(--wood-lt,#f5ede0);width:90px">金額</th>
+          <th class="ol-th" style="background:var(--wood-lt,#f5ede0);width:84px">上棟時金 日付</th>
+          <th class="ol-th" style="background:var(--wood-lt,#f5ede0);width:90px">金額</th>
+          <th class="ol-th" style="background:var(--wood-lt,#f5ede0);width:84px">最終金 日付</th>
+          <th class="ol-th" style="background:var(--wood-lt,#f5ede0);width:90px">金額</th>
+          <th class="ol-th" style="background:#e8f0e8;width:52px">粗利率</th>
+          <th class="ol-th" style="background:#e8f0e8;width:90px">見込み額</th>
+          <th class="ol-th" style="background:#e0ebe0;width:100px">完成額</th>
+          <th class="ol-th" style="background:#e0ebe0;width:52px">粗利率</th>
+        </tr>
+      </thead>
+      <tbody id="orders-list-body"></tbody>
+      <tfoot id="orders-list-totals"></tfoot>
+    </table>
+  </div>
+</div>
+
 <!-- ════ 工程表ページ ════ -->
 <div class="page staff-only" id="page-schedule">
   <div class="sch-toolbar">
@@ -484,6 +530,10 @@
 
 <!-- bottom nav -->
 <nav class="main-nav" id="app-nav" style="display:none">
+  <button class="main-nav-btn staff-only" id="nav-orderslist" onclick="mainTab('orderslist')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+    受注一覧
+  </button>
   <button class="main-nav-btn staff-only" id="nav-schedule" onclick="mainTab('schedule')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
     工程表
@@ -791,50 +841,53 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=106"></script>
+<script src="js/supabase-client.js?v=107"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=106"></script>
+<script src="js/utils.js?v=107"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=106"></script>
+<script src="js/state.js?v=107"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=106"></script>
+<script src="js/data/db.js?v=107"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=106"></script>
+<script src="js/nav.js?v=107"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=106"></script>
+<script src="js/talk.js?v=107"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=106"></script>
+<script src="js/push.js?v=107"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=106"></script>
-<script src="js/estimate/estimate-items.js?v=106"></script>
-<script src="js/estimate/estimate-master.js?v=106"></script>
-<script src="js/estimate/estimate-summary.js?v=106"></script>
-<script src="js/estimate/estimate-crud.js?v=106"></script>
-<script src="js/estimate/estimate-pdf.js?v=106"></script>
-<script src="js/estimate/estimate-invoice.js?v=106"></script>
+<script src="js/estimate/estimate-tabs.js?v=107"></script>
+<script src="js/estimate/estimate-items.js?v=107"></script>
+<script src="js/estimate/estimate-master.js?v=107"></script>
+<script src="js/estimate/estimate-summary.js?v=107"></script>
+<script src="js/estimate/estimate-crud.js?v=107"></script>
+<script src="js/estimate/estimate-pdf.js?v=107"></script>
+<script src="js/estimate/estimate-invoice.js?v=107"></script>
+
+<!-- 受注一覧 -->
+<script src="js/orders-list.js?v=107"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=106"></script>
+<script src="js/schedule.js?v=107"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=106"></script>
-<script src="js/order/item-master.js?v=106"></script>
-<script src="js/order/order-cart.js?v=106"></script>
-<script src="js/order/order-confirm.js?v=106"></script>
-<script src="js/order/order-history.js?v=106"></script>
+<script src="js/order/supplier-master.js?v=107"></script>
+<script src="js/order/item-master.js?v=107"></script>
+<script src="js/order/order-cart.js?v=107"></script>
+<script src="js/order/order-confirm.js?v=107"></script>
+<script src="js/order/order-history.js?v=107"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=106"></script>
+<script src="js/init.js?v=107"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=106"></script>
+<script src="js/auth.js?v=107"></script>
 </body>
 </html>
