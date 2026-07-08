@@ -134,47 +134,69 @@ function renderOrdersTotals(list){
 }
 
 function printOrdersList(){
-  let existing = document.getElementById('orders-print-area');
-  if(existing) existing.remove();
-
   const src = document.getElementById('orders-table');
   if(!src) return;
 
-  const wrap = document.createElement('div');
-  wrap.id = 'orders-print-area';
-
-  const title = document.createElement('div');
-  title.id = 'orders-print-title';
-  title.textContent = '受注一覧表　' + new Date().toLocaleDateString('ja-JP');
-  wrap.appendChild(title);
-
   const tbl = src.cloneNode(true);
-  // input → span（値テキスト）に置換
+
+  // input → 値テキストに置換
   tbl.querySelectorAll('input').forEach(inp => {
     const span = document.createElement('span');
     span.textContent = inp.value;
     inp.replaceWith(span);
   });
   tbl.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
-  // colgroup の固定幅を解除してtable-layout:fixedで均等配分
-  tbl.querySelectorAll('col').forEach(col => col.removeAttribute('style'));
-  tbl.style.width = '100%';
-  tbl.style.tableLayout = 'fixed';
-  wrap.appendChild(tbl);
-  document.body.appendChild(wrap);
 
-  // A3横(420mm)から余白(16mm)を引いた幅をpxに換算してスケール算出
-  const a3px = (404 / 25.4) * 96; // 96dpi換算
-  const tableW = wrap.scrollWidth;
-  if(tableW > a3px){
-    const scale = a3px / tableW;
-    wrap.style.transform = `scale(${scale})`;
-    wrap.style.transformOrigin = 'top left';
-    wrap.style.width = (tableW) + 'px';
-  }
+  // 備考列（最終列）を削除
+  tbl.querySelectorAll('tr').forEach(tr => {
+    const cells = tr.querySelectorAll('th, td');
+    if(cells.length) cells[cells.length - 1].remove();
+  });
 
-  window.print();
-  setTimeout(() => { const el = document.getElementById('orders-print-area'); if(el) el.remove(); }, 1500);
+  // バッジを小さいテキストに置換
+  tbl.querySelectorAll('.badge').forEach(b => {
+    const t = document.createTextNode('[' + b.textContent + ']');
+    b.replaceWith(t);
+  });
+
+  // colgroup: 22列分の幅を明示（合計 ≈ 1050pt、A3横1147ptに収まる）
+  const colWidths = [14,44,56,88,56,42,8,42,28,54,54,54,40,50,40,50,40,50,28,54,54,28];
+  const cg = document.createElement('colgroup');
+  colWidths.forEach(w => {
+    const c = document.createElement('col');
+    c.style.width = w + 'pt';
+    cg.appendChild(c);
+  });
+  const oldCg = tbl.querySelector('colgroup');
+  if(oldCg) oldCg.replaceWith(cg); else tbl.prepend(cg);
+
+  const date = new Date().toLocaleDateString('ja-JP');
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>受注一覧表</title>
+<style>
+@page { size: A3 landscape; margin: 8mm; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Meiryo", "Yu Gothic", sans-serif; font-size: 6.5pt; }
+h2 { font-size: 10pt; margin: 0 0 2mm; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th, td { border: 0.4pt solid #888; padding: 1pt 2pt; overflow: hidden; word-break: break-all; vertical-align: middle; }
+th { background: #dae3f3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 700; text-align: center; font-size: 6pt; }
+.ol-r { text-align: right; }
+.ol-c { text-align: left; }
+.ol-no { text-align: center; color: #666; font-size: 5.5pt; }
+tr:nth-child(even) td { background: #f5f5f5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+tfoot td { font-weight: 700; background: #e8e8e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+</style>
+</head><body>
+<h2>受注一覧表　${date}</h2>
+${tbl.outerHTML}
+<script>window.onload=function(){ window.print(); setTimeout(()=>window.close(),800); }<\/script>
+</body></html>`;
+
+  const w = window.open('', '_blank', 'width=1200,height=800');
+  if(!w){ showToast('ポップアップをブロックされています。許可してください'); return; }
+  w.document.write(html);
+  w.document.close();
 }
 
 async function saveOrdersList(){
