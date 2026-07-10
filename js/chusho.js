@@ -115,13 +115,13 @@ function printChusho(estId){
     .pay-table td { border: 0.5pt solid #bbb; padding: 3pt 5pt; }
     .pay-table td.label { text-align: center; }
     .pay-table td.r { text-align: right; }
-    .sign-block { display: flex; gap: 12mm; justify-content: flex-end; margin-top: 12mm; }
-    .sign-box { width: 160px; }
-    .sign-box .sign-title { font-weight: 700; margin-bottom: 3mm; font-size: 9pt; }
-    .sign-box table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
-    .sign-box td { border: 0.5pt solid #aaa; padding: 3pt 5pt; vertical-align: top; }
-    .sign-box .lbl { background: #f5f5f5; font-weight: 600; white-space: nowrap; }
-    .stamp-area { display: inline-block; border: 0.5pt solid #bbb; width: 40px; height: 40px; margin-left: 8px; vertical-align: middle; }
+    .sign-block { display: flex; gap: 6mm; justify-content: flex-end; margin-top: 10mm; flex-wrap: wrap; }
+    .sign-box { width: 84mm; min-width: 0; flex: 0 0 84mm; }
+    .sign-box .sign-title { font-weight: 700; margin-bottom: 2mm; font-size: 9pt; }
+    .sign-box table { width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed; }
+    .sign-box td { border: 0.5pt solid #aaa; padding: 2pt 4pt; vertical-align: top; word-break: break-all; }
+    .sign-box .lbl { background: #f5f5f5; font-weight: 600; white-space: nowrap; width: 36px; }
+    .stamp-area { display: inline-block; border: 0.5pt solid #bbb; width: 36px; height: 36px; margin-left: 6px; vertical-align: middle; flex-shrink: 0; }
     .subtitle { font-size: 8pt; color: #555; text-align: center; margin-bottom: 4mm; }
   `;
 
