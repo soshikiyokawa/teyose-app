@@ -218,8 +218,8 @@ function printChusho(estId){
     </thead>
     <tbody>${payRows}</tbody>
   </table>
-  <div style="display:flex;gap:6mm;margin-top:10mm;align-items:flex-start">
-    <div style="flex:1;min-width:0">
+  <div style="margin-top:10mm">
+    <div style="margin-bottom:6mm">
       <div class="sign-title">注文者</div>
       <table class="sign-full-table">
         <tr><td class="lbl">住&ensp;所</td><td>${esc(est.clientAddress||'')}</td></tr>
@@ -228,7 +228,7 @@ function printChusho(estId){
         </tr>
       </table>
     </div>
-    <div style="flex:1;min-width:0">
+    <div>
       <div class="sign-title">請負者</div>
       <table class="sign-full-table">
         <tr><td class="lbl">住&ensp;所</td><td>広島県広島市安佐北区可部2-13-31-1</td></tr>
