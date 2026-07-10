@@ -119,7 +119,7 @@ function printChusho(estId){
     .sign-full-table { width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed; }
     .sign-full-table td { border: 0.5pt solid #aaa; padding: 2pt 4pt; vertical-align: top; word-break: break-all; }
     .sign-full-table .lbl { background: #f5f5f5; font-weight: 600; white-space: nowrap; width: 36px; }
-    .stamp-area { display: inline-block; border: 0.5pt solid #bbb; width: 36px; height: 36px; margin-left: 6px; vertical-align: middle; flex-shrink: 0; }
+    .stamp-mark { float: right; font-size: 9pt; color: #333; }
     .subtitle { font-size: 8pt; color: #555; text-align: center; margin-bottom: 4mm; }
   `;
 
@@ -170,7 +170,7 @@ function printChusho(estId){
     <table class="sign-full-table">
       <tr><td class="lbl">住&ensp;所</td><td>${esc(est.clientAddress||'')}</td></tr>
       <tr><td class="lbl">氏&ensp;名</td>
-        <td>${clientName}<span class="stamp-area"></span></td>
+        <td>${clientName}<span class="stamp-mark">印</span></td>
       </tr>
     </table>
   </div>
@@ -224,7 +224,7 @@ function printChusho(estId){
       <table class="sign-full-table">
         <tr><td class="lbl">住&ensp;所</td><td>${esc(est.clientAddress||'')}</td></tr>
         <tr><td class="lbl">氏&ensp;名</td>
-          <td>${clientName}<span class="stamp-area"></span></td>
+          <td>${clientName}<span class="stamp-mark">印</span></td>
         </tr>
       </table>
     </div>
@@ -234,7 +234,7 @@ function printChusho(estId){
         <tr><td class="lbl">住&ensp;所</td><td>広島県広島市安佐北区可部2-13-31-1</td></tr>
         <tr><td class="lbl">社&ensp;名</td><td>株式会社きよかわ</td></tr>
         <tr><td class="lbl">代&ensp;表</td>
-          <td>代表取締役　清川創史<span class="stamp-area"></span></td>
+          <td>代表取締役　清川創史<span class="stamp-mark">印</span></td>
         </tr>
         <tr><td class="lbl">TEL</td><td>082-815-6080</td></tr>
         <tr><td class="lbl">FAX</td><td>082-815-6081</td></tr>
