@@ -236,6 +236,7 @@ function printChusho(estId){
         <tr><td class="lbl">代&ensp;表</td>
           <td>代表取締役　清川創史<span class="stamp-mark">印</span></td>
         </tr>
+        <tr><td class="lbl">担&ensp;当</td><td>${esc(est.tantou||'')}</td></tr>
         <tr><td class="lbl">TEL</td><td>082-815-6080</td></tr>
         <tr><td class="lbl">FAX</td><td>082-815-6081</td></tr>
         <tr><td class="lbl">Mail</td><td>info@kiyokawanoie.com</td></tr>

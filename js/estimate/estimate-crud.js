@@ -10,7 +10,7 @@ function collectEstData(){
   return {id:editingEstId||Date.now(),title:v('est-title')||defaultEstTitle(),no:v('est-no'),date:v('est-date'),expire:v('est-expire'),status:v('est-status'),type:v('est-type'),
     startDate:v('est-start-date'),endDate:v('est-end-date'),
     clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
-    clientAddress:v('est-client-address'),
+    clientAddress:v('est-client-address'),tantou:v('est-tantou'),
     contractDate:v('est-contract-date'),contractAmount:payAmtVal('est-contract-amount'),
     completion:parseFloat(document.getElementById('est-completion')?.value)||0,
     estProfitRate:parseFloat(document.getElementById('est-profit-rate')?.value)||0,
@@ -38,7 +38,7 @@ async function saveEstInfo(){
     status:v('est-status'),type:v('est-type'),
     startDate:v('est-start-date'),endDate:v('est-end-date'),
     clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
-    clientAddress:v('est-client-address'),
+    clientAddress:v('est-client-address'),tantou:v('est-tantou'),
     contractDate:v('est-contract-date'),contractAmount:payAmtVal('est-contract-amount'),
     extras:[
       {date:v('est-extra1-date'),amount:payAmtVal('est-extra1-amount')},
@@ -109,7 +109,7 @@ function newEstimateChecked(){confirmEstDiscard(()=>newEstimate());}
 
 function newEstimate(){
   editingEstId=null;
-  ['est-no','est-date','est-expire','est-start-date','est-end-date','est-client','est-client-address','est-project','est-site','est-note',
+  ['est-no','est-date','est-expire','est-start-date','est-end-date','est-client','est-client-address','est-tantou','est-project','est-site','est-note',
    'est-contract-date','est-extra1-date','est-extra2-date','est-extra3-date',
    'est-pay1-date','est-pay1-amount','est-pay2-date','est-pay2-amount','est-pay3-date','est-pay3-amount',
    'est-pay1-actual-date','est-pay1-actual-amount','est-pay2-actual-date','est-pay2-actual-amount','est-pay3-actual-date','est-pay3-actual-amount'
@@ -183,7 +183,7 @@ function loadEstimate(est){
   const sv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   sv('est-title',est.title);sv('est-no',est.no);sv('est-date',est.date);sv('est-expire',est.expire);sv('est-status',est.status);sv('est-type',est.type);
   sv('est-start-date',est.startDate);sv('est-end-date',est.endDate);
-  sv('est-client',est.clientName);sv('est-client-address',est.clientAddress);sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
+  sv('est-client',est.clientName);sv('est-client-address',est.clientAddress);sv('est-tantou',est.tantou);sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
   sv('discount-amount',est.discountAmount);sv('tax-rate',est.taxRate);
   const pays=est.payments||[];
   sv('est-contract-date',est.contractDate);payAmtLoad('est-contract-amount',est.contractAmount);
