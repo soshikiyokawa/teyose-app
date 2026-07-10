@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=125">
-<link rel="stylesheet" href="css/schedule.css?v=125">
+<link rel="stylesheet" href="css/main.css?v=126">
+<link rel="stylesheet" href="css/schedule.css?v=126">
 </head>
 <body>
 
@@ -197,10 +197,16 @@
     </div>
 
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <button class="btn primary" onclick="saveEstInfo()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        保存
-      </button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn primary" onclick="saveEstInfo()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          保存
+        </button>
+        <button class="btn" onclick="showChushoModal()" title="注文書・注文請書を出力">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          注文書出力
+        </button>
+      </div>
       <button class="btn" onclick="estSubTab('items')">明細入力へ <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
   </div>
@@ -887,53 +893,56 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=125"></script>
+<script src="js/supabase-client.js?v=126"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=125"></script>
+<script src="js/utils.js?v=126"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=125"></script>
+<script src="js/state.js?v=126"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=125"></script>
+<script src="js/data/db.js?v=126"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=125"></script>
+<script src="js/nav.js?v=126"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=125"></script>
+<script src="js/talk.js?v=126"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=125"></script>
+<script src="js/push.js?v=126"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=125"></script>
-<script src="js/estimate/estimate-items.js?v=125"></script>
-<script src="js/estimate/estimate-master.js?v=125"></script>
-<script src="js/estimate/estimate-summary.js?v=125"></script>
-<script src="js/estimate/estimate-crud.js?v=125"></script>
-<script src="js/estimate/estimate-pdf.js?v=125"></script>
-<script src="js/estimate/estimate-invoice.js?v=125"></script>
+<script src="js/estimate/estimate-tabs.js?v=126"></script>
+<script src="js/estimate/estimate-items.js?v=126"></script>
+<script src="js/estimate/estimate-master.js?v=126"></script>
+<script src="js/estimate/estimate-summary.js?v=126"></script>
+<script src="js/estimate/estimate-crud.js?v=126"></script>
+<script src="js/estimate/estimate-pdf.js?v=126"></script>
+<script src="js/estimate/estimate-invoice.js?v=126"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=125"></script>
+<script src="js/orders-list.js?v=126"></script>
+
+<!-- 注文書・注文請書 -->
+<script src="js/chusho.js?v=126"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=125"></script>
+<script src="js/schedule.js?v=126"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=125"></script>
-<script src="js/order/item-master.js?v=125"></script>
-<script src="js/order/order-cart.js?v=125"></script>
-<script src="js/order/order-confirm.js?v=125"></script>
-<script src="js/order/order-history.js?v=125"></script>
+<script src="js/order/supplier-master.js?v=126"></script>
+<script src="js/order/item-master.js?v=126"></script>
+<script src="js/order/order-cart.js?v=126"></script>
+<script src="js/order/order-confirm.js?v=126"></script>
+<script src="js/order/order-history.js?v=126"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=125"></script>
+<script src="js/init.js?v=126"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=125"></script>
+<script src="js/auth.js?v=126"></script>
 </body>
 </html>
