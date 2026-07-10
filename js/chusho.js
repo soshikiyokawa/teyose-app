@@ -115,12 +115,10 @@ function printChusho(estId){
     .pay-table td { border: 0.5pt solid #bbb; padding: 3pt 5pt; }
     .pay-table td.label { text-align: center; }
     .pay-table td.r { text-align: right; }
-    .sign-block { display: flex; gap: 6mm; justify-content: flex-end; margin-top: 10mm; flex-wrap: wrap; }
-    .sign-box { width: 84mm; min-width: 0; flex: 0 0 84mm; }
-    .sign-box .sign-title { font-weight: 700; margin-bottom: 2mm; font-size: 9pt; }
-    .sign-box table { width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed; }
-    .sign-box td { border: 0.5pt solid #aaa; padding: 2pt 4pt; vertical-align: top; word-break: break-all; }
-    .sign-box .lbl { background: #f5f5f5; font-weight: 600; white-space: nowrap; width: 36px; }
+    .sign-title { font-weight: 700; margin-bottom: 2mm; font-size: 9pt; }
+    .sign-full-table { width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed; }
+    .sign-full-table td { border: 0.5pt solid #aaa; padding: 2pt 4pt; vertical-align: top; word-break: break-all; }
+    .sign-full-table .lbl { background: #f5f5f5; font-weight: 600; white-space: nowrap; width: 36px; }
     .stamp-area { display: inline-block; border: 0.5pt solid #bbb; width: 36px; height: 36px; margin-left: 6px; vertical-align: middle; flex-shrink: 0; }
     .subtitle { font-size: 8pt; color: #555; text-align: center; margin-bottom: 4mm; }
   `;
@@ -130,7 +128,7 @@ function printChusho(estId){
   <h1>注　文　書</h1>
   <div class="date-line">注文日：${contractDate}</div>
   <div class="client-block">
-    <span class="client-name">${clientName}&nbsp;様</span>
+    <span class="client-name">株式会社きよかわ&nbsp;御中</span>
   </div>
   <p style="margin-bottom:6mm;line-height:1.8">下記のとおり注文いたします。</p>
   <table class="fields">
@@ -167,16 +165,14 @@ function printChusho(estId){
     </thead>
     <tbody>${payRows}</tbody>
   </table>
-  <div class="sign-block">
-    <div class="sign-box">
-      <div class="sign-title">注文者</div>
-      <table>
-        <tr><td class="lbl">住&ensp;所</td><td>${esc(est.clientAddress||'')}</td></tr>
-        <tr><td class="lbl">氏&ensp;名</td>
-          <td>${clientName}<span class="stamp-area"></span></td>
-        </tr>
-      </table>
-    </div>
+  <div class="sign-block" style="display:block;margin-top:10mm">
+    <div class="sign-title">注文者</div>
+    <table class="sign-full-table">
+      <tr><td class="lbl">住&ensp;所</td><td>${esc(est.clientAddress||'')}</td></tr>
+      <tr><td class="lbl">氏&ensp;名</td>
+        <td>${clientName}<span class="stamp-area"></span></td>
+      </tr>
+    </table>
   </div>
 </div>`;
 
@@ -222,19 +218,19 @@ function printChusho(estId){
     </thead>
     <tbody>${payRows}</tbody>
   </table>
-  <div class="sign-block">
-    <div class="sign-box">
+  <div style="display:flex;gap:6mm;margin-top:10mm;align-items:flex-start">
+    <div style="flex:1;min-width:0">
       <div class="sign-title">注文者</div>
-      <table>
+      <table class="sign-full-table">
         <tr><td class="lbl">住&ensp;所</td><td>${esc(est.clientAddress||'')}</td></tr>
         <tr><td class="lbl">氏&ensp;名</td>
           <td>${clientName}<span class="stamp-area"></span></td>
         </tr>
       </table>
     </div>
-    <div class="sign-box">
+    <div style="flex:1;min-width:0">
       <div class="sign-title">請負者</div>
-      <table>
+      <table class="sign-full-table">
         <tr><td class="lbl">住&ensp;所</td><td>広島県広島市安佐北区可部2-13-31-1</td></tr>
         <tr><td class="lbl">社&ensp;名</td><td>株式会社きよかわ</td></tr>
         <tr><td class="lbl">代&ensp;表</td>
