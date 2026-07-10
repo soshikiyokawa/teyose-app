@@ -21,7 +21,7 @@ function openOrderPreview(){
   const date=now.toISOString().slice(0,10);
   const no=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
   const sup=selectedSupplier||{name:'—',tel:'',email:''};
-  const subtotal=cart.reduce((s,c)=>s+c.price*c.qty,0);
+  const subtotal=cart.reduce((s,c)=>s+c.cost*c.qty,0);
   const tax=Math.round(subtotal*.1);
   currentOrder={no,project,date,dueDate,costType,suppliers:sup.name,supplierObj:sup,items:[...cart.map(c=>({...c}))],subtotal,tax,total:subtotal+tax};
 
@@ -48,8 +48,8 @@ function openOrderPreview(){
       <div style="flex:3;padding:6px 8px">${c.name}</div>
       <div style="flex:1;padding:6px 8px;text-align:center">${c.unit}</div>
       <div style="flex:1;padding:6px 8px;text-align:right">${c.qty}</div>
-      <div style="flex:1.2;padding:6px 8px;text-align:right">¥${fmt(c.price)}</div>
-      <div style="flex:1.2;padding:6px 8px;text-align:right;font-weight:600">¥${fmt(c.price*c.qty)}</div>
+      <div style="flex:1.2;padding:6px 8px;text-align:right">¥${fmt(c.cost)}</div>
+      <div style="flex:1.2;padding:6px 8px;text-align:right;font-weight:600">¥${fmt(c.cost*c.qty)}</div>
     </div>`).join('')}
     <div style="margin-top:12px;text-align:right;font-size:13px;line-height:2.2">
       <div>小計：¥${fmt(subtotal)}</div>

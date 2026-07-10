@@ -124,7 +124,7 @@ function renderCart(){
     <div class="cart-item">
       <div style="flex:1">
         <div style="font-size:13px;font-weight:500">${c.name}</div>
-        <div style="font-size:11px;color:var(--text-muted)">¥${fmt(c.price)}/${c.unit}</div>
+        <div style="font-size:11px;color:var(--text-muted)">¥${fmt(c.cost)}/${c.unit}</div>
       </div>
       <div class="qty-ctrl">
         <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>
@@ -132,10 +132,10 @@ function renderCart(){
         <button class="qty-btn" onclick="changeQty(${i},1)">＋</button>
         <span style="font-size:12px;color:var(--text-sub);margin-left:2px">${c.unit}</span>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--wood-t);min-width:62px;text-align:right">¥${fmt(c.price*c.qty)}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--wood-t);min-width:62px;text-align:right">¥${fmt(c.cost*c.qty)}</div>
       <button class="btn danger xs" onclick="removeCartItem(${i})" style="margin-left:4px">×</button>
     </div>`).join('');
-  document.getElementById('cart-total').textContent=fmt(cart.reduce((s,c)=>s+c.price*c.qty,0));
+  document.getElementById('cart-total').textContent=fmt(cart.reduce((s,c)=>s+c.cost*c.qty,0));
   updateOrderPreviewBtnState();
 }
 function changeQty(i,d){

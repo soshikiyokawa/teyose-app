@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=132">
-<link rel="stylesheet" href="css/schedule.css?v=132">
+<link rel="stylesheet" href="css/main.css?v=133">
+<link rel="stylesheet" href="css/schedule.css?v=133">
 </head>
 <body>
 
@@ -877,10 +877,7 @@
       <div class="fg"><label>単位</label><input id="m-unit" placeholder="本・枚・袋"></div>
     </div>
     <div class="fg" style="margin-top:10px"><label>品目名</label><input id="m-name" placeholder="例：杉 KD材 105×105×3000"></div>
-    <div class="form-row2" style="margin-top:10px">
-      <div class="fg"><label>単価（円）</label><input type="number" id="m-price" placeholder="0"></div>
-      <div class="fg"><label>原価（円）</label><input type="number" id="m-cost" placeholder="0"></div>
-    </div>
+    <div class="fg" style="margin-top:10px"><label>原価（円）</label><input type="number" id="m-cost" placeholder="0"><input type="hidden" id="m-price" value="0"></div>
     <div class="fg" style="margin-top:10px"><label>発注先</label><select id="m-supplier-sel"></select></div>
     <!-- 保存ボタン -->
     <div style="background:var(--accent-bg);border:0.5px solid var(--accent);border-radius:8px;padding:10px 12px;margin-top:14px;display:flex;align-items:center;gap:10px">
@@ -943,57 +940,57 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=132"></script>
+<script src="js/supabase-client.js?v=133"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=132"></script>
+<script src="js/utils.js?v=133"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=132"></script>
+<script src="js/state.js?v=133"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=132"></script>
+<script src="js/data/db.js?v=133"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=132"></script>
+<script src="js/nav.js?v=133"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=132"></script>
+<script src="js/talk.js?v=133"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=132"></script>
+<script src="js/push.js?v=133"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=132"></script>
-<script src="js/estimate/estimate-items.js?v=132"></script>
-<script src="js/estimate/estimate-master.js?v=132"></script>
-<script src="js/estimate/estimate-summary.js?v=132"></script>
-<script src="js/estimate/estimate-crud.js?v=132"></script>
-<script src="js/estimate/estimate-pdf.js?v=132"></script>
-<script src="js/estimate/estimate-invoice.js?v=132"></script>
+<script src="js/estimate/estimate-tabs.js?v=133"></script>
+<script src="js/estimate/estimate-items.js?v=133"></script>
+<script src="js/estimate/estimate-master.js?v=133"></script>
+<script src="js/estimate/estimate-summary.js?v=133"></script>
+<script src="js/estimate/estimate-crud.js?v=133"></script>
+<script src="js/estimate/estimate-pdf.js?v=133"></script>
+<script src="js/estimate/estimate-invoice.js?v=133"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=132"></script>
+<script src="js/orders-list.js?v=133"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=132"></script>
+<script src="js/chusho.js?v=133"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=132"></script>
+<script src="js/schedule.js?v=133"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=132"></script>
-<script src="js/order/item-master.js?v=132"></script>
-<script src="js/order/order-cart.js?v=132"></script>
-<script src="js/order/order-confirm.js?v=132"></script>
-<script src="js/order/order-history.js?v=132"></script>
-<script src="js/receipt.js?v=132"></script>
+<script src="js/order/supplier-master.js?v=133"></script>
+<script src="js/order/item-master.js?v=133"></script>
+<script src="js/order/order-cart.js?v=133"></script>
+<script src="js/order/order-confirm.js?v=133"></script>
+<script src="js/order/order-history.js?v=133"></script>
+<script src="js/receipt.js?v=133"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=132"></script>
+<script src="js/init.js?v=133"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=132"></script>
+<script src="js/auth.js?v=133"></script>
 </body>
 </html>

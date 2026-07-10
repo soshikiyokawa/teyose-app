@@ -48,8 +48,7 @@ function renderMaster(){
             <span class="mi-spec">${s}</span>
           </div>
           <div class="mi-meta">
-            <span>単価 ¥${fmt(m.price)}/${m.unit}</span>
-            <span>原価 ¥${fmt(m.cost)}</span>
+            <span>原価 ¥${fmt(m.cost)}/${m.unit}</span>
           </div>
         </div>
         <button class="mi-edit-btn-sm staff-only" onclick="duplicateMasterItem(${m.id})" title="この品目を複製して次の品目を追加">複製</button>
@@ -119,11 +118,10 @@ function openMasterEdit(id){
     document.getElementById('m-cat').value=m.cat;
     document.getElementById('m-name').value=m.name;
     document.getElementById('m-unit').value=m.unit;
-    document.getElementById('m-price').value=m.price;
     document.getElementById('m-cost').value=m.cost;
     document.getElementById('m-supplier-sel').value=m.supplier;
   }
-  // 発注先ロールは価格・原価のみ編集可（その他は閲覧のみ）
+  // 発注先ロールは原価のみ編集可（その他は閲覧のみ）
   const supplierOnly = currentUserRole!=='staff';
   ['m-cat','m-name','m-unit','m-supplier-sel'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
   document.getElementById('master-delete-btn').style.display = (supplierOnly||editingMasterId===-1) ? 'none' : 'inline-flex';
@@ -140,7 +138,6 @@ function duplicateMasterItem(id){
   document.getElementById('m-cat').value=m.cat;
   document.getElementById('m-name').value=m.name;
   document.getElementById('m-unit').value=m.unit;
-  document.getElementById('m-price').value=m.price;
   document.getElementById('m-cost').value=m.cost;
   document.getElementById('m-supplier-sel').value=m.supplier;
   document.getElementById('master-modal').classList.add('open');
@@ -173,8 +170,8 @@ async function saveMasterItem(){
     cat: document.getElementById('m-cat').value,
     name: document.getElementById('m-name').value.trim(),
     unit: document.getElementById('m-unit').value.trim()||'式',
-    price: parseInt(document.getElementById('m-price').value)||0,
     cost: parseInt(document.getElementById('m-cost').value)||0,
+    price: parseInt(document.getElementById('m-cost').value)||0,
     supplier: document.getElementById('m-supplier-sel').value
   };
   if(!item.name){alert('品目名を入力してください');return;}
