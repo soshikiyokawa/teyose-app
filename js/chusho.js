@@ -130,7 +130,7 @@ function printChusho(estId){
   <div class="client-block">
     <span class="client-name">株式会社きよかわ&nbsp;御中</span>
   </div>
-  <p style="margin-bottom:6mm;line-height:1.8">下記のとおり注文いたします。</p>
+  <p style="margin-bottom:6mm;line-height:1.8">本書面をもってリフォーム工事を注文します。<br>なお、請負者からの請書の提出をもって契約が成立するものとします。</p>
   <table class="fields">
     <tr>
       <td class="label">工事名称</td><td class="colon">：</td>
@@ -183,7 +183,7 @@ function printChusho(estId){
   <div class="client-block">
     <span class="client-name">${clientName}&nbsp;様</span>
   </div>
-  <p style="margin-bottom:6mm;line-height:1.8">下記のとおり請け負いいたします。</p>
+  <p style="margin-bottom:6mm;line-height:1.8">本書面の通り、リフォーム工事をお請けいたします。<br>なお、本書面の提出をもって契約が成立するものとします。</p>
   <table class="fields">
     <tr>
       <td class="label">工事名称</td><td class="colon">：</td>
