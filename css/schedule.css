@@ -11,6 +11,12 @@ body.sch-preview .gantt-body-right { overflow-x: auto; overflow-y: visible; heig
 body.sch-preview .gantt-left-panel { height: auto; }
 body.sch-preview .gantt-right-panel { height: auto; }
 body.sch-preview #task-edit-sheet { display: none; }
+/* プレビューモード：編集ボタン類・ドラッグ・クリック操作を無効化 */
+body.sch-preview .sch-toolbar button { display: none; }
+body.sch-preview .gantt-bar { pointer-events: none; cursor: default; }
+body.sch-preview .gantt-bar-hdl { display: none; }
+body.sch-preview .gantt-row-left { cursor: default; pointer-events: none; }
+body.sch-preview .gantt-drag-hdl { display: none; }
 
 .sch-toolbar {
   display: flex;
