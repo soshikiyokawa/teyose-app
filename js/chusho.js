@@ -219,15 +219,6 @@ function printChusho(estId){
     <tbody>${payRows}</tbody>
   </table>
   <div style="margin-top:10mm">
-    <div style="margin-bottom:6mm">
-      <div class="sign-title">注文者</div>
-      <table class="sign-full-table">
-        <tr><td class="lbl">住&ensp;所</td><td>${esc(est.clientAddress||'')}</td></tr>
-        <tr><td class="lbl">氏&ensp;名</td>
-          <td>${clientName}<span class="stamp-mark">印</span></td>
-        </tr>
-      </table>
-    </div>
     <div>
       <div class="sign-title">請負者</div>
       <table class="sign-full-table">
