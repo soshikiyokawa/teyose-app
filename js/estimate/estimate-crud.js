@@ -1,9 +1,98 @@
 // ════ 見積：保存・新規作成・読み込み・一覧 ════
 
 function openGoogleMap(){
+  const lat = window._currentMapLat;
+  const lng = window._currentMapLng;
+  if(lat && lng){
+    window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank', 'noopener');
+  } else {
+    const addr = document.getElementById('est-site')?.value.trim();
+    if(!addr){ showToast('工事場所を入力してください'); return; }
+    window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr), '_blank', 'noopener');
+  }
+}
+
+function updateMapPinIndicator(){
+  const el = document.getElementById('map-pin-indicator');
+  if(!el) return;
+  el.style.display = (window._currentMapLat && window._currentMapLng) ? 'inline' : 'none';
+}
+
+let _leafletMap = null, _leafletMarker = null;
+
+async function openMapPicker(){
   const addr = document.getElementById('est-site')?.value.trim();
-  if(!addr){ showToast('工事場所を入力してください'); return; }
-  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr), '_blank', 'noopener');
+  document.getElementById('map-picker-overlay').style.display = 'flex';
+  await new Promise(r=>setTimeout(r,100));
+
+  if(!_leafletMap){
+    _leafletMap = L.map('map-picker-container').setView([34.5, 132.5], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'© OpenStreetMap contributors', maxZoom:19
+    }).addTo(_leafletMap);
+    _leafletMap.on('click', e=>{
+      if(_leafletMarker) _leafletMarker.setLatLng(e.latlng);
+      else _leafletMarker = L.marker(e.latlng,{draggable:true}).addTo(_leafletMap);
+      document.getElementById('map-picker-coords').textContent = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+    });
+  } else {
+    _leafletMap.invalidateSize();
+  }
+
+  // 既存ピンがあれば表示
+  if(window._currentMapLat && window._currentMapLng){
+    const latlng = L.latLng(window._currentMapLat, window._currentMapLng);
+    if(_leafletMarker) _leafletMarker.setLatLng(latlng);
+    else _leafletMarker = L.marker(latlng,{draggable:true}).addTo(_leafletMap);
+    _leafletMap.setView(latlng, 16);
+    document.getElementById('map-picker-coords').textContent = `${window._currentMapLat.toFixed(6)}, ${window._currentMapLng.toFixed(6)}`;
+    _leafletMarker.on('dragend', e=>{
+      const p = e.target.getLatLng();
+      document.getElementById('map-picker-coords').textContent = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
+    });
+    return;
+  }
+
+  // 住所で検索して移動
+  if(addr){
+    try{
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`);
+      const data = await res.json();
+      if(data.length){
+        const latlng = L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
+        if(_leafletMarker) _leafletMarker.setLatLng(latlng);
+        else _leafletMarker = L.marker(latlng,{draggable:true}).addTo(_leafletMap);
+        _leafletMap.setView(latlng, 17);
+        document.getElementById('map-picker-coords').textContent = `${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+        _leafletMarker.on('dragend', e=>{
+          const p = e.target.getLatLng();
+          document.getElementById('map-picker-coords').textContent = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
+        });
+      } else {
+        showToast('住所が見つかりませんでした。地図をタップしてピンを置いてください。');
+      }
+    }catch(_){ showToast('住所検索に失敗しました'); }
+  }
+}
+
+function closeMapPicker(){ document.getElementById('map-picker-overlay').style.display = 'none'; }
+
+function saveMapPin(){
+  if(!_leafletMarker){ showToast('ピンを置いてください'); return; }
+  const p = _leafletMarker.getLatLng();
+  window._currentMapLat = p.lat;
+  window._currentMapLng = p.lng;
+  updateMapPinIndicator();
+  closeMapPicker();
+  showToast('✅ ピン位置を保存しました（案件保存で確定します）');
+}
+
+function clearMapPin(){
+  window._currentMapLat = null;
+  window._currentMapLng = null;
+  if(_leafletMarker){ _leafletMarker.remove(); _leafletMarker = null; }
+  document.getElementById('map-picker-coords').textContent = '地図をタップしてピンを置いてください';
+  updateMapPinIndicator();
 }
 
 function defaultEstTitle(){
@@ -16,7 +105,7 @@ function collectEstData(){
   return {id:editingEstId||Date.now(),title:v('est-title')||defaultEstTitle(),no:v('est-no'),date:v('est-date'),expire:v('est-expire'),status:v('est-status'),type:v('est-type'),
     startDate:v('est-start-date'),endDate:v('est-end-date'),
     clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
-    clientAddress:v('est-client-address'),clientTel:v('est-client-tel'),clientEmail:v('est-client-email'),tantou:v('est-tantou'),
+    clientAddress:v('est-client-address'),clientTel:v('est-client-tel'),clientEmail:v('est-client-email'),tantou:v('est-tantou'),mapLat:window._currentMapLat||null,mapLng:window._currentMapLng||null,
     contractDate:v('est-contract-date'),contractAmount:payAmtVal('est-contract-amount'),
     completion:parseFloat(document.getElementById('est-completion')?.value)||0,
     estProfitRate:parseFloat(document.getElementById('est-profit-rate')?.value)||0,
@@ -44,7 +133,7 @@ async function saveEstInfo(){
     status:v('est-status'),type:v('est-type'),
     startDate:v('est-start-date'),endDate:v('est-end-date'),
     clientName:v('est-client'),projectName:v('est-project'),siteName:v('est-site'),note:v('est-note'),
-    clientAddress:v('est-client-address'),clientTel:v('est-client-tel'),clientEmail:v('est-client-email'),tantou:v('est-tantou'),
+    clientAddress:v('est-client-address'),clientTel:v('est-client-tel'),clientEmail:v('est-client-email'),tantou:v('est-tantou'),mapLat:window._currentMapLat||null,mapLng:window._currentMapLng||null,
     contractDate:v('est-contract-date'),contractAmount:payAmtVal('est-contract-amount'),
     extras:[
       {date:v('est-extra1-date'),amount:payAmtVal('est-extra1-amount')},
@@ -189,7 +278,10 @@ function loadEstimate(est){
   const sv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   sv('est-title',est.title);sv('est-no',est.no);sv('est-date',est.date);sv('est-expire',est.expire);sv('est-status',est.status);sv('est-type',est.type);
   sv('est-start-date',est.startDate);sv('est-end-date',est.endDate);
-  sv('est-client',est.clientName);sv('est-client-address',est.clientAddress);sv('est-client-tel',est.clientTel);sv('est-client-email',est.clientEmail);sv('est-tantou',est.tantou);sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
+  sv('est-client',est.clientName);sv('est-client-address',est.clientAddress);sv('est-client-tel',est.clientTel);sv('est-client-email',est.clientEmail);sv('est-tantou',est.tantou);
+  window._currentMapLat = est.mapLat||null;
+  window._currentMapLng = est.mapLng||null;
+  updateMapPinIndicator();sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
   sv('discount-amount',est.discountAmount);sv('tax-rate',est.taxRate);
   const pays=est.payments||[];
   sv('est-contract-date',est.contractDate);payAmtLoad('est-contract-amount',est.contractAmount);

@@ -12,8 +12,9 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=137">
-<link rel="stylesheet" href="css/schedule.css?v=137">
+<link rel="stylesheet" href="css/main.css?v=138">
+<link rel="stylesheet" href="css/schedule.css?v=138">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
 
@@ -124,6 +125,11 @@
             <input id="est-site" placeholder="広島市安佐北区可部2-13-31-1" style="flex:1">
             <button type="button" class="btn sm" onclick="openGoogleMap()" title="Googleマップで開く" style="flex-shrink:0;padding:6px 8px">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span id="map-pin-indicator" style="display:none;font-size:10px;color:var(--accent-t)">●</span>
+            </button>
+            <button type="button" class="btn sm staff-only" onclick="openMapPicker()" title="ピン位置を調整" style="flex-shrink:0;padding:6px 8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><path d="M12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" fill="currentColor"/></svg>
+              ピン調整
             </button>
           </div>
         </div>
@@ -783,6 +789,25 @@
   </div>
 </div>
 
+<!-- マップピッカー -->
+<div id="map-picker-overlay" style="display:none;position:fixed;inset:0;z-index:9400;background:rgba(0,0,0,.5);flex-direction:column">
+  <div style="display:flex;flex-direction:column;height:100%;max-width:680px;margin:0 auto;width:100%">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <button onclick="closeMapPicker()" class="btn sm">✕ 閉じる</button>
+      <span style="flex:1;font-size:13px;font-weight:600">ピン位置を調整</span>
+      <button onclick="clearMapPin()" class="btn sm danger">クリア</button>
+      <button onclick="saveMapPin()" class="btn sm wood">保存</button>
+    </div>
+    <div style="padding:8px 12px;background:var(--surface);font-size:12px;color:var(--text-muted);flex-shrink:0">
+      地図をタップ or ピンをドラッグして正確な位置を指定してください
+    </div>
+    <div id="map-picker-container" style="flex:1;min-height:0"></div>
+    <div style="padding:8px 12px;background:var(--surface);border-top:1px solid var(--border);font-size:12px;color:var(--text-secondary);flex-shrink:0">
+      📍 <span id="map-picker-coords">地図をタップしてピンを置いてください</span>
+    </div>
+  </div>
+</div>
+
 <!-- PDFビューワー -->
 <div id="pdf-viewer-overlay" style="display:none;position:fixed;inset:0;z-index:9500;background:#222;flex-direction:column">
   <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#333;flex-shrink:0">
@@ -958,58 +983,59 @@
 </div>
 
 <!-- Supabase（共有データベース） -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=137"></script>
+<script src="js/supabase-client.js?v=138"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=137"></script>
+<script src="js/utils.js?v=138"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=137"></script>
+<script src="js/state.js?v=138"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=137"></script>
+<script src="js/data/db.js?v=138"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=137"></script>
+<script src="js/nav.js?v=138"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=137"></script>
+<script src="js/talk.js?v=138"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=137"></script>
+<script src="js/push.js?v=138"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=137"></script>
-<script src="js/estimate/estimate-items.js?v=137"></script>
-<script src="js/estimate/estimate-master.js?v=137"></script>
-<script src="js/estimate/estimate-summary.js?v=137"></script>
-<script src="js/estimate/estimate-crud.js?v=137"></script>
-<script src="js/estimate/estimate-pdf.js?v=137"></script>
-<script src="js/estimate/estimate-invoice.js?v=137"></script>
+<script src="js/estimate/estimate-tabs.js?v=138"></script>
+<script src="js/estimate/estimate-items.js?v=138"></script>
+<script src="js/estimate/estimate-master.js?v=138"></script>
+<script src="js/estimate/estimate-summary.js?v=138"></script>
+<script src="js/estimate/estimate-crud.js?v=138"></script>
+<script src="js/estimate/estimate-pdf.js?v=138"></script>
+<script src="js/estimate/estimate-invoice.js?v=138"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=137"></script>
+<script src="js/orders-list.js?v=138"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=137"></script>
+<script src="js/chusho.js?v=138"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=137"></script>
+<script src="js/schedule.js?v=138"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=137"></script>
-<script src="js/order/item-master.js?v=137"></script>
-<script src="js/order/order-cart.js?v=137"></script>
-<script src="js/order/order-confirm.js?v=137"></script>
-<script src="js/order/order-history.js?v=137"></script>
-<script src="js/receipt.js?v=137"></script>
+<script src="js/order/supplier-master.js?v=138"></script>
+<script src="js/order/item-master.js?v=138"></script>
+<script src="js/order/order-cart.js?v=138"></script>
+<script src="js/order/order-confirm.js?v=138"></script>
+<script src="js/order/order-history.js?v=138"></script>
+<script src="js/receipt.js?v=138"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=137"></script>
+<script src="js/init.js?v=138"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=137"></script>
+<script src="js/auth.js?v=138"></script>
 </body>
 </html>
