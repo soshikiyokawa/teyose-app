@@ -28,7 +28,7 @@ async function fetchAllData(){
   chatRows.forEach(r=>{
     const name = supplierNameById(r.supplier_id);
     if(!talkThreads[name]) talkThreads[name]=[];
-    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread});
+    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||''});
   });
 
   if(currentUserRole==='staff'){
@@ -295,11 +295,12 @@ async function dbAddChatMessage(supplierName, msg){
   if(!supplier_id) return;
   const { data, error } = await sb.from('chat_messages').insert({
     supplier_id, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
-    file_url:msg.fileUrl||null, file_name:msg.fileName||null, file_mime:msg.fileMime||null, unread:false
+    file_url:msg.fileUrl||null, file_name:msg.fileName||null, file_mime:msg.fileMime||null, unread:false,
+    sender_name: currentUserDisplayName||''
   }).select().single();
   if(error){showToast('送信に失敗しました：'+error.message);throw error;}
   if(!talkThreads[supplierName]) talkThreads[supplierName]=[];
-  talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,fileUrl:data.file_url,fileName:data.file_name,fileMime:data.file_mime,ts:new Date(data.created_at).getTime(),unread:false});
+  talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,fileUrl:data.file_url,fileName:data.file_name,fileMime:data.file_mime,ts:new Date(data.created_at).getTime(),unread:false,senderName:data.sender_name||''});
 
   // 通知の送信（社内→発注先 or 発注先→社内）。失敗してもチャット送信自体は成立させる
   const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}` : msg.type==='file' ? `📎 ${msg.fileName||'ファイル'}` : (msg.text||'');

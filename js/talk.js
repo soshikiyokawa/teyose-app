@@ -123,12 +123,12 @@ function renderTalkPanelMessages(){
           : `<a href="${m.fileUrl}" target="_blank" rel="noopener" download class="bbl" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:inherit">
               <span style="font-size:18px">📄</span><span style="word-break:break-all">${esc(m.fileName||'資料')}</span>
             </a>`}
-        <div class="ts">${isMe?'きよかわ':activeTalkPanelSupplier}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+        <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
       </div>`;
     }
     return `${sep}<div class="talk-bubble ${isMe?'me':'them'}">
       <div class="bbl">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
-      <div class="ts">${isMe?'きよかわ':activeTalkPanelSupplier}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+      <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
     </div>`;
   }).join('');
   el.scrollTop=el.scrollHeight;
