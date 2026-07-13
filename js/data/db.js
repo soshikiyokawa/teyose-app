@@ -71,7 +71,7 @@ function rowToEstimate(r){
     startDate:r.start_date,endDate:r.end_date,clientName:r.client_name,projectName:r.project_name,siteName:r.site_name,
     note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[],
     contractDate:ci.contractDate||'',contractAmount:ci.contractAmount||0,extras:ci.extras||[],
-    completion:ci.completion||0,actualProfit:ci.actualProfit||0,ordersMemo:ci.ordersMemo||'',clientAddress:ci.clientAddress||'',tantou:ci.tantou||'',
+    completion:ci.completion||0,actualProfit:ci.actualProfit||0,ordersMemo:ci.ordersMemo||'',clientAddress:ci.clientAddress||'',tantou:ci.tantou||'',clientTel:ci.clientTel||'',clientEmail:ci.clientEmail||'',
     updatedAt:r.updated_at};
 }
 
@@ -218,7 +218,7 @@ async function dbSaveEstimate(data){
     contract_info:{
       contractDate:data.contractDate||null,contractAmount:data.contractAmount||0,
       extras:data.extras||[],
-      completion:data.completion||0,actualProfit:data.actualProfit||0,ordersMemo:data.ordersMemo||'',clientAddress:data.clientAddress||'',tantou:data.tantou||''
+      completion:data.completion||0,actualProfit:data.actualProfit||0,ordersMemo:data.ordersMemo||'',clientAddress:data.clientAddress||'',tantou:data.tantou||'',clientTel:data.clientTel||'',clientEmail:data.clientEmail||''
     },
     updated_at:new Date().toISOString()
   };
