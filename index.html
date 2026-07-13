@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=133">
-<link rel="stylesheet" href="css/schedule.css?v=133">
+<link rel="stylesheet" href="css/main.css?v=134">
+<link rel="stylesheet" href="css/schedule.css?v=134">
 </head>
 <body>
 
@@ -774,6 +774,16 @@
   </div>
 </div>
 
+<!-- PDFビューワー -->
+<div id="pdf-viewer-overlay" style="display:none;position:fixed;inset:0;z-index:9500;background:#222;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#333;flex-shrink:0">
+    <button onclick="closePdfViewer()" style="background:#555;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:14px;cursor:pointer">✕ 閉じる</button>
+    <span id="pdf-viewer-title" style="color:#fff;font-size:13px;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"></span>
+    <a id="pdf-viewer-dl" href="" download style="background:#5c7a3e;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;text-decoration:none;white-space:nowrap">↓ 保存</a>
+  </div>
+  <iframe id="pdf-viewer-frame" src="" style="flex:1;width:100%;border:none;background:#fff"></iframe>
+</div>
+
 <!-- レシート確認モーダル -->
 <div class="overlay" id="receipt-confirm-overlay" onclick="if(event.target.id==='receipt-confirm-overlay')closeReceiptConfirm()">
   <div class="sheet" style="max-height:90vh;display:flex;flex-direction:column">
@@ -940,57 +950,57 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=133"></script>
+<script src="js/supabase-client.js?v=134"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=133"></script>
+<script src="js/utils.js?v=134"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=133"></script>
+<script src="js/state.js?v=134"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=133"></script>
+<script src="js/data/db.js?v=134"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=133"></script>
+<script src="js/nav.js?v=134"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=133"></script>
+<script src="js/talk.js?v=134"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=133"></script>
+<script src="js/push.js?v=134"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=133"></script>
-<script src="js/estimate/estimate-items.js?v=133"></script>
-<script src="js/estimate/estimate-master.js?v=133"></script>
-<script src="js/estimate/estimate-summary.js?v=133"></script>
-<script src="js/estimate/estimate-crud.js?v=133"></script>
-<script src="js/estimate/estimate-pdf.js?v=133"></script>
-<script src="js/estimate/estimate-invoice.js?v=133"></script>
+<script src="js/estimate/estimate-tabs.js?v=134"></script>
+<script src="js/estimate/estimate-items.js?v=134"></script>
+<script src="js/estimate/estimate-master.js?v=134"></script>
+<script src="js/estimate/estimate-summary.js?v=134"></script>
+<script src="js/estimate/estimate-crud.js?v=134"></script>
+<script src="js/estimate/estimate-pdf.js?v=134"></script>
+<script src="js/estimate/estimate-invoice.js?v=134"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=133"></script>
+<script src="js/orders-list.js?v=134"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=133"></script>
+<script src="js/chusho.js?v=134"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=133"></script>
+<script src="js/schedule.js?v=134"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=133"></script>
-<script src="js/order/item-master.js?v=133"></script>
-<script src="js/order/order-cart.js?v=133"></script>
-<script src="js/order/order-confirm.js?v=133"></script>
-<script src="js/order/order-history.js?v=133"></script>
-<script src="js/receipt.js?v=133"></script>
+<script src="js/order/supplier-master.js?v=134"></script>
+<script src="js/order/item-master.js?v=134"></script>
+<script src="js/order/order-cart.js?v=134"></script>
+<script src="js/order/order-confirm.js?v=134"></script>
+<script src="js/order/order-history.js?v=134"></script>
+<script src="js/receipt.js?v=134"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=133"></script>
+<script src="js/init.js?v=134"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=133"></script>
+<script src="js/auth.js?v=134"></script>
 </body>
 </html>
