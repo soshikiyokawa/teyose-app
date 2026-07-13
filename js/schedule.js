@@ -18,6 +18,8 @@ let editingTaskId     = null;
 let ganttD0str    = ''; // leftmost date of current gantt view (for hit testing)
 let _drag         = null; // { type:'move'|'resize-start'|'resize-end', taskId, startX, origStart, origEnd, moved }
 let ganttScrollLeft = -1; // -1 = 未設定（初回のみ今日へスクロール）
+let _longPressTimer = null;
+let _pendingMove    = null; // { taskId, startX, startY, origStart, origEnd, isTouch }
 
 // ─ Date helpers ─
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -177,22 +179,82 @@ function schToggleCollapse(id) {
 }
 
 // ─ Bar drag ─
+
+// 長押し待機をキャンセル
+function _cancelPendingMove() {
+  if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+  _pendingMove = null;
+  document.removeEventListener('mousemove', _onPendingMouseMove);
+  document.removeEventListener('mouseup',   _onPendingMouseUp);
+  document.removeEventListener('touchmove', _onPendingTouchMove);
+  document.removeEventListener('touchend',  _onPendingTouchEnd);
+}
+function _onPendingMouseMove(e) {
+  if (!_pendingMove) return;
+  if (Math.abs(e.clientX - _pendingMove.startX) > 10 || Math.abs(e.clientY - _pendingMove.startY) > 10) _cancelPendingMove();
+}
+function _onPendingMouseUp() {
+  const id = _pendingMove?.taskId; _cancelPendingMove(); if (id) openTaskEdit(id);
+}
+function _onPendingTouchMove(e) {
+  if (!_pendingMove) return;
+  const t = e.touches[0];
+  if (Math.abs(t.clientX - _pendingMove.startX) > 10 || Math.abs(t.clientY - _pendingMove.startY) > 10) _cancelPendingMove();
+}
+function _onPendingTouchEnd() {
+  const id = _pendingMove?.taskId; _cancelPendingMove(); if (id) openTaskEdit(id);
+}
+
 function onBarDragStart(e, taskId, type) {
   if (e.touches === undefined && e.button !== 0) return;
-  e.preventDefault();
-  e.stopPropagation();
   const task = scheduleTasks.find(t => t.id === taskId);
   if (!task) return;
-  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  _drag = { type, taskId, startX: clientX, origStart: task.start, origEnd: task.end, moved: false };
+  const isTouch = !!e.touches;
+  const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+  const clientY = isTouch ? e.touches[0].clientY : e.clientY;
 
-  if (e.touches) {
-    document.addEventListener('touchmove', _onDragMove, { passive: false });
-    document.addEventListener('touchend',  _onDragEnd);
-  } else {
-    document.addEventListener('mousemove', _onDragMove);
-    document.addEventListener('mouseup',   _onDragEnd);
+  // リサイズハンドルは即時ドラッグ（精密操作のため）
+  if (type !== 'move') {
+    e.preventDefault(); e.stopPropagation();
+    _drag = { type, taskId, startX: clientX, origStart: task.start, origEnd: task.end, moved: false };
+    if (isTouch) {
+      document.addEventListener('touchmove', _onDragMove, { passive: false });
+      document.addEventListener('touchend',  _onDragEnd);
+    } else {
+      document.addEventListener('mousemove', _onDragMove);
+      document.addEventListener('mouseup',   _onDragEnd);
+    }
+    return;
   }
+
+  // バー移動は長押し（400ms）後のみドラッグ開始
+  e.stopPropagation();
+  _cancelPendingMove();
+  _pendingMove = { taskId, startX: clientX, startY: clientY, origStart: task.start, origEnd: task.end, isTouch };
+
+  if (isTouch) {
+    document.addEventListener('touchmove', _onPendingTouchMove, { passive: true });
+    document.addEventListener('touchend',  _onPendingTouchEnd);
+  } else {
+    document.addEventListener('mousemove', _onPendingMouseMove);
+    document.addEventListener('mouseup',   _onPendingMouseUp);
+  }
+
+  _longPressTimer = setTimeout(() => {
+    if (!_pendingMove) return;
+    const pm = _pendingMove;
+    _cancelPendingMove();
+    _drag = { type: 'move', taskId: pm.taskId, startX: pm.startX, origStart: pm.origStart, origEnd: pm.origEnd, moved: false };
+    const bar = document.getElementById('gantt-bar-' + pm.taskId);
+    if (bar) bar.classList.add('gantt-bar-dragging');
+    if (pm.isTouch) {
+      document.addEventListener('touchmove', _onDragMove, { passive: false });
+      document.addEventListener('touchend',  _onDragEnd);
+    } else {
+      document.addEventListener('mousemove', _onDragMove);
+      document.addEventListener('mouseup',   _onDragEnd);
+    }
+  }, 400);
 }
 
 function _onDragMove(e) {
@@ -232,14 +294,18 @@ function _onDragEnd(e) {
   document.removeEventListener('mouseup',   _onDragEnd);
   document.removeEventListener('touchmove', _onDragMove);
   document.removeEventListener('touchend',  _onDragEnd);
+  if (_drag) {
+    const bar = document.getElementById('gantt-bar-' + _drag.taskId);
+    if (bar) bar.classList.remove('gantt-bar-dragging');
+  }
 
   if (!_drag) return;
-  const { taskId, moved } = _drag;
+  const { taskId, moved, type: dragType } = _drag;
   _drag = null;
 
-  if (!moved) {
-    openTaskEdit(taskId); // treat as click
-  } else {
+  if (!moved && dragType !== 'move') {
+    openTaskEdit(taskId); // treat as click (resize handles only)
+  } else if (moved) {
     // ドラッグ確定後に親日付を同期してから再描画
     const movedTask = scheduleTasks.find(t => t.id === taskId);
     if (movedTask?.parentId) _syncParentDates(movedTask.parentId);

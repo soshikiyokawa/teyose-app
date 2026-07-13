@@ -182,6 +182,7 @@ body.sch-preview .gantt-drag-hdl { display: none; }
 }
 .gantt-bar:active { cursor: grabbing; }
 .gantt-bar:hover  { filter: brightness(1.10); }
+.gantt-bar.gantt-bar-dragging { opacity: 0.72; cursor: grabbing; transform: scaleY(1.15); transition: opacity 0.1s, transform 0.1s; }
 .gantt-bar-selected {
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
   z-index: 2;
