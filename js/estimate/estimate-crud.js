@@ -1,5 +1,11 @@
 // ════ 見積：保存・新規作成・読み込み・一覧 ════
 
+function openGoogleMap(){
+  const addr = document.getElementById('est-site')?.value.trim();
+  if(!addr){ showToast('工事場所を入力してください'); return; }
+  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(addr), '_blank', 'noopener');
+}
+
 function defaultEstTitle(){
   const d=new Date();
   return '御見積書'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');

@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=136">
-<link rel="stylesheet" href="css/schedule.css?v=136">
+<link rel="stylesheet" href="css/main.css?v=137">
+<link rel="stylesheet" href="css/schedule.css?v=137">
 </head>
 <body>
 
@@ -119,7 +119,14 @@
         <div class="fg"><label>施主電話番号</label><input type="tel" id="est-client-tel" placeholder="090-0000-0000"></div>
         <div class="fg"><label>施主メールアドレス</label><input type="email" id="est-client-email" placeholder="example@mail.com"></div>
         <div class="fg"><label>物件名</label><input id="est-project" placeholder="山田邸 新築工事"></div>
-        <div class="fg"><label>工事場所</label><input id="est-site" placeholder="広島市安佐北区可部2-13-31-1"></div>
+        <div class="fg"><label>工事場所</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="est-site" placeholder="広島市安佐北区可部2-13-31-1" style="flex:1">
+            <button type="button" class="btn sm" onclick="openGoogleMap()" title="Googleマップで開く" style="flex-shrink:0;padding:6px 8px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </button>
+          </div>
+        </div>
         <div class="fg"><label>担当</label>
           <select id="est-tantou">
             <option value="">（未選択）</option>
@@ -952,57 +959,57 @@
 
 <!-- Supabase（共有データベース） -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=136"></script>
+<script src="js/supabase-client.js?v=137"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=136"></script>
+<script src="js/utils.js?v=137"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=136"></script>
+<script src="js/state.js?v=137"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=136"></script>
+<script src="js/data/db.js?v=137"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=136"></script>
+<script src="js/nav.js?v=137"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=136"></script>
+<script src="js/talk.js?v=137"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=136"></script>
+<script src="js/push.js?v=137"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=136"></script>
-<script src="js/estimate/estimate-items.js?v=136"></script>
-<script src="js/estimate/estimate-master.js?v=136"></script>
-<script src="js/estimate/estimate-summary.js?v=136"></script>
-<script src="js/estimate/estimate-crud.js?v=136"></script>
-<script src="js/estimate/estimate-pdf.js?v=136"></script>
-<script src="js/estimate/estimate-invoice.js?v=136"></script>
+<script src="js/estimate/estimate-tabs.js?v=137"></script>
+<script src="js/estimate/estimate-items.js?v=137"></script>
+<script src="js/estimate/estimate-master.js?v=137"></script>
+<script src="js/estimate/estimate-summary.js?v=137"></script>
+<script src="js/estimate/estimate-crud.js?v=137"></script>
+<script src="js/estimate/estimate-pdf.js?v=137"></script>
+<script src="js/estimate/estimate-invoice.js?v=137"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=136"></script>
+<script src="js/orders-list.js?v=137"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=136"></script>
+<script src="js/chusho.js?v=137"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=136"></script>
+<script src="js/schedule.js?v=137"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=136"></script>
-<script src="js/order/item-master.js?v=136"></script>
-<script src="js/order/order-cart.js?v=136"></script>
-<script src="js/order/order-confirm.js?v=136"></script>
-<script src="js/order/order-history.js?v=136"></script>
-<script src="js/receipt.js?v=136"></script>
+<script src="js/order/supplier-master.js?v=137"></script>
+<script src="js/order/item-master.js?v=137"></script>
+<script src="js/order/order-cart.js?v=137"></script>
+<script src="js/order/order-confirm.js?v=137"></script>
+<script src="js/order/order-history.js?v=137"></script>
+<script src="js/receipt.js?v=137"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=136"></script>
+<script src="js/init.js?v=137"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=136"></script>
+<script src="js/auth.js?v=137"></script>
 </body>
 </html>
