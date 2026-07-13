@@ -93,13 +93,13 @@ function renderReceiptItems() {
       </div>
       <div class="rr-amt" style="flex-direction:column;align-items:flex-end;gap:1px">
         <span style="font-size:11px">税込 ¥<span id="rr-amt-${i}">${fmt(it.price * it.qty)}</span></span>
-        <span style="font-size:10px;color:var(--text-muted)">税抜 ¥${fmt(Math.floor(it.price / 1.1) * it.qty)}</span>
+        <span style="font-size:10px;color:var(--text-muted)">税抜 ¥${fmt(Math.round(it.price / 1.1) * it.qty)}</span>
       </div>
       <button class="btn danger xs" onclick="removeReceiptItem(${i})" style="flex-shrink:0">×</button>
     </div>`).join('');
 
   const total = receiptItems.reduce((s, it) => s + it.price * it.qty, 0);
-  const totalEx = receiptItems.reduce((s, it) => s + Math.floor(it.price / 1.1) * it.qty, 0);
+  const totalEx = receiptItems.reduce((s, it) => s + Math.round(it.price / 1.1) * it.qty, 0);
   document.getElementById('receipt-total').textContent = fmt(total);
   const exEl = document.getElementById('receipt-total-ex');
   if (exEl) exEl.textContent = fmt(totalEx);
@@ -109,7 +109,7 @@ function updateReceiptAmt(i) {
   const el = document.getElementById('rr-amt-' + i);
   if (el) el.textContent = fmt(receiptItems[i].price * receiptItems[i].qty);
   const total = receiptItems.reduce((s, it) => s + it.price * it.qty, 0);
-  const totalEx = receiptItems.reduce((s, it) => s + Math.floor(it.price / 1.1) * it.qty, 0);
+  const totalEx = receiptItems.reduce((s, it) => s + Math.round(it.price / 1.1) * it.qty, 0);
   document.getElementById('receipt-total').textContent = fmt(total);
   const exEl = document.getElementById('receipt-total-ex');
   if (exEl) exEl.textContent = fmt(totalEx);
@@ -129,7 +129,7 @@ function addReceiptToCart() {
     if (existing) {
       existing.qty += it.qty;
     } else {
-      const costEx = Math.floor(it.price / 1.1);
+      const costEx = Math.round(it.price / 1.1);
       cart.push({
         id: it._id,
         name: it.name,
