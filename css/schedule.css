@@ -180,6 +180,11 @@ body.sch-preview .gantt-drag-hdl { display: none; }
   user-select: none;
   transition: filter 0.1s, box-shadow 0.1s;
 }
+.gantt-bar {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 .gantt-bar:active { cursor: grabbing; }
 .gantt-bar:hover  { filter: brightness(1.10); }
 .gantt-bar.gantt-bar-dragging { opacity: 0.72; cursor: grabbing; transform: scaleY(1.15); transition: opacity 0.1s, transform 0.1s; }
