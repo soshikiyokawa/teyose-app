@@ -332,10 +332,16 @@ async function dbUploadChatFile(file){
 // ── 現場管理（写真・図面・日報・有給） ──
 async function fetchGenbaData(){
   const { data: photoRows } = await sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false});
-  sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
+  sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
 
   const { data: drawingRows } = await sb.from('drawings').select('*').order('created_at',{ascending:false});
-  drawings = (drawingRows||[]).map(r=>({id:r.id,projectId:r.project_id,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime||'',note:r.note||'',uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
+  drawings = (drawingRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime||'',note:r.note||'',uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
+
+  const { data: folderRows } = await sb.from('site_folders').select('*').order('name');
+  siteFolders = (folderRows||[]).map(r=>({id:r.id,projectId:r.project_id,kind:r.kind,parentId:r.parent_id||null,name:r.name,createdBy:r.created_by}));
+
+  const { data: viewRows } = await sb.from('drawing_views').select('*').order('viewed_at',{ascending:false});
+  drawingViews = (viewRows||[]).map(r=>({id:r.id,drawingId:r.drawing_id,userId:r.user_id,userName:r.user_name||'',viewedAt:r.viewed_at}));
 
   // 日報・有給はRLSが自動で絞る（carpenter＝自分の分のみ／staff＝全員分）
   const { data: nippoRows } = await sb.from('daily_reports').select('*').order('work_date',{ascending:false}).order('id',{ascending:false});
@@ -356,7 +362,7 @@ async function dbUploadSiteFile(folder, projectId, blob, ext){
 
 async function dbAddSitePhoto(photo){
   const { data, error } = await sb.from('site_photos').insert({
-    project_id:photo.projectId, url:photo.url, caption:photo.caption||'', shot_date:photo.shotDate,
+    project_id:photo.projectId, folder_id:photo.folderId||null, url:photo.url, caption:photo.caption||'', shot_date:photo.shotDate,
     uploaded_by:currentUserId, uploader_name:currentUserDisplayName||''
   }).select().single();
   if(error){showToast('写真の登録に失敗しました：'+error.message);throw error;}
@@ -373,7 +379,7 @@ async function dbDeleteSitePhoto(id){
 
 async function dbAddDrawing(d){
   const { data, error } = await sb.from('drawings').insert({
-    project_id:d.projectId, file_url:d.fileUrl, file_name:d.fileName, file_mime:d.fileMime||'', note:d.note||'',
+    project_id:d.projectId, folder_id:d.folderId||null, file_url:d.fileUrl, file_name:d.fileName, file_mime:d.fileMime||'', note:d.note||'',
     uploaded_by:currentUserId, uploader_name:currentUserDisplayName||''
   }).select().single();
   if(error){showToast('図面の登録に失敗しました：'+error.message);throw error;}
@@ -382,6 +388,37 @@ async function dbAddDrawing(d){
 async function dbDeleteDrawing(id){
   const { error } = await sb.from('drawings').delete().eq('id',id);
   if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+// ── フォルダ（写真・図面の整理） ──
+async function dbAddFolder(projectId, kind, parentId, name){
+  const { data, error } = await sb.from('site_folders').insert({
+    project_id:projectId, kind, parent_id:parentId||null, name, created_by:currentUserId
+  }).select().single();
+  if(error){showToast('フォルダの作成に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
+async function dbRenameFolder(id, name){
+  const { error } = await sb.from('site_folders').update({name}).eq('id',id);
+  if(error){showToast('名前の変更に失敗しました：'+error.message);throw error;}
+}
+async function dbDeleteFolder(id){
+  const { error } = await sb.from('site_folders').delete().eq('id',id);
+  if(error){showToast('フォルダの削除に失敗しました：'+error.message);throw error;}
+}
+// 写真・図面を別フォルダへ移動（folderId=nullで未分類へ）
+async function dbMoveItem(kind, id, folderId){
+  const table = kind==='photo' ? 'site_photos' : 'drawings';
+  const { error } = await sb.from(table).update({folder_id:folderId||null}).eq('id',id);
+  if(error){showToast('移動に失敗しました：'+error.message);throw error;}
+}
+
+// ── 図面の閲覧記録（開くたびに日時を更新） ──
+async function dbRecordDrawingView(drawingId){
+  const { error } = await sb.from('drawing_views').upsert({
+    drawing_id:drawingId, user_id:currentUserId, user_name:currentUserDisplayName||'', viewed_at:new Date().toISOString()
+  }, { onConflict:'drawing_id,user_id' });
+  if(error) console.warn('閲覧記録に失敗', error.message);
 }
 
 async function dbSaveNippo(n){
@@ -459,6 +496,8 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'cost_entries'}, ()=>refetchAndRerender('cost_entries'))
     .on('postgres_changes',{event:'*',schema:'public',table:'site_photos'}, ()=>refetchAndRerender('site_photos'))
     .on('postgres_changes',{event:'*',schema:'public',table:'drawings'}, ()=>refetchAndRerender('drawings'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'site_folders'}, ()=>refetchAndRerender('site_folders'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'drawing_views'}, ()=>refetchAndRerender('drawing_views'))
     .on('postgres_changes',{event:'*',schema:'public',table:'daily_reports'}, ()=>refetchAndRerender('daily_reports'))
     .on('postgres_changes',{event:'*',schema:'public',table:'leave_requests'}, ()=>refetchAndRerender('leave_requests'))
     .subscribe();
@@ -483,8 +522,9 @@ async function refetchAndRerender(table){
     if(document.getElementById('ordersub-history')?.classList.contains('active')) renderOrders();
     if(document.getElementById('page-cost')?.classList.contains('active')) renderCost();
   }
-  if(['site_photos','drawings','daily_reports','leave_requests'].includes(table)){
+  if(['site_photos','drawings','site_folders','drawing_views','daily_reports','leave_requests'].includes(table)){
     if(document.getElementById('page-genba')?.classList.contains('active')) renderGenbaPage();
     renderInfoGenbaSections && renderInfoGenbaSections();
+    refreshFB && refreshFB(); // 開いているファイルブラウザにも反映
   }
 }

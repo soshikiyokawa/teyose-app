@@ -10,6 +10,15 @@ let currentUserId = null;         // auth.users の uuid（日報・有給の本
 // 現場管理（写真・図面・日報・有給）
 let sitePhotos = [];        // 現場写真
 let drawings = [];          // 図面
+let siteFolders = [];       // 写真・図面の整理用フォルダ（階層あり）
+let drawingViews = [];      // 図面の閲覧記録（1人1図面1行）
+
+// ファイルブラウザ（写真・図面のフォルダ表示）の状態
+let fbKind = null;          // 'photo' | 'drawing'
+let fbProjectId = null;     // 表示中の工事ID
+let fbFolderId = null;      // 表示中のフォルダID（null=ルート）
+let fbContainerId = null;   // 描画先のコンテナ要素ID（モーダル or 現場ページ内）
+let fbMoving = null;        // 移動中のアイテム {kind:'photo'|'drawing', id}
 let dailyReports = [];      // 日報（carpenterは自分の分のみ・staffは全員分。RLSが自動で絞る）
 let leaveRequests = [];     // 有給申請（同上）
 let genbaProjectId = null;  // 現場ページで選択中の工事ID（写真・図面タブ共通）

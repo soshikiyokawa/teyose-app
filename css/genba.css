@@ -14,6 +14,30 @@
 #photo-viewer-img-wrap img{max-width:100%;max-height:100%;object-fit:contain}
 #photo-viewer-foot{background:rgba(15,10,4,.85);padding:10px 14px calc(10px + env(safe-area-inset-bottom));color:#fff}
 
+/* ── ファイルブラウザ（フォルダ表示） ── */
+#fb-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-end;justify-content:center}
+#fb-modal.open{display:flex}
+#fb-modal-sheet{background:var(--bg);width:100%;height:92vh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;overflow:hidden}
+@media(min-width:640px){#fb-modal{align-items:center}#fb-modal-sheet{max-width:680px;height:85vh;border-radius:12px}}
+#fb-modal-head{display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surface);border-bottom:0.5px solid var(--border);flex-shrink:0}
+#fb-modal-body{flex:1;overflow-y:auto;padding:12px 14px;min-height:0}
+
+.fb-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.fb-crumbs{flex:1;min-width:0;display:flex;align-items:center;gap:4px;font-size:12px;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch}
+.fb-crumbs a{color:var(--wood-t);cursor:pointer;text-decoration:none;font-weight:600}
+.fb-crumbs a.current{color:var(--text);pointer-events:none}
+.fb-crumbs .sep{color:var(--text-muted)}
+.fb-folder-row{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:0.5px solid var(--border)}
+.fb-folder-row:last-child{border-bottom:none}
+
+.fb-move-row{display:block;width:100%;text-align:left;border:none;background:none;font-family:inherit;font-size:13px;padding:9px 10px;border-radius:7px;cursor:pointer;color:var(--text)}
+.fb-move-row:hover{background:var(--surface2)}
+.fb-move-row.current{background:var(--wood-bg)}
+
+/* 案件情報タブの現場資料ボタン */
+.info-genba-btn{flex:1;justify-content:center;padding:13px 10px;gap:8px;font-size:13px;font-weight:700}
+.info-genba-count{font-size:11px;font-weight:400;color:var(--text-muted)}
+
 /* ── 図面 ── */
 .drawing-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:0.5px solid var(--border)}
 .drawing-row:last-child{border-bottom:none}

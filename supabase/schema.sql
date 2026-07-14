@@ -164,10 +164,22 @@ create table public.profiles (
 
 -- ════ 現場管理（写真・図面・日報・有給） ════
 
+-- 写真・図面の整理用フォルダ（parent_idで階層化。写真用と図面用をkindで区別）
+create table public.site_folders (
+  id bigint generated always as identity primary key,
+  project_id bigint not null references public.projects(id) on delete cascade,
+  kind text not null check (kind in ('photo','drawing')),
+  parent_id bigint references public.site_folders(id) on delete cascade,
+  name text not null,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz default now()
+);
+
 -- 現場写真（工事ごとに撮影日つきで保存。画像本体はStorageのsite-filesバケット）
 create table public.site_photos (
   id bigint generated always as identity primary key,
   project_id bigint not null references public.projects(id) on delete cascade,
+  folder_id bigint references public.site_folders(id) on delete set null,
   url text not null,
   caption text default '',
   shot_date date not null default ((now() at time zone 'Asia/Tokyo')::date),
@@ -180,6 +192,7 @@ create table public.site_photos (
 create table public.drawings (
   id bigint generated always as identity primary key,
   project_id bigint not null references public.projects(id) on delete cascade,
+  folder_id bigint references public.site_folders(id) on delete set null,
   file_url text not null,
   file_name text not null,
   file_mime text default '',
@@ -187,6 +200,16 @@ create table public.drawings (
   uploaded_by uuid references auth.users(id) on delete set null,
   uploader_name text default '',
   created_at timestamptz default now()
+);
+
+-- 図面の閲覧記録（1人1図面1行。開くたびに日時を更新）
+create table public.drawing_views (
+  id bigint generated always as identity primary key,
+  drawing_id bigint not null references public.drawings(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  user_name text default '',
+  viewed_at timestamptz default now(),
+  unique (drawing_id, user_id)
 );
 
 -- 日報（1人1日1件〜複数件。実働・残業は分単位で保存）
@@ -260,6 +283,8 @@ alter table public.site_photos enable row level security;
 alter table public.drawings enable row level security;
 alter table public.daily_reports enable row level security;
 alter table public.leave_requests enable row level security;
+alter table public.site_folders enable row level security;
+alter table public.drawing_views enable row level security;
 
 -- ════ projects（閲覧は社内全員＝staff＋carpenter。編集はstaffのみ） ════
 create policy projects_select on public.projects for select using (app_is_employee());
@@ -394,6 +419,24 @@ create policy drawings_update on public.drawings
 create policy drawings_delete on public.drawings
   for delete using (app_user_role() = 'staff' or uploaded_by = auth.uid());
 
+-- ════ site_folders（閲覧・作成は社内全員。変更・削除は作成者またはstaff） ════
+create policy site_folders_select on public.site_folders
+  for select using (app_is_employee());
+create policy site_folders_insert on public.site_folders
+  for insert with check (app_is_employee() and created_by = auth.uid());
+create policy site_folders_update on public.site_folders
+  for update using (app_user_role() = 'staff' or created_by = auth.uid());
+create policy site_folders_delete on public.site_folders
+  for delete using (app_user_role() = 'staff' or created_by = auth.uid());
+
+-- ════ drawing_views（閲覧記録。自分の記録のみ書き込み可） ════
+create policy drawing_views_select on public.drawing_views
+  for select using (app_is_employee());
+create policy drawing_views_insert on public.drawing_views
+  for insert with check (app_is_employee() and user_id = auth.uid());
+create policy drawing_views_update on public.drawing_views
+  for update using (user_id = auth.uid());
+
 -- ════ daily_reports（本人は自分の分のみ・staffは全件） ════
 create policy daily_reports_select on public.daily_reports
   for select using (app_user_role() = 'staff' or user_id = auth.uid());
@@ -504,3 +547,5 @@ alter publication supabase_realtime add table public.site_photos;
 alter publication supabase_realtime add table public.drawings;
 alter publication supabase_realtime add table public.daily_reports;
 alter publication supabase_realtime add table public.leave_requests;
+alter publication supabase_realtime add table public.site_folders;
+alter publication supabase_realtime add table public.drawing_views;

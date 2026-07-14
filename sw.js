@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v144';
+const CACHE_NAME = 'teyose-v145';
 const ASSETS = [
   './',
   './index.html',
@@ -40,6 +40,7 @@ const ASSETS = [
   './js/receipt.js',
   './js/schedule.js',
   './js/genba/genba-tabs.js',
+  './js/genba/genba-files.js',
   './js/genba/genba-photos.js',
   './js/genba/genba-drawings.js',
   './js/genba/genba-nippo.js',

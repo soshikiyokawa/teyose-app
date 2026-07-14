@@ -16,18 +16,10 @@ function renderGenbaPage(){
     if(act && (act.id==='genbasub-photos'||act.id==='genbasub-drawings')){ genbaTab('nippo'); return; }
   }
   renderGenbaProjectSelects();
-  if(document.getElementById('genbasub-photos')?.classList.contains('active')) renderSitePhotos();
-  if(document.getElementById('genbasub-drawings')?.classList.contains('active')) renderDrawings();
+  if(document.getElementById('genbasub-photos')?.classList.contains('active')) mountGenbaFB('photo');
+  if(document.getElementById('genbasub-drawings')?.classList.contains('active')) mountGenbaFB('drawing');
   if(document.getElementById('genbasub-nippo')?.classList.contains('active')) renderNippo();
   if(document.getElementById('genbasub-leave')?.classList.contains('active')) renderLeave();
-}
-
-// 案件情報タブ内の現場写真・図面セクション（選択中の案件に紐づく）
-function renderInfoGenbaSections(){
-  if(!document.getElementById('info-photo-list')) return;
-  const pid = selectedProject?.id || null;
-  renderPhotoListInto('info-photo-list', pid, '左の案件一覧から案件を選択すると写真が表示されます');
-  renderDrawingListInto('info-drawing-list', pid, '左の案件一覧から案件を選択すると図面が表示されます');
 }
 
 // 写真・図面・日報の工事選択プルダウンを最新の案件一覧で埋める
@@ -49,8 +41,8 @@ function renderGenbaProjectSelects(){
 function setGenbaProject(val){
   genbaProjectId = val ? Number(val) : null;
   renderGenbaProjectSelects();
-  if(document.getElementById('genbasub-photos')?.classList.contains('active')) renderSitePhotos();
-  if(document.getElementById('genbasub-drawings')?.classList.contains('active')) renderDrawings();
+  if(document.getElementById('genbasub-photos')?.classList.contains('active')) mountGenbaFB('photo');
+  if(document.getElementById('genbasub-drawings')?.classList.contains('active')) mountGenbaFB('drawing');
 }
 
 // 保存・削除後にSupabaseから取り直して再描画する
@@ -58,6 +50,7 @@ async function refreshGenba(){
   try{ await fetchGenbaData(); }catch(e){ console.warn('現場データの再取得に失敗', e); }
   if(document.getElementById('page-genba')?.classList.contains('active')) renderGenbaPage();
   renderInfoGenbaSections();
+  refreshFB(); // モーダルで開いているファイルブラウザにも反映
 }
 
 // ── 日付ユーティリティ ──
