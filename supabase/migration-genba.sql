@@ -156,7 +156,16 @@ for delete to authenticated
 using (bucket_id = 'site-files' and app_is_employee());
 
 -- ── 10. Realtime（複数端末への即時反映） ──
-alter publication supabase_realtime add table public.site_photos;
-alter publication supabase_realtime add table public.drawings;
-alter publication supabase_realtime add table public.daily_reports;
-alter publication supabase_realtime add table public.leave_requests;
+-- 登録済みのテーブルはスキップする（再実行してもエラーにならない）
+do $$
+declare t text;
+begin
+  foreach t in array array['site_photos','drawings','daily_reports','leave_requests'] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
