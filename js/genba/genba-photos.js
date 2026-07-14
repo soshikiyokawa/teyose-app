@@ -27,19 +27,20 @@ async function gbCompressImage(file){
   }
 }
 
-async function onSitePhotoFiles(input){
+// 現場ページ・案件情報タブ共通のアップロード処理
+async function uploadSitePhotos(input, projectId, btnId){
   const files = [...(input.files||[])];
   input.value = '';
   if(!files.length) return;
-  if(!genbaProjectId){ showToast('先に工事を選択してください'); return; }
-  const btn = document.getElementById('photo-add-btn');
+  if(!projectId){ showToast('先に工事（案件）を選択してください'); return; }
+  const btn = document.getElementById(btnId);
   if(btn) btn.disabled = true;
   try{
     for(let i=0;i<files.length;i++){
       showToast(`アップロード中…（${i+1}/${files.length}）`, 30000);
       const blob = await gbCompressImage(files[i]);
-      const url = await dbUploadSiteFile('photos', genbaProjectId, blob, '.jpg');
-      await dbAddSitePhoto({projectId:genbaProjectId, url, caption:'', shotDate:gbToday()});
+      const url = await dbUploadSiteFile('photos', projectId, blob, '.jpg');
+      await dbAddSitePhoto({projectId, url, caption:'', shotDate:gbToday()});
     }
     showToast(files.length+'枚の写真を登録しました');
   }finally{
@@ -47,17 +48,22 @@ async function onSitePhotoFiles(input){
   }
   await refreshGenba();
 }
+function onSitePhotoFiles(input){ uploadSitePhotos(input, genbaProjectId, 'photo-add-btn'); }
+function onInfoPhotoFiles(input){ uploadSitePhotos(input, selectedProject?.id, 'info-photo-add-btn'); }
 
 function renderSitePhotos(){
-  const wrap = document.getElementById('site-photo-list');
+  renderPhotoListInto('site-photo-list', genbaProjectId, '工事を選択すると写真が表示されます');
+}
+function renderPhotoListInto(containerId, projectId, noProjectMsg){
+  const wrap = document.getElementById(containerId);
   if(!wrap) return;
-  if(!genbaProjectId){
-    wrap.innerHTML = '<div class="empty">工事を選択すると写真が表示されます</div>';
+  if(!projectId){
+    wrap.innerHTML = `<div class="empty">${noProjectMsg}</div>`;
     return;
   }
-  const list = sitePhotos.filter(p=>p.projectId===genbaProjectId);
+  const list = sitePhotos.filter(p=>p.projectId===projectId);
   if(!list.length){
-    wrap.innerHTML = '<div class="empty">まだ写真がありません。「＋ 写真を追加」から登録できます</div>';
+    wrap.innerHTML = '<div class="empty">まだ写真がありません。「＋ 写真」から登録できます</div>';
     return;
   }
   // 撮影日ごとにグループ表示（新しい日付が上）
@@ -100,6 +106,7 @@ async function savePhotoCaption(){
   await dbUpdateSitePhotoCaption(p.id, caption);
   p.caption = caption;
   renderSitePhotos();
+  renderInfoGenbaSections();
   showToast('メモを保存しました');
 }
 async function deleteViewingPhoto(){

@@ -13,6 +13,7 @@ function estSubTab(t){
   } else {
     document.body.classList.remove('sch-preview');
   }
+  if(t==='info') renderInfoGenbaSections && renderInfoGenbaSections();
 }
 
 function updateEstBadge(){

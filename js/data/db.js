@@ -485,5 +485,6 @@ async function refetchAndRerender(table){
   }
   if(['site_photos','drawings','daily_reports','leave_requests'].includes(table)){
     if(document.getElementById('page-genba')?.classList.contains('active')) renderGenbaPage();
+    renderInfoGenbaSections && renderInfoGenbaSections();
   }
 }

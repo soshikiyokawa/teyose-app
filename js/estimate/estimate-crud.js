@@ -301,6 +301,7 @@ function loadEstimate(est){
   selectedProjectName = est.projectName || null;
   selectedProject = projects.find(p=>p.name===est.projectName)||null;
   renderProjectSidebar();
+  renderInfoGenbaSections && renderInfoGenbaSections();
 }
 
 function calcEstTotal(e){
@@ -372,6 +373,7 @@ function _selectProjectSidebarGo(id){
   else renderProjectSidebar();
   renderEstListBody();
   onProjectChanged && onProjectChanged();
+  renderInfoGenbaSections && renderInfoGenbaSections();
 }
 
 // ── 案件作成・編集モーダル ──
