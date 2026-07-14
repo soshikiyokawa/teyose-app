@@ -31,10 +31,15 @@ async function fetchAllData(){
     talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||''});
   });
 
-  if(currentUserRole==='staff'){
+  // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
+  if(currentUserRole==='staff'||currentUserRole==='carpenter'){
     const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
     projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',updatedAt:r.updated_at}));
 
+    await fetchGenbaData();
+  }
+
+  if(currentUserRole==='staff'){
     const { data: typeRows } = await sb.from('estimate_types').select('*').order('sort_order').order('id');
     estimateTypes = (typeRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
     estTypeIdSeq = Math.max(0,...estimateTypes.map(t=>t.id))+1;
@@ -324,6 +329,109 @@ async function dbUploadChatFile(file){
   return data.publicUrl;
 }
 
+// ── 現場管理（写真・図面・日報・有給） ──
+async function fetchGenbaData(){
+  const { data: photoRows } = await sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false});
+  sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
+
+  const { data: drawingRows } = await sb.from('drawings').select('*').order('created_at',{ascending:false});
+  drawings = (drawingRows||[]).map(r=>({id:r.id,projectId:r.project_id,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime||'',note:r.note||'',uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
+
+  // 日報・有給はRLSが自動で絞る（carpenter＝自分の分のみ／staff＝全員分）
+  const { data: nippoRows } = await sb.from('daily_reports').select('*').order('work_date',{ascending:false}).order('id',{ascending:false});
+  dailyReports = (nippoRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',content:r.content||'',startTime:r.start_time||'08:00',endTime:r.end_time||'17:00',breakMinutes:r.break_minutes,workMinutes:r.work_minutes,overtimeMinutes:r.overtime_minutes}));
+
+  const { data: leaveRows } = await sb.from('leave_requests').select('*').order('created_at',{ascending:false});
+  leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
+}
+
+// 現場写真・図面のファイルをStorageにアップロードし、公開URLを返す
+async function dbUploadSiteFile(folder, projectId, blob, ext){
+  const path = `${folder}/${projectId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}${ext}`;
+  const { error } = await sb.storage.from('site-files').upload(path, blob, { contentType: blob.type || 'application/octet-stream' });
+  if(error){showToast('アップロードに失敗しました：'+error.message);throw error;}
+  const { data } = sb.storage.from('site-files').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function dbAddSitePhoto(photo){
+  const { data, error } = await sb.from('site_photos').insert({
+    project_id:photo.projectId, url:photo.url, caption:photo.caption||'', shot_date:photo.shotDate,
+    uploaded_by:currentUserId, uploader_name:currentUserDisplayName||''
+  }).select().single();
+  if(error){showToast('写真の登録に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
+async function dbUpdateSitePhotoCaption(id, caption){
+  const { error } = await sb.from('site_photos').update({caption}).eq('id',id);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+}
+async function dbDeleteSitePhoto(id){
+  const { error } = await sb.from('site_photos').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+async function dbAddDrawing(d){
+  const { data, error } = await sb.from('drawings').insert({
+    project_id:d.projectId, file_url:d.fileUrl, file_name:d.fileName, file_mime:d.fileMime||'', note:d.note||'',
+    uploaded_by:currentUserId, uploader_name:currentUserDisplayName||''
+  }).select().single();
+  if(error){showToast('図面の登録に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
+async function dbDeleteDrawing(id){
+  const { error } = await sb.from('drawings').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+async function dbSaveNippo(n){
+  const row = {
+    work_date:n.workDate, project_id:n.projectId||null, project_name:n.projectName||'',
+    content:n.content||'', start_time:n.startTime, end_time:n.endTime,
+    break_minutes:n.breakMinutes, work_minutes:n.workMinutes, overtime_minutes:n.overtimeMinutes,
+    updated_at:new Date().toISOString()
+  };
+  if(n.id){
+    const { error } = await sb.from('daily_reports').update(row).eq('id',n.id);
+    if(error){showToast('日報の保存に失敗しました：'+error.message);throw error;}
+    return n.id;
+  }
+  const { data, error } = await sb.from('daily_reports').insert({...row, user_id:currentUserId, user_name:currentUserDisplayName||''}).select().single();
+  if(error){showToast('日報の保存に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
+async function dbDeleteNippo(id){
+  const { error } = await sb.from('daily_reports').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+async function dbAddLeaveRequest(lr){
+  const { data, error } = await sb.from('leave_requests').insert({
+    user_id:currentUserId, user_name:currentUserDisplayName||'',
+    start_date:lr.startDate, end_date:lr.endDate, leave_type:lr.leaveType, days:lr.days, reason:lr.reason||''
+  }).select().single();
+  if(error){showToast('申請に失敗しました：'+error.message);throw error;}
+  // 事務（staff）へ通知。失敗しても申請自体は成立させる
+  dbSendPush('staff', null, '有給申請', `${currentUserDisplayName}さんから有給申請（${lr.startDate.replace(/-/g,'/')}〜）`).catch(()=>{});
+  return data.id;
+}
+async function dbReviewLeaveRequest(id, status, note){
+  const lr = leaveRequests.find(x=>x.id===id);
+  const { error } = await sb.from('leave_requests').update({
+    status, review_note:note||'', reviewer_name:currentUserDisplayName||'', reviewed_at:new Date().toISOString()
+  }).eq('id',id);
+  if(error){showToast('更新に失敗しました：'+error.message);throw error;}
+  // 申請者本人へ通知
+  if(lr){
+    const label = status==='approved' ? '承認されました' : '却下されました';
+    dbSendPushToUser(lr.userId, '有給申請の結果', `${lr.startDate.replace(/-/g,'/')}〜の有給申請が${label}`).catch(()=>{});
+  }
+}
+async function dbDeleteLeaveRequest(id){
+  const { error } = await sb.from('leave_requests').delete().eq('id',id);
+  if(error){showToast('取り下げに失敗しました：'+error.message);throw error;}
+}
+
 // ── プッシュ通知 ──
 async function dbSavePushSubscription(sub){
   const { data: userData } = await sb.auth.getUser();
@@ -337,6 +445,9 @@ async function dbSavePushSubscription(sub){
 async function dbSendPush(targetRole, targetSupplierId, title, body){
   await sb.functions.invoke('send-push', { body: { targetRole, targetSupplierId, title, body } });
 }
+async function dbSendPushToUser(targetUserId, title, body){
+  await sb.functions.invoke('send-push', { body: { targetRole:'user', targetUserId, title, body } });
+}
 
 // ── リアルタイム同期（他端末の変更を反映） ──
 function subscribeRealtime(){
@@ -346,6 +457,10 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'}, ()=>refetchAndRerender('chat_messages'))
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'}, ()=>refetchAndRerender('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'cost_entries'}, ()=>refetchAndRerender('cost_entries'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'site_photos'}, ()=>refetchAndRerender('site_photos'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'drawings'}, ()=>refetchAndRerender('drawings'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'daily_reports'}, ()=>refetchAndRerender('daily_reports'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'leave_requests'}, ()=>refetchAndRerender('leave_requests'))
     .subscribe();
 }
 
@@ -367,5 +482,8 @@ async function refetchAndRerender(table){
   if((table==='orders'||table==='cost_entries') && currentUserRole==='staff'){
     if(document.getElementById('ordersub-history')?.classList.contains('active')) renderOrders();
     if(document.getElementById('page-cost')?.classList.contains('active')) renderCost();
+  }
+  if(['site_photos','drawings','daily_reports','leave_requests'].includes(table)){
+    if(document.getElementById('page-genba')?.classList.contains('active')) renderGenbaPage();
   }
 }

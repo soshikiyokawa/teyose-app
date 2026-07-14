@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v142';
+const CACHE_NAME = 'teyose-v143';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const ASSETS = [
   './css/talk.css',
   './css/overlay.css',
   './css/schedule.css',
+  './css/genba.css',
   './js/supabase-client.js',
   './js/utils.js',
   './js/state.js',
@@ -38,6 +39,11 @@ const ASSETS = [
   './js/chusho.js',
   './js/receipt.js',
   './js/schedule.js',
+  './js/genba/genba-tabs.js',
+  './js/genba/genba-photos.js',
+  './js/genba/genba-drawings.js',
+  './js/genba/genba-nippo.js',
+  './js/genba/genba-leave.js',
   './js/push.js',
   './icon-192.png',
   './icon-512.png',

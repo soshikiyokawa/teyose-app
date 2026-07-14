@@ -44,8 +44,9 @@ async function bootstrapApp(){
   currentUserRole = profile.role;
   currentUserSupplierId = profile.supplier_id;
   currentUserDisplayName = profile.display_name || sessionData.session.user.email;
+  currentUserId = sessionData.session.user.id;
 
-  document.body.classList.remove('role-staff','role-supplier');
+  document.body.classList.remove('role-staff','role-supplier','role-carpenter');
   document.body.classList.add('role-'+currentUserRole);
 
   try{
@@ -64,6 +65,9 @@ async function bootstrapApp(){
     newEstimate();
     renderSupplierSelectList();
     mainTab('estimate');
+  } else if(currentUserRole==='carpenter'){
+    // 社員大工ロール：現場ページ（写真・図面・日報・有給）のみ表示
+    mainTab('genba');
   } else {
     // 発注先ロール：品目マスタ（自社品目の単価編集）のみ表示
     mainTab('order');

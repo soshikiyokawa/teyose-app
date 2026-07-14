@@ -25,6 +25,11 @@
 
 /* 発注先（supplier）ロールでは社内専用UIを隠す */
 .role-supplier .staff-only{display:none !important}
+/* 社員大工（carpenter）ロールでは事務専用UI（見積・原価など）と発注先向けUIを隠す */
+.role-carpenter .staff-only{display:none !important}
+.role-carpenter .carpenter-hidden{display:none !important}
+/* 現場ページ（写真・図面・日報・有給）は社内全員（staff＋carpenter）のみ */
+.role-supplier .employee-only{display:none !important}
 
 /* ── モバイル案件選択バー（スマートフォンでサイドバーの代わりに表示） ── */
 #est-project-mobile-bar{display:none;padding:7px 12px;border-bottom:0.5px solid var(--border);background:var(--surface);gap:8px;align-items:center}

@@ -153,12 +153,74 @@ create table public.push_subscriptions (
 );
 
 -- ユーザーのロール・所属発注先を管理するテーブル
--- staff = 社内（全権限）/ supplier = 発注先（チャット＋自社品目の単価編集のみ）
+-- staff = 社内（全権限）/ carpenter = 社員大工（現場ページのみ）/ supplier = 発注先（チャット＋自社品目の単価編集のみ）
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  role text not null check (role in ('staff','supplier')),
+  role text not null check (role in ('staff','carpenter','supplier')),
   supplier_id bigint references public.suppliers(id) on delete set null,
   display_name text,
+  created_at timestamptz default now()
+);
+
+-- ════ 現場管理（写真・図面・日報・有給） ════
+
+-- 現場写真（工事ごとに撮影日つきで保存。画像本体はStorageのsite-filesバケット）
+create table public.site_photos (
+  id bigint generated always as identity primary key,
+  project_id bigint not null references public.projects(id) on delete cascade,
+  url text not null,
+  caption text default '',
+  shot_date date not null default ((now() at time zone 'Asia/Tokyo')::date),
+  uploaded_by uuid references auth.users(id) on delete set null,
+  uploader_name text default '',
+  created_at timestamptz default now()
+);
+
+-- 図面（工事ごとのPDF・画像。本体はStorageのsite-filesバケット）
+create table public.drawings (
+  id bigint generated always as identity primary key,
+  project_id bigint not null references public.projects(id) on delete cascade,
+  file_url text not null,
+  file_name text not null,
+  file_mime text default '',
+  note text default '',
+  uploaded_by uuid references auth.users(id) on delete set null,
+  uploader_name text default '',
+  created_at timestamptz default now()
+);
+
+-- 日報（1人1日1件〜複数件。実働・残業は分単位で保存）
+create table public.daily_reports (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  user_name text default '',
+  work_date date not null,
+  project_id bigint references public.projects(id) on delete set null,
+  project_name text default '',
+  content text default '',
+  start_time text default '08:00',
+  end_time text default '17:00',
+  break_minutes integer not null default 60,
+  work_minutes integer not null default 0,
+  overtime_minutes integer not null default 0,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- 有給申請（pending＝申請中 / approved＝承認 / rejected＝却下）
+create table public.leave_requests (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  user_name text default '',
+  start_date date not null,
+  end_date date not null,
+  leave_type text not null default '全日', -- 全日／午前半休／午後半休
+  days numeric not null default 1,
+  reason text default '',
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  reviewer_name text default '',
+  review_note text default '',
+  reviewed_at timestamptz,
   created_at timestamptz default now()
 );
 
@@ -172,6 +234,12 @@ $$;
 create or replace function public.app_supplier_id() returns bigint
 language sql stable security definer as $$
   select supplier_id from public.profiles where id = auth.uid()
+$$;
+
+-- 社内（staff＋carpenter）判定。現場管理系のポリシーで使う
+create or replace function public.app_is_employee() returns boolean
+language sql stable security definer as $$
+  select coalesce((select role in ('staff','carpenter') from public.profiles where id = auth.uid()), false)
 $$;
 
 -- ════ RLS（行レベルセキュリティ）有効化 ════
@@ -188,9 +256,13 @@ alter table public.orders enable row level security;
 alter table public.cost_entries enable row level security;
 alter table public.chat_messages enable row level security;
 alter table public.profiles enable row level security;
+alter table public.site_photos enable row level security;
+alter table public.drawings enable row level security;
+alter table public.daily_reports enable row level security;
+alter table public.leave_requests enable row level security;
 
--- ════ projects（社内のみ） ════
-create policy projects_select on public.projects for select using (app_user_role() = 'staff');
+-- ════ projects（閲覧は社内全員＝staff＋carpenter。編集はstaffのみ） ════
+create policy projects_select on public.projects for select using (app_is_employee());
 create policy projects_insert on public.projects for insert with check (app_user_role() = 'staff');
 create policy projects_update on public.projects for update using (app_user_role() = 'staff');
 create policy projects_delete on public.projects for delete using (app_user_role() = 'staff');
@@ -303,6 +375,67 @@ create policy "chat_files_select" on storage.objects
 for select to authenticated
 using (bucket_id = 'chat-files');
 
+-- ════ site_photos / drawings（閲覧・追加は社内全員。削除は本人またはstaff） ════
+create policy site_photos_select on public.site_photos
+  for select using (app_is_employee());
+create policy site_photos_insert on public.site_photos
+  for insert with check (app_is_employee() and uploaded_by = auth.uid());
+create policy site_photos_update on public.site_photos
+  for update using (app_user_role() = 'staff' or uploaded_by = auth.uid());
+create policy site_photos_delete on public.site_photos
+  for delete using (app_user_role() = 'staff' or uploaded_by = auth.uid());
+
+create policy drawings_select on public.drawings
+  for select using (app_is_employee());
+create policy drawings_insert on public.drawings
+  for insert with check (app_is_employee() and uploaded_by = auth.uid());
+create policy drawings_update on public.drawings
+  for update using (app_user_role() = 'staff' or uploaded_by = auth.uid());
+create policy drawings_delete on public.drawings
+  for delete using (app_user_role() = 'staff' or uploaded_by = auth.uid());
+
+-- ════ daily_reports（本人は自分の分のみ・staffは全件） ════
+create policy daily_reports_select on public.daily_reports
+  for select using (app_user_role() = 'staff' or user_id = auth.uid());
+create policy daily_reports_insert on public.daily_reports
+  for insert with check (app_is_employee() and user_id = auth.uid());
+create policy daily_reports_update on public.daily_reports
+  for update using (app_user_role() = 'staff' or user_id = auth.uid());
+create policy daily_reports_delete on public.daily_reports
+  for delete using (app_user_role() = 'staff' or user_id = auth.uid());
+
+-- ════ leave_requests（本人は自分の申請のみ・staffは全件＋承認操作） ════
+create policy leave_requests_select on public.leave_requests
+  for select using (app_user_role() = 'staff' or user_id = auth.uid());
+create policy leave_requests_insert on public.leave_requests
+  for insert with check (app_is_employee() and user_id = auth.uid());
+-- 承認・却下はstaff。本人は申請中（pending）の間だけ内容変更可
+create policy leave_requests_update on public.leave_requests
+  for update using (app_user_role() = 'staff' or (user_id = auth.uid() and status = 'pending'));
+-- 取り下げは本人（pendingのみ）またはstaff
+create policy leave_requests_delete on public.leave_requests
+  for delete using (app_user_role() = 'staff' or (user_id = auth.uid() and status = 'pending'));
+
+-- ════ site-files（現場写真・図面のストレージ。書き込みは社内のみ） ════
+insert into storage.buckets (id, name, public)
+values ('site-files', 'site-files', true)
+on conflict (id) do nothing;
+
+drop policy if exists "site_files_insert" on storage.objects;
+create policy "site_files_insert" on storage.objects
+for insert to authenticated
+with check (bucket_id = 'site-files' and app_is_employee());
+
+drop policy if exists "site_files_select" on storage.objects;
+create policy "site_files_select" on storage.objects
+for select to authenticated
+using (bucket_id = 'site-files' and app_is_employee());
+
+drop policy if exists "site_files_delete" on storage.objects;
+create policy "site_files_delete" on storage.objects
+for delete to authenticated
+using (bucket_id = 'site-files' and app_is_employee());
+
 -- ════ push_subscriptions（自分の端末の購読のみ操作可。送信処理はEdge Functionがservice roleで参照） ════
 alter table public.push_subscriptions enable row level security;
 create policy push_subscriptions_select on public.push_subscriptions
@@ -367,3 +500,7 @@ alter publication supabase_realtime add table public.estimates;
 alter publication supabase_realtime add table public.orders;
 alter publication supabase_realtime add table public.cost_entries;
 alter publication supabase_realtime add table public.chat_messages;
+alter publication supabase_realtime add table public.site_photos;
+alter publication supabase_realtime add table public.drawings;
+alter publication supabase_realtime add table public.daily_reports;
+alter publication supabase_realtime add table public.leave_requests;
