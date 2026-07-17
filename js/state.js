@@ -21,6 +21,7 @@ let fbContainerId = null;   // 描画先のコンテナ要素ID（モーダル o
 let fbMoving = null;        // 移動中のアイテム {kind:'photo'|'drawing', id}
 let dailyReports = [];      // 日報（carpenterは自分の分のみ・staffは全員分。RLSが自動で絞る）
 let leaveRequests = [];     // 有給申請（同上）
+let holidayRequests = [];   // 休日出勤申請（同上）
 let genbaProjectId = null;  // 現場ページで選択中の工事ID（写真・図面タブ共通）
 let editingNippoId = null;  // 編集中の日報ID（nullなら新規）
 let nippoMonth = null;      // 日報一覧で表示中の月（'YYYY-MM'）
@@ -31,6 +32,8 @@ let viewingPhotoId = null;  // 写真ビューアで表示中の写真ID
 let talkPanelOpen = false;
 let activeTalkPanelSupplier = null;
 let talkThreads = {};
+// 社内チャット（きよかわ社員のみ）のスレッド名。suppliersとは別枠で常に一覧の先頭に表示する
+const INTERNAL_THREAD = 'きよかわ（社員）';
 
 // 受発注
 let cart=[], orders=[], orderSeq=1, costEntries=[], currentOrder=null;

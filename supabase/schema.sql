@@ -131,6 +131,7 @@ create table public.cost_entries (
 create table public.chat_messages (
   id bigint generated always as identity primary key,
   supplier_id bigint references public.suppliers(id) on delete cascade,
+  is_internal boolean not null default false, -- true＝社内チャット（きよかわ社員のみ。supplier_idはnull）
   role text not null, -- 'me'（きよかわ）/ 'them'（発注先）
   type text not null default 'text', -- 'text' / 'order' / 'file'
   text text,
@@ -236,7 +237,24 @@ create table public.daily_reports (
   updated_at timestamptz default now()
 );
 
--- 有給申請（pending＝申請中 / approved＝承認 / rejected＝却下）
+-- 休日出勤申請（承認プロセスは残業と同様：申請時に承認者を1人指名）
+create table public.holiday_requests (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  user_name text default '',
+  work_date date not null,
+  project_id bigint references public.projects(id) on delete set null,
+  project_name text default '',
+  reason text default '',
+  approver_name text not null default '',
+  status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  reviewer_name text default '',
+  review_note text default '',
+  reviewed_at timestamptz,
+  created_at timestamptz default now()
+);
+
+-- 有給申請（pending＝申請中 / approved＝承認 / rejected＝却下）。承認者は清川創史（アプリ側で固定）
 create table public.leave_requests (
   id bigint generated always as identity primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -301,6 +319,7 @@ alter table public.daily_reports enable row level security;
 alter table public.leave_requests enable row level security;
 alter table public.site_folders enable row level security;
 alter table public.drawing_views enable row level security;
+alter table public.holiday_requests enable row level security;
 
 -- ════ projects（閲覧は社内全員＝staff＋carpenter。編集はstaffのみ） ════
 create policy projects_select on public.projects for select using (app_is_employee());
@@ -390,15 +409,29 @@ create policy cost_entries_insert on public.cost_entries for insert with check (
 create policy cost_entries_update on public.cost_entries for update using (app_user_role() = 'staff');
 create policy cost_entries_delete on public.cost_entries for delete using (app_user_role() = 'staff');
 
--- ════ chat_messages（社内は全件・発注先は自社スレッドのみ） ════
+-- ════ chat_messages ════
+-- 社内チャンネル（is_internal）＝社員（staff＋carpenter）のみ
+-- 発注先チャンネル＝staffは全件・発注先は自社スレッドのみ
 create policy chat_messages_select on public.chat_messages
-  for select using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
+  for select using (
+    (is_internal and app_is_employee())
+    or (not is_internal and (app_user_role() = 'staff' or supplier_id = app_supplier_id()))
+  );
 create policy chat_messages_insert on public.chat_messages
-  for insert with check (app_user_role() = 'staff' or supplier_id = app_supplier_id());
+  for insert with check (
+    (is_internal and app_is_employee())
+    or (not is_internal and (app_user_role() = 'staff' or supplier_id = app_supplier_id()))
+  );
 create policy chat_messages_update on public.chat_messages
-  for update using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
+  for update using (
+    (is_internal and app_is_employee())
+    or (not is_internal and (app_user_role() = 'staff' or supplier_id = app_supplier_id()))
+  );
 create policy chat_messages_delete on public.chat_messages
-  for delete using (app_user_role() = 'staff' or supplier_id = app_supplier_id());
+  for delete using (
+    (is_internal and app_is_employee())
+    or (not is_internal and (app_user_role() = 'staff' or supplier_id = app_supplier_id()))
+  );
 
 -- ════ chat-files（チャットへの写真・PDF等の資料添付用ストレージ） ════
 -- バケット自体はSupabaseダッシュボードのStorageで作成する（public、名前は chat-files）
@@ -462,6 +495,16 @@ create policy daily_reports_update on public.daily_reports
   for update using (app_user_role() = 'staff' or user_id = auth.uid() or app_is_ot_approver());
 create policy daily_reports_delete on public.daily_reports
   for delete using (app_user_role() = 'staff' or user_id = auth.uid());
+
+-- ════ holiday_requests（本人は自分の申請のみ・staffと承認者は全件＋承認操作） ════
+create policy holiday_requests_select on public.holiday_requests
+  for select using (app_user_role() = 'staff' or user_id = auth.uid() or app_is_ot_approver());
+create policy holiday_requests_insert on public.holiday_requests
+  for insert with check (app_is_employee() and user_id = auth.uid());
+create policy holiday_requests_update on public.holiday_requests
+  for update using (app_user_role() = 'staff' or app_is_ot_approver() or (user_id = auth.uid() and status = 'pending'));
+create policy holiday_requests_delete on public.holiday_requests
+  for delete using (app_user_role() = 'staff' or (user_id = auth.uid() and status = 'pending'));
 
 -- ════ leave_requests（本人は自分の申請のみ・staffは全件＋承認操作） ════
 create policy leave_requests_select on public.leave_requests
@@ -565,3 +608,4 @@ alter publication supabase_realtime add table public.daily_reports;
 alter publication supabase_realtime add table public.leave_requests;
 alter publication supabase_realtime add table public.site_folders;
 alter publication supabase_realtime add table public.drawing_views;
+alter publication supabase_realtime add table public.holiday_requests;

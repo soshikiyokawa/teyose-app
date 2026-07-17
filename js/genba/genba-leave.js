@@ -1,5 +1,7 @@
-// ════ 有給申請（申請・取り下げ・staffによる承認／却下） ════
+// ════ 有給申請（申請・取り下げ・承認／却下） ════
+// 承認者は清川創史（固定）。申請の通知は承認者へ、申請内容は社内チャットにも自動転記される
 
+const LEAVE_APPROVER = '清川創史';
 let reviewingLeaveId = null;
 
 function leaveTypeChanged(){
@@ -85,9 +87,9 @@ function leaveRowHtml(lr, forReview){
 function renderLeave(){
   if(!document.getElementById('leave-type').value) document.getElementById('leave-type').value = '全日';
 
-  // ── staff：承認待ち一覧 ──
+  // ── 承認者（清川創史）のみ：承認待ち一覧 ──
   const reviewWrap = document.getElementById('leave-review-wrap');
-  if(currentUserRole==='staff'){
+  if(currentUserDisplayName===LEAVE_APPROVER){
     reviewWrap.style.display = '';
     const pendings = leaveRequests.filter(lr=>lr.status==='pending' && lr.userId!==currentUserId);
     document.getElementById('leave-review-list').innerHTML = pendings.length

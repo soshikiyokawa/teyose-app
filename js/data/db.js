@@ -21,12 +21,12 @@ async function fetchAllData(){
   master = itemRows.map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,price:Number(r.price),cost:Number(r.cost),supplier:supplierNameById(r.supplier_id),sortOrder:r.sort_order}));
   masterIdSeq = Math.max(0,...master.map(m=>m.id))+1;
 
-  // チャットは社内＝全件／発注先＝自社分のみ（RLSが自動で絞る）
+  // チャットは社内＝全件／発注先＝自社分のみ／大工＝社内チャットのみ（RLSが自動で絞る）
   const { data: chatRows, error: chatErr } = await sb.from('chat_messages').select('*').order('created_at');
   if(chatErr) throw chatErr;
   talkThreads = {};
   chatRows.forEach(r=>{
-    const name = supplierNameById(r.supplier_id);
+    const name = r.is_internal ? INTERNAL_THREAD : supplierNameById(r.supplier_id);
     if(!talkThreads[name]) talkThreads[name]=[];
     talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||''});
   });
@@ -296,10 +296,11 @@ async function dbMarkOrderReceived(orderNo, supplierName){
 
 // ── チャット ──
 async function dbAddChatMessage(supplierName, msg){
-  const supplier_id = supplierIdByName(supplierName);
-  if(!supplier_id) return;
+  const isInternal = supplierName===INTERNAL_THREAD;
+  const supplier_id = isInternal ? null : supplierIdByName(supplierName);
+  if(!isInternal && !supplier_id) return;
   const { data, error } = await sb.from('chat_messages').insert({
-    supplier_id, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
+    supplier_id, is_internal:isInternal, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
     file_url:msg.fileUrl||null, file_name:msg.fileName||null, file_mime:msg.fileMime||null, unread:false,
     sender_name: currentUserDisplayName||''
   }).select().single();
@@ -307,9 +308,13 @@ async function dbAddChatMessage(supplierName, msg){
   if(!talkThreads[supplierName]) talkThreads[supplierName]=[];
   talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,fileUrl:data.file_url,fileName:data.file_name,fileMime:data.file_mime,ts:new Date(data.created_at).getTime(),unread:false,senderName:data.sender_name||''});
 
-  // 通知の送信（社内→発注先 or 発注先→社内）。失敗してもチャット送信自体は成立させる
+  // 通知の送信。失敗してもチャット送信自体は成立させる（msg.silent=trueなら通知しない：自動転記用）
+  if(msg.silent) return;
   const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}` : msg.type==='file' ? `📎 ${msg.fileName||'ファイル'}` : (msg.text||'');
-  if(msg.role==='me'){
+  if(isInternal){
+    // 社内チャット：自分以外の社員全員（staff＋carpenter）へ
+    dbSendPush('employee', null, `${INTERNAL_THREAD} ${currentUserDisplayName||''}`, preview, currentUserId).catch(()=>{});
+  } else if(msg.role==='me'){
     dbSendPush('supplier', supplier_id, supplierName, preview).catch(()=>{});
   } else {
     dbSendPush('staff', null, supplierName, preview).catch(()=>{});
@@ -349,6 +354,9 @@ async function fetchGenbaData(){
 
   const { data: leaveRows } = await sb.from('leave_requests').select('*').order('created_at',{ascending:false});
   leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
+
+  const { data: holidayRows } = await sb.from('holiday_requests').select('*').order('created_at',{ascending:false});
+  holidayRequests = (holidayRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',reason:r.reason||'',approverName:r.approver_name||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
 }
 
 // 現場写真・図面のファイルをStorageにアップロードし、公開URLを返す
@@ -468,8 +476,13 @@ async function dbAddLeaveRequest(lr){
     start_date:lr.startDate, end_date:lr.endDate, leave_type:lr.leaveType, days:lr.days, reason:lr.reason||''
   }).select().single();
   if(error){showToast('申請に失敗しました：'+error.message);throw error;}
-  // 事務（staff）へ通知。失敗しても申請自体は成立させる
-  dbSendPush('staff', null, '有給申請', `${currentUserDisplayName}さんから有給申請（${lr.startDate.replace(/-/g,'/')}〜）`).catch(()=>{});
+  // 承認者（清川創史）へ通知＋社内チャットへ転記。失敗しても申請自体は成立させる
+  dbSendPushToNames([LEAVE_APPROVER], '有給申請',
+    `${currentUserDisplayName}さんから有給申請（${lr.startDate.replace(/-/g,'/')}〜）`).catch(()=>{});
+  const period = lr.startDate.replace(/-/g,'/') + (lr.endDate && lr.endDate!==lr.startDate ? '〜'+lr.endDate.replace(/-/g,'/') : '') +
+    (lr.leaveType!=='全日' ? `（${lr.leaveType}）` : '');
+  dbAddChatMessage(INTERNAL_THREAD, {role:'me', type:'text', silent:true,
+    text:`【有給申請】${period}　${lr.days}日${lr.reason?'\n理由：'+lr.reason:''}`}).catch(()=>{});
   return data.id;
 }
 async function dbReviewLeaveRequest(id, status, note){
@@ -489,6 +502,35 @@ async function dbDeleteLeaveRequest(id){
   if(error){showToast('取り下げに失敗しました：'+error.message);throw error;}
 }
 
+// ── 休日出勤申請（承認プロセスは残業と同様：承認者1人を指名→通知・リマインド） ──
+async function dbAddHolidayRequest(hr){
+  const { data, error } = await sb.from('holiday_requests').insert({
+    user_id:currentUserId, user_name:currentUserDisplayName||'',
+    work_date:hr.workDate, project_id:hr.projectId||null, project_name:hr.projectName||'',
+    reason:hr.reason||'', approver_name:hr.approverName
+  }).select().single();
+  if(error){showToast('申請に失敗しました：'+error.message);throw error;}
+  dbSendPushToNames([hr.approverName], '休日出勤の承認のお願い',
+    `${currentUserDisplayName}さん ${hr.workDate.replace(/-/g,'/')} 休日出勤（${hr.projectName||''}）`).catch(()=>{});
+  return data.id;
+}
+async function dbReviewHolidayRequest(id, status, note){
+  const hr = holidayRequests.find(x=>x.id===id);
+  const { error } = await sb.from('holiday_requests').update({
+    status, reviewer_name:currentUserDisplayName||'', review_note:note||'', reviewed_at:new Date().toISOString()
+  }).eq('id',id);
+  if(error){showToast('更新に失敗しました：'+error.message);throw error;}
+  if(hr){
+    const label = status==='approved' ? '承認されました' : '却下されました';
+    dbSendPushToUser(hr.userId, '休日出勤申請の結果',
+      `${hr.workDate.replace(/-/g,'/')} の休日出勤申請が${label}（${currentUserDisplayName}）${note?'：'+note:''}`).catch(()=>{});
+  }
+}
+async function dbDeleteHolidayRequest(id){
+  const { error } = await sb.from('holiday_requests').delete().eq('id',id);
+  if(error){showToast('取り下げに失敗しました：'+error.message);throw error;}
+}
+
 // ── プッシュ通知 ──
 async function dbSavePushSubscription(sub){
   const { data: userData } = await sb.auth.getUser();
@@ -499,8 +541,8 @@ async function dbSavePushSubscription(sub){
   }, { onConflict: 'endpoint' });
   if(error){showToast('通知設定の保存に失敗しました：'+error.message);throw error;}
 }
-async function dbSendPush(targetRole, targetSupplierId, title, body){
-  await sb.functions.invoke('send-push', { body: { targetRole, targetSupplierId, title, body } });
+async function dbSendPush(targetRole, targetSupplierId, title, body, excludeUserId){
+  await sb.functions.invoke('send-push', { body: { targetRole, targetSupplierId, title, body, excludeUserId } });
 }
 async function dbSendPushToUser(targetUserId, title, body){
   await sb.functions.invoke('send-push', { body: { targetRole:'user', targetUserId, title, body } });
@@ -525,6 +567,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'drawing_views'}, ()=>refetchAndRerender('drawing_views'))
     .on('postgres_changes',{event:'*',schema:'public',table:'daily_reports'}, ()=>refetchAndRerender('daily_reports'))
     .on('postgres_changes',{event:'*',schema:'public',table:'leave_requests'}, ()=>refetchAndRerender('leave_requests'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'holiday_requests'}, ()=>refetchAndRerender('holiday_requests'))
     .subscribe();
 }
 
@@ -547,7 +590,7 @@ async function refetchAndRerender(table){
     if(document.getElementById('ordersub-history')?.classList.contains('active')) renderOrders();
     if(document.getElementById('page-cost')?.classList.contains('active')) renderCost();
   }
-  if(['site_photos','drawings','site_folders','drawing_views','daily_reports','leave_requests'].includes(table)){
+  if(['site_photos','drawings','site_folders','drawing_views','daily_reports','leave_requests','holiday_requests'].includes(table)){
     if(document.getElementById('page-genba')?.classList.contains('active')) renderGenbaPage();
     renderInfoGenbaSections && renderInfoGenbaSections();
     refreshFB && refreshFB(); // 開いているファイルブラウザにも反映

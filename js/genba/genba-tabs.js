@@ -1,7 +1,7 @@
 // ════ 現場ページ：タブ切替・工事選択・共通ユーティリティ ════
 
 function genbaTab(t){
-  ['photos','drawings','nippo','leave'].forEach(n=>{
+  ['photos','drawings','nippo','leave','holiday'].forEach(n=>{
     document.getElementById('genbasub-'+n)?.classList.toggle('active',n===t);
     document.getElementById('genbatab-'+n)?.classList.toggle('active',n===t);
   });
@@ -20,19 +20,20 @@ function renderGenbaPage(){
   if(document.getElementById('genbasub-drawings')?.classList.contains('active')) mountGenbaFB('drawing');
   if(document.getElementById('genbasub-nippo')?.classList.contains('active')) renderNippo();
   if(document.getElementById('genbasub-leave')?.classList.contains('active')) renderLeave();
+  if(document.getElementById('genbasub-holiday')?.classList.contains('active')) renderHoliday();
 }
 
 // 写真・図面・日報の工事選択プルダウンを最新の案件一覧で埋める
 function renderGenbaProjectSelects(){
   const opts = '<option value="">工事を選択...</option>' +
     projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
-  ['photo-project-select','drawing-project-select','nippo-project'].forEach(id=>{
+  ['photo-project-select','drawing-project-select','nippo-project','holiday-project'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     const prev = el.value;
     el.innerHTML = opts;
     // 選択状態を維持（写真・図面は共通のgenbaProjectIdを優先）
-    if(id!=='nippo-project' && genbaProjectId) el.value = String(genbaProjectId);
+    if(id!=='nippo-project' && id!=='holiday-project' && genbaProjectId) el.value = String(genbaProjectId);
     else if(prev) el.value = prev;
     if(el.value==='') el.selectedIndex = 0;
   });

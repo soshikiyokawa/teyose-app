@@ -26,17 +26,21 @@ function toggleTalkPanel(){
 function renderTalkPanelList(){
   document.getElementById('talk-panel-list').style.display='flex';
   document.getElementById('talk-panel-detail').style.display='none';
-  const allSups=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])];
+  // 社内チャット（きよかわ社員のみ）を先頭に固定。発注先スレッドはstaffのみ／supplierは自社のみ
+  const isEmployee = currentUserRole==='staff' || currentUserRole==='carpenter';
+  const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])].filter(n=>n!==INTERNAL_THREAD);
+  const allSups=[...(isEmployee?[INTERNAL_THREAD]:[]), ...(currentUserRole==='carpenter'?[]:supNames)];
   const el=document.getElementById('talk-panel-thread-list');
   if(!allSups.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
   el.innerHTML=allSups.map(name=>{
+    const isInternal=name===INTERNAL_THREAD;
     const msgs=talkThreads[name]||[];
     const last=msgs[msgs.length-1];
-    const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text):'タップしてトークを開始';
+    const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text):(isInternal?'社員メンバーの連絡用':'タップしてトークを開始');
     const sup=suppliers.find(s=>s.name===name);
     const unread=msgs.filter(m=>m.unread).length;
     return `<div class="sup-thread-row" onclick="openTalkPanelThread('${name.replace(/'/g,"\\'")}')">
-      <div class="sup-thread-icon">🏪</div>
+      <div class="sup-thread-icon">${isInternal?'🏡':'🏪'}</div>
       <div class="sup-thread-info">
         <div class="sup-thread-name">${name}</div>
         <div class="sup-thread-preview">${preview}</div>
@@ -56,7 +60,9 @@ function openTalkPanelThread(supName){
   if(!talkThreads[supName]) talkThreads[supName]=[];
   const sup=suppliers.find(s=>s.name===supName);
   document.getElementById('talk-panel-title').textContent=supName;
-  document.getElementById('talk-panel-meta').textContent=sup?.tel?'📞 '+sup.tel+(sup.email?' · ✉ '+sup.email:''):'';
+  document.getElementById('talk-panel-meta').textContent=
+    supName===INTERNAL_THREAD ? '社員メンバーのみ表示されます'
+    : (sup?.tel?'📞 '+sup.tel+(sup.email?' · ✉ '+sup.email:''):'');
   document.getElementById('talk-panel-list').style.display='none';
   document.getElementById('talk-panel-detail').style.display='flex';
   // 未読クリア
@@ -74,10 +80,13 @@ function closeTalkPanelThread(){
 }
 
 function renderTalkPanelMessages(){
+  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD;
   const msgs=talkThreads[activeTalkPanelSupplier]||[];
   const el=document.getElementById('talk-panel-messages');
   if(!msgs.length){
-    el.innerHTML='<div class="empty" style="padding:24px">まだメッセージがありません。<br>発注確定するとここに発注書が届きます。</div>';
+    el.innerHTML = internalThread
+      ? '<div class="empty" style="padding:24px">まだメッセージがありません。<br>社員メンバーへの連絡・共有に使えます。</div>'
+      : '<div class="empty" style="padding:24px">まだメッセージがありません。<br>発注確定するとここに発注書が届きます。</div>';
     return;
   }
   let lastDate='';
@@ -114,7 +123,8 @@ function renderTalkPanelMessages(){
         <div class="ts">${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
       </div>`;
     }
-    const isMe=m.role==='me';
+    // 社内チャットは送信者名で自分／他人を判定（全員が社員のためroleでは区別できない）
+    const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';
     if(m.type==='file'){
       const isImage=(m.fileMime||'').startsWith('image/');
       return `${sep}<div class="talk-bubble ${isMe?'me':'them'}">
@@ -139,7 +149,7 @@ function sendTalkPanelMsg(){
   const text=input.value.trim();
   if(!text||!activeTalkPanelSupplier) return;
   if(!talkThreads[activeTalkPanelSupplier]) talkThreads[activeTalkPanelSupplier]=[];
-  const role = currentUserRole==='staff' ? 'me' : 'them';
+  const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole==='staff') ? 'me' : 'them';
   input.value='';
   dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text})
     .then(renderTalkPanelMessages)
@@ -150,7 +160,7 @@ async function sendTalkPanelFile(fileInput){
   const file=fileInput.files[0];
   fileInput.value='';
   if(!file||!activeTalkPanelSupplier) return;
-  const role = currentUserRole==='staff' ? 'me' : 'them';
+  const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole==='staff') ? 'me' : 'them';
   showToast('アップロード中…');
   try{
     const fileUrl = await dbUploadChatFile(file);
