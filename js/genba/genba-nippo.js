@@ -42,6 +42,8 @@ function nippoRecalc(){
   const otEl = document.getElementById('nippo-overtime');
   otEl.textContent = overtime>0 ? gbMinLabel(overtime) : 'なし';
   otEl.style.color = overtime>0 ? 'var(--danger)' : 'var(--text)';
+  // 残業が発生する場合のみ承認者の選択欄を表示
+  document.getElementById('nippo-ot-approver-wrap').style.display = overtime>0 ? '' : 'none';
 }
 
 function resetNippoForm(){
@@ -52,6 +54,7 @@ function resetNippoForm(){
   document.getElementById('nippo-start').value = '08:00';
   document.getElementById('nippo-end').value = '18:00';
   document.getElementById('nippo-break').value = '120';
+  document.getElementById('nippo-ot-approver').value = '';
   document.getElementById('nippo-form-title').textContent = '日報を書く';
   document.getElementById('nippo-cancel-btn').style.display = 'none';
   document.getElementById('nippo-delete-btn').style.display = 'none';
@@ -72,26 +75,36 @@ async function saveNippo(){
   const {work, overtime} = nippoCalc();
   const project = projects.find(p=>p.id===projectId);
 
+  // 残業がある場合は承認者を1人選んでもらう（その人だけに通知される）
+  let otApproverName = '';
+  if(overtime>0){
+    otApproverName = document.getElementById('nippo-ot-approver').value;
+    if(!otApproverName){ showToast('残業の承認者を選択してください'); return; }
+  }
+
   // 残業の承認ステータスを決める：残業なし＝none／残業あり＝申請中
-  // （承認・却下済みで残業時間が変わっていなければステータスを維持する）
+  // （承認・却下済みで残業時間も承認者も変わっていなければステータスを維持する）
   const prev = editingNippoId ? dailyReports.find(x=>x.id===editingNippoId) : null;
   let otStatus = 'none';
   if(overtime>0){
-    otStatus = (prev && prev.overtimeMinutes===overtime && (prev.otStatus==='approved'||prev.otStatus==='rejected'))
+    otStatus = (prev && prev.overtimeMinutes===overtime && prev.otApproverName===otApproverName
+                && (prev.otStatus==='approved'||prev.otStatus==='rejected'))
       ? prev.otStatus : 'pending';
   }
-  const notifyApprovers = otStatus==='pending' && !(prev && prev.otStatus==='pending' && prev.overtimeMinutes===overtime);
+  const notifyApprover = otStatus==='pending' &&
+    !(prev && prev.otStatus==='pending' && prev.overtimeMinutes===overtime && prev.otApproverName===otApproverName);
 
   const reportUserName = prev ? prev.userName : (currentUserDisplayName||'');
   await dbSaveNippo({
     id: editingNippoId, workDate, projectId, projectName: project?.name||'',
-    content, startTime, endTime, breakMinutes, workMinutes: work, overtimeMinutes: overtime, otStatus
+    content, startTime, endTime, breakMinutes, workMinutes: work, overtimeMinutes: overtime,
+    otStatus, otApproverName
   });
 
   if(otStatus==='pending'){
-    showToast('日報を保存し、残業を申請しました（承認待ち）');
-    if(notifyApprovers){
-      dbSendPushToNames(OT_APPROVERS, '残業承認のお願い',
+    showToast(`日報を保存し、${otApproverName}さんに残業を申請しました（承認待ち）`);
+    if(notifyApprover){
+      dbSendPushToNames([otApproverName], '残業承認のお願い',
         `${reportUserName}さん ${workDate.replace(/-/g,'/')} 残業${gbMinLabel(overtime)}（${project?.name||''}）`).catch(()=>{});
     }
   } else {
@@ -134,6 +147,7 @@ function editNippo(id){
   document.getElementById('nippo-start').value = n.startTime;
   document.getElementById('nippo-end').value = n.endTime;
   document.getElementById('nippo-break').value = String(n.breakMinutes);
+  document.getElementById('nippo-ot-approver').value = n.otApproverName||'';
   document.getElementById('nippo-form-title').textContent =
     (currentUserRole==='staff' && n.userId!==currentUserId ? `日報を編集（${n.userName}）` : '日報を編集');
   document.getElementById('nippo-cancel-btn').style.display = '';
@@ -165,10 +179,12 @@ function renderNippo(){
   const [y,m] = nippoMonth.split('-').map(Number);
   document.getElementById('nippo-month-lbl').textContent = y+'年'+m+'月';
 
-  // ── 承認者のみ：残業の承認待ち一覧（月をまたいで全件表示） ──
+  // ── 承認者のみ：自分宛の残業承認待ち一覧（月をまたいで全件表示） ──
+  // 承認者が未指定の古い申請は5人全員に表示する
   const otWrap = document.getElementById('ot-approve-wrap');
   if(isOtApprover()){
-    const pendings = dailyReports.filter(n=>n.otStatus==='pending' && n.userId!==currentUserId);
+    const pendings = dailyReports.filter(n=>n.otStatus==='pending' && n.userId!==currentUserId
+      && (!n.otApproverName || n.otApproverName===currentUserDisplayName));
     otWrap.style.display = pendings.length ? '' : 'none';
     document.getElementById('ot-approve-list').innerHTML = pendings.map(n=>`
       <div class="nippo-row" style="cursor:default">
@@ -251,7 +267,7 @@ function renderNippo(){
       <div style="flex-shrink:0;text-align:right">
         <div style="font-size:11px">${n.startTime}〜${n.endTime}</div>
         <div style="font-size:10px;${n.overtimeMinutes>0?'color:var(--danger);font-weight:700':'color:var(--text-muted)'}">${n.overtimeMinutes>0?'残業 '+gbMinLabel(n.overtimeMinutes):gbMinLabel(n.workMinutes)}</div>
-        ${n.overtimeMinutes>0 && OT_STATUS[n.otStatus] ? `<span class="status-badge ${OT_STATUS[n.otStatus].cls}" style="margin-top:2px">${OT_STATUS[n.otStatus].label}${n.otStatus!=='pending'&&n.otReviewerName?'：'+esc(n.otReviewerName):''}</span>` : ''}
+        ${n.overtimeMinutes>0 && OT_STATUS[n.otStatus] ? `<span class="status-badge ${OT_STATUS[n.otStatus].cls}" style="margin-top:2px">${OT_STATUS[n.otStatus].label}：${esc(n.otStatus==='pending' ? (n.otApproverName||'承認者未設定') : n.otReviewerName)}</span>` : ''}
       </div>
     </div>`).join('');
 }

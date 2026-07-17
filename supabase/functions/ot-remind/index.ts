@@ -36,42 +36,50 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     // 承認待ちの残業がなければ何もしない（＝承認完了でリマインド停止）
-    const { count } = await admin
+    const { data: pendings } = await admin
       .from("daily_reports")
-      .select("id", { count: "exact", head: true })
+      .select("ot_approver_name")
       .eq("ot_status", "pending");
-    if (!count) return json({ sent: 0, pending: 0 });
+    if (!pendings?.length) return json({ sent: 0, pending: 0 });
 
-    // 承認者のユーザーID → 購読端末
+    // 申請時に選ばれた承認者ごとに件数を集計（承認者未指定の古い申請は5人全員に数える）
+    const countByName: Record<string, number> = {};
+    for (const row of pendings) {
+      const names = row.ot_approver_name && APPROVERS.includes(row.ot_approver_name)
+        ? [row.ot_approver_name] : APPROVERS;
+      for (const name of names) countByName[name] = (countByName[name] || 0) + 1;
+    }
+
+    // 表示名 → ユーザーID → 購読端末。自分宛の件数だけを知らせる
     const { data: profiles } = await admin.from("profiles").select("id, display_name");
-    const approverIds = (profiles || [])
-      .filter((p: any) => APPROVERS.includes(p.display_name))
-      .map((p: any) => p.id);
-    if (!approverIds.length) return json({ sent: 0, pending: count });
-
-    const { data: subs } = await admin.from("push_subscriptions").select("*").in("user_id", approverIds);
-
     let sent = 0;
     await Promise.all(
-      (subs || []).map(async (sub: any) => {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            JSON.stringify({
-              title: "残業承認のリマインド",
-              body: `残業の承認待ちが${count}件あります。手寄の勤怠日報から承認してください。`,
+      (profiles || [])
+        .filter((p: any) => countByName[p.display_name])
+        .map(async (p: any) => {
+          const { data: subs } = await admin.from("push_subscriptions").select("*").eq("user_id", p.id);
+          await Promise.all(
+            (subs || []).map(async (sub: any) => {
+              try {
+                await webpush.sendNotification(
+                  { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+                  JSON.stringify({
+                    title: "残業承認のリマインド",
+                    body: `あなた宛の残業承認待ちが${countByName[p.display_name]}件あります。手寄の勤怠日報から承認してください。`,
+                  }),
+                );
+                sent++;
+              } catch (e: any) {
+                if (e?.statusCode === 410 || e?.statusCode === 404) {
+                  await admin.from("push_subscriptions").delete().eq("id", sub.id);
+                }
+              }
             }),
           );
-          sent++;
-        } catch (e: any) {
-          if (e?.statusCode === 410 || e?.statusCode === 404) {
-            await admin.from("push_subscriptions").delete().eq("id", sub.id);
-          }
-        }
-      }),
+        }),
     );
 
-    return json({ sent, pending: count });
+    return json({ sent, pending: pendings.length });
   } catch (e) {
     return json({ error: String((e as any)?.message || e) }, 500);
   }

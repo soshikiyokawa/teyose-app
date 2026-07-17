@@ -228,6 +228,7 @@ create table public.daily_reports (
   work_minutes integer not null default 0,
   overtime_minutes integer not null default 0,
   ot_status text not null default 'none' check (ot_status in ('none','pending','approved','rejected')),
+  ot_approver_name text default '', -- 申請時に選んだ承認者（この1人にだけ通知・リマインドされる）
   ot_reviewer_name text default '',
   ot_review_note text default '',
   ot_reviewed_at timestamptz,

@@ -669,6 +669,18 @@
         <div>実働 <b id="nippo-worktime">8時間</b></div>
         <div>残業 <b id="nippo-overtime">なし</b></div>
       </div>
+      <!-- 残業が発生する場合のみ表示：承認を依頼する相手を1人選ぶ（その人だけに通知される） -->
+      <div class="fg" id="nippo-ot-approver-wrap" style="display:none;margin-top:8px">
+        <label>残業の承認者 <span style="color:var(--danger)">*</span></label>
+        <select id="nippo-ot-approver">
+          <option value="">選択してください</option>
+          <option value="清川創史">清川創史</option>
+          <option value="清川太視">清川太視</option>
+          <option value="清川説志">清川説志</option>
+          <option value="清川伸二">清川伸二</option>
+          <option value="原口晴郎">原口晴郎</option>
+        </select>
+      </div>
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
         <button class="btn primary" onclick="saveNippo()">
           <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="14" height="14" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
@@ -1209,7 +1221,7 @@
 <script src="js/state.js?v=145"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=147"></script>
+<script src="js/data/db.js?v=148"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=143"></script>
@@ -1251,7 +1263,7 @@
 <script src="js/genba/genba-files.js?v=145"></script>
 <script src="js/genba/genba-photos.js?v=145"></script>
 <script src="js/genba/genba-drawings.js?v=145"></script>
-<script src="js/genba/genba-nippo.js?v=147"></script>
+<script src="js/genba/genba-nippo.js?v=148"></script>
 <script src="js/genba/genba-leave.js?v=145"></script>
 
 <!-- 初期化 -->
