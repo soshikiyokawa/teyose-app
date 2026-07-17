@@ -1,7 +1,7 @@
 // ════ 見積：サブタブ切り替え・ステータスバッジ ════
 
 function estSubTab(t){
-  document.querySelectorAll('#page-estimate .sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['info','items','summary','master'][i]===t));
+  document.querySelectorAll('#page-estimate .sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['info','quote','items','summary','master'][i]===t));
   document.querySelectorAll('#page-estimate .sub-page').forEach(p=>p.classList.remove('active'));
   document.getElementById('estsub-'+t).classList.add('active');
   if(t==='items') renderSections();
