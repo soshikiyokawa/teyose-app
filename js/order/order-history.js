@@ -44,75 +44,78 @@ async function markReceived(i){
 
 const COST_TYPES=['材料費','外注費','労務費','諸経費'];
 
+// 原価管理は選択中の案件単位で表示する（全体表示はしない）
+// 「在庫分を表示」ボタンで、案件に紐づかない発注（在庫分）に切り替えられる
+let costViewStock=false;
+function toggleCostStock(){ costViewStock=!costViewStock; renderCost(); }
+
+const fmtNinku=v=>{const r=Math.round(v*100)/100;return Number.isInteger(r)?r.toFixed(1):String(r);};
+
 function renderCost(){
-  const total=costEntries.reduce((s,e)=>s+e.amount,0);
-  const pending=costEntries.filter(e=>e.status==='pending').length;
+  const target = costViewStock ? '在庫分' : (selectedProject?.name||null);
+  document.getElementById('cost-proj-name').textContent = target||'（案件未選択）';
+  document.getElementById('cost-stock-btn').classList.toggle('active', costViewStock);
+
+  if(!target){
+    document.getElementById('c-total').textContent='¥0';
+    document.getElementById('c-count').textContent='0件';
+    document.getElementById('c-pending').textContent='0件';
+    document.getElementById('c-ninku').textContent='—';
+    const msg='<div class="empty">左の案件一覧から案件を選択してください</div>';
+    ['cost-by-project','cost-by-supplier','cost-list'].forEach(id=>document.getElementById(id).innerHTML=msg);
+    return;
+  }
+
+  const entries=costEntries.filter(e=>(e.project||'')===target);
+  const total=entries.reduce((s,e)=>s+e.amount,0);
+  const pending=entries.filter(e=>e.status==='pending').length;
   document.getElementById('c-total').textContent='¥'+fmt(total);
-  document.getElementById('c-count').textContent=costEntries.length+'件';
+  document.getElementById('c-count').textContent=entries.length+'件';
   document.getElementById('c-pending').textContent=pending+'件';
-  renderCostByProject();
-  renderCostBySupplier();
+
+  // 人工（日報の実働から累計。日報の追加・修正はRealtimeで即時反映される）
+  const ninku=dailyReports.filter(n=>n.projectName===target).reduce((s,n)=>s+n.workMinutes/480,0);
+  document.getElementById('c-ninku').textContent=ninku?fmtNinku(ninku)+'人工':'—';
+
+  renderCostByType(entries);
+  renderCostBySupplier(entries);
+
   const el=document.getElementById('cost-list');
-  el.innerHTML=costEntries.length?costEntries.map(e=>`
+  el.innerHTML=entries.length?entries.map(e=>`
     <div class="cost-row">
       <div class="cost-row-top"><div class="cost-row-name">${e.name}</div><div class="cost-row-amt">¥${fmt(e.amount)}</div></div>
-      <div class="cost-row-meta"><span>${e.date}</span><span>${e.project}</span><span>${e.qty}${e.unit}</span><span>${e.supplier}</span>${e.costType?`<span>🏷️ ${e.costType}</span>`:''}<span class="badge ${e.status==='received'?'received':'pending'}">${e.status==='received'?'受領済み':'発注済み'}</span>
+      <div class="cost-row-meta"><span>${e.date}</span><span>${e.qty}${e.unit}</span><span>${e.supplier}</span>${e.costType?`<span>🏷️ ${e.costType}</span>`:''}<span class="badge ${e.status==='received'?'received':'pending'}">${e.status==='received'?'受領済み':'発注済み'}</span>
         <button class="btn danger xs" onclick="deleteCostEntry(${e.id})" style="margin-left:auto">削除</button>
       </div>
-    </div>`).join(''):'<div class="empty">発注データがありません</div>';
+    </div>`).join(''):'<div class="empty">この案件の発注データはありません</div>';
 }
 
-// 現場（物件）ごとに、費目区分（材料費／外注費／労務費／諸経費）別の合計と
-// 日報から算出した累計人工（実働8時間＝1.0人工）を一覧表示
-function renderCostByProject(){
+// 選択中の案件の費目区分（材料費／外注費／労務費／諸経費）別の合計
+function renderCostByType(entries){
   const el=document.getElementById('cost-by-project');
-
-  // 日報 → 現場ごとの累計人工（日報が保存されるたびにRealtime経由で再描画され、常に最新になる）
-  const ninkuByProject={};
-  dailyReports.forEach(n=>{
-    const p=n.projectName||'（物件未設定）';
-    ninkuByProject[p]=(ninkuByProject[p]||0)+n.workMinutes/480;
-  });
-  const fmtNinku=v=>{const r=Math.round(v*100)/100;return Number.isInteger(r)?r.toFixed(1):String(r);};
-
-  if(!costEntries.length && !Object.keys(ninkuByProject).length){el.innerHTML='<div class="empty">発注データがありません</div>';return;}
-  const byProject={};
-  costEntries.forEach(e=>{
-    const p=e.project||'（物件未設定）';
-    if(!byProject[p]) byProject[p]={};
+  if(!entries.length){el.innerHTML='<div class="empty">この案件の発注データはありません</div>';return;}
+  const byType={};
+  entries.forEach(e=>{
     const t=e.costType||'未分類';
-    byProject[p][t]=(byProject[p][t]||0)+e.amount;
+    byType[t]=(byType[t]||0)+e.amount;
   });
-  // 原価データがある現場＋日報だけ出ている現場の両方を表示する
-  const projects=[...new Set([...Object.keys(byProject),...Object.keys(ninkuByProject)])].sort();
-  const grand={};
-  let grandTotal=0, grandNinku=0;
-  const rows=projects.map(p=>{
-    const rowTotal=Object.values(byProject[p]||{}).reduce((s,v)=>s+v,0);
-    grandTotal+=rowTotal;
-    const ninku=ninkuByProject[p]||0;
-    grandNinku+=ninku;
-    const cells=COST_TYPES.map(t=>{
-      grand[t]=(grand[t]||0)+(byProject[p]?.[t]||0);
-      return `<td class="num">${byProject[p]?.[t]?'¥'+fmt(byProject[p][t]):'—'}</td>`;
-    }).join('');
-    return `<tr><td>${p}</td><td class="num" style="font-weight:700;color:var(--accent-t)">${ninku?fmtNinku(ninku):'—'}</td>${cells}<td class="num" style="font-weight:700;color:var(--wood-t)">¥${fmt(rowTotal)}</td></tr>`;
-  }).join('');
-  const grandCells=COST_TYPES.map(t=>`<td class="num" style="font-weight:700">¥${fmt(grand[t]||0)}</td>`).join('');
-  el.innerHTML=`<table class="items-table" style="width:100%;min-width:620px">
-    <thead><tr><th>現場（物件）</th><th class="r" title="日報の実働から算出（8時間＝1.0人工）">人工</th>${COST_TYPES.map(t=>`<th class="r">${t}</th>`).join('')}<th class="r">合計</th></tr></thead>
-    <tbody>${rows}
-      <tr style="background:var(--surface2)"><td style="font-weight:700">総合計</td><td class="num" style="font-weight:800;color:var(--accent-t)">${grandNinku?fmtNinku(grandNinku):'—'}</td>${grandCells}<td class="num" style="font-weight:800;color:var(--wood-t)">¥${fmt(grandTotal)}</td></tr>
+  const types=[...COST_TYPES.filter(t=>byType[t]), ...Object.keys(byType).filter(t=>!COST_TYPES.includes(t))];
+  const total=entries.reduce((s,e)=>s+e.amount,0);
+  el.innerHTML=`<table class="items-table" style="width:100%">
+    <thead><tr><th>費目区分</th><th class="r">金額</th><th class="r">構成比</th></tr></thead>
+    <tbody>
+      ${types.map(t=>`<tr><td>${t}</td><td class="num">¥${fmt(byType[t])}</td><td class="num">${total?Math.round(byType[t]/total*100):0}%</td></tr>`).join('')}
+      <tr style="background:var(--surface2)"><td style="font-weight:700">合計</td><td class="num" style="font-weight:800;color:var(--wood-t)">¥${fmt(total)}</td><td class="num">100%</td></tr>
     </tbody>
   </table>`;
 }
 
-// 発注先（業者）ごとに、現時点での発注金額の合計を一覧表示
-function renderCostBySupplier(){
+// 選択中の案件内での、発注先（業者）ごとの発注金額の合計
+function renderCostBySupplier(entries){
   const el=document.getElementById('cost-by-supplier');
-  if(!costEntries.length){el.innerHTML='<div class="empty">発注データがありません</div>';return;}
+  if(!entries.length){el.innerHTML='<div class="empty">この案件の発注データはありません</div>';return;}
   const bySupplier={};
-  costEntries.forEach(e=>{
+  entries.forEach(e=>{
     const s=e.supplier||'（発注先未設定）';
     bySupplier[s]=(bySupplier[s]||0)+e.amount;
   });
@@ -123,7 +126,7 @@ function renderCostBySupplier(){
       <div class="cost-row-top"><div class="cost-row-name">🏪 ${name}</div><div class="cost-row-amt">¥${fmt(amount)}</div></div>
     </div>`).join('')+`
     <div class="cost-row" style="background:var(--surface2)">
-      <div class="cost-row-top"><div class="cost-row-name" style="font-weight:700">総合計</div><div class="cost-row-amt" style="font-weight:800;color:var(--wood-t)">¥${fmt(total)}</div></div>
+      <div class="cost-row-top"><div class="cost-row-name" style="font-weight:700">合計</div><div class="cost-row-amt" style="font-weight:800;color:var(--wood-t)">¥${fmt(total)}</div></div>
     </div>`;
 }
 

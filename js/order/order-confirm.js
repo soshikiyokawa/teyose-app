@@ -7,7 +7,8 @@ function updateOrderPreviewBtnState(){
   if(!btn) return;
   const costType=document.getElementById('order-cost-type')?.value;
   const dueDate=document.getElementById('order-due-date')?.value;
-  const ready = !!(cart.length && costType && dueDate);
+  const project=document.getElementById('order-project')?.value;
+  const ready = !!(cart.length && costType && dueDate && project);
   btn.classList.toggle('btn-incomplete', !ready);
 }
 
@@ -15,8 +16,9 @@ function openOrderPreview(){
   if(!cart.length){alert('カートが空です。');return;}
   const costType=document.getElementById('order-cost-type').value;
   const dueDate=document.getElementById('order-due-date').value;
+  const project=document.getElementById('order-project').value;
+  if(!project){alert('案件を選択してください。\n（現場に紐づかない発注の場合は「在庫分」を選択）');return;}
   if(!costType || !dueDate){alert('必須項目を入力してください。');return;}
-  const project=selectedProjectName||'';
   const now=new Date();
   const date=now.toISOString().slice(0,10);
   const no=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
@@ -101,6 +103,7 @@ async function confirmOrder(){
   cart = []; currentOrder = null;
   document.getElementById('order-due-date').value = '';
   document.getElementById('order-cost-type').value = '';
+  document.getElementById('order-project').value = '';
   renderCart();
   updateOrderPreviewBtnState();
   if(selectedSupplier) renderItemSelectList();

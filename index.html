@@ -370,22 +370,27 @@
   </div>
 </div>
 
-<!-- ════ 原価管理ページ ════ -->
+<!-- ════ 原価管理ページ（選択中の案件単位で表示） ════ -->
 <div class="page staff-only" id="page-cost">
-  <div class="section-lbl">原価サマリー</div>
-  <div class="metric-grid">
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span class="section-lbl" style="margin:0">原価サマリー</span>
+    <span class="sch-proj-badge" id="cost-proj-name">（案件未選択）</span>
+    <button class="sf-btn" id="cost-stock-btn" onclick="toggleCostStock()" style="margin-left:auto" title="案件に紐づかない発注（在庫分）を表示">在庫分を表示</button>
+  </div>
+  <div class="metric-grid" style="margin-top:8px">
     <div class="metric"><div class="lbl">発注総額（原価）</div><div class="val g" id="c-total">¥0</div></div>
     <div class="metric"><div class="lbl">発注件数</div><div class="val" id="c-count">0件</div></div>
     <div class="metric"><div class="lbl">未受領</div><div class="val warn" id="c-pending">0件</div></div>
+    <div class="metric"><div class="lbl">人工（日報から累計）</div><div class="val" id="c-ninku">—</div></div>
   </div>
-  <div class="section-lbl">現場別・費目別 原価集計</div>
-  <div class="card" id="cost-by-project" style="overflow-x:auto"><div class="empty">発注データがありません</div></div>
+  <div class="section-lbl">費目別 原価集計</div>
+  <div class="card" id="cost-by-project" style="overflow-x:auto"><div class="empty">左の案件一覧から案件を選択してください</div></div>
 
   <div class="section-lbl">発注先別 発注金額集計</div>
-  <div class="card" id="cost-by-supplier"><div class="empty">発注データがありません</div></div>
+  <div class="card" id="cost-by-supplier"><div class="empty">左の案件一覧から案件を選択してください</div></div>
 
   <div class="section-lbl">発注明細（原価転記済み）</div>
-  <div class="card" id="cost-list"><div class="empty">発注データがありません</div></div>
+  <div class="card" id="cost-list"><div class="empty">左の案件一覧から案件を選択してください</div></div>
 </div>
 
 <!-- ════ 受発注ページ ════ -->
@@ -442,6 +447,11 @@
           <button class="btn sm danger" onclick="clearCart()">クリア</button>
         </div>
         <div id="cart-items"></div>
+        <div class="fg" style="padding:0 12px 10px"><label>案件<span style="color:var(--danger)">＊必須</span></label>
+          <select id="order-project" onchange="updateOrderPreviewBtnState()">
+            <option value="">選択してください</option>
+          </select>
+        </div>
         <div class="fg" style="padding:0 12px 10px"><label>費目区分<span style="color:var(--danger)">＊必須</span></label>
           <select id="order-cost-type" onchange="updateOrderPreviewBtnState()">
             <option value="">選択してください</option>
@@ -1282,7 +1292,7 @@
 <script src="js/estimate/estimate-items.js?v=138"></script>
 <script src="js/estimate/estimate-master.js?v=138"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
-<script src="js/estimate/estimate-crud.js?v=144"></script>
+<script src="js/estimate/estimate-crud.js?v=153"></script>
 <script src="js/estimate/estimate-pdf.js?v=138"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 
@@ -1298,9 +1308,9 @@
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=138"></script>
 <script src="js/order/item-master.js?v=138"></script>
-<script src="js/order/order-cart.js?v=138"></script>
-<script src="js/order/order-confirm.js?v=138"></script>
-<script src="js/order/order-history.js?v=152"></script>
+<script src="js/order/order-cart.js?v=153"></script>
+<script src="js/order/order-confirm.js?v=153"></script>
+<script src="js/order/order-history.js?v=153"></script>
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->

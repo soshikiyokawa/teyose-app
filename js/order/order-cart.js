@@ -33,9 +33,23 @@ function selectSupplier(id){
   document.getElementById('order-step1').style.display='none';
   document.getElementById('order-step2').style.display='block';
   document.getElementById('selected-supplier-name').textContent=selectedSupplier.name;
+  renderOrderProjectSelect();
   renderCatFilter();
   renderItemSelectList();
   renderCart();
+}
+
+// 発注の紐づけ先（案件 or 在庫分）の選択肢。サイドバーで選択中の案件を初期値にする
+function renderOrderProjectSelect(){
+  const el=document.getElementById('order-project');
+  if(!el) return;
+  const prev=el.value;
+  el.innerHTML='<option value="">選択してください</option>'
+    +'<option value="在庫分">在庫分（案件に紐づかない発注）</option>'
+    +projects.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
+  el.value = prev || selectedProjectName || '';
+  if(el.selectedIndex<0) el.selectedIndex=0;
+  updateOrderPreviewBtnState();
 }
 
 function backToStep1(){

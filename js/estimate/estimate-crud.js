@@ -374,6 +374,11 @@ function _selectProjectSidebarGo(id){
   renderEstListBody();
   onProjectChanged && onProjectChanged();
   renderInfoGenbaSections && renderInfoGenbaSections();
+  // 原価管理ページを開いたまま案件を切り替えた場合も即反映（在庫分表示は解除）
+  if(document.getElementById('page-cost')?.classList.contains('active')){
+    costViewStock=false;
+    renderCost();
+  }
 }
 
 // ── 案件作成・編集モーダル ──
