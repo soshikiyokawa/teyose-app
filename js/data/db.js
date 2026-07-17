@@ -356,7 +356,7 @@ async function fetchGenbaData(){
   leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
 
   const { data: holidayRows } = await sb.from('holiday_requests').select('*').order('created_at',{ascending:false});
-  holidayRequests = (holidayRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',reason:r.reason||'',approverName:r.approver_name||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
+  holidayRequests = (holidayRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',reason:r.reason||'',substituteDate:r.substitute_date||null,approverName:r.approver_name||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
 }
 
 // 現場写真・図面のファイルをStorageにアップロードし、公開URLを返す
@@ -507,11 +507,12 @@ async function dbAddHolidayRequest(hr){
   const { data, error } = await sb.from('holiday_requests').insert({
     user_id:currentUserId, user_name:currentUserDisplayName||'',
     work_date:hr.workDate, project_id:hr.projectId||null, project_name:hr.projectName||'',
-    reason:hr.reason||'', approver_name:hr.approverName
+    reason:hr.reason||'', substitute_date:hr.substituteDate||null, approver_name:hr.approverName
   }).select().single();
   if(error){showToast('申請に失敗しました：'+error.message);throw error;}
   dbSendPushToNames([hr.approverName], '休日出勤の承認のお願い',
-    `${currentUserDisplayName}さん ${hr.workDate.replace(/-/g,'/')} 休日出勤（${hr.projectName||''}）`).catch(()=>{});
+    `${currentUserDisplayName}さん ${hr.workDate.replace(/-/g,'/')} 休日出勤（${hr.projectName||''}）`
+    + (hr.substituteDate?`　振替休日：${hr.substituteDate.replace(/-/g,'/')}`:'')).catch(()=>{});
   return data.id;
 }
 async function dbReviewHolidayRequest(id, status, note){

@@ -694,6 +694,10 @@
       <button class="btn xs" onclick="nippoMonthShift(-1)">‹ 前月</button>
       <span class="month-lbl" id="nippo-month-lbl"></span>
       <button class="btn xs" onclick="nippoMonthShift(1)">翌月 ›</button>
+      <button class="btn xs staff-only" onclick="printDezura()" title="給与計算用（前月21日〜当月20日）">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        出面表
+      </button>
       <select id="nippo-user-filter" class="staff-only" onchange="nippoSetUserFilter(this.value)" style="margin-left:auto;font-size:12px;padding:4px 8px"></select>
     </div>
 
@@ -758,6 +762,7 @@
         <div class="fg"><label>出勤日 <span style="color:var(--danger)">*</span></label><input type="date" id="holiday-date"></div>
         <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="holiday-project"></select></div>
         <div class="fg full"><label>作業内容・理由</label><input id="holiday-reason" placeholder="例：上棟前の準備のため"></div>
+        <div class="fg"><label>振替休日（任意）</label><input type="date" id="holiday-substitute"></div>
         <div class="fg"><label>承認者 <span style="color:var(--danger)">*</span></label>
           <select id="holiday-approver">
             <option value="">選択してください</option>
@@ -1261,7 +1266,7 @@
 <script src="js/state.js?v=149"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=149"></script>
+<script src="js/data/db.js?v=150"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=143"></script>
@@ -1303,9 +1308,9 @@
 <script src="js/genba/genba-files.js?v=145"></script>
 <script src="js/genba/genba-photos.js?v=145"></script>
 <script src="js/genba/genba-drawings.js?v=145"></script>
-<script src="js/genba/genba-nippo.js?v=148"></script>
+<script src="js/genba/genba-nippo.js?v=150"></script>
 <script src="js/genba/genba-leave.js?v=149"></script>
-<script src="js/genba/genba-holiday.js?v=149"></script>
+<script src="js/genba/genba-holiday.js?v=150"></script>
 
 <!-- 初期化 -->
 <script src="js/init.js?v=138"></script>

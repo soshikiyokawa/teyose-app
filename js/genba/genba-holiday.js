@@ -11,14 +11,16 @@ async function applyHoliday(){
   const workDate = document.getElementById('holiday-date').value;
   const projectId = Number(document.getElementById('holiday-project').value)||null;
   const reason = document.getElementById('holiday-reason').value.trim();
+  const substituteDate = document.getElementById('holiday-substitute').value||null;
   const approverName = document.getElementById('holiday-approver').value;
   if(!workDate){ showToast('出勤日を入力してください'); return; }
   if(!projectId){ showToast('工事を選択してください'); return; }
   if(!approverName){ showToast('承認者を選択してください'); return; }
   const project = projects.find(p=>p.id===projectId);
-  await dbAddHolidayRequest({workDate, projectId, projectName:project?.name||'', reason, approverName});
+  await dbAddHolidayRequest({workDate, projectId, projectName:project?.name||'', reason, substituteDate, approverName});
   document.getElementById('holiday-date').value = '';
   document.getElementById('holiday-reason').value = '';
+  document.getElementById('holiday-substitute').value = '';
   document.getElementById('holiday-approver').value = '';
   showToast(`${approverName}さんに休日出勤を申請しました（承認待ち）`);
   await refreshGenba();
@@ -57,6 +59,7 @@ function holidayRowHtml(hr, forReview){
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700">${gbDateLabel(hr.workDate)}${!isMine?`<span style="font-weight:400;color:var(--text-sub)">　${esc(hr.userName)}</span>`:''}</div>
         <div style="font-size:11px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(hr.projectName||'（工事未設定）')}${hr.reason?'　'+esc(hr.reason):''}</div>
+        ${hr.substituteDate?`<div style="font-size:11px;color:var(--accent-t)">振替休日：${gbDateLabel(hr.substituteDate)}</div>`:''}
         ${hr.status==='pending'?`<div style="font-size:10px;color:var(--text-muted)">承認者：${esc(hr.approverName||'未設定')}</div>`:''}
         ${hr.status!=='pending'?`<div style="font-size:10px;color:var(--text-muted)">${st.label}：${esc(hr.reviewerName)}${hr.reviewNote?'　'+esc(hr.reviewNote):''}</div>`:''}
       </div>

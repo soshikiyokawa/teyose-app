@@ -276,3 +276,103 @@ function nippoSetUserFilter(v){
   nippoFilterUser = v;
   renderNippo();
 }
+
+// ════ 出面表（給与計算用：前月21日〜当月20日の勤怠一覧） ════
+// 表示中の月を「締め月」として出力する（例：7月度 ＝ 6/21〜7/20）
+
+function dzDateStr(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+function printDezura(){
+  const [y,m] = (nippoMonth||gbThisMonth()).split('-').map(Number);
+  const start = new Date(y, m-2, 21); // 前月21日
+  const end = new Date(y, m-1, 20);   // 当月20日
+  const dates = [];
+  for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) dates.push(new Date(d));
+  const inPeriod = s => s && s>=dzDateStr(start) && s<=dzDateStr(end);
+
+  // 社員ごとに日別マークと集計を組み立てる
+  // マーク：○＝出勤／◎＝出勤（残業あり）／休＝休日出勤／有＝有給／半＝半休／振＝振替休日
+  const users = {}; // userId -> {name, marks:{date:mark}, work, overtime, days, holidayDays, leaveDays, subDays}
+  const getU = (id,name)=>users[id] = users[id]||{name:name||'（名前未設定）',marks:{},work:0,overtime:0,days:new Set(),holidayDays:0,leaveDays:0,subDays:0};
+
+  dailyReports.filter(n=>inPeriod(n.workDate)).forEach(n=>{
+    const u = getU(n.userId, n.userName);
+    u.work += n.workMinutes; u.overtime += n.overtimeMinutes; u.days.add(n.workDate);
+    if(u.marks[n.workDate]!=='休') u.marks[n.workDate] = (n.overtimeMinutes>0 || u.marks[n.workDate]==='◎') ? '◎' : '○';
+  });
+  holidayRequests.filter(hr=>hr.status==='approved').forEach(hr=>{
+    const u = getU(hr.userId, hr.userName);
+    if(inPeriod(hr.workDate)){ u.marks[hr.workDate]='休'; u.holidayDays++; u.days.add(hr.workDate); }
+    if(inPeriod(hr.substituteDate)){ u.marks[hr.substituteDate]=u.marks[hr.substituteDate]||'振'; u.subDays++; }
+  });
+  leaveRequests.filter(lr=>lr.status==='approved').forEach(lr=>{
+    const u = getU(lr.userId, lr.userName);
+    const half = lr.leaveType!=='全日';
+    for(let d=new Date(lr.startDate+'T00:00:00'); dzDateStr(d)<=lr.endDate; d.setDate(d.getDate()+1)){
+      const s = dzDateStr(d);
+      if(!inPeriod(s)) continue;
+      u.marks[s] = u.marks[s]||(half?'半':'有');
+      u.leaveDays += half ? 0.5 : 1;
+    }
+  });
+
+  const userIds = Object.keys(users).sort((a,b)=>users[a].name.localeCompare(users[b].name,'ja'));
+  if(!userIds.length){ showToast('この期間の勤怠データがありません'); return; }
+
+  const yobi = ['日','月','火','水','木','金','土'];
+  const fmtH = min => (Math.round(min/60*10)/10).toFixed(1); // 時間（小数1桁）
+  const periodLabel = `${start.getMonth()+1}/21〜${end.getMonth()+1}/20`;
+
+  const head = dates.map(d=>{
+    const wd = d.getDay();
+    const bg = wd===0?'#fde8e8':wd===6?'#e8f0fd':'#f3efe6';
+    return `<th style="background:${bg}"><div>${d.getMonth()+1===start.getMonth()+1&&d.getDate()===21||d.getDate()===1?`${d.getMonth()+1}/`:''}${d.getDate()}</div><div style="font-weight:400">${yobi[wd]}</div></th>`;
+  }).join('');
+
+  const rows = userIds.map(uid=>{
+    const u = users[uid];
+    const cells = dates.map(d=>{
+      const s = dzDateStr(d);
+      const mk = u.marks[s]||'';
+      const wd = d.getDay();
+      const bg = mk?'' : (wd===0?'background:#fdf3f3':wd===6?'background:#f3f7fd':'');
+      const color = mk==='休'?'color:#b5302a;font-weight:700':mk==='有'||mk==='半'?'color:#2e7d52;font-weight:700':mk==='振'?'color:#8a6000;font-weight:700':'';
+      return `<td style="text-align:center;${bg};${color}">${mk}</td>`;
+    }).join('');
+    return `<tr>
+      <td style="white-space:nowrap;font-weight:700">${esc(u.name)}</td>
+      ${cells}
+      <td style="text-align:right">${u.days.size}</td>
+      <td style="text-align:right">${fmtH(u.work)}</td>
+      <td style="text-align:right;${u.overtime>0?'font-weight:700':''}">${u.overtime>0?fmtH(u.overtime):''}</td>
+      <td style="text-align:right">${u.holidayDays||''}</td>
+      <td style="text-align:right">${u.leaveDays||''}</td>
+      <td style="text-align:right">${u.subDays||''}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `
+  <style>
+    @page{size:A3 landscape;margin:8mm}
+    body{max-width:none !important;padding:12px !important}
+    table.dz{border-collapse:collapse;width:100%;font-size:9px;table-layout:fixed}
+    table.dz th,table.dz td{border:0.4pt solid #999;padding:2px 1px;overflow:hidden}
+    table.dz th{font-weight:700;text-align:center;font-size:8px}
+    table.dz td:first-child,table.dz th:first-child{width:64px}
+    table.dz th.sum,table.dz td.sum{width:34px}
+  </style>
+  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px">
+    <h2 style="font-size:16px;margin:0">出面表　${y}年${m}月度</h2>
+    <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
+    <span style="font-size:10px;color:#555">○出勤　◎出勤（残業あり）　休=休日出勤　有=有給　半=半休　振=振替休日　※休日出勤・有給・振替は承認済みのみ</span>
+  </div>
+  <table class="dz">
+    <tr><th>氏名</th>${head}<th class="sum">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum">有給<br>日数</th><th class="sum">振休<br>日数</th></tr>
+    ${rows}
+  </table>
+  <div style="font-size:9px;color:#555;margin-top:6px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
+
+  printHtml(`出面表 ${y}年${m}月度`, html);
+}

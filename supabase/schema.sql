@@ -246,6 +246,7 @@ create table public.holiday_requests (
   project_id bigint references public.projects(id) on delete set null,
   project_name text default '',
   reason text default '',
+  substitute_date date, -- 振替休日（任意）
   approver_name text not null default '',
   status text not null default 'pending' check (status in ('pending','approved','rejected')),
   reviewer_name text default '',
