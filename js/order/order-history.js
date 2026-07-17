@@ -62,10 +62,20 @@ function renderCost(){
     </div>`).join(''):'<div class="empty">発注データがありません</div>';
 }
 
-// 現場（物件）ごとに、費目区分（材料費／外注費／労務費／諸経費）別の合計を一覧表示
+// 現場（物件）ごとに、費目区分（材料費／外注費／労務費／諸経費）別の合計と
+// 日報から算出した累計人工（実働8時間＝1.0人工）を一覧表示
 function renderCostByProject(){
   const el=document.getElementById('cost-by-project');
-  if(!costEntries.length){el.innerHTML='<div class="empty">発注データがありません</div>';return;}
+
+  // 日報 → 現場ごとの累計人工（日報が保存されるたびにRealtime経由で再描画され、常に最新になる）
+  const ninkuByProject={};
+  dailyReports.forEach(n=>{
+    const p=n.projectName||'（物件未設定）';
+    ninkuByProject[p]=(ninkuByProject[p]||0)+n.workMinutes/480;
+  });
+  const fmtNinku=v=>{const r=Math.round(v*100)/100;return Number.isInteger(r)?r.toFixed(1):String(r);};
+
+  if(!costEntries.length && !Object.keys(ninkuByProject).length){el.innerHTML='<div class="empty">発注データがありません</div>';return;}
   const byProject={};
   costEntries.forEach(e=>{
     const p=e.project||'（物件未設定）';
@@ -73,23 +83,26 @@ function renderCostByProject(){
     const t=e.costType||'未分類';
     byProject[p][t]=(byProject[p][t]||0)+e.amount;
   });
-  const projects=Object.keys(byProject).sort();
+  // 原価データがある現場＋日報だけ出ている現場の両方を表示する
+  const projects=[...new Set([...Object.keys(byProject),...Object.keys(ninkuByProject)])].sort();
   const grand={};
-  let grandTotal=0;
+  let grandTotal=0, grandNinku=0;
   const rows=projects.map(p=>{
-    const rowTotal=Object.values(byProject[p]).reduce((s,v)=>s+v,0);
+    const rowTotal=Object.values(byProject[p]||{}).reduce((s,v)=>s+v,0);
     grandTotal+=rowTotal;
+    const ninku=ninkuByProject[p]||0;
+    grandNinku+=ninku;
     const cells=COST_TYPES.map(t=>{
-      grand[t]=(grand[t]||0)+(byProject[p][t]||0);
-      return `<td class="num">${byProject[p][t]?'¥'+fmt(byProject[p][t]):'—'}</td>`;
+      grand[t]=(grand[t]||0)+(byProject[p]?.[t]||0);
+      return `<td class="num">${byProject[p]?.[t]?'¥'+fmt(byProject[p][t]):'—'}</td>`;
     }).join('');
-    return `<tr><td>${p}</td>${cells}<td class="num" style="font-weight:700;color:var(--wood-t)">¥${fmt(rowTotal)}</td></tr>`;
+    return `<tr><td>${p}</td><td class="num" style="font-weight:700;color:var(--accent-t)">${ninku?fmtNinku(ninku):'—'}</td>${cells}<td class="num" style="font-weight:700;color:var(--wood-t)">¥${fmt(rowTotal)}</td></tr>`;
   }).join('');
   const grandCells=COST_TYPES.map(t=>`<td class="num" style="font-weight:700">¥${fmt(grand[t]||0)}</td>`).join('');
-  el.innerHTML=`<table class="items-table" style="width:100%;min-width:560px">
-    <thead><tr><th>現場（物件）</th>${COST_TYPES.map(t=>`<th class="r">${t}</th>`).join('')}<th class="r">合計</th></tr></thead>
+  el.innerHTML=`<table class="items-table" style="width:100%;min-width:620px">
+    <thead><tr><th>現場（物件）</th><th class="r" title="日報の実働から算出（8時間＝1.0人工）">人工</th>${COST_TYPES.map(t=>`<th class="r">${t}</th>`).join('')}<th class="r">合計</th></tr></thead>
     <tbody>${rows}
-      <tr style="background:var(--surface2)"><td style="font-weight:700">総合計</td>${grandCells}<td class="num" style="font-weight:800;color:var(--wood-t)">¥${fmt(grandTotal)}</td></tr>
+      <tr style="background:var(--surface2)"><td style="font-weight:700">総合計</td><td class="num" style="font-weight:800;color:var(--accent-t)">${grandNinku?fmtNinku(grandNinku):'—'}</td>${grandCells}<td class="num" style="font-weight:800;color:var(--wood-t)">¥${fmt(grandTotal)}</td></tr>
     </tbody>
   </table>`;
 }

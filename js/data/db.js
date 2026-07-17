@@ -596,4 +596,8 @@ async function refetchAndRerender(table){
     renderInfoGenbaSections && renderInfoGenbaSections();
     refreshFB && refreshFB(); // 開いているファイルブラウザにも反映
   }
+  // 日報の追加・修正は原価サマリーの人工集計にも即時反映する
+  if(table==='daily_reports' && currentUserRole==='staff' && document.getElementById('page-cost')?.classList.contains('active')){
+    renderCost();
+  }
 }
