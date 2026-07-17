@@ -32,15 +32,16 @@ Deno.serve(async (req) => {
       return json({ error: "認証が必要です" }, 401);
     }
 
-    const { targetRole, targetSupplierId, targetUserId, title, body } = await req.json();
+    const { targetRole, targetSupplierId, targetUserId, targetNames, title, body } = await req.json();
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    const { data: profiles } = await admin.from("profiles").select("id, role, supplier_id");
+    const { data: profiles } = await admin.from("profiles").select("id, role, supplier_id, display_name");
     const targetUserIds = (profiles || [])
       .filter((p: any) => {
         if (targetRole === "staff") return p.role === "staff";
         if (targetRole === "supplier") return p.role === "supplier" && p.supplier_id === targetSupplierId;
         if (targetRole === "user") return p.id === targetUserId; // 特定ユーザー宛（有給承認結果など）
+        if (targetRole === "names") return Array.isArray(targetNames) && targetNames.includes(p.display_name); // 表示名指定（残業承認者など）
         return false;
       })
       .map((p: any) => p.id);

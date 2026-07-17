@@ -213,6 +213,7 @@ create table public.drawing_views (
 );
 
 -- 日報（1人1日1件〜複数件。実働・残業は分単位で保存）
+-- 残業（overtime_minutes > 0）は承認フローあり：ot_status = none / pending / approved / rejected
 create table public.daily_reports (
   id bigint generated always as identity primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -222,10 +223,14 @@ create table public.daily_reports (
   project_name text default '',
   content text default '',
   start_time text default '08:00',
-  end_time text default '17:00',
-  break_minutes integer not null default 60,
+  end_time text default '18:00',
+  break_minutes integer not null default 120,
   work_minutes integer not null default 0,
   overtime_minutes integer not null default 0,
+  ot_status text not null default 'none' check (ot_status in ('none','pending','approved','rejected')),
+  ot_reviewer_name text default '',
+  ot_review_note text default '',
+  ot_reviewed_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -263,6 +268,16 @@ $$;
 create or replace function public.app_is_employee() returns boolean
 language sql stable security definer as $$
   select coalesce((select role in ('staff','carpenter') from public.profiles where id = auth.uid()), false)
+$$;
+
+-- 残業の承認者判定（js/genba/genba-nippo.js の OT_APPROVERS、
+-- supabase/functions/ot-remind/index.ts の APPROVERS と合わせること）
+create or replace function public.app_is_ot_approver() returns boolean
+language sql stable security definer as $$
+  select coalesce(
+    (select display_name in ('清川創史','清川太視','清川説志','清川伸二','原口晴郎')
+       from public.profiles where id = auth.uid()),
+    false)
 $$;
 
 -- ════ RLS（行レベルセキュリティ）有効化 ════
@@ -437,13 +452,13 @@ create policy drawing_views_insert on public.drawing_views
 create policy drawing_views_update on public.drawing_views
   for update using (user_id = auth.uid());
 
--- ════ daily_reports（本人は自分の分のみ・staffは全件） ════
+-- ════ daily_reports（本人は自分の分のみ・staffと残業承認者は全件） ════
 create policy daily_reports_select on public.daily_reports
-  for select using (app_user_role() = 'staff' or user_id = auth.uid());
+  for select using (app_user_role() = 'staff' or user_id = auth.uid() or app_is_ot_approver());
 create policy daily_reports_insert on public.daily_reports
   for insert with check (app_is_employee() and user_id = auth.uid());
 create policy daily_reports_update on public.daily_reports
-  for update using (app_user_role() = 'staff' or user_id = auth.uid());
+  for update using (app_user_role() = 'staff' or user_id = auth.uid() or app_is_ot_approver());
 create policy daily_reports_delete on public.daily_reports
   for delete using (app_user_role() = 'staff' or user_id = auth.uid());
 

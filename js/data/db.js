@@ -345,7 +345,7 @@ async function fetchGenbaData(){
 
   // 日報・有給はRLSが自動で絞る（carpenter＝自分の分のみ／staff＝全員分）
   const { data: nippoRows } = await sb.from('daily_reports').select('*').order('work_date',{ascending:false}).order('id',{ascending:false});
-  dailyReports = (nippoRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',content:r.content||'',startTime:r.start_time||'08:00',endTime:r.end_time||'17:00',breakMinutes:r.break_minutes,workMinutes:r.work_minutes,overtimeMinutes:r.overtime_minutes}));
+  dailyReports = (nippoRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',content:r.content||'',startTime:r.start_time||'08:00',endTime:r.end_time||'18:00',breakMinutes:r.break_minutes,workMinutes:r.work_minutes,overtimeMinutes:r.overtime_minutes,otStatus:r.ot_status||'none',otReviewerName:r.ot_reviewer_name||'',otReviewNote:r.ot_review_note||''}));
 
   const { data: leaveRows } = await sb.from('leave_requests').select('*').order('created_at',{ascending:false});
   leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
@@ -426,8 +426,13 @@ async function dbSaveNippo(n){
     work_date:n.workDate, project_id:n.projectId||null, project_name:n.projectName||'',
     content:n.content||'', start_time:n.startTime, end_time:n.endTime,
     break_minutes:n.breakMinutes, work_minutes:n.workMinutes, overtime_minutes:n.overtimeMinutes,
+    ot_status:n.otStatus||'none',
     updated_at:new Date().toISOString()
   };
+  // 申請中・残業なしに戻す場合は前回の承認情報をクリアする
+  if(n.otStatus!=='approved' && n.otStatus!=='rejected'){
+    row.ot_reviewer_name=''; row.ot_review_note=''; row.ot_reviewed_at=null;
+  }
   if(n.id){
     const { error } = await sb.from('daily_reports').update(row).eq('id',n.id);
     if(error){showToast('日報の保存に失敗しました：'+error.message);throw error;}
@@ -440,6 +445,21 @@ async function dbSaveNippo(n){
 async function dbDeleteNippo(id){
   const { error } = await sb.from('daily_reports').delete().eq('id',id);
   if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+// 残業の承認・却下（承認者のみ。結果は本人に通知）
+async function dbReviewOtNippo(id, status, note){
+  const n = dailyReports.find(x=>x.id===id);
+  const { error } = await sb.from('daily_reports').update({
+    ot_status:status, ot_reviewer_name:currentUserDisplayName||'', ot_review_note:note||'',
+    ot_reviewed_at:new Date().toISOString()
+  }).eq('id',id);
+  if(error){showToast('更新に失敗しました：'+error.message);throw error;}
+  if(n){
+    const label = status==='approved' ? '承認されました' : '却下されました';
+    dbSendPushToUser(n.userId, '残業申請の結果',
+      `${n.workDate.replace(/-/g,'/')} の残業申請が${label}（${currentUserDisplayName}）${note?'：'+note:''}`).catch(()=>{});
+  }
 }
 
 async function dbAddLeaveRequest(lr){
@@ -484,6 +504,11 @@ async function dbSendPush(targetRole, targetSupplierId, title, body){
 }
 async function dbSendPushToUser(targetUserId, title, body){
   await sb.functions.invoke('send-push', { body: { targetRole:'user', targetUserId, title, body } });
+}
+// 表示名で宛先を指定して送信（残業承認者への通知用）。21時〜翌7時は送らない（cronのリマインドに任せる）
+async function dbSendPushToNames(targetNames, title, body){
+  if(isQuietHoursJST()) return;
+  await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body } });
 }
 
 // ── リアルタイム同期（他端末の変更を反映） ──

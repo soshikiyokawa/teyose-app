@@ -1,7 +1,25 @@
 // ════ 日報（作業内容・実働・残業時間の記録と月次集計） ════
 // 実働 ＝ 終了 − 開始 − 休憩。残業 ＝ 実働のうち8時間（480分）を超えた分
+// 残業が発生した日報は「申請中」となり、承認者の承認が必要（未承認の間は1時間ごとにリマインド通知）
 
 const NIPPO_STANDARD_MINUTES = 480;
+
+// 残業の承認者（変更する場合は supabase/migration-genba3.sql の app_is_ot_approver と
+// supabase/functions/ot-remind の APPROVERS も合わせて変更すること）
+const OT_APPROVERS = ['清川創史','清川太視','清川説志','清川伸二','原口晴郎'];
+function isOtApprover(){ return OT_APPROVERS.includes(currentUserDisplayName); }
+
+// 21時〜翌7時は通知を送らない（リマインドはSupabase側のcronが7時以降に再開する）
+function isQuietHoursJST(){
+  const h = new Date().getHours();
+  return h>=21 || h<7;
+}
+
+const OT_STATUS = {
+  pending:  {label:'残業 申請中', cls:'pending'},
+  approved: {label:'残業 承認済', cls:'approved'},
+  rejected: {label:'残業 却下', cls:'rejected'}
+};
 
 function nippoParseHM(s){
   const m = String(s||'').match(/^(\d{1,2}):(\d{2})$/);
@@ -32,8 +50,8 @@ function resetNippoForm(){
   document.getElementById('nippo-project').value = '';
   document.getElementById('nippo-content').value = '';
   document.getElementById('nippo-start').value = '08:00';
-  document.getElementById('nippo-end').value = '17:00';
-  document.getElementById('nippo-break').value = '60';
+  document.getElementById('nippo-end').value = '18:00';
+  document.getElementById('nippo-break').value = '120';
   document.getElementById('nippo-form-title').textContent = '日報を書く';
   document.getElementById('nippo-cancel-btn').style.display = 'none';
   document.getElementById('nippo-delete-btn').style.display = 'none';
@@ -53,13 +71,53 @@ async function saveNippo(){
   if(nippoParseHM(endTime) <= nippoParseHM(startTime)){ showToast('終了時刻は開始時刻より後にしてください'); return; }
   const {work, overtime} = nippoCalc();
   const project = projects.find(p=>p.id===projectId);
+
+  // 残業の承認ステータスを決める：残業なし＝none／残業あり＝申請中
+  // （承認・却下済みで残業時間が変わっていなければステータスを維持する）
+  const prev = editingNippoId ? dailyReports.find(x=>x.id===editingNippoId) : null;
+  let otStatus = 'none';
+  if(overtime>0){
+    otStatus = (prev && prev.overtimeMinutes===overtime && (prev.otStatus==='approved'||prev.otStatus==='rejected'))
+      ? prev.otStatus : 'pending';
+  }
+  const notifyApprovers = otStatus==='pending' && !(prev && prev.otStatus==='pending' && prev.overtimeMinutes===overtime);
+
+  const reportUserName = prev ? prev.userName : (currentUserDisplayName||'');
   await dbSaveNippo({
     id: editingNippoId, workDate, projectId, projectName: project?.name||'',
-    content, startTime, endTime, breakMinutes, workMinutes: work, overtimeMinutes: overtime
+    content, startTime, endTime, breakMinutes, workMinutes: work, overtimeMinutes: overtime, otStatus
   });
-  showToast(editingNippoId ? '日報を更新しました' : '日報を登録しました');
+
+  if(otStatus==='pending'){
+    showToast('日報を保存し、残業を申請しました（承認待ち）');
+    if(notifyApprovers){
+      dbSendPushToNames(OT_APPROVERS, '残業承認のお願い',
+        `${reportUserName}さん ${workDate.replace(/-/g,'/')} 残業${gbMinLabel(overtime)}（${project?.name||''}）`).catch(()=>{});
+    }
+  } else {
+    showToast(editingNippoId ? '日報を更新しました' : '日報を登録しました');
+  }
   resetNippoForm();
   nippoMonth = workDate.slice(0,7); // 保存した月を表示
+  await refreshGenba();
+}
+
+// ── 残業の承認・却下（承認者のみ） ──
+async function approveOtNippo(id){
+  const n = dailyReports.find(x=>x.id===id);
+  if(!n) return;
+  if(!confirm(`${n.userName}さんの ${gbDateLabel(n.workDate)} の残業${gbMinLabel(n.overtimeMinutes)}を承認しますか？`)) return;
+  await dbReviewOtNippo(id, 'approved', '');
+  showToast('承認しました（本人に通知されます）');
+  await refreshGenba();
+}
+async function rejectOtNippo(id){
+  const n = dailyReports.find(x=>x.id===id);
+  if(!n) return;
+  const note = prompt(`${n.userName}さんの ${gbDateLabel(n.workDate)} の残業を却下します。\n理由（本人に表示されます）：`);
+  if(note===null) return;
+  await dbReviewOtNippo(id, 'rejected', note.trim());
+  showToast('却下しました（本人に通知されます）');
   await refreshGenba();
 }
 
@@ -107,7 +165,30 @@ function renderNippo(){
   const [y,m] = nippoMonth.split('-').map(Number);
   document.getElementById('nippo-month-lbl').textContent = y+'年'+m+'月';
 
+  // ── 承認者のみ：残業の承認待ち一覧（月をまたいで全件表示） ──
+  const otWrap = document.getElementById('ot-approve-wrap');
+  if(isOtApprover()){
+    const pendings = dailyReports.filter(n=>n.otStatus==='pending' && n.userId!==currentUserId);
+    otWrap.style.display = pendings.length ? '' : 'none';
+    document.getElementById('ot-approve-list').innerHTML = pendings.map(n=>`
+      <div class="nippo-row" style="cursor:default">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700">${esc(n.userName)}　${gbDateLabel(n.workDate)}</div>
+          <div style="font-size:11px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.projectName)}　${n.startTime}〜${n.endTime}（休憩${n.breakMinutes}分）</div>
+          <div style="font-size:11px;color:var(--danger);font-weight:700">残業 ${gbMinLabel(n.overtimeMinutes)}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button class="btn xs" onclick="rejectOtNippo(${n.id})">却下</button>
+          <button class="btn xs primary" onclick="approveOtNippo(${n.id})">承認</button>
+        </div>
+      </div>`).join('');
+  } else {
+    otWrap.style.display = 'none';
+  }
+
   let list = dailyReports.filter(n=>n.workDate.slice(0,7)===nippoMonth);
+  // 承認者でも一般社員（staff以外）の月次一覧は自分の日報のみ
+  if(currentUserRole!=='staff') list = list.filter(n=>n.userId===currentUserId);
 
   // ── staff：月次集計（社員別）と絞り込み ──
   const sumWrap = document.getElementById('nippo-summary-wrap');
@@ -170,6 +251,7 @@ function renderNippo(){
       <div style="flex-shrink:0;text-align:right">
         <div style="font-size:11px">${n.startTime}〜${n.endTime}</div>
         <div style="font-size:10px;${n.overtimeMinutes>0?'color:var(--danger);font-weight:700':'color:var(--text-muted)'}">${n.overtimeMinutes>0?'残業 '+gbMinLabel(n.overtimeMinutes):gbMinLabel(n.workMinutes)}</div>
+        ${n.overtimeMinutes>0 && OT_STATUS[n.otStatus] ? `<span class="status-badge ${OT_STATUS[n.otStatus].cls}" style="margin-top:2px">${OT_STATUS[n.otStatus].label}${n.otStatus!=='pending'&&n.otReviewerName?'：'+esc(n.otReviewerName):''}</span>` : ''}
       </div>
     </div>`).join('');
 }
