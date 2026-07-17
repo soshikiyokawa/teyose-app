@@ -293,14 +293,28 @@ function printDezura(){
   const inPeriod = s => s && s>=dzDateStr(start) && s<=dzDateStr(end);
 
   // 社員ごとに日別マークと集計を組み立てる
-  // マーク：○＝出勤／◎＝出勤（残業あり）／休＝休日出勤／有＝有給／半＝半休／振＝振替休日
-  const users = {}; // userId -> {name, marks:{date:mark}, work, overtime, days, holidayDays, leaveDays, subDays}
-  const getU = (id,name)=>users[id] = users[id]||{name:name||'（名前未設定）',marks:{},work:0,overtime:0,days:new Set(),holidayDays:0,leaveDays:0,subDays:0};
+  // 日別セル：現場番号（同日複数現場は「1·2」、＊＝残業あり）／休＝休日出勤／有＝有給／半＝半休／振＝振替休日
+  const users = {}; // userId -> {name, marks:{date:mark}, siteByDate:{date:{nos:Set,ot:bool}}, work, overtime, days, ...}
+  const getU = (id,name)=>users[id] = users[id]||{name:name||'（名前未設定）',marks:{},siteByDate:{},work:0,overtime:0,days:new Set(),holidayDays:0,leaveDays:0,subDays:0};
+
+  // 現場（工事）ごとに番号を振り、人工（実働8時間＝1.0人工）を集計する
+  const sites = {}; // siteName -> {no, total, byUser:{userName:ninku}}
+  const getSite = name=>{
+    const key = name||'（工事未設定）';
+    if(!sites[key]) sites[key] = {no:Object.keys(sites).length+1, total:0, byUser:{}};
+    return sites[key];
+  };
 
   dailyReports.filter(n=>inPeriod(n.workDate)).forEach(n=>{
     const u = getU(n.userId, n.userName);
     u.work += n.workMinutes; u.overtime += n.overtimeMinutes; u.days.add(n.workDate);
-    if(u.marks[n.workDate]!=='休') u.marks[n.workDate] = (n.overtimeMinutes>0 || u.marks[n.workDate]==='◎') ? '◎' : '○';
+    const site = getSite(n.projectName);
+    const ninku = n.workMinutes/480;
+    site.total += ninku;
+    site.byUser[u.name] = (site.byUser[u.name]||0) + ninku;
+    const cell = u.siteByDate[n.workDate] = u.siteByDate[n.workDate]||{nos:new Set(),ot:false};
+    cell.nos.add(site.no);
+    if(n.overtimeMinutes>0) cell.ot = true;
   });
   holidayRequests.filter(hr=>hr.status==='approved').forEach(hr=>{
     const u = getU(hr.userId, hr.userName);
@@ -335,10 +349,13 @@ function printDezura(){
     const u = users[uid];
     const cells = dates.map(d=>{
       const s = dzDateStr(d);
-      const mk = u.marks[s]||'';
+      const special = u.marks[s]||'';           // 休・有・半・振
+      const siteCell = u.siteByDate[s];         // 日報から：現場番号＋残業
+      const siteTxt = siteCell ? [...siteCell.nos].sort((a,b)=>a-b).join('·') + (siteCell.ot?'＊':'') : '';
+      const mk = special + siteTxt;             // 例：「1」「1·2＊」「休1」「有」
       const wd = d.getDay();
       const bg = mk?'' : (wd===0?'background:#fdf3f3':wd===6?'background:#f3f7fd':'');
-      const color = mk==='休'?'color:#b5302a;font-weight:700':mk==='有'||mk==='半'?'color:#2e7d52;font-weight:700':mk==='振'?'color:#8a6000;font-weight:700':'';
+      const color = special==='休'?'color:#b5302a;font-weight:700':special==='有'||special==='半'?'color:#2e7d52;font-weight:700':special==='振'?'color:#8a6000;font-weight:700':(siteCell?.ot?'font-weight:700':'');
       return `<td style="text-align:center;${bg};${color}">${mk}</td>`;
     }).join('');
     return `<tr>
@@ -353,6 +370,25 @@ function printDezura(){
     </tr>`;
   }).join('');
 
+  // ── 現場別人工集計（番号順） ──
+  const fmtNinku = v=>{
+    const r = Math.round(v*100)/100;
+    return Number.isInteger(r) ? r.toFixed(1) : String(r);
+  };
+  const siteNames = Object.keys(sites).sort((a,b)=>sites[a].no-sites[b].no);
+  const siteTotal = siteNames.reduce((s,n)=>s+sites[n].total,0);
+  const siteRows = siteNames.map(name=>{
+    const st = sites[name];
+    const breakdown = Object.keys(st.byUser).sort((a,b)=>st.byUser[b]-st.byUser[a])
+      .map(un=>`${esc(un)} ${fmtNinku(st.byUser[un])}`).join('、');
+    return `<tr>
+      <td style="text-align:center;font-weight:700">${st.no}</td>
+      <td>${esc(name)}</td>
+      <td style="text-align:right;font-weight:700">${fmtNinku(st.total)}</td>
+      <td>${breakdown}</td>
+    </tr>`;
+  }).join('');
+
   const html = `
   <style>
     @page{size:A3 landscape;margin:8mm}
@@ -362,15 +398,24 @@ function printDezura(){
     table.dz th{font-weight:700;text-align:center;font-size:8px}
     table.dz td:first-child,table.dz th:first-child{width:64px}
     table.dz th.sum,table.dz td.sum{width:34px}
+    table.st{border-collapse:collapse;font-size:10px;margin-top:10px}
+    table.st th,table.st td{border:0.4pt solid #999;padding:3px 6px}
+    table.st th{background:#f3efe6;font-weight:700}
   </style>
-  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px">
+  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
     <h2 style="font-size:16px;margin:0">出面表　${y}年${m}月度</h2>
     <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
-    <span style="font-size:10px;color:#555">○出勤　◎出勤（残業あり）　休=休日出勤　有=有給　半=半休　振=振替休日　※休日出勤・有給・振替は承認済みのみ</span>
+    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　休=休日出勤　有=有給　半=半休　振=振替休日　※休日出勤・有給・振替は承認済みのみ</span>
   </div>
   <table class="dz">
     <tr><th>氏名</th>${head}<th class="sum">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum">有給<br>日数</th><th class="sum">振休<br>日数</th></tr>
     ${rows}
+  </table>
+  <div style="font-size:11px;font-weight:700;margin-top:12px">現場別人工集計（実働8時間＝1.0人工。日報の実働から算出）</div>
+  <table class="st">
+    <tr><th style="width:30px">No</th><th style="min-width:180px">現場（工事）</th><th style="width:60px">人工計</th><th>内訳（社員別）</th></tr>
+    ${siteRows}
+    <tr><td></td><td style="font-weight:700;text-align:right">合計</td><td style="text-align:right;font-weight:700">${fmtNinku(siteTotal)}</td><td></td></tr>
   </table>
   <div style="font-size:9px;color:#555;margin-top:6px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
 
