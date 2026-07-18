@@ -7,6 +7,7 @@ if('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js', {updateViaCache:'none'});
     navigator.serviceWorker.addEventListener('message', e=>{
       if(e.data?.type==='SW_UPDATED') location.reload();
+      if(e.data?.type==='OPEN_TAB') appOpenTab(e.data.tab); // 通知タップ→該当タブへ
     });
     // アクティブなSWからバージョンを取得して表示
     navigator.serviceWorker.ready.then(reg=>{

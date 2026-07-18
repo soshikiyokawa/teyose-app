@@ -124,7 +124,7 @@ async function saveNippo(){
     showToast(`日報を保存し、${otApproverName}さんに残業を申請しました（承認待ち）`);
     if(notifyApprover){
       dbSendPushToNames([otApproverName], '残業承認のお願い',
-        `${reportUserName}さん ${workDate.replace(/-/g,'/')} 残業${gbMinLabel(overtime)}（${project?.name||''}）`).catch(()=>{});
+        `${reportUserName}さん ${workDate.replace(/-/g,'/')} 残業${gbMinLabel(overtime)}（${project?.name||''}）`, 'genba/nippo').catch(()=>{});
     }
   } else {
     showToast(editingNippoId ? '日報を更新しました' : '日報を登録しました');

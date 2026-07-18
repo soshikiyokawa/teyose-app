@@ -1,4 +1,15 @@
 // ════ MAIN NAV ════
+
+// 通知タップからの画面遷移（'genba/nippo' 形式。ログイン前に届いた場合は復元後に開く）
+let _pendingOpenTab = null;
+function appOpenTab(spec){
+  if(!spec) return;
+  const [page, sub] = String(spec).split('/');
+  if(page !== 'genba') return;
+  if(!currentUserRole || currentUserRole === 'supplier'){ _pendingOpenTab = spec; return; }
+  mainTab('genba');
+  if(sub && document.getElementById('genbatab-'+sub)) genbaTab(sub);
+}
 function mainTab(t){
   const onEst=document.getElementById('page-estimate').classList.contains('active');
   if(t!=='estimate' && onEst){

@@ -75,6 +75,16 @@ async function bootstrapApp(){
   }
 
   subscribeRealtime();
+
+  // 通知タップからの起動（URLハッシュ）／ログイン復元前に届いた遷移要求をここで開く
+  const hashTab = location.hash.replace(/^#/,'');
+  if(hashTab.startsWith('genba')){
+    history.replaceState(null,'',location.pathname+location.search);
+    appOpenTab(hashTab);
+  } else if(_pendingOpenTab){
+    const t=_pendingOpenTab; _pendingOpenTab=null;
+    appOpenTab(t);
+  }
 }
 
 // 初回読み込み時：既存セッションがあれば自動ログイン

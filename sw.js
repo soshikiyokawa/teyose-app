@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v156';
+const CACHE_NAME = 'teyose-v157';
 const ASSETS = [
   './',
   './index.html',
@@ -85,17 +85,24 @@ self.addEventListener('push', e=>{
   e.waitUntil(self.registration.showNotification(title, {
     body: data.body || '',
     icon: './icon-192.png',
-    badge: './icon-192.png'
+    badge: './icon-192.png',
+    data: { tab: data.tab || null } // タップ時に開くタブ（例：'genba/nippo'）
   }));
 });
 
 self.addEventListener('notificationclick', e=>{
   e.notification.close();
+  const tab = e.notification.data?.tab || null;
   e.waitUntil(
     self.clients.matchAll({type:'window'}).then(list=>{
       const existing = list.find(c=>'focus' in c);
-      if(existing) return existing.focus();
-      if(self.clients.openWindow) return self.clients.openWindow('./');
+      if(existing){
+        // 開いているアプリを前面にして、該当タブへ移動させる
+        if(tab) existing.postMessage({type:'OPEN_TAB', tab});
+        return existing.focus();
+      }
+      // 未起動の場合はハッシュ付きで起動し、ログイン復元後にアプリ側が該当タブを開く
+      if(self.clients.openWindow) return self.clients.openWindow(tab ? './#'+tab : './');
     })
   );
 });

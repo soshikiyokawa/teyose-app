@@ -80,6 +80,8 @@ Deno.serve(async (req) => {
             c.holiday ? `休日出勤${c.holiday}件` : "",
             c.leave ? `有給${c.leave}件` : "",
           ].filter(Boolean).join("・");
+          // タップ時に開くタブ（件数が多い種類を優先：残業→休日出勤→有給の順）
+          const tab = c.ot ? "genba/nippo" : c.holiday ? "genba/holiday" : "genba/leave";
           const { data: subs } = await admin.from("push_subscriptions").select("*").eq("user_id", p.id);
           await Promise.all(
             (subs || []).map(async (sub: any) => {
@@ -89,6 +91,7 @@ Deno.serve(async (req) => {
                   JSON.stringify({
                     title: "承認待ちのリマインド",
                     body: `あなた宛の承認待ちがあります（${parts}）。手寄の勤怠日報から承認してください。`,
+                    tab,
                   }),
                 );
                 sent++;

@@ -466,7 +466,7 @@ async function dbReviewOtNippo(id, status, note){
   if(n){
     const label = status==='approved' ? '承認されました' : '却下されました';
     dbSendPushToUser(n.userId, '残業申請の結果',
-      `${n.workDate.replace(/-/g,'/')} の残業申請が${label}（${currentUserDisplayName}）${note?'：'+note:''}`).catch(()=>{});
+      `${n.workDate.replace(/-/g,'/')} の残業申請が${label}（${currentUserDisplayName}）${note?'：'+note:''}`, 'genba/nippo').catch(()=>{});
   }
 }
 
@@ -478,7 +478,7 @@ async function dbAddLeaveRequest(lr){
   if(error){showToast('申請に失敗しました：'+error.message);throw error;}
   // 承認者（清川創史）へ通知＋社内チャットへ転記。失敗しても申請自体は成立させる
   dbSendPushToNames([LEAVE_APPROVER], '有給申請',
-    `${currentUserDisplayName}さんから有給申請（${lr.startDate.replace(/-/g,'/')}〜）`).catch(()=>{});
+    `${currentUserDisplayName}さんから有給申請（${lr.startDate.replace(/-/g,'/')}〜）`, 'genba/leave').catch(()=>{});
   const period = lr.startDate.replace(/-/g,'/') + (lr.endDate && lr.endDate!==lr.startDate ? '〜'+lr.endDate.replace(/-/g,'/') : '') +
     (lr.leaveType!=='全日' ? `（${lr.leaveType}）` : '');
   dbAddChatMessage(INTERNAL_THREAD, {role:'me', type:'text', silent:true,
@@ -494,7 +494,7 @@ async function dbReviewLeaveRequest(id, status, note){
   // 申請者本人へ通知
   if(lr){
     const label = status==='approved' ? '承認されました' : '却下されました';
-    dbSendPushToUser(lr.userId, '有給申請の結果', `${lr.startDate.replace(/-/g,'/')}〜の有給申請が${label}`).catch(()=>{});
+    dbSendPushToUser(lr.userId, '有給申請の結果', `${lr.startDate.replace(/-/g,'/')}〜の有給申請が${label}`, 'genba/leave').catch(()=>{});
   }
 }
 async function dbDeleteLeaveRequest(id){
@@ -512,7 +512,7 @@ async function dbAddHolidayRequest(hr){
   if(error){showToast('申請に失敗しました：'+error.message);throw error;}
   dbSendPushToNames([hr.approverName], '休日出勤の承認のお願い',
     `${currentUserDisplayName}さん ${hr.workDate.replace(/-/g,'/')} 休日出勤（${hr.projectName||''}）`
-    + (hr.substituteDate?`　振替休日：${hr.substituteDate.replace(/-/g,'/')}`:'')).catch(()=>{});
+    + (hr.substituteDate?`　振替休日：${hr.substituteDate.replace(/-/g,'/')}`:''), 'genba/holiday').catch(()=>{});
   return data.id;
 }
 async function dbReviewHolidayRequest(id, status, note){
@@ -524,7 +524,7 @@ async function dbReviewHolidayRequest(id, status, note){
   if(hr){
     const label = status==='approved' ? '承認されました' : '却下されました';
     dbSendPushToUser(hr.userId, '休日出勤申請の結果',
-      `${hr.workDate.replace(/-/g,'/')} の休日出勤申請が${label}（${currentUserDisplayName}）${note?'：'+note:''}`).catch(()=>{});
+      `${hr.workDate.replace(/-/g,'/')} の休日出勤申請が${label}（${currentUserDisplayName}）${note?'：'+note:''}`, 'genba/holiday').catch(()=>{});
   }
 }
 async function dbDeleteHolidayRequest(id){
@@ -542,16 +542,17 @@ async function dbSavePushSubscription(sub){
   }, { onConflict: 'endpoint' });
   if(error){showToast('通知設定の保存に失敗しました：'+error.message);throw error;}
 }
-async function dbSendPush(targetRole, targetSupplierId, title, body, excludeUserId){
-  await sb.functions.invoke('send-push', { body: { targetRole, targetSupplierId, title, body, excludeUserId } });
+// tab: 通知タップ時に開く画面（例 'genba/nippo'。省略時はアプリを開くだけ）
+async function dbSendPush(targetRole, targetSupplierId, title, body, excludeUserId, tab){
+  await sb.functions.invoke('send-push', { body: { targetRole, targetSupplierId, title, body, excludeUserId, tab } });
 }
-async function dbSendPushToUser(targetUserId, title, body){
-  await sb.functions.invoke('send-push', { body: { targetRole:'user', targetUserId, title, body } });
+async function dbSendPushToUser(targetUserId, title, body, tab){
+  await sb.functions.invoke('send-push', { body: { targetRole:'user', targetUserId, title, body, tab } });
 }
 // 表示名で宛先を指定して送信（残業承認者への通知用）。21時〜翌7時は送らない（cronのリマインドに任せる）
-async function dbSendPushToNames(targetNames, title, body){
+async function dbSendPushToNames(targetNames, title, body, tab){
   if(isQuietHoursJST()) return;
-  await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body } });
+  await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body, tab } });
 }
 
 // ── リアルタイム同期（他端末の変更を反映） ──

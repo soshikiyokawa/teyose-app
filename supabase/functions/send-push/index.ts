@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
       return json({ error: "認証が必要です" }, 401);
     }
 
-    const { targetRole, targetSupplierId, targetUserId, targetNames, title, body, excludeUserId } = await req.json();
+    const { targetRole, targetSupplierId, targetUserId, targetNames, title, body, excludeUserId, tab } = await req.json();
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     const { data: profiles } = await admin.from("profiles").select("id, role, supplier_id, display_name");
@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
         try {
           await webpush.sendNotification(
             { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            JSON.stringify({ title: title || "手寄", body: body || "" }),
+            JSON.stringify({ title: title || "手寄", body: body || "", tab: tab || null }),
           );
           sent++;
         } catch (e: any) {
