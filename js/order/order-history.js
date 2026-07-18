@@ -113,6 +113,7 @@ function renderCost(){
     document.getElementById('c-count').textContent='0件';
     document.getElementById('c-pending').textContent='0件';
     document.getElementById('c-ninku').textContent='—';
+    document.getElementById('c-ninku-breakdown').style.display='none';
     const msg='<div class="empty">左の案件一覧から案件を選択してください</div>';
     ['cost-by-project','cost-by-supplier','cost-list'].forEach(id=>document.getElementById(id).innerHTML=msg);
     return;
@@ -126,8 +127,18 @@ function renderCost(){
   document.getElementById('c-pending').textContent=pending+'件';
 
   // 人工（日報の実働から累計。日報の追加・修正はRealtimeで即時反映される）
-  const ninku=dailyReports.filter(n=>n.projectName===target).reduce((s,n)=>s+n.workMinutes/480,0);
+  const targetReports=dailyReports.filter(n=>n.projectName===target);
+  const ninku=targetReports.reduce((s,n)=>s+n.workMinutes/480,0);
   document.getElementById('c-ninku').textContent=ninku?fmtNinku(ninku)+'人工':'—';
+
+  // 作業種別（新築：木工事／上棟／墨付け刻み）ごとの人工内訳
+  const kindMin={};
+  targetReports.forEach(n=>{ const k=n.workKind||''; kindMin[k]=(kindMin[k]||0)+n.workMinutes; });
+  const bd=document.getElementById('c-ninku-breakdown');
+  const parts=['木工事','上棟','墨付け刻み'].filter(k=>kindMin[k]).map(k=>`${k} <b>${fmtNinku(kindMin[k]/480)}</b>`);
+  if(kindMin['']&&parts.length) parts.push(`種別なし <b>${fmtNinku(kindMin['']/480)}</b>`);
+  bd.innerHTML = parts.length ? '人工内訳：'+parts.join('　／　') : '';
+  bd.style.display = parts.length ? '' : 'none';
 
   renderCostByType(entries);
   renderCostBySupplier(entries);

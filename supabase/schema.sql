@@ -227,6 +227,7 @@ create table public.daily_reports (
   work_date date not null,
   project_id bigint references public.projects(id) on delete set null,
   project_name text default '',
+  work_kind text default '', -- 作業種別（工事区分が新築の場合のみ：木工事／上棟／墨付け刻み）
   content text default '',
   start_time text default '08:00',
   end_time text default '18:00',

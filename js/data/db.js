@@ -350,7 +350,7 @@ async function fetchGenbaData(){
 
   // 日報・有給はRLSが自動で絞る（carpenter＝自分の分のみ／staff＝全員分）
   const { data: nippoRows } = await sb.from('daily_reports').select('*').order('work_date',{ascending:false}).order('id',{ascending:false});
-  dailyReports = (nippoRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',content:r.content||'',startTime:r.start_time||'08:00',endTime:r.end_time||'18:00',breakMinutes:r.break_minutes,workMinutes:r.work_minutes,overtimeMinutes:r.overtime_minutes,otStatus:r.ot_status||'none',otApproverName:r.ot_approver_name||'',otReviewerName:r.ot_reviewer_name||'',otReviewNote:r.ot_review_note||''}));
+  dailyReports = (nippoRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',workKind:r.work_kind||'',content:r.content||'',startTime:r.start_time||'08:00',endTime:r.end_time||'18:00',breakMinutes:r.break_minutes,workMinutes:r.work_minutes,overtimeMinutes:r.overtime_minutes,otStatus:r.ot_status||'none',otApproverName:r.ot_approver_name||'',otReviewerName:r.ot_reviewer_name||'',otReviewNote:r.ot_review_note||''}));
 
   const { data: leaveRows } = await sb.from('leave_requests').select('*').order('created_at',{ascending:false});
   leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
@@ -432,7 +432,7 @@ async function dbRecordDrawingView(drawingId){
 async function dbSaveNippo(n){
   const row = {
     work_date:n.workDate, project_id:n.projectId||null, project_name:n.projectName||'',
-    content:n.content||'', start_time:n.startTime, end_time:n.endTime,
+    work_kind:n.workKind||'', content:n.content||'', start_time:n.startTime, end_time:n.endTime,
     break_minutes:n.breakMinutes, work_minutes:n.workMinutes, overtime_minutes:n.overtimeMinutes,
     ot_status:n.otStatus||'none', ot_approver_name:n.otApproverName||'',
     updated_at:new Date().toISOString()

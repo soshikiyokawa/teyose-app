@@ -21,6 +21,18 @@ const OT_STATUS = {
   rejected: {label:'残業 却下', cls:'rejected'}
 };
 
+// 作業種別（工事区分が「新築」の案件のみ）：木工事／上棟／墨付け刻み
+function nippoIsShinchiku(projectId){
+  const p = projects.find(x=>x.id===projectId);
+  return (p?.type||'')==='新築';
+}
+function nippoWorkKindToggle(){
+  const wrap = document.getElementById('nippo-work-kind-wrap');
+  if(!wrap) return;
+  const projectId = Number(document.getElementById('nippo-project').value)||null;
+  wrap.style.display = nippoIsShinchiku(projectId) ? '' : 'none';
+}
+
 function nippoParseHM(s){
   const m = String(s||'').match(/^(\d{1,2}):(\d{2})$/);
   return m ? Number(m[1])*60+Number(m[2]) : null;
@@ -50,6 +62,8 @@ function resetNippoForm(){
   editingNippoId = null;
   document.getElementById('nippo-date').value = gbToday();
   document.getElementById('nippo-project').value = '';
+  document.getElementById('nippo-work-kind').value = '';
+  nippoWorkKindToggle();
   document.getElementById('nippo-content').value = '';
   document.getElementById('nippo-start').value = '08:00';
   document.getElementById('nippo-end').value = '18:00';
@@ -70,6 +84,10 @@ async function saveNippo(){
   const breakMinutes = Number(document.getElementById('nippo-break').value)||0;
   if(!workDate){ showToast('日付を入力してください'); return; }
   if(!projectId){ showToast('工事を選択してください'); return; }
+  // 新築案件は作業種別（木工事／上棟／墨付け刻み）が必須
+  const isShinchiku = nippoIsShinchiku(projectId);
+  const workKind = isShinchiku ? document.getElementById('nippo-work-kind').value : '';
+  if(isShinchiku && !workKind){ showToast('作業種別を選択してください'); return; }
   if(nippoParseHM(startTime)==null || nippoParseHM(endTime)==null){ showToast('開始・終了時刻を入力してください'); return; }
   if(nippoParseHM(endTime) <= nippoParseHM(startTime)){ showToast('終了時刻は開始時刻より後にしてください'); return; }
   const {work, overtime} = nippoCalc();
@@ -96,7 +114,7 @@ async function saveNippo(){
 
   const reportUserName = prev ? prev.userName : (currentUserDisplayName||'');
   await dbSaveNippo({
-    id: editingNippoId, workDate, projectId, projectName: project?.name||'',
+    id: editingNippoId, workDate, projectId, projectName: project?.name||'', workKind,
     content, startTime, endTime, breakMinutes, workMinutes: work, overtimeMinutes: overtime,
     otStatus, otApproverName
   });
@@ -143,6 +161,8 @@ function editNippo(id){
   document.getElementById('nippo-date').value = n.workDate;
   renderGenbaProjectSelects();
   document.getElementById('nippo-project').value = n.projectId ? String(n.projectId) : '';
+  document.getElementById('nippo-work-kind').value = n.workKind||'';
+  nippoWorkKindToggle();
   document.getElementById('nippo-content').value = n.content;
   document.getElementById('nippo-start').value = n.startTime;
   document.getElementById('nippo-end').value = n.endTime;
@@ -261,7 +281,7 @@ function renderNippo(){
         ${currentUserRole==='staff'?`<div style="font-size:10px;color:var(--text-muted)">${esc(n.userName)}</div>`:''}
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.projectName||'（工事未設定）')}</div>
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.projectName||'（工事未設定）')}${n.workKind?`<span style="font-weight:400;color:var(--accent-t)">｜${esc(n.workKind)}</span>`:''}</div>
         <div style="font-size:11px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.content)||'　'}</div>
       </div>
       <div style="flex-shrink:0;text-align:right">

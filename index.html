@@ -383,6 +383,8 @@
     <div class="metric"><div class="lbl">未受領</div><div class="val warn" id="c-pending">0件</div></div>
     <div class="metric"><div class="lbl">人工（日報から累計）</div><div class="val" id="c-ninku">—</div></div>
   </div>
+  <!-- 新築案件：作業種別（木工事／上棟／墨付け刻み）ごとの人工内訳 -->
+  <div id="c-ninku-breakdown" style="display:none;font-size:12px;color:var(--text-sub);margin-top:6px;padding:0 2px"></div>
 
   <!-- 在庫一覧（「在庫分を表示」のときだけ表示） -->
   <div id="stock-inventory-wrap" style="display:none">
@@ -675,7 +677,16 @@
       </div>
       <div class="form-grid">
         <div class="fg"><label>日付</label><input type="date" id="nippo-date"></div>
-        <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="nippo-project"></select></div>
+        <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="nippo-project" onchange="nippoWorkKindToggle()"></select></div>
+        <!-- 工事区分が「新築」の案件のみ表示 -->
+        <div class="fg" id="nippo-work-kind-wrap" style="display:none"><label>作業種別 <span style="color:var(--danger)">*</span></label>
+          <select id="nippo-work-kind">
+            <option value="">選択してください</option>
+            <option value="木工事">木工事</option>
+            <option value="上棟">上棟</option>
+            <option value="墨付け刻み">墨付け刻み</option>
+          </select>
+        </div>
         <div class="fg full"><label>作業内容</label><textarea id="nippo-content" rows="2" placeholder="例：2階床合板張り、階段下地" style="resize:vertical;width:100%;box-sizing:border-box"></textarea></div>
       </div>
       <div class="nippo-time-grid" style="margin-top:8px">
@@ -1283,7 +1294,7 @@
 <script src="js/state.js?v=149"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=152"></script>
+<script src="js/data/db.js?v=155"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=143"></script>
@@ -1317,7 +1328,7 @@
 <script src="js/order/item-master.js?v=138"></script>
 <script src="js/order/order-cart.js?v=154"></script>
 <script src="js/order/order-confirm.js?v=154"></script>
-<script src="js/order/order-history.js?v=154"></script>
+<script src="js/order/order-history.js?v=155"></script>
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
@@ -1325,7 +1336,7 @@
 <script src="js/genba/genba-files.js?v=145"></script>
 <script src="js/genba/genba-photos.js?v=145"></script>
 <script src="js/genba/genba-drawings.js?v=145"></script>
-<script src="js/genba/genba-nippo.js?v=151"></script>
+<script src="js/genba/genba-nippo.js?v=155"></script>
 <script src="js/genba/genba-leave.js?v=149"></script>
 <script src="js/genba/genba-holiday.js?v=150"></script>
 
