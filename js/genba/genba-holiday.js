@@ -15,6 +15,7 @@ async function applyHoliday(){
   const approverName = document.getElementById('holiday-approver').value;
   if(!workDate){ showToast('出勤日を入力してください'); return; }
   if(!projectId){ showToast('工事を選択してください'); return; }
+  if(!reason){ showToast('作業内容・理由を入力してください'); return; }
   if(!approverName){ showToast('承認者を選択してください'); return; }
   const project = projects.find(p=>p.id===projectId);
   await dbAddHolidayRequest({workDate, projectId, projectName:project?.name||'', reason, substituteDate, approverName});

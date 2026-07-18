@@ -687,7 +687,7 @@
             <option value="墨付け刻み">墨付け刻み</option>
           </select>
         </div>
-        <div class="fg full"><label>作業内容</label><textarea id="nippo-content" rows="2" placeholder="例：2階床合板張り、階段下地" style="resize:vertical;width:100%;box-sizing:border-box"></textarea></div>
+        <div class="fg full"><label>作業内容 <span style="color:var(--danger)">*</span></label><textarea id="nippo-content" rows="2" placeholder="例：2階床合板張り、階段下地" style="resize:vertical;width:100%;box-sizing:border-box"></textarea></div>
       </div>
       <div class="nippo-time-grid" style="margin-top:8px">
         <div class="fg" style="margin:0"><label>開始</label><input type="time" id="nippo-start" value="08:00" onchange="nippoRecalc()"></div>
@@ -760,7 +760,7 @@
         <div class="fg"><label>取得日 <span style="color:var(--danger)">*</span></label><input type="date" id="leave-start" onchange="leaveDaysRecalc()"></div>
         <div class="fg" id="leave-end-wrap"><label>終了日（連続取得時のみ）</label><input type="date" id="leave-end" onchange="leaveDaysRecalc()"></div>
         <div class="fg"><label>日数</label><div id="leave-days-lbl" style="padding:8px 2px;font-weight:800;font-size:15px">—</div></div>
-        <div class="fg full"><label>理由（任意）</label><input id="leave-reason" placeholder="私用のため など"></div>
+        <div class="fg full"><label>理由 <span style="color:var(--danger)">*</span></label><input id="leave-reason" placeholder="私用のため など"></div>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
         <button class="btn primary" onclick="applyLeave()">申請する</button>
@@ -789,7 +789,7 @@
       <div class="form-grid">
         <div class="fg"><label>出勤日 <span style="color:var(--danger)">*</span></label><input type="date" id="holiday-date"></div>
         <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="holiday-project"></select></div>
-        <div class="fg full"><label>作業内容・理由</label><input id="holiday-reason" placeholder="例：上棟前の準備のため"></div>
+        <div class="fg full"><label>作業内容・理由 <span style="color:var(--danger)">*</span></label><input id="holiday-reason" placeholder="例：上棟前の準備のため"></div>
         <div class="fg"><label>振替休日（任意）</label><input type="date" id="holiday-substitute"></div>
         <div class="fg"><label>承認者 <span style="color:var(--danger)">*</span></label>
           <select id="holiday-approver">
@@ -1336,9 +1336,9 @@
 <script src="js/genba/genba-files.js?v=145"></script>
 <script src="js/genba/genba-photos.js?v=145"></script>
 <script src="js/genba/genba-drawings.js?v=145"></script>
-<script src="js/genba/genba-nippo.js?v=155"></script>
-<script src="js/genba/genba-leave.js?v=149"></script>
-<script src="js/genba/genba-holiday.js?v=150"></script>
+<script src="js/genba/genba-nippo.js?v=156"></script>
+<script src="js/genba/genba-leave.js?v=156"></script>
+<script src="js/genba/genba-holiday.js?v=156"></script>
 
 <!-- 初期化 -->
 <script src="js/init.js?v=138"></script>

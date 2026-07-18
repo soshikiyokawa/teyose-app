@@ -33,6 +33,7 @@ async function applyLeave(){
   let end = document.getElementById('leave-end').value;
   const reason = document.getElementById('leave-reason').value.trim();
   if(!start){ showToast('取得日を入力してください'); return; }
+  if(!reason){ showToast('理由を入力してください'); return; }
   if(type!=='全日' || !end || end<start) end = start;
   const days = leaveDaysRecalc();
   if(days<=0){ showToast('日付を確認してください'); return; }

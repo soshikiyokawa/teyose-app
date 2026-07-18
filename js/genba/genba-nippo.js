@@ -88,6 +88,7 @@ async function saveNippo(){
   const isShinchiku = nippoIsShinchiku(projectId);
   const workKind = isShinchiku ? document.getElementById('nippo-work-kind').value : '';
   if(isShinchiku && !workKind){ showToast('作業種別を選択してください'); return; }
+  if(!content){ showToast('作業内容を入力してください'); return; }
   if(nippoParseHM(startTime)==null || nippoParseHM(endTime)==null){ showToast('開始・終了時刻を入力してください'); return; }
   if(nippoParseHM(endTime) <= nippoParseHM(startTime)){ showToast('終了時刻は開始時刻より後にしてください'); return; }
   const {work, overtime} = nippoCalc();
