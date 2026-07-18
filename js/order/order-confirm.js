@@ -19,6 +19,15 @@ function openOrderPreview(){
   const project=document.getElementById('order-project').value;
   if(!project){alert('案件を選択してください。\n（現場に紐づかない発注の場合は「在庫分」を選択）');return;}
   if(!costType || !dueDate){alert('必須項目を入力してください。');return;}
+  // 在庫からの出庫：出庫先は現場（案件）のみ。確定直前にも在庫数を再チェックする
+  if(selectedSupplier?.name==='在庫分'){
+    if(project==='在庫分'){alert('発注先「在庫分」の場合は、在庫を使う現場（案件）を選択してください。');return;}
+    const stock=calcStock();
+    for(const c of cart){
+      const s=stock[c.name];
+      if(!s || c.qty>s.qty){alert(`在庫が足りません。「${c.name}」の現在庫は ${s?s.qty:0}${c.unit} です。`);return;}
+    }
+  }
   const now=new Date();
   const date=now.toISOString().slice(0,10);
   const no=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');

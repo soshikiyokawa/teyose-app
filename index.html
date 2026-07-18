@@ -383,6 +383,13 @@
     <div class="metric"><div class="lbl">未受領</div><div class="val warn" id="c-pending">0件</div></div>
     <div class="metric"><div class="lbl">人工（日報から累計）</div><div class="val" id="c-ninku">—</div></div>
   </div>
+
+  <!-- 在庫一覧（「在庫分を表示」のときだけ表示） -->
+  <div id="stock-inventory-wrap" style="display:none">
+    <div class="section-lbl">在庫一覧（現在庫）</div>
+    <div class="card" id="stock-inventory" style="overflow-x:auto"><div class="empty">在庫の記録がありません</div></div>
+  </div>
+
   <div class="section-lbl">費目別 原価集計</div>
   <div class="card" id="cost-by-project" style="overflow-x:auto"><div class="empty">左の案件一覧から案件を選択してください</div></div>
 
@@ -1308,9 +1315,9 @@
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=138"></script>
 <script src="js/order/item-master.js?v=138"></script>
-<script src="js/order/order-cart.js?v=153"></script>
-<script src="js/order/order-confirm.js?v=153"></script>
-<script src="js/order/order-history.js?v=153"></script>
+<script src="js/order/order-cart.js?v=154"></script>
+<script src="js/order/order-confirm.js?v=154"></script>
+<script src="js/order/order-history.js?v=154"></script>
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->

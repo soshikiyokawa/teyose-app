@@ -14,16 +14,19 @@ function orderSubTab(t){
 function renderSupplierSelectList(){
   const el=document.getElementById('supplier-select-list');
   if(!suppliers.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
-  el.innerHTML=suppliers.map(s=>`
+  el.innerHTML=suppliers.map(s=>{
+    const isStock=s.name==='在庫分';
+    return `
     <div class="supplier-card${selectedSupplier&&selectedSupplier.id===s.id?' selected':''}" onclick="selectSupplier(${s.id})">
-      <div class="sup-icon">🏪</div>
+      <div class="sup-icon">${isStock?'📦':'🏪'}</div>
       <div class="sup-info">
         <div class="sup-name">${s.name}</div>
-        <div class="sup-meta">${s.contact}${s.tel?' · '+s.tel:''}</div>
-        <div class="sup-meta" style="color:var(--accent-t);margin-top:1px">${s.cats||'—'}</div>
+        <div class="sup-meta">${isStock?'自社在庫から現場へ出す（原価は使う現場に計上）':s.contact+(s.tel?' · '+s.tel:'')}</div>
+        <div class="sup-meta" style="color:var(--accent-t);margin-top:1px">${isStock?'':s.cats||'—'}</div>
       </div>
       <svg viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" width="16" height="16" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function selectSupplier(id){
@@ -60,6 +63,7 @@ function backToStep1(){
 
 // ── STEP2: カテゴリフィルタ ──
 function renderCatFilter(){
+  if(selectedSupplier?.name==='在庫分'){document.getElementById('cat-filter-wrap').innerHTML='';return;}
   const items=master.filter(m=>m.supplier===selectedSupplier.name);
   const cats=['全て',...new Set(items.map(m=>m.cat))];
   document.getElementById('cat-filter-wrap').innerHTML=cats.map(c=>`
@@ -73,7 +77,30 @@ function setCat(cat){
 }
 
 // ── STEP2: 品目リスト（選択式） ──
+// 発注先「在庫分」の場合は品目マスタではなく、現在庫がある品目を表示する
+let _stockList=[];
+function renderStockItemList(){
+  _stockList=Object.values(calcStock()).filter(s=>s.qty>0).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  const el=document.getElementById('item-select-list');
+  if(!_stockList.length){el.innerHTML='<div class="empty">現在、在庫がありません。<br>案件「在庫分」で発注すると在庫に入ります。</div>';return;}
+  el.innerHTML=_stockList.map((s,i)=>{
+    const inCart=cart.find(c=>c.id==='stock:'+s.name);
+    const {n, s:spec} = splitNameSpec(s.name);
+    return `<div class="item-pick-card${inCart?' in-cart':''}" onclick="openStockQtyModal(${i})">
+      <div class="ipc-info">
+        <div class="ipc-row">
+          <span class="ipc-name">${esc(n)}</span>
+          <span class="ipc-spec">${esc(spec)}</span>
+        </div>
+        <div class="ipc-meta">在庫 ${s.qty}${s.unit}${inCart?` · カート: ${inCart.qty}${s.unit}`:'　／　タップして追加'}</div>
+      </div>
+      <div class="ipc-price">平均単価 ¥${fmt(s.avgCost)}/${s.unit}</div>
+    </div>`;
+  }).join('');
+}
+
 function renderItemSelectList(){
+  if(selectedSupplier?.name==='在庫分'){renderStockItemList();return;}
   const items=master.filter(m=>{
     if(m.supplier!==selectedSupplier.name) return false;
     if(activeCat!=='全て'&&m.cat!==activeCat) return false;
@@ -115,14 +142,38 @@ function openQtyModal(itemId){
   setTimeout(()=>document.getElementById('qty-input').focus(),100);
 }
 
+// 在庫品目の数量入力（在庫数を上限にする）
+function openStockQtyModal(i){
+  const s=_stockList[i];
+  if(!s) return;
+  pendingItem={id:'stock:'+s.name, cat:'在庫', name:s.name, unit:s.unit, cost:Math.round(s.avgCost), price:0, supplier:'在庫分', _stockMax:s.qty};
+  const inCart=cart.find(c=>c.id===pendingItem.id);
+  document.getElementById('qty-modal-title').textContent=inCart?'数量を変更':'数量を入力';
+  document.getElementById('qty-item-name').textContent=s.name;
+  document.getElementById('qty-item-meta').textContent=`在庫 ${s.qty}${s.unit}　平均単価 ¥${fmt(s.avgCost)}/${s.unit}`;
+  document.getElementById('qty-unit-label').textContent=s.unit;
+  document.getElementById('qty-input').value=inCart?inCart.qty:1;
+  const quicks=[1,2,3,5,10,20].filter(n=>n<=s.qty);
+  document.getElementById('qty-quick-btns').innerHTML=quicks.map(n=>`
+    <button class="btn sm" onclick="document.getElementById('qty-input').value=${n}" style="min-width:44px;justify-content:center">${n}${s.unit}</button>`).join('');
+  document.getElementById('qty-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('qty-input').focus(),100);
+}
+
 function closeQtyModal(){document.getElementById('qty-modal').classList.remove('open');pendingItem=null;}
 
 function confirmQty(){
   if(!pendingItem) return;
   const qty=parseFloat(document.getElementById('qty-input').value)||0;
   if(qty<=0){closeQtyModal();return;}
+  // 在庫品目は現在庫を超えて出庫できない
+  if(pendingItem._stockMax!=null && qty>pendingItem._stockMax){
+    alert(`在庫が足りません。「${pendingItem.name}」の現在庫は ${pendingItem._stockMax}${pendingItem.unit} です。`);
+    return;
+  }
   const ex=cart.find(c=>c.id===pendingItem.id);
-  if(ex) ex.qty=qty; else cart.push({...pendingItem,qty});
+  const {_stockMax, ...clean}=pendingItem;
+  if(ex) ex.qty=qty; else cart.push({...clean,qty});
   closeQtyModal();
   renderItemSelectList();
   renderCart();

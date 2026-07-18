@@ -51,10 +51,62 @@ function toggleCostStock(){ costViewStock=!costViewStock; renderCost(); }
 
 const fmtNinku=v=>{const r=Math.round(v*100)/100;return Number.isInteger(r)?r.toFixed(1):String(r);};
 
+// ── 在庫計算（原価データから常に導出。別テーブルは持たない） ──
+// 入庫＝案件「在庫分」で発注した明細／出庫＝発注先「在庫分」で現場向けに発注した明細
+// 現在庫 ＝ 入庫数量 − 出庫数量。出庫単価は入庫の平均単価を使う
+function calcStock(){
+  const stock={}; // 品目名 -> {name, unit, inQty, inAmount, outQty, qty, avgCost}
+  costEntries.forEach(e=>{
+    const get=()=>stock[e.name]=stock[e.name]||{name:e.name,unit:e.unit,inQty:0,inAmount:0,outQty:0};
+    if(e.project==='在庫分' && e.supplier!=='在庫分'){
+      const s=get(); s.inQty+=e.qty; s.inAmount+=e.amount;
+    }
+    if(e.supplier==='在庫分' && e.project!=='在庫分'){
+      const s=get(); s.outQty+=e.qty;
+    }
+  });
+  Object.values(stock).forEach(s=>{
+    s.qty=Math.round((s.inQty-s.outQty)*100)/100;
+    s.avgCost=s.inQty ? s.inAmount/s.inQty : 0;
+  });
+  return stock;
+}
+
+// 在庫一覧（原価管理の「在庫分を表示」時のみ）
+function renderStockInventory(){
+  const el=document.getElementById('stock-inventory');
+  const list=Object.values(calcStock()).sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  if(!list.length){el.innerHTML='<div class="empty">在庫の記録がありません。<br>案件「在庫分」で発注すると入庫、発注先「在庫分」で現場向けに発注すると出庫されます</div>';return;}
+  let totalValue=0;
+  const rows=list.map(s=>{
+    const value=Math.max(0,s.qty*s.avgCost);
+    totalValue+=value;
+    return `<tr${s.qty<=0?' style="color:var(--text-muted)"':''}>
+      <td>${esc(s.name)}</td>
+      <td style="text-align:center">${s.unit}</td>
+      <td class="num">${s.inQty}</td>
+      <td class="num">${s.outQty||'—'}</td>
+      <td class="num" style="font-weight:800;${s.qty>0?'color:var(--accent-t)':s.qty<0?'color:var(--danger)':''}">${s.qty}</td>
+      <td class="num">¥${fmt(s.avgCost)}</td>
+      <td class="num">¥${fmt(value)}</td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<table class="items-table" style="width:100%;min-width:560px">
+    <thead><tr><th>品目</th><th>単位</th><th class="r">入庫計</th><th class="r">出庫計</th><th class="r">現在庫</th><th class="r">平均単価</th><th class="r">在庫金額</th></tr></thead>
+    <tbody>${rows}
+      <tr style="background:var(--surface2)"><td colspan="6" style="font-weight:700;text-align:right">在庫金額 合計</td><td class="num" style="font-weight:800;color:var(--wood-t)">¥${fmt(totalValue)}</td></tr>
+    </tbody>
+  </table>`;
+}
+
 function renderCost(){
   const target = costViewStock ? '在庫分' : (selectedProject?.name||null);
   document.getElementById('cost-proj-name').textContent = target||'（案件未選択）';
   document.getElementById('cost-stock-btn').classList.toggle('active', costViewStock);
+
+  // 在庫一覧は「在庫分を表示」のときだけ出す
+  document.getElementById('stock-inventory-wrap').style.display = costViewStock ? '' : 'none';
+  if(costViewStock) renderStockInventory();
 
   if(!target){
     document.getElementById('c-total').textContent='¥0';

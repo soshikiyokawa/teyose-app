@@ -50,6 +50,11 @@ insert into public.estimate_types (name, sort_order) values
   ('新築',0),('リフォーム',1),('増築',2),('外構',3),('その他',4)
 on conflict (name) do nothing;
 
+-- 在庫出庫用の疑似発注先（入庫＝案件「在庫分」で発注／出庫＝発注先「在庫分」で現場向けに発注）
+insert into public.suppliers (name, contact, note, sort_order)
+select '在庫分', '', '自社在庫（在庫から現場へ出す時に使う発注先。削除しないでください）', 999
+where not exists (select 1 from public.suppliers where name = '在庫分');
+
 create table public.estimate_categories (
   id bigint generated always as identity primary key,
   name text not null,
