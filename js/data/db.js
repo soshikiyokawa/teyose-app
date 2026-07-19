@@ -513,6 +513,12 @@ async function dbAddHolidayRequest(hr){
   dbSendPushToNames([hr.approverName], '休日出勤の承認のお願い',
     `${currentUserDisplayName}さん ${hr.workDate.replace(/-/g,'/')} 休日出勤（${hr.projectName||''}）`
     + (hr.substituteDate?`　振替休日：${hr.substituteDate.replace(/-/g,'/')}`:''), 'genba/holiday').catch(()=>{});
+  // 社内チャットにも記録を残す（通知は承認者宛のみ。チャット転記は通知なし）
+  dbAddChatMessage(INTERNAL_THREAD, {role:'me', type:'text', silent:true,
+    text:`【休日出勤申請】${hr.workDate.replace(/-/g,'/')}（${hr.projectName||''}）`
+      + (hr.reason?`\n理由：${hr.reason}`:'')
+      + (hr.substituteDate?`\n振替休日：${hr.substituteDate.replace(/-/g,'/')}`:'')
+      + `\n承認者：${hr.approverName}`}).catch(()=>{});
   return data.id;
 }
 async function dbReviewHolidayRequest(id, status, note){
