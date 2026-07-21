@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=159">
+<link rel="stylesheet" href="css/main.css?v=162">
 <link rel="stylesheet" href="css/schedule.css?v=141">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -739,6 +739,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         勤務カレンダー
       </button>
+      <button class="btn xs staff-only" onclick="openAccountPerms()" title="アカウントの権限設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        アカウント権限
+      </button>
       <select id="nippo-user-filter" class="staff-only" onchange="nippoSetUserFilter(this.value)" style="margin-left:auto;font-size:12px;padding:4px 8px"></select>
     </div>
 
@@ -853,6 +857,26 @@
         <button class="btn" onclick="closeProjectModal()">キャンセル</button>
         <button class="btn primary" onclick="saveProject()">保存</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ アカウント権限（管理者専用） ════ -->
+<div id="acct-modal">
+  <div id="acct-modal-sheet">
+    <div id="acct-modal-head">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:800">アカウント権限</div>
+        <div style="font-size:11px;color:var(--text-muted)">各アカウントの権限を設定</div>
+      </div>
+      <button onclick="closeAccountPerms()" style="border:none;background:none;color:var(--text-muted);font-size:24px;line-height:1;cursor:pointer;padding:2px 6px">×</button>
+    </div>
+    <div id="acct-modal-body">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.7">
+        <b>管理者</b>＝全機能／<b>一般社員</b>＝勤怠日報・現場写真・図面・社内チャット／<b>業者</b>＝発注先（品目単価・自社チャット）。<br>
+        変更は本人の次回ログインから反映されます。業者は所属の発注先も選んでください。
+      </div>
+      <div class="card" id="acct-list" style="padding:4px 0"></div>
     </div>
   </div>
 </div>
@@ -1342,7 +1366,7 @@
 <script src="js/state.js?v=159"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=160"></script>
+<script src="js/data/db.js?v=162"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
@@ -1387,7 +1411,8 @@
 <script src="js/genba/genba-nippo.js?v=161"></script>
 <script src="js/genba/genba-leave.js?v=156"></script>
 <script src="js/genba/genba-holiday.js?v=159"></script>
-<script src="js/genba/work-calendar.js?v=159"></script>
+<script src="js/genba/work-calendar.js?v=162"></script>
+<script src="js/genba/account-perms.js?v=162"></script>
 
 <!-- 初期化 -->
 <script src="js/init.js?v=157"></script>

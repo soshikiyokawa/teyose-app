@@ -345,9 +345,14 @@ async function fetchWorkCalendar(){
   (rows||[]).forEach(r=>{ (workHolidays[r.cal]||(workHolidays[r.cal]=new Set())).add(r.holiday_date); });
   // 事務のみ：社員区分の割り当て用に全プロフィールを取得（RLSでstaffは全件可）
   if(currentUserRole==='staff'){
-    const { data: profs } = await sb.from('profiles').select('id, display_name, role, work_group').order('display_name');
-    allProfiles = (profs||[]).map(p=>({id:p.id,displayName:p.display_name||'',role:p.role,workGroup:p.work_group||''}));
+    const { data: profs } = await sb.from('profiles').select('id, display_name, role, work_group, supplier_id').order('display_name');
+    allProfiles = (profs||[]).map(p=>({id:p.id,displayName:p.display_name||'',role:p.role,workGroup:p.work_group||'',supplierId:p.supplier_id||null}));
   }
+}
+// アカウントの権限（role）と所属発注先を更新（管理者のみ）
+async function dbSetRole(userId, role, supplierId){
+  const { error } = await sb.from('profiles').update({role, supplier_id:supplierId||null}).eq('id',userId);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
 }
 async function dbAddHoliday(cal, date){
   const { error } = await sb.from('work_holidays').insert({cal, holiday_date:date});
