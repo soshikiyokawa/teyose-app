@@ -124,7 +124,7 @@ function collectEstData(){
 }
 
 async function saveEstInfo(){
-  if(!editingEstId){ showToast('先に見積を選択してください'); return; }
+  if(!editingEstId){ return saveEstimate(); } // 見積がまだ無ければ新規作成する
   const existing = estimates.find(e=>e.id===editingEstId);
   if(!existing) return;
   const v=id=>document.getElementById(id)?.value||'';
@@ -155,7 +155,7 @@ async function saveEstInfo(){
   estDirty=false;
   updateEstBadge();
   renderProjectSidebar();
-  showToast('案件情報を保存しました');
+  showToast('見積情報を保存しました');
 }
 
 async function saveEstimate(){
@@ -224,10 +224,9 @@ function newEstimate(){
   // 案件が選択されていれば、その情報を自動入力する
   const initType = selectedProject?.type||'新築';
   if(selectedProject){
-    document.getElementById('est-project').value=selectedProject.name;
     document.getElementById('est-client').value=selectedProject.clientName;
     document.getElementById('est-type').value=initType;
-    document.getElementById('est-site').value=selectedProject.address;
+    fillProjectInfoTab(selectedProject); // 物件名・工事場所・着工/完工予定日・地図ピンは案件から
   }
   loadDefaultSectionsForType(initType);
   renderPresetDatalists();
@@ -277,11 +276,9 @@ function loadEstimate(est){
   editingEstId=est.id;
   const sv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   sv('est-title',est.title);sv('est-no',est.no);sv('est-date',est.date);sv('est-expire',est.expire);sv('est-status',est.status);sv('est-type',est.type);
-  sv('est-start-date',est.startDate);sv('est-end-date',est.endDate);
   sv('est-client',est.clientName);sv('est-client-address',est.clientAddress);sv('est-client-tel',est.clientTel);sv('est-client-email',est.clientEmail);sv('est-tantou',est.tantou);
-  window._currentMapLat = est.mapLat||null;
-  window._currentMapLng = est.mapLng||null;
-  updateMapPinIndicator();sv('est-project',est.projectName);sv('est-site',est.siteName);sv('est-note',est.note);
+  sv('est-note',est.note);
+  // 物件名・工事場所・着工/完工予定日・地図ピンは案件（projects）側の情報。下で案件から反映する
   sv('discount-amount',est.discountAmount);sv('tax-rate',est.taxRate);
   const pays=est.payments||[];
   sv('est-contract-date',est.contractDate);payAmtLoad('est-contract-amount',est.contractAmount);
@@ -300,6 +297,9 @@ function loadEstimate(est){
   updateEstBadge();renderSections();estSubTab('info');
   selectedProjectName = est.projectName || null;
   selectedProject = projects.find(p=>p.name===est.projectName)||null;
+  // 案件情報タブは案件（projects）から反映。案件が見つからない旧見積は見積の値で表示
+  if(selectedProject) fillProjectInfoTab(selectedProject);
+  else fillProjectInfoTab({name:est.projectName,address:est.siteName,startDate:est.startDate,endDate:est.endDate,mapLat:est.mapLat,mapLng:est.mapLng});
   renderProjectSidebar();
   renderInfoGenbaSections && renderInfoGenbaSections();
 }
@@ -370,7 +370,7 @@ function _selectProjectSidebarGo(id){
   const matches=estimates.filter(e=>e.projectName===selectedProject?.name);
   matches.sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));
   if(matches.length) loadEstimate(matches[0]);
-  else renderProjectSidebar();
+  else newEstimate(); // 見積が無い案件：案件情報を表示（見積書は任意）
   renderEstListBody();
   onProjectChanged && onProjectChanged();
   renderInfoGenbaSections && renderInfoGenbaSections();
@@ -379,6 +379,48 @@ function _selectProjectSidebarGo(id){
     costViewStock=false;
     renderCost();
   }
+}
+
+// ── 案件情報タブ（物件名・工事場所・着工/完工予定日・地図ピン）は案件（projects）に保存する ──
+// 見積書なしで案件を立ち上げ・編集できる
+function fillProjectInfoTab(p){
+  const sv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  sv('est-project', p?.name);
+  sv('est-site', p?.address);
+  sv('est-start-date', p?.startDate);
+  sv('est-end-date', p?.endDate);
+  window._currentMapLat = p?.mapLat||null;
+  window._currentMapLng = p?.mapLng||null;
+  updateMapPinIndicator && updateMapPinIndicator();
+}
+
+async function saveProjectInfo(){
+  const name=document.getElementById('est-project').value.trim();
+  if(!name){ showToast('物件名を入力してください'); return; }
+  const base=selectedProject||{};
+  const proj={
+    id: selectedProject?.id || undefined,
+    name,
+    clientName: base.clientName||'',
+    type: base.type||'新築',
+    address: document.getElementById('est-site').value.trim(),
+    note: base.note||'',
+    startDate: document.getElementById('est-start-date').value||'',
+    endDate: document.getElementById('est-end-date').value||'',
+    mapLat: window._currentMapLat||null,
+    mapLng: window._currentMapLng||null
+  };
+  let savedId;
+  try{ savedId=await dbSaveProject(proj); }catch(e){ return; }
+  proj.id=savedId; proj.updatedAt=new Date().toISOString();
+  const i=projects.findIndex(p=>p.id===savedId);
+  if(i>=0) projects[i]={...projects[i],...proj}; else projects.unshift(proj);
+  selectedProject={...projects.find(p=>p.id===savedId)};
+  selectedProjectName=proj.name;
+  estDirty=false;
+  renderProjectSidebar();
+  renderInfoGenbaSections && renderInfoGenbaSections();
+  showToast('案件を保存しました');
 }
 
 // ── 案件作成・編集モーダル ──

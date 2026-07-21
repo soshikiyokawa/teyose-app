@@ -33,8 +33,12 @@ create table public.projects (
   name text not null,
   client_name text default '',
   type text default '新築',
-  address text default '',
+  address text default '',      -- 工事場所（現場住所）
   note text default '',
+  start_date date,              -- 着工予定日
+  end_date date,                -- 完工予定日
+  map_lat double precision,     -- 工事場所の地図ピン
+  map_lng double precision,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

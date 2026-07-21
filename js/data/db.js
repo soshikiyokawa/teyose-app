@@ -34,7 +34,7 @@ async function fetchAllData(){
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
     const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
-    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',updatedAt:r.updated_at}));
+    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,updatedAt:r.updated_at}));
 
     await fetchGenbaData();
   }
@@ -84,7 +84,9 @@ function rowToEstimate(r){
 
 // ── 案件マスタ ──
 async function dbSaveProject(proj){
-  const row={name:proj.name,client_name:proj.clientName,type:proj.type,address:proj.address,note:proj.note,updated_at:new Date().toISOString()};
+  const row={name:proj.name,client_name:proj.clientName,type:proj.type,address:proj.address,note:proj.note,
+    start_date:proj.startDate||null,end_date:proj.endDate||null,map_lat:proj.mapLat??null,map_lng:proj.mapLng??null,
+    updated_at:new Date().toISOString()};
   if(proj.id){
     // 案件名が変わった場合、紐づく見積のproject_nameも一括更新する
     const oldProject=projects.find(p=>p.id===proj.id);
