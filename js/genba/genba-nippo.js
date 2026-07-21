@@ -33,6 +33,13 @@ function nippoWorkKindToggle(){
   wrap.style.display = nippoIsShinchiku(projectId) ? '' : 'none';
 }
 
+// 工事選択の変更：「その他」なら区分入力欄を表示、作業種別の出し分けも更新
+function nippoProjectChanged(){
+  const otherWrap = document.getElementById('nippo-other-wrap');
+  if(otherWrap) otherWrap.style.display = (document.getElementById('nippo-project').value==='other') ? '' : 'none';
+  nippoWorkKindToggle();
+}
+
 function nippoParseHM(s){
   const m = String(s||'').match(/^(\d{1,2}):(\d{2})$/);
   return m ? Number(m[1])*60+Number(m[2]) : null;
@@ -62,8 +69,9 @@ function resetNippoForm(){
   editingNippoId = null;
   document.getElementById('nippo-date').value = gbToday();
   document.getElementById('nippo-project').value = '';
+  document.getElementById('nippo-other').value = '';
   document.getElementById('nippo-work-kind').value = '';
-  nippoWorkKindToggle();
+  nippoProjectChanged();
   document.getElementById('nippo-content').value = '';
   document.getElementById('nippo-start').value = '08:00';
   document.getElementById('nippo-end').value = '18:00';
@@ -77,14 +85,23 @@ function resetNippoForm(){
 
 async function saveNippo(){
   const workDate = document.getElementById('nippo-date').value;
-  const projectId = Number(document.getElementById('nippo-project').value)||null;
+  const projVal = document.getElementById('nippo-project').value;
   const content = document.getElementById('nippo-content').value.trim();
   const startTime = document.getElementById('nippo-start').value;
   const endTime = document.getElementById('nippo-end').value;
   const breakMinutes = Number(document.getElementById('nippo-break').value)||0;
   if(!workDate){ showToast('日付を入力してください'); return; }
-  if(!projectId){ showToast('工事を選択してください'); return; }
-  // 新築案件は作業種別（木工事／上棟／墨付け刻み）が必須
+  // 工事：案件を選択、または「その他」で区分を入力
+  let projectId = null, projectName = '';
+  if(projVal==='other'){
+    projectName = document.getElementById('nippo-other').value.trim();
+    if(!projectName){ showToast('区分を入力してください（設計・事務・空き家管理など）'); return; }
+  } else {
+    projectId = Number(projVal)||null;
+    if(!projectId){ showToast('工事を選択してください'); return; }
+    projectName = projects.find(p=>p.id===projectId)?.name||'';
+  }
+  // 新築案件は作業種別（木工事／上棟／墨付け刻み）が必須（「その他」は対象外）
   const isShinchiku = nippoIsShinchiku(projectId);
   const workKind = isShinchiku ? document.getElementById('nippo-work-kind').value : '';
   if(isShinchiku && !workKind){ showToast('作業種別を選択してください'); return; }
@@ -92,7 +109,6 @@ async function saveNippo(){
   if(nippoParseHM(startTime)==null || nippoParseHM(endTime)==null){ showToast('開始・終了時刻を入力してください'); return; }
   if(nippoParseHM(endTime) <= nippoParseHM(startTime)){ showToast('終了時刻は開始時刻より後にしてください'); return; }
   const {work, overtime} = nippoCalc();
-  const project = projects.find(p=>p.id===projectId);
 
   // 残業がある場合は承認者を1人選んでもらう（その人だけに通知される）
   let otApproverName = '';
@@ -115,7 +131,7 @@ async function saveNippo(){
 
   const reportUserName = prev ? prev.userName : (currentUserDisplayName||'');
   await dbSaveNippo({
-    id: editingNippoId, workDate, projectId, projectName: project?.name||'', workKind,
+    id: editingNippoId, workDate, projectId, projectName, workKind,
     content, startTime, endTime, breakMinutes, workMinutes: work, overtimeMinutes: overtime,
     otStatus, otApproverName
   });
@@ -124,10 +140,10 @@ async function saveNippo(){
     showToast(`日報を保存し、${otApproverName}さんに残業を申請しました（承認待ち）`);
     if(notifyApprover){
       dbSendPushToNames([otApproverName], '残業承認のお願い',
-        `${reportUserName}さん ${workDate.replace(/-/g,'/')} 残業${gbMinLabel(overtime)}（${project?.name||''}）`, 'genba/nippo').catch(()=>{});
+        `${reportUserName}さん ${workDate.replace(/-/g,'/')} 残業${gbMinLabel(overtime)}（${projectName}）`, 'genba/nippo').catch(()=>{});
       // 社内チャットにも記録を残す（通知は承認者宛のみ。チャット転記は通知なし）
       dbAddChatMessage(INTERNAL_THREAD, {role:'me', type:'text', silent:true,
-        text:`【残業申請】${workDate.replace(/-/g,'/')}　残業${gbMinLabel(overtime)}（${project?.name||''}）\n承認者：${otApproverName}`}).catch(()=>{});
+        text:`【残業申請】${workDate.replace(/-/g,'/')}　残業${gbMinLabel(overtime)}（${projectName}）\n承認者：${otApproverName}`}).catch(()=>{});
     }
   } else {
     showToast(editingNippoId ? '日報を更新しました' : '日報を登録しました');
@@ -164,9 +180,16 @@ function editNippo(id){
   editingNippoId = id;
   document.getElementById('nippo-date').value = n.workDate;
   renderGenbaProjectSelects();
-  document.getElementById('nippo-project').value = n.projectId ? String(n.projectId) : '';
+  // 案件に紐づかない日報（projectIdなし・projectNameあり）は「その他」として復元
+  if(n.projectId){
+    document.getElementById('nippo-project').value = String(n.projectId);
+    document.getElementById('nippo-other').value = '';
+  } else {
+    document.getElementById('nippo-project').value = 'other';
+    document.getElementById('nippo-other').value = n.projectName||'';
+  }
   document.getElementById('nippo-work-kind').value = n.workKind||'';
-  nippoWorkKindToggle();
+  nippoProjectChanged();
   document.getElementById('nippo-content').value = n.content;
   document.getElementById('nippo-start').value = n.startTime;
   document.getElementById('nippo-end').value = n.endTime;

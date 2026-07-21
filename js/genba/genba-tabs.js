@@ -31,12 +31,14 @@ function renderGenbaProjectSelects(){
     const el = document.getElementById(id);
     if(!el) return;
     const prev = el.value;
-    el.innerHTML = opts;
+    // 日報のみ「その他」（案件に紐づかない：設計・事務・空き家管理など）を追加
+    el.innerHTML = id==='nippo-project' ? opts+'<option value="other">その他</option>' : opts;
     // 選択状態を維持（写真・図面は共通のgenbaProjectIdを優先）
     if(id!=='nippo-project' && id!=='holiday-project' && genbaProjectId) el.value = String(genbaProjectId);
     else if(prev) el.value = prev;
     if(el.value==='') el.selectedIndex = 0;
   });
+  if(typeof nippoProjectChanged==='function') nippoProjectChanged(); // 「その他」欄の表示を同期
 }
 
 function setGenbaProject(val){

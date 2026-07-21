@@ -677,7 +677,16 @@
       </div>
       <div class="form-grid">
         <div class="fg"><label>日付</label><input type="date" id="nippo-date"></div>
-        <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="nippo-project" onchange="nippoWorkKindToggle()"></select></div>
+        <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="nippo-project" onchange="nippoProjectChanged()"></select></div>
+        <!-- 「その他」選択時のみ表示：区分を選択または入力 -->
+        <div class="fg" id="nippo-other-wrap" style="display:none"><label>区分（その他） <span style="color:var(--danger)">*</span></label>
+          <input id="nippo-other" list="nippo-other-list" placeholder="設計／事務／空き家管理 など" autocomplete="off">
+          <datalist id="nippo-other-list">
+            <option value="設計"></option>
+            <option value="事務"></option>
+            <option value="空き家管理"></option>
+          </datalist>
+        </div>
         <!-- 工事区分が「新築」の案件のみ表示 -->
         <div class="fg" id="nippo-work-kind-wrap" style="display:none"><label>作業種別 <span style="color:var(--danger)">*</span></label>
           <select id="nippo-work-kind">
@@ -1371,11 +1380,11 @@
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=149"></script>
+<script src="js/genba/genba-tabs.js?v=161"></script>
 <script src="js/genba/genba-files.js?v=145"></script>
 <script src="js/genba/genba-photos.js?v=145"></script>
 <script src="js/genba/genba-drawings.js?v=145"></script>
-<script src="js/genba/genba-nippo.js?v=158"></script>
+<script src="js/genba/genba-nippo.js?v=161"></script>
 <script src="js/genba/genba-leave.js?v=156"></script>
 <script src="js/genba/genba-holiday.js?v=159"></script>
 <script src="js/genba/work-calendar.js?v=159"></script>
