@@ -29,7 +29,7 @@ function renderTalkPanelList(){
   // 社内チャット（きよかわ社員のみ）を先頭に固定。発注先スレッドはstaffのみ／supplierは自社のみ
   const isEmployee = currentUserRole==='staff' || currentUserRole==='carpenter';
   const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])].filter(n=>n!==INTERNAL_THREAD);
-  const allSups=[...(isEmployee?[INTERNAL_THREAD]:[]), ...(currentUserRole==='carpenter'?[]:supNames)];
+  const allSups=[...(isEmployee?[INTERNAL_THREAD]:[]), ...supNames];
   const el=document.getElementById('talk-panel-thread-list');
   if(!allSups.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
   el.innerHTML=allSups.map(name=>{
@@ -149,7 +149,7 @@ function sendTalkPanelMsg(){
   const text=input.value.trim();
   if(!text||!activeTalkPanelSupplier) return;
   if(!talkThreads[activeTalkPanelSupplier]) talkThreads[activeTalkPanelSupplier]=[];
-  const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole==='staff') ? 'me' : 'them';
+  const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole!=='supplier') ? 'me' : 'them';
   input.value='';
   dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text})
     .then(renderTalkPanelMessages)
@@ -160,7 +160,7 @@ async function sendTalkPanelFile(fileInput){
   const file=fileInput.files[0];
   fileInput.value='';
   if(!file||!activeTalkPanelSupplier) return;
-  const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole==='staff') ? 'me' : 'them';
+  const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole!=='supplier') ? 'me' : 'them';
   showToast('アップロード中…');
   try{
     const fileUrl = await dbUploadChatFile(file);

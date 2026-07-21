@@ -39,8 +39,9 @@ async function fetchAllData(){
     await fetchGenbaData();
   }
 
-  if(currentUserRole==='staff'){
-    await fetchWorkCalendar();
+  // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）
+  if(currentUserRole==='staff'||currentUserRole==='carpenter'){
+    if(currentUserRole==='staff') await fetchWorkCalendar(); // 勤務カレンダー・社員区分は管理者のみ
 
     const { data: typeRows } = await sb.from('estimate_types').select('*').order('sort_order').order('id');
     estimateTypes = (typeRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
@@ -202,7 +203,7 @@ async function dbAddMasterItem(item){
 }
 async function dbUpdateMasterItem(id,item){
   const supplier_id = supplierIdByName(item.supplier);
-  const payload = currentUserRole==='staff'
+  const payload = currentUserRole!=='supplier'
     ? {cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id}
     : {price:item.price,cost:item.cost}; // 発注先は価格・原価のみ更新（DB側のトリガーでも強制）
   const { error } = await sb.from('master_items').update(payload).eq('id',id);
@@ -631,7 +632,7 @@ async function refetchAndRerender(table){
       else renderTalkPanelList();
     }
   }
-  if((table==='orders'||table==='cost_entries') && currentUserRole==='staff'){
+  if((table==='orders'||table==='cost_entries') && (currentUserRole==='staff'||currentUserRole==='carpenter')){
     if(document.getElementById('ordersub-history')?.classList.contains('active')) renderOrders();
     if(document.getElementById('page-cost')?.classList.contains('active')) renderCost();
   }
@@ -642,7 +643,7 @@ async function refetchAndRerender(table){
   }
   if(table==='work_holidays' && document.getElementById('wc-modal')?.classList.contains('open')) renderWorkCalendar();
   // 日報の追加・修正は原価サマリーの人工集計にも即時反映する
-  if(table==='daily_reports' && currentUserRole==='staff' && document.getElementById('page-cost')?.classList.contains('active')){
+  if(table==='daily_reports' && (currentUserRole==='staff'||currentUserRole==='carpenter') && document.getElementById('page-cost')?.classList.contains('active')){
     renderCost();
   }
 }

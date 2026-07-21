@@ -626,6 +626,42 @@ create policy push_subscriptions_delete on public.push_subscriptions
 -- create policy projects_update on public.projects for update using (app_user_role() = 'staff');
 -- create policy projects_delete on public.projects for delete using (app_user_role() = 'staff');
 
+-- ════ 一般社員（carpenter）への業務機能開放（staffポリシーにOR追加） ════
+-- 見積・原価・受発注・受注一覧・工程表・案件編集・マスタ・チャットを一般社員も利用可。
+-- プロフィール（権限）・work_holidays（勤務カレンダー）はstaff専用のまま。
+do $$
+declare
+  tbl text;
+  biz_tables text[] := array[
+    'projects','estimate_types','estimate_categories','estimate_presets','estimate_defaults',
+    'estimates','orders','cost_entries','suppliers','master_items','schedules'
+  ];
+begin
+  foreach tbl in array biz_tables loop
+    execute format('drop policy if exists %I on public.%I', tbl||'_carpenter_select', tbl);
+    execute format('create policy %I on public.%I for select using (app_user_role() = ''carpenter'')', tbl||'_carpenter_select', tbl);
+    execute format('drop policy if exists %I on public.%I', tbl||'_carpenter_insert', tbl);
+    execute format('create policy %I on public.%I for insert with check (app_user_role() = ''carpenter'')', tbl||'_carpenter_insert', tbl);
+    execute format('drop policy if exists %I on public.%I', tbl||'_carpenter_update', tbl);
+    execute format('create policy %I on public.%I for update using (app_user_role() = ''carpenter'')', tbl||'_carpenter_update', tbl);
+    execute format('drop policy if exists %I on public.%I', tbl||'_carpenter_delete', tbl);
+    execute format('create policy %I on public.%I for delete using (app_user_role() = ''carpenter'')', tbl||'_carpenter_delete', tbl);
+  end loop;
+exception when undefined_table then null; -- schedules等が未作成でもスキップ
+end $$;
+
+drop policy if exists chat_messages_carpenter_select on public.chat_messages;
+drop policy if exists chat_messages_carpenter_insert on public.chat_messages;
+drop policy if exists chat_messages_carpenter_update on public.chat_messages;
+drop policy if exists chat_messages_carpenter_delete on public.chat_messages;
+create policy chat_messages_carpenter_select on public.chat_messages for select using (app_user_role() = 'carpenter');
+create policy chat_messages_carpenter_insert on public.chat_messages for insert with check (app_user_role() = 'carpenter');
+create policy chat_messages_carpenter_update on public.chat_messages for update using (app_user_role() = 'carpenter');
+create policy chat_messages_carpenter_delete on public.chat_messages for delete using (app_user_role() = 'carpenter');
+
+drop policy if exists daily_reports_carpenter_select_all on public.daily_reports;
+create policy daily_reports_carpenter_select_all on public.daily_reports for select using (app_user_role() = 'carpenter');
+
 -- ════ Realtime（複数端末への即時反映） ════
 alter publication supabase_realtime add table public.suppliers;
 alter publication supabase_realtime add table public.master_items;

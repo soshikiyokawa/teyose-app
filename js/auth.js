@@ -60,14 +60,12 @@ async function bootstrapApp(){
   document.getElementById('app-shell').style.display='';
   document.getElementById('app-nav').style.display='';
 
-  if(currentUserRole==='staff'){
+  if(currentUserRole==='staff' || currentUserRole==='carpenter'){
+    // 管理者・一般社員：見積など全機能を初期化。管理者は見積、一般社員は勤怠日報を初期表示
     renderEstTypeSelect();
     newEstimate();
     renderSupplierSelectList();
-    mainTab('estimate');
-  } else if(currentUserRole==='carpenter'){
-    // 社員大工ロール：現場ページ（写真・図面・日報・有給）のみ表示
-    mainTab('genba');
+    mainTab(currentUserRole==='staff' ? 'estimate' : 'genba');
   } else {
     // 発注先ロール：品目マスタ（自社品目の単価編集）のみ表示
     mainTab('order');

@@ -39,7 +39,7 @@ function renderMaster(){
       const row = document.createElement('div');
       row.className = 'master-item draggable';
       row.dataset.id = m.id;
-      row.draggable = currentUserRole==='staff';
+      row.draggable = currentUserRole!=='supplier';
       row.innerHTML = `
         <div class="drag-handle staff-only" title="ドラッグで並び替え">⠿</div>
         <div class="mi-info">
@@ -52,7 +52,7 @@ function renderMaster(){
           </div>
         </div>
         <button class="mi-edit-btn-sm staff-only" onclick="duplicateMasterItem(${m.id})" title="この品目を複製して次の品目を追加">複製</button>
-        <button class="mi-edit-btn-sm" onclick="openMasterEdit(${m.id})">${currentUserRole==='staff'?'編集':'単価編集'}</button>`;
+        <button class="mi-edit-btn-sm" onclick="openMasterEdit(${m.id})">${currentUserRole!=='supplier'?'編集':'単価編集'}</button>`;
 
       row.addEventListener('dragstart', e=>{
         dragSrcId = m.id;
@@ -121,8 +121,8 @@ function openMasterEdit(id){
     document.getElementById('m-cost').value=m.cost;
     document.getElementById('m-supplier-sel').value=m.supplier;
   }
-  // 発注先ロールは原価のみ編集可（その他は閲覧のみ）
-  const supplierOnly = currentUserRole!=='staff';
+  // 発注先ロールは原価のみ編集可（管理者・一般社員は全項目編集可）
+  const supplierOnly = currentUserRole==='supplier';
   ['m-cat','m-name','m-unit','m-supplier-sel'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
   document.getElementById('master-delete-btn').style.display = (supplierOnly||editingMasterId===-1) ? 'none' : 'inline-flex';
   document.getElementById('master-modal').classList.add('open');

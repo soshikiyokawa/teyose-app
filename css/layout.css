@@ -25,9 +25,10 @@
 
 /* 発注先（supplier）ロールでは社内専用UIを隠す */
 .role-supplier .staff-only{display:none !important}
-/* 社員大工（carpenter）ロールでは事務専用UI（見積・原価など）と発注先向けUIを隠す */
-.role-carpenter .staff-only{display:none !important}
 .role-carpenter .carpenter-hidden{display:none !important}
+/* 管理者専用UI（アカウント権限・勤務カレンダー・出面表など）は管理者=staffのみ。
+   一般社員=carpenterは staff-only は見えるが admin-only は見えない */
+.role-carpenter .admin-only,.role-supplier .admin-only{display:none !important}
 /* 現場ページ（写真・図面・日報・有給）は社内全員（staff＋carpenter）のみ */
 .role-supplier .employee-only{display:none !important}
 /* 大工専用UI（staffの現場写真・図面は案件情報タブに集約） */
