@@ -81,8 +81,19 @@ function leaveRowHtml(lr, forReview){
       ${forReview
         ? `<button class="btn xs primary" onclick="openLeaveReview(${lr.id})">確認</button>`
         : (lr.status==='pending' && isMine ? `<button class="btn xs" onclick="cancelLeave(${lr.id})">取り下げ</button>` : '')}
+      ${currentUserRole==='staff' && !(lr.status==='pending' && isMine && !forReview) ? `<button class="btn xs danger" onclick="adminDeleteLeave(${lr.id})" title="申請を削除（管理者）">削除</button>` : ''}
     </div>
   </div>`;
+}
+
+// 管理者：間違って提出された有給申請を削除（本人への通知はしない）
+async function adminDeleteLeave(id){
+  const lr = leaveRequests.find(x=>x.id===id);
+  if(!lr) return;
+  if(!confirm(`${lr.userName}さんの有給申請（${leavePeriodLabel(lr)}　${lr.days}日）を削除しますか？\nこの操作は元に戻せません。`)) return;
+  await dbDeleteLeaveRequest(id);
+  showToast('有給申請を削除しました');
+  await refreshGenba();
 }
 
 function renderLeave(){
@@ -106,10 +117,10 @@ function renderLeave(){
     ? mine.map(lr=>leaveRowHtml(lr,false)).join('')
     : '<div class="empty" style="padding:14px">申請履歴はありません</div>';
 
-  // ── staff：全員の履歴（今年分） ──
+  // ── staff：全員の履歴（今年分。申請中も含めて表示＝間違い申請の削除用） ──
   if(currentUserRole==='staff'){
     const year = String(new Date().getFullYear());
-    const others = leaveRequests.filter(lr=>lr.userId!==currentUserId && lr.status!=='pending' && lr.startDate.startsWith(year));
+    const others = leaveRequests.filter(lr=>lr.userId!==currentUserId && lr.startDate.startsWith(year));
     document.getElementById('leave-all-wrap').style.display = '';
     document.getElementById('leave-all-list').innerHTML = others.length
       ? others.map(lr=>leaveRowHtml(lr,false)).join('')

@@ -69,8 +69,19 @@ function holidayRowHtml(hr, forReview){
         ? `<button class="btn xs" onclick="rejectHoliday(${hr.id})">却下</button>
            <button class="btn xs primary" onclick="approveHoliday(${hr.id})">承認</button>`
         : (hr.status==='pending' && isMine ? `<button class="btn xs" onclick="cancelHoliday(${hr.id})">取り下げ</button>` : '')}
+      ${currentUserRole==='staff' && !forReview && !(hr.status==='pending' && isMine) ? `<button class="btn xs danger" onclick="adminDeleteHoliday(${hr.id})" title="申請を削除（管理者）">削除</button>` : ''}
     </div>
   </div>`;
+}
+
+// 管理者：間違って提出された休日出勤申請を削除（本人への通知はしない）
+async function adminDeleteHoliday(id){
+  const hr = holidayRequests.find(x=>x.id===id);
+  if(!hr) return;
+  if(!confirm(`${hr.userName}さんの休日出勤申請（${gbDateLabel(hr.workDate)}／${hr.projectName||'工事未設定'}）を削除しますか？\nこの操作は元に戻せません。`)) return;
+  await dbDeleteHolidayRequest(id);
+  showToast('休日出勤申請を削除しました');
+  await refreshGenba();
 }
 
 function renderHoliday(){
