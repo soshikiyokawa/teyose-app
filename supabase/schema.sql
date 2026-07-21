@@ -165,7 +165,16 @@ create table public.profiles (
   role text not null check (role in ('staff','carpenter','supplier')),
   supplier_id bigint references public.suppliers(id) on delete set null,
   display_name text,
+  work_group text default '', -- 勤怠区分：役員／一般社員／訓練校生（空＝対象外）。カレンダーは訓練校生→trainee、他→regular
   created_at timestamptz default now()
+);
+
+-- 勤務カレンダーの休日（出勤しない日）。出勤日＝この表に無い日。cal: 'regular'／'trainee'
+create table public.work_holidays (
+  cal text not null check (cal in ('regular','trainee')),
+  holiday_date date not null,
+  note text default '',
+  primary key (cal, holiday_date)
 );
 
 -- ════ 現場管理（写真・図面・日報・有給） ════
@@ -327,6 +336,7 @@ alter table public.leave_requests enable row level security;
 alter table public.site_folders enable row level security;
 alter table public.drawing_views enable row level security;
 alter table public.holiday_requests enable row level security;
+alter table public.work_holidays enable row level security;
 
 -- ════ projects（閲覧は社内全員＝staff＋carpenter。編集はstaffのみ） ════
 create policy projects_select on public.projects for select using (app_is_employee());
@@ -503,6 +513,16 @@ create policy daily_reports_update on public.daily_reports
 create policy daily_reports_delete on public.daily_reports
   for delete using (app_user_role() = 'staff' or user_id = auth.uid());
 
+-- ════ work_holidays（閲覧は社内全員・編集は事務のみ） ════
+create policy work_holidays_select on public.work_holidays
+  for select using (app_is_employee());
+create policy work_holidays_insert on public.work_holidays
+  for insert with check (app_user_role() = 'staff');
+create policy work_holidays_update on public.work_holidays
+  for update using (app_user_role() = 'staff');
+create policy work_holidays_delete on public.work_holidays
+  for delete using (app_user_role() = 'staff');
+
 -- ════ holiday_requests（本人は自分の申請のみ・staffと承認者は全件＋承認操作） ════
 create policy holiday_requests_select on public.holiday_requests
   for select using (app_user_role() = 'staff' or user_id = auth.uid() or app_is_ot_approver());
@@ -616,3 +636,4 @@ alter publication supabase_realtime add table public.leave_requests;
 alter publication supabase_realtime add table public.site_folders;
 alter publication supabase_realtime add table public.drawing_views;
 alter publication supabase_realtime add table public.holiday_requests;
+alter publication supabase_realtime add table public.work_holidays;

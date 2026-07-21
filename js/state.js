@@ -22,6 +22,12 @@ let fbMoving = null;        // 移動中のアイテム {kind:'photo'|'drawing',
 let dailyReports = [];      // 日報（carpenterは自分の分のみ・staffは全員分。RLSが自動で絞る）
 let leaveRequests = [];     // 有給申請（同上）
 let holidayRequests = [];   // 休日出勤申請（同上）
+
+// 勤務カレンダー（休日＝出勤しない日）。{regular:Set<'YYYY-MM-DD'>, trainee:Set<...>}
+let workHolidays = {regular:new Set(), trainee:new Set()};
+let allProfiles = [];       // 事務用：社員区分の割り当てで使う全プロフィール
+let wcCal = 'regular';      // 管理画面で表示中のカレンダー種別
+let wcMonth = null;         // 管理画面で表示中の月（'YYYY-MM'）
 let genbaProjectId = null;  // 現場ページで選択中の工事ID（写真・図面タブ共通）
 let editingNippoId = null;  // 編集中の日報ID（nullなら新規）
 let nippoMonth = null;      // 日報一覧で表示中の月（'YYYY-MM'）

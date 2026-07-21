@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=145">
+<link rel="stylesheet" href="css/main.css?v=159">
 <link rel="stylesheet" href="css/schedule.css?v=141">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -726,6 +726,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         出面表
       </button>
+      <button class="btn xs staff-only" onclick="openWorkCalendar()" title="出勤日・休日と社員区分の設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        勤務カレンダー
+      </button>
       <select id="nippo-user-filter" class="staff-only" onchange="nippoSetUserFilter(this.value)" style="margin-left:auto;font-size:12px;padding:4px 8px"></select>
     </div>
 
@@ -840,6 +844,41 @@
         <button class="btn" onclick="closeProjectModal()">キャンセル</button>
         <button class="btn primary" onclick="saveProject()">保存</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ 勤務カレンダー管理（事務専用） ════ -->
+<div id="wc-modal">
+  <div id="wc-modal-sheet">
+    <div id="wc-modal-head">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:800">勤務カレンダー</div>
+        <div style="font-size:11px;color:var(--text-muted)">出勤日・休日と社員区分の設定</div>
+      </div>
+      <button onclick="closeWorkCalendar()" style="border:none;background:none;color:var(--text-muted);font-size:24px;line-height:1;cursor:pointer;padding:2px 6px">×</button>
+    </div>
+    <div id="wc-modal-body">
+      <!-- グループ切替 -->
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="wc-caltab active" id="wc-cal-regular" onclick="wcSetCal('regular')">一般社員（役員含む）</button>
+        <button class="wc-caltab" id="wc-cal-trainee" onclick="wcSetCal('trainee')">訓練校生</button>
+      </div>
+      <!-- 月ナビ -->
+      <div class="month-nav" style="margin:0 0 8px">
+        <button class="btn xs" onclick="wcMonthShift(-1)">‹ 前月</button>
+        <span class="month-lbl" id="wc-month-lbl"></span>
+        <button class="btn xs" onclick="wcMonthShift(1)">翌月 ›</button>
+        <button class="btn xs" onclick="wcSeedMonth()" style="margin-left:auto" title="土日祝を休みに一括設定">土日祝で初期化</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">日付をタップで「出勤日／休日」を切り替え。<span style="color:var(--danger);font-weight:700">休</span>＝休日（出勤しない日）。</div>
+      <div id="wc-grid" class="wc-grid"></div>
+      <div id="wc-workcount" style="font-size:12px;font-weight:700;color:var(--accent-t);margin-top:8px"></div>
+
+      <!-- 社員区分の割り当て -->
+      <div class="section-lbl" style="margin-top:18px">社員区分の割り当て</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">役員・一般社員は「一般社員」カレンダー、訓練校生は「訓練校生」カレンダーで判定されます。</div>
+      <div class="card" id="wc-assign-list" style="padding:4px 0"></div>
     </div>
   </div>
 </div>
@@ -1291,10 +1330,10 @@
 <script src="js/utils.js?v=138"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=149"></script>
+<script src="js/state.js?v=159"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=158"></script>
+<script src="js/data/db.js?v=159"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
@@ -1338,7 +1377,8 @@
 <script src="js/genba/genba-drawings.js?v=145"></script>
 <script src="js/genba/genba-nippo.js?v=158"></script>
 <script src="js/genba/genba-leave.js?v=156"></script>
-<script src="js/genba/genba-holiday.js?v=156"></script>
+<script src="js/genba/genba-holiday.js?v=159"></script>
+<script src="js/genba/work-calendar.js?v=159"></script>
 
 <!-- 初期化 -->
 <script src="js/init.js?v=157"></script>

@@ -40,6 +40,8 @@ async function fetchAllData(){
   }
 
   if(currentUserRole==='staff'){
+    await fetchWorkCalendar();
+
     const { data: typeRows } = await sb.from('estimate_types').select('*').order('sort_order').order('id');
     estimateTypes = (typeRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
     estTypeIdSeq = Math.max(0,...estimateTypes.map(t=>t.id))+1;
@@ -334,6 +336,33 @@ async function dbUploadChatFile(file){
   return data.publicUrl;
 }
 
+// ── 勤務カレンダー（休日）＋社員区分 ──
+async function fetchWorkCalendar(){
+  const { data: rows } = await sb.from('work_holidays').select('*');
+  workHolidays = {regular:new Set(), trainee:new Set()};
+  (rows||[]).forEach(r=>{ (workHolidays[r.cal]||(workHolidays[r.cal]=new Set())).add(r.holiday_date); });
+  // 事務のみ：社員区分の割り当て用に全プロフィールを取得（RLSでstaffは全件可）
+  if(currentUserRole==='staff'){
+    const { data: profs } = await sb.from('profiles').select('id, display_name, role, work_group').order('display_name');
+    allProfiles = (profs||[]).map(p=>({id:p.id,displayName:p.display_name||'',role:p.role,workGroup:p.work_group||''}));
+  }
+}
+async function dbAddHoliday(cal, date){
+  const { error } = await sb.from('work_holidays').insert({cal, holiday_date:date});
+  if(error && error.code!=='23505'){showToast('保存に失敗しました：'+error.message);throw error;} // 23505=重複は無視
+  workHolidays[cal].add(date);
+}
+async function dbRemoveHoliday(cal, date){
+  const { error } = await sb.from('work_holidays').delete().eq('cal',cal).eq('holiday_date',date);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  workHolidays[cal].delete(date);
+}
+async function dbSetWorkGroup(userId, group){
+  const { error } = await sb.from('profiles').update({work_group:group}).eq('id',userId);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  const p = allProfiles.find(x=>x.id===userId); if(p) p.workGroup=group;
+}
+
 // ── 現場管理（写真・図面・日報・有給） ──
 async function fetchGenbaData(){
   const { data: photoRows } = await sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false});
@@ -576,6 +605,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'daily_reports'}, ()=>refetchAndRerender('daily_reports'))
     .on('postgres_changes',{event:'*',schema:'public',table:'leave_requests'}, ()=>refetchAndRerender('leave_requests'))
     .on('postgres_changes',{event:'*',schema:'public',table:'holiday_requests'}, ()=>refetchAndRerender('holiday_requests'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'work_holidays'}, ()=>refetchAndRerender('work_holidays'))
     .subscribe();
 }
 
@@ -603,6 +633,7 @@ async function refetchAndRerender(table){
     renderInfoGenbaSections && renderInfoGenbaSections();
     refreshFB && refreshFB(); // 開いているファイルブラウザにも反映
   }
+  if(table==='work_holidays' && document.getElementById('wc-modal')?.classList.contains('open')) renderWorkCalendar();
   // 日報の追加・修正は原価サマリーの人工集計にも即時反映する
   if(table==='daily_reports' && currentUserRole==='staff' && document.getElementById('page-cost')?.classList.contains('active')){
     renderCost();

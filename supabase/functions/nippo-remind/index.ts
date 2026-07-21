@@ -1,12 +1,15 @@
 // 日報の提出リマインド用Edge Function。
 //
 // Supabaseのpg_cronから毎日19時・20時（JST）に呼ばれ（migration-genba9.sql参照）、
-// 当日の日報が未提出の大工（carpenterロール）へプッシュ通知を送る。
+// 当日の日報が未提出の社員へプッシュ通知を送る。
 //
-// 出勤日の判定：
-//   ・月〜土 ＝ 出勤日（日曜は承認済みの休日出勤がある人のみ対象）
-//   ・承認済みの全日有給の人は除外（半休の人は日報が必要なので対象のまま）
-//   ・承認済みの振替休日の人は除外
+// 対象：profiles.work_group が設定された人（役員・一般社員・訓練校生）。
+// カレンダー：訓練校生 → 'trainee'／役員・一般社員 → 'regular'。
+// 出勤日の判定：work_holidays（休日テーブル）に当日が「無ければ」出勤日。
+//   ・work_holidays にそのカレンダーの行が1件も無い場合は未設定とみなしスキップ（誤送信防止）
+//   ・当日が承認済みの休日出勤 → 出勤日として扱う（カレンダー上の休日でも対象）
+//   ・当日が承認済みの全日有給 → 除外（半休は対象のまま）
+//   ・当日が承認済みの振替休日 → 除外
 //
 // 認証：x-remind-secretヘッダーがSecrets（OT_REMIND_SECRET）と一致する場合のみ動作。
 
@@ -29,12 +32,22 @@ Deno.serve(async (req) => {
 
     const jstNow = new Date(Date.now() + 9 * 3600 * 1000);
     const today = jstNow.toISOString().slice(0, 10);
-    const dow = jstNow.getUTCDay(); // JSTの曜日（0=日曜）
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    // 対象：大工（carpenter）ロール
-    const { data: profiles } = await admin.from("profiles").select("id, role, display_name").eq("role", "carpenter");
+    // 対象：work_group が設定された人（役員・一般社員・訓練校生）
+    const { data: profiles } = await admin.from("profiles").select("id, display_name, work_group")
+      .in("work_group", ["役員", "一般社員", "訓練校生"]);
     if (!profiles?.length) return json({ sent: 0, targets: 0 });
+
+    // 勤務カレンダーの休日（当日分）。カレンダーごとに「未設定か」も判定する
+    const { data: holidays } = await admin.from("work_holidays").select("cal, holiday_date");
+    const calConfigured: Record<string, boolean> = { regular: false, trainee: false };
+    const isHolidayToday: Record<string, boolean> = { regular: false, trainee: false };
+    for (const h of holidays || []) {
+      calConfigured[h.cal] = true;
+      if (h.holiday_date === today) isHolidayToday[h.cal] = true;
+    }
+    const calOf = (p: any) => (p.work_group === "訓練校生" ? "trainee" : "regular");
 
     // 当日の日報を提出済みの人
     const { data: reports } = await admin.from("daily_reports").select("user_id").eq("work_date", today);
@@ -46,7 +59,7 @@ Deno.serve(async (req) => {
       .lte("start_date", today).gte("end_date", today);
     const onLeave = new Set((leaves || []).filter((l: any) => l.leave_type === "全日").map((l: any) => l.user_id));
 
-    // 承認済みの休日出勤（当日）＝日曜でも対象／振替休日（当日）＝除外
+    // 承認済みの休日出勤（当日）＝カレンダー休日でも対象／振替休日（当日）＝除外
     const { data: holidayWork } = await admin.from("holiday_requests")
       .select("user_id").eq("status", "approved").eq("work_date", today);
     const workingHoliday = new Set((holidayWork || []).map((h: any) => h.user_id));
@@ -55,11 +68,13 @@ Deno.serve(async (req) => {
     const onSubstitute = new Set((substitutes || []).map((h: any) => h.user_id));
 
     const targets = profiles.filter((p: any) => {
+      const cal = calOf(p);
+      if (!calConfigured[cal]) return false;       // カレンダー未設定はスキップ（誤送信防止）
       if (submitted.has(p.id)) return false;       // 提出済み
       if (onLeave.has(p.id)) return false;         // 全日有給
       if (onSubstitute.has(p.id)) return false;    // 振替休日
-      if (dow === 0) return workingHoliday.has(p.id); // 日曜は休日出勤の人のみ
-      return true;                                 // 月〜土は出勤日
+      if (workingHoliday.has(p.id)) return true;   // 承認済み休日出勤は休日でも対象
+      return !isHolidayToday[cal];                 // カレンダー上の出勤日のみ対象
     });
     if (!targets.length) return json({ sent: 0, targets: 0 });
 
