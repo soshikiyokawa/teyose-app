@@ -74,6 +74,12 @@ async function bootstrapApp(){
 
   subscribeRealtime();
 
+  // 招待メール・パスワード再設定のリンクから来た場合：パスワード設定を求める
+  if(APP_NEEDS_PASSWORD_SETUP && !window._passwordSetupDone){
+    document.getElementById('invite-pass-modal').classList.add('open');
+    setTimeout(()=>document.getElementById('inv-pass1')?.focus(),100);
+  }
+
   // 通知タップからの起動（URLハッシュ）／ログイン復元前に届いた遷移要求をここで開く
   const hashTab = location.hash.replace(/^#/,'');
   if(hashTab.startsWith('genba')){
@@ -83,6 +89,22 @@ async function bootstrapApp(){
     const t=_pendingOpenTab; _pendingOpenTab=null;
     appOpenTab(t);
   }
+}
+
+// ── 招待から来た人のパスワード設定 ──
+async function saveInvitePassword(){
+  const p1=document.getElementById('inv-pass1').value;
+  const p2=document.getElementById('inv-pass2').value;
+  if(p1.length<8){ showToast('パスワードは8文字以上にしてください'); return; }
+  if(p1!==p2){ showToast('パスワードが一致しません'); return; }
+  const btn=document.getElementById('inv-pass-btn');
+  btn.disabled=true; btn.textContent='設定中…';
+  const { error } = await sb.auth.updateUser({password:p1});
+  btn.disabled=false; btn.textContent='パスワードを設定';
+  if(error){ showToast('設定に失敗しました：'+error.message); return; }
+  window._passwordSetupDone=true;
+  document.getElementById('invite-pass-modal').classList.remove('open');
+  showToast('パスワードを設定しました。次回からこのパスワードでログインできます');
 }
 
 // 初回読み込み時：既存セッションがあれば自動ログイン

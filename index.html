@@ -861,6 +861,19 @@
   </div>
 </div>
 
+<!-- ════ 招待から来た人のパスワード設定 ════ -->
+<div class="modal-overlay" id="invite-pass-modal" style="z-index:340">
+  <div class="modal-sheet" style="max-width:360px">
+    <h3>パスワードの設定</h3>
+    <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px;line-height:1.7">手寄へようこそ。今後のログインに使うパスワードを設定してください（8文字以上）。</div>
+    <div class="fg" style="margin-bottom:10px"><label>新しいパスワード</label><input type="password" id="inv-pass1" autocomplete="new-password"></div>
+    <div class="fg" style="margin-bottom:10px"><label>新しいパスワード（確認）</label><input type="password" id="inv-pass2" autocomplete="new-password" onkeydown="if(event.key==='Enter')saveInvitePassword()"></div>
+    <div class="modal-actions">
+      <button class="btn primary" id="inv-pass-btn" style="width:100%;justify-content:center" onclick="saveInvitePassword()">パスワードを設定</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════ アカウント権限（管理者専用） ════ -->
 <div id="acct-modal">
   <div id="acct-modal-sheet">
@@ -872,8 +885,40 @@
       <button onclick="closeAccountPerms()" style="border:none;background:none;color:var(--text-muted);font-size:24px;line-height:1;cursor:pointer;padding:2px 6px">×</button>
     </div>
     <div id="acct-modal-body">
+      <!-- アカウント追加（メール招待） -->
+      <div class="section-lbl" style="margin-top:0">アカウントを追加（メール招待）</div>
+      <div class="card" style="padding:12px;margin-bottom:14px">
+        <div class="form-grid">
+          <div class="fg"><label>メールアドレス <span style="color:var(--danger)">*</span></label><input id="inv-email" type="email" placeholder="example@mail.com" autocomplete="off"></div>
+          <div class="fg"><label>表示名（氏名） <span style="color:var(--danger)">*</span></label><input id="inv-name" placeholder="例：山口大輔" autocomplete="off"></div>
+          <div class="fg"><label>権限</label>
+            <select id="inv-role" onchange="invRoleChanged()">
+              <option value="carpenter">一般社員</option>
+              <option value="staff">管理者</option>
+              <option value="supplier">業者</option>
+            </select>
+          </div>
+          <div class="fg" id="inv-supplier-wrap" style="display:none"><label>発注先 <span style="color:var(--danger)">*</span></label>
+            <select id="inv-supplier"></select>
+          </div>
+          <div class="fg" id="inv-group-wrap"><label>勤怠区分</label>
+            <select id="inv-group">
+              <option value="">（対象外）</option>
+              <option value="役員">役員</option>
+              <option value="一般社員">一般社員</option>
+              <option value="訓練校生">訓練校生</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+          <span style="flex:1;font-size:10px;color:var(--text-muted)">招待メールのリンクからアプリを開くと、本人がパスワードを設定して利用開始できます</span>
+          <button class="btn primary" id="inv-btn" onclick="inviteAccount()">招待メールを送信</button>
+        </div>
+      </div>
+
+      <div class="section-lbl">権限の変更</div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;line-height:1.7">
-        <b>管理者</b>＝全機能／<b>一般社員</b>＝勤怠日報・現場写真・図面・社内チャット／<b>業者</b>＝発注先（品目単価・自社チャット）。<br>
+        <b>管理者</b>＝全機能／<b>一般社員</b>＝アカウント設定・権限変更以外／<b>業者</b>＝発注先（品目単価・自社チャット）。<br>
         変更は本人の次回ログインから反映されます。業者は所属の発注先も選んでください。
       </div>
       <div class="card" id="acct-list" style="padding:4px 0"></div>
@@ -1356,7 +1401,7 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=138"></script>
+<script src="js/supabase-client.js?v=164"></script>
 
 
 <!-- 共通ユーティリティ -->
@@ -1366,7 +1411,7 @@
 <script src="js/state.js?v=159"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=163"></script>
+<script src="js/data/db.js?v=164"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
@@ -1412,12 +1457,12 @@
 <script src="js/genba/genba-leave.js?v=156"></script>
 <script src="js/genba/genba-holiday.js?v=159"></script>
 <script src="js/genba/work-calendar.js?v=162"></script>
-<script src="js/genba/account-perms.js?v=162"></script>
+<script src="js/genba/account-perms.js?v=164"></script>
 
 <!-- 初期化 -->
 <script src="js/init.js?v=157"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=163"></script>
+<script src="js/auth.js?v=164"></script>
 </body>
 </html>

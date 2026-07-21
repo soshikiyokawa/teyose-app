@@ -355,6 +355,12 @@ async function dbSetRole(userId, role, supplierId){
   const { error } = await sb.from('profiles').update({role, supplier_id:supplierId||null}).eq('id',userId);
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
 }
+// アカウント新規作成（メール招待）。Edge Functionが招待メール送信とプロフィール作成を行う（管理者のみ）
+async function dbInviteUser(payload){
+  const { data, error } = await sb.functions.invoke('invite-user', { body: payload });
+  if(error){showToast('招待に失敗しました：'+error.message);throw error;}
+  if(data?.error){showToast(data.error);throw new Error(data.error);}
+}
 async function dbAddHoliday(cal, date){
   const { error } = await sb.from('work_holidays').insert({cal, holiday_date:date});
   if(error && error.code!=='23505'){showToast('保存に失敗しました：'+error.message);throw error;} // 23505=重複は無視
