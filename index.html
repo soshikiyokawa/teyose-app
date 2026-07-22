@@ -1096,9 +1096,8 @@
         <button onclick="document.getElementById('talk-panel-file').click()" title="写真・PDFを添付" style="width:36px;height:36px;border-radius:50%;background:var(--surface2);border:0.5px solid var(--border-s);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="16" height="16" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
         </button>
-        <textarea id="talk-panel-input" placeholder="メッセージを入力…" rows="2"
+        <textarea id="talk-panel-input" placeholder="メッセージを入力（改行OK・送信は右のボタン）…" rows="2"
           style="flex:1;border:0.5px solid var(--border-s);border-radius:10px;padding:8px 11px;font-size:13px;background:var(--surface2);color:var(--text);font-family:inherit;resize:none;outline:none;line-height:1.5"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendTalkPanelMsg()}"
         ></textarea>
         <button onclick="sendTalkPanelMsg()" style="width:36px;height:36px;border-radius:50%;background:var(--wood);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="14" height="14" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
