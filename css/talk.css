@@ -54,3 +54,14 @@
 /* ── トースト ── */
 .toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#2a1e0e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:all .25s;z-index:300;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── チャットのリアクション（スタンプ） ── */
+.reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.reactions.me{justify-content:flex-end}
+.reaction-chip{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-family:inherit;line-height:1;padding:3px 8px;border-radius:999px;background:var(--surface);border:0.5px solid var(--border-s);color:var(--text-sub);cursor:pointer}
+.reaction-chip.mine{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-t);font-weight:700}
+.reaction-add{display:inline-flex;align-items:center;justify-content:center;width:24px;height:22px;border-radius:999px;background:var(--surface);border:0.5px solid var(--border-s);color:var(--text-muted);cursor:pointer;padding:0}
+.reaction-add:hover{color:var(--accent-t);border-color:var(--accent)}
+/* リアクション選択パレット */
+#reaction-picker .reaction-opt{font-size:13px;font-family:inherit;line-height:1.3;padding:8px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border-s);color:var(--text);cursor:pointer}
+#reaction-picker .reaction-opt.mine{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-t);font-weight:700}

@@ -149,6 +149,7 @@ create table public.chat_messages (
   file_name text,
   file_mime text,
   unread boolean default false,
+  reactions jsonb not null default '{}', -- リアクション {"👍":["清川創史",...], "了解です":[...]}
   created_at timestamptz default now()
 );
 

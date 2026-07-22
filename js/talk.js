@@ -1,3 +1,40 @@
+// ════ チャットのリアクション（スタンプ） ════
+const REACTION_PALETTE = ['👍','👏','🙏','ありがとうございます','お大事に','お疲れ様です','お願いします','おめでとうございます','ご安全に','承知しました','済','了解です'];
+let reactingMsgId = null;
+
+// メッセージ下のリアクション表示（他人の投稿には追加ボタンも出す）
+function reactionsHtml(m, isMe){
+  const reactions = m.reactions||{};
+  const keys = Object.keys(reactions).filter(k=>(reactions[k]||[]).length);
+  const chips = keys.map(k=>{
+    const arr = reactions[k]||[];
+    const mine = arr.includes(currentUserDisplayName);
+    return `<button class="reaction-chip${mine?' mine':''}" title="${esc(arr.join('、'))}" onclick="dbToggleReaction(${m.id},'${k.replace(/'/g,"\\'")}')">${esc(k)} ${arr.length}</button>`;
+  }).join('');
+  // 他人の投稿にのみ「＋リアクション」ボタン
+  const addBtn = !isMe ? `<button class="reaction-add" title="リアクション" onclick="openReactionPicker(${m.id})">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.4 2 4 2 4-2 4-2"/><line x1="9" y1="9.5" x2="9.01" y2="9.5"/><line x1="15" y1="9.5" x2="15.01" y2="9.5"/></svg>
+  </button>` : '';
+  if(!chips && !addBtn) return '';
+  return `<div class="reactions${isMe?' me':''}">${chips}${addBtn}</div>`;
+}
+
+function openReactionPicker(msgId){
+  reactingMsgId = msgId;
+  let msg=null;
+  for(const k in talkThreads){ const f=(talkThreads[k]||[]).find(m=>m.id===msgId); if(f){msg=f;break;} }
+  const mine = new Set();
+  if(msg) Object.keys(msg.reactions||{}).forEach(r=>{ if((msg.reactions[r]||[]).includes(currentUserDisplayName)) mine.add(r); });
+  document.getElementById('reaction-picker').innerHTML = REACTION_PALETTE.map(v=>
+    `<button class="reaction-opt${mine.has(v)?' mine':''}" onclick="pickReaction('${v.replace(/'/g,"\\'")}')">${esc(v)}</button>`).join('');
+  document.getElementById('reaction-modal').classList.add('open');
+}
+function closeReactionPicker(){ document.getElementById('reaction-modal').classList.remove('open'); reactingMsgId=null; }
+async function pickReaction(v){
+  const id=reactingMsgId; closeReactionPicker();
+  if(id!=null) await dbToggleReaction(id, v);
+}
+
 // ════ PDFビューワー ════
 function openPdfViewer(url, title) {
   const overlay = document.getElementById('pdf-viewer-overlay');
@@ -121,6 +158,7 @@ function renderTalkPanelMessages(){
           </div>
         </div>
         <div class="ts">${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+        ${reactionsHtml(m,true)}
       </div>`;
     }
     // 社内チャットは送信者名で自分／他人を判定（全員が社員のためroleでは区別できない）
@@ -134,11 +172,13 @@ function renderTalkPanelMessages(){
               <span style="font-size:18px">📄</span><span style="word-break:break-all">${esc(m.fileName||'資料')}</span>
             </a>`}
         <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+        ${reactionsHtml(m,isMe)}
       </div>`;
     }
     return `${sep}<div class="talk-bubble ${isMe?'me':'them'}">
       <div class="bbl">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
       <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+      ${reactionsHtml(m,isMe)}
     </div>`;
   }).join('');
   el.scrollTop=el.scrollHeight;

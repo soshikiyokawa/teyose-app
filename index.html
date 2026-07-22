@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=163">
+<link rel="stylesheet" href="css/main.css?v=167">
 <link rel="stylesheet" href="css/schedule.css?v=141">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -861,6 +861,15 @@
   </div>
 </div>
 
+<!-- ════ チャットのリアクション選択 ════ -->
+<div class="modal-overlay" id="reaction-modal" style="z-index:330">
+  <div class="modal-sheet" style="max-width:340px">
+    <h3>リアクション</h3>
+    <div id="reaction-picker" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+    <div class="modal-actions"><button class="btn" style="width:100%;justify-content:center" onclick="closeReactionPicker()">閉じる</button></div>
+  </div>
+</div>
+
 <!-- ════ 招待から来た人のパスワード設定 ════ -->
 <div class="modal-overlay" id="invite-pass-modal" style="z-index:340">
   <div class="modal-sheet" style="max-width:360px">
@@ -1410,13 +1419,13 @@
 <script src="js/state.js?v=159"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=164"></script>
+<script src="js/data/db.js?v=167"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=163"></script>
+<script src="js/talk.js?v=167"></script>
 
 <!-- プッシュ通知 -->
 <script src="js/push.js?v=138"></script>

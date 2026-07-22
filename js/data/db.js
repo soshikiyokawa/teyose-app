@@ -28,7 +28,7 @@ async function fetchAllData(){
   chatRows.forEach(r=>{
     const name = r.is_internal ? INTERNAL_THREAD : supplierNameById(r.supplier_id);
     if(!talkThreads[name]) talkThreads[name]=[];
-    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||''});
+    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{}});
   });
 
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
@@ -299,6 +299,23 @@ async function dbMarkOrderReceived(orderNo, supplierName){
   await sb.from('cost_entries').update({status:'received'}).eq('order_no',orderNo).eq('supplier_id',supplier_id);
 }
 
+// メッセージへのリアクション（スタンプ）をトグル。自分の名前を付ける／外す
+async function dbToggleReaction(msgId, reaction){
+  let msg=null;
+  for(const k in talkThreads){ const f=(talkThreads[k]||[]).find(m=>m.id===msgId); if(f){msg=f;break;} }
+  if(!msg) return;
+  const reactions = {...(msg.reactions||{})};
+  const arr = Array.isArray(reactions[reaction]) ? [...reactions[reaction]] : [];
+  const me = currentUserDisplayName||'';
+  const i = arr.indexOf(me);
+  if(i>=0) arr.splice(i,1); else arr.push(me);
+  if(arr.length) reactions[reaction]=arr; else delete reactions[reaction];
+  const { error } = await sb.from('chat_messages').update({reactions}).eq('id',msgId);
+  if(error){showToast('リアクションに失敗しました：'+error.message);return;}
+  msg.reactions=reactions;
+  renderTalkPanelMessages();
+}
+
 // ── チャット ──
 async function dbAddChatMessage(supplierName, msg){
   const isInternal = supplierName===INTERNAL_THREAD;
@@ -311,7 +328,7 @@ async function dbAddChatMessage(supplierName, msg){
   }).select().single();
   if(error){showToast('送信に失敗しました：'+error.message);throw error;}
   if(!talkThreads[supplierName]) talkThreads[supplierName]=[];
-  talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,fileUrl:data.file_url,fileName:data.file_name,fileMime:data.file_mime,ts:new Date(data.created_at).getTime(),unread:false,senderName:data.sender_name||''});
+  talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,fileUrl:data.file_url,fileName:data.file_name,fileMime:data.file_mime,ts:new Date(data.created_at).getTime(),unread:false,senderName:data.sender_name||'',reactions:{}});
 
   // 通知の送信。失敗してもチャット送信自体は成立させる（msg.silent=trueなら通知しない：自動転記用）
   if(msg.silent) return;
