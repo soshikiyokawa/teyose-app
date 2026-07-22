@@ -861,8 +861,8 @@
   </div>
 </div>
 
-<!-- ════ チャットのリアクション選択 ════ -->
-<div class="modal-overlay" id="reaction-modal" style="z-index:330">
+<!-- ════ チャットのリアクション選択（チャットパネル z-index:400 より手前に） ════ -->
+<div class="modal-overlay" id="reaction-modal" style="z-index:460" onclick="if(event.target===this)closeReactionPicker()">
   <div class="modal-sheet" style="max-width:340px">
     <h3>リアクション</h3>
     <div id="reaction-picker" style="display:flex;flex-wrap:wrap;gap:8px"></div>
