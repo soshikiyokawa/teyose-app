@@ -4,7 +4,15 @@
 // PWA: ホーム画面追加・オフライン表示に対応
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'});
+    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'}).then(reg=>{
+      reg.update(); // 起動時に新バージョンをチェック（スマホが古いままになるのを防ぐ）
+    }).catch(()=>{});
+    // 復帰時（アプリを再度前面に出したとき）にも更新チェック
+    document.addEventListener('visibilitychange', ()=>{
+      if(document.visibilityState==='visible'){
+        navigator.serviceWorker.getRegistration().then(reg=>reg&&reg.update()).catch(()=>{});
+      }
+    });
     navigator.serviceWorker.addEventListener('message', e=>{
       if(e.data?.type==='SW_UPDATED') location.reload();
       if(e.data?.type==='OPEN_TAB') appOpenTab(e.data.tab); // 通知タップ→該当タブへ
