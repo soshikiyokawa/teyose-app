@@ -65,3 +65,16 @@
 /* リアクション選択パレット */
 #reaction-picker .reaction-opt{font-size:13px;font-family:inherit;line-height:1.3;padding:8px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border-s);color:var(--text);cursor:pointer}
 #reaction-picker .reaction-opt.mine{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-t);font-weight:700}
+
+/* ── メッセージ長押しメニュー・引用・編集・既読 ── */
+.talk-bubble{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.quote-ref{border-left:3px solid var(--wood);padding:2px 8px;margin-bottom:4px;font-size:11px;color:var(--text-sub);background:rgba(139,99,64,.06);border-radius:0 6px 6px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:230px}
+.edited-mark{font-size:10px;color:var(--text-muted);margin-left:4px}
+.bm-mark{margin-left:4px;font-size:11px}
+#talk-bm-filter.active{opacity:1;filter:drop-shadow(0 0 1px var(--wood))}
+.msg-menu-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:none;background:none;font-family:inherit;font-size:14px;color:var(--text);padding:11px 12px;border-radius:8px;cursor:pointer}
+.msg-menu-item:hover{background:var(--surface2)}
+.msg-menu-item.danger{color:var(--danger)}
+.msg-menu-item .mmi-icon{width:22px;text-align:center;font-size:15px;flex-shrink:0}
+.read-member{font-size:13px;padding:8px 10px;border-bottom:0.5px solid var(--border);color:var(--accent-t)}
+.read-member:last-child{border-bottom:none}

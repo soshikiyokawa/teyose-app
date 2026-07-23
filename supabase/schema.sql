@@ -150,7 +150,22 @@ create table public.chat_messages (
   file_mime text,
   unread boolean default false,
   reactions jsonb not null default '{}', -- リアクション {"👍":["清川創史",...], "了解です":[...]}
+  reply_to_id bigint,        -- 引用元メッセージID
+  reply_to_text text,        -- 引用元の抜粋
+  reply_to_sender text,      -- 引用元の送信者名
+  edited_at timestamptz,     -- 編集日時（編集済みなら表示）
+  bookmarks jsonb not null default '[]', -- ブックマークした人の表示名 ["清川創史",...]
   created_at timestamptz default now()
+);
+
+-- 既読管理：ユーザー×スレッドの最終閲覧時刻。既読者＝last_read_atがメッセージ時刻以降の人
+create table public.chat_reads (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  user_name text default '',
+  thread text not null,      -- 'internal' または 'supplier:<id>'
+  last_read_at timestamptz default now(),
+  unique (user_id, thread)
 );
 
 -- プッシュ通知の購読情報（端末ごとに1件）
@@ -342,6 +357,7 @@ alter table public.site_folders enable row level security;
 alter table public.drawing_views enable row level security;
 alter table public.holiday_requests enable row level security;
 alter table public.work_holidays enable row level security;
+alter table public.chat_reads enable row level security;
 
 -- ════ projects（閲覧は社内全員＝staff＋carpenter。編集はstaffのみ） ════
 create policy projects_select on public.projects for select using (app_is_employee());
@@ -518,6 +534,11 @@ create policy daily_reports_update on public.daily_reports
 create policy daily_reports_delete on public.daily_reports
   for delete using (app_user_role() = 'staff' or user_id = auth.uid());
 
+-- ════ chat_reads（既読管理。社員は全件・発注先は自分の行のみ） ════
+create policy chat_reads_select on public.chat_reads for select using (app_is_employee() or user_id = auth.uid());
+create policy chat_reads_insert on public.chat_reads for insert with check (user_id = auth.uid());
+create policy chat_reads_update on public.chat_reads for update using (user_id = auth.uid());
+
 -- ════ work_holidays（閲覧は社内全員・編集は事務のみ） ════
 create policy work_holidays_select on public.work_holidays
   for select using (app_is_employee());
@@ -678,3 +699,4 @@ alter publication supabase_realtime add table public.site_folders;
 alter publication supabase_realtime add table public.drawing_views;
 alter publication supabase_realtime add table public.holiday_requests;
 alter publication supabase_realtime add table public.work_holidays;
+alter publication supabase_realtime add table public.chat_reads;

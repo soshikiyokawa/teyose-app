@@ -40,6 +40,11 @@ let activeTalkPanelSupplier = null;
 let talkThreads = {};
 // 社内チャット（きよかわ社員のみ）のスレッド名。suppliersとは別枠で常に一覧の先頭に表示する
 const INTERNAL_THREAD = 'きよかわ（社員）';
+let chatReads = [];          // 既読管理（{userId,userName,thread,lastReadAt}）
+let quotingMsg = null;       // 引用中のメッセージ
+let editingMsgId = null;     // 編集中のメッセージID
+let menuMsgId = null;        // 長押しメニューの対象メッセージID
+let chatBookmarkFilter = false; // ブックマークのみ表示
 
 // 受発注
 let cart=[], orders=[], orderSeq=1, costEntries=[], currentOrder=null;

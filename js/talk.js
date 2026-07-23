@@ -35,6 +35,124 @@ async function pickReaction(v){
   if(id!=null) await dbToggleReaction(id, v);
 }
 
+// ════ メッセージ長押しメニュー（引用・編集・ブックマーク・既読・コピー・削除） ════
+let _msgMenuReady = false;
+function setupMsgMenuHandlers(){
+  if(_msgMenuReady) return;
+  const c = document.getElementById('talk-panel-messages');
+  if(!c) return;
+  _msgMenuReady = true;
+  let timer=null, startX=0, startY=0;
+  const start=(e)=>{
+    const b=e.target.closest('.talk-bubble'); if(!b) return;
+    const mid=Number(b.dataset.mid);
+    const p=e.touches?e.touches[0]:e; startX=p.clientX; startY=p.clientY;
+    timer=setTimeout(()=>{ timer=null; if(navigator.vibrate)navigator.vibrate(12); openMsgMenu(mid); }, 480);
+  };
+  const cancel=()=>{ if(timer){clearTimeout(timer);timer=null;} };
+  const move=(e)=>{ if(!timer)return; const p=e.touches?e.touches[0]:e; if(Math.abs(p.clientX-startX)>10||Math.abs(p.clientY-startY)>10) cancel(); };
+  c.addEventListener('touchstart',start,{passive:true});
+  c.addEventListener('touchmove',move,{passive:true});
+  c.addEventListener('touchend',cancel);
+  c.addEventListener('touchcancel',cancel);
+  c.addEventListener('mousedown',start);
+  c.addEventListener('mousemove',move);
+  c.addEventListener('mouseup',cancel);
+  c.addEventListener('mouseleave',cancel);
+  // PC右クリック / 一部端末の長押し
+  c.addEventListener('contextmenu',e=>{ const b=e.target.closest('.talk-bubble'); if(b){ e.preventDefault(); openMsgMenu(Number(b.dataset.mid)); } });
+}
+
+function findMsg(mid){ return (talkThreads[activeTalkPanelSupplier]||[]).find(m=>m.id===mid)||null; }
+
+function openMsgMenu(mid){
+  const m=findMsg(mid); if(!m) return;
+  menuMsgId=mid;
+  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD;
+  const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';
+  const isMine = m.senderName===currentUserDisplayName; // 自分が送信した本人か
+  const canEdit = isMine && m.type==='text';
+  const canDelete = isMine || currentUserRole==='staff';
+  const hasText = m.type==='text' || (m.type==='file' && m.fileName);
+  const bookmarked = Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName);
+  const item=(icon,label,fn,danger)=>`<button class="msg-menu-item${danger?' danger':''}" onclick="${fn}"><span class="mmi-icon">${icon}</span>${label}</button>`;
+  let html='';
+  html+=item('↩','引用して返信','menuQuote()');
+  if(canEdit) html+=item('✏️','編集','menuEdit()');
+  html+=item('🔖', bookmarked?'ブックマーク解除':'ブックマーク','menuBookmark()');
+  html+=item('✓✓','既読メンバー','menuReadMembers()');
+  if(hasText) html+=item('📋','テキストをコピー','menuCopy()');
+  if(canDelete) html+=item('🗑','削除','menuDelete()',true);
+  document.getElementById('msg-menu-items').innerHTML=html;
+  document.getElementById('msg-menu').classList.add('open');
+}
+function closeMsgMenu(){ document.getElementById('msg-menu').classList.remove('open'); }
+
+// ① 引用
+function menuQuote(){
+  const m=findMsg(menuMsgId); closeMsgMenu(); if(!m) return;
+  quotingMsg=m; editingMsgId=null; hideEditBar();
+  const snip=(m.text||(m.type==='file'?'📎 '+(m.fileName||'ファイル'):m.type==='order'?'📋 発注書':'')).slice(0,60);
+  document.getElementById('talk-quote-text').textContent=(m.senderName||'')+'：'+snip;
+  document.getElementById('talk-quote-bar').style.display='flex';
+  document.getElementById('talk-panel-input').focus();
+}
+function cancelQuote(){ quotingMsg=null; const b=document.getElementById('talk-quote-bar'); if(b) b.style.display='none'; }
+
+// ② 編集
+function menuEdit(){
+  const m=findMsg(menuMsgId); closeMsgMenu(); if(!m||m.type!=='text') return;
+  editingMsgId=m.id; quotingMsg=null; cancelQuote();
+  const input=document.getElementById('talk-panel-input');
+  input.value=m.text; input.focus();
+  document.getElementById('talk-edit-bar').style.display='flex';
+}
+function cancelEditMsg(){ editingMsgId=null; const b=document.getElementById('talk-edit-bar'); if(b) b.style.display='none'; const i=document.getElementById('talk-panel-input'); if(i) i.value=''; }
+function hideEditBar(){ const b=document.getElementById('talk-edit-bar'); if(b) b.style.display='none'; }
+
+// ③ ブックマーク
+async function menuBookmark(){
+  const id=menuMsgId; closeMsgMenu();
+  await dbToggleBookmark(id);
+  renderTalkPanelMessages();
+}
+
+// ④ 既読メンバー
+function menuReadMembers(){
+  const m=findMsg(menuMsgId); closeMsgMenu(); if(!m) return;
+  const thread=threadKeyOf(activeTalkPanelSupplier);
+  // このスレッドを、メッセージ時刻以降に開いた人（送信者本人は除く）
+  const readers=chatReads.filter(r=>r.thread===thread && r.lastReadAt>=m.ts && r.userName!==m.senderName)
+    .map(r=>r.userName).filter(Boolean);
+  const uniq=[...new Set(readers)];
+  document.getElementById('read-members-list').innerHTML = uniq.length
+    ? uniq.map(n=>`<div class="read-member">✓ ${esc(n)}</div>`).join('')
+    : '<div class="empty" style="padding:14px">まだ既読の人はいません</div>';
+  document.getElementById('read-members-modal').classList.add('open');
+}
+function closeReadMembers(){ document.getElementById('read-members-modal').classList.remove('open'); }
+
+// ⑤ テキストコピー
+async function menuCopy(){
+  const m=findMsg(menuMsgId); closeMsgMenu(); if(!m) return;
+  const t=m.text||m.fileName||'';
+  try{ await navigator.clipboard.writeText(t); showToast('コピーしました'); }
+  catch(e){
+    // フォールバック
+    const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); showToast('コピーしました'); }catch(_){ showToast('コピーできませんでした'); }
+    ta.remove();
+  }
+}
+
+// ⑥ 削除
+async function menuDelete(){
+  const id=menuMsgId; closeMsgMenu();
+  if(!confirm('このメッセージを削除しますか？')) return;
+  try{ await dbDeleteChatMessage(activeTalkPanelSupplier,id); }catch(e){ return; }
+  renderTalkPanelMessages();
+}
+
 // ════ PDFビューワー ════
 function openPdfViewer(url, title) {
   const overlay = document.getElementById('pdf-viewer-overlay');
@@ -102,12 +220,18 @@ function openTalkPanelThread(supName){
     : (sup?.tel?'📞 '+sup.tel+(sup.email?' · ✉ '+sup.email:''):'');
   document.getElementById('talk-panel-list').style.display='none';
   document.getElementById('talk-panel-detail').style.display='flex';
-  // 未読クリア
+  // 未読クリア＋引用/編集状態をリセット
   (talkThreads[supName]||[]).forEach(m=>m.unread=false);
   document.getElementById('nav-talk-dot').style.display='none';
+  cancelQuote(); cancelEditMsg();
+  setupMsgMenuHandlers();
   renderTalkPanelMessages();
+  dbMarkThreadRead(threadKeyOf(supName)).catch(()=>{}); // 開いた時刻を既読として記録
   setTimeout(()=>document.getElementById('talk-panel-input').focus(),200);
 }
+
+// スレッド名 → 既読管理のキー
+function threadKeyOf(name){ return name===INTERNAL_THREAD ? 'internal' : 'supplier:'+(supplierIdByName(name)||'?'); }
 
 function closeTalkPanelThread(){
   activeTalkPanelSupplier=null;
@@ -116,14 +240,29 @@ function closeTalkPanelThread(){
   renderTalkPanelList();
 }
 
+// 引用（返信元）・編集済み・ブックマークの補助表示
+function replyRefHtml(m){
+  if(!m.replyToText) return '';
+  return `<div class="quote-ref">${esc(m.replyToSender||'')}：${esc(m.replyToText)}</div>`;
+}
+function msgMarks(m){
+  const edited = m.editedAt ? '<span class="edited-mark">（編集済み）</span>' : '';
+  const bm = (Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName)) ? '<span class="bm-mark" title="ブックマーク">🔖</span>' : '';
+  return edited+bm;
+}
+
 function renderTalkPanelMessages(){
   const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD;
-  const msgs=talkThreads[activeTalkPanelSupplier]||[];
+  let msgs=talkThreads[activeTalkPanelSupplier]||[];
+  if(chatBookmarkFilter) msgs=msgs.filter(m=>Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName));
+  document.getElementById('talk-bm-filter')?.classList.toggle('active',chatBookmarkFilter);
   const el=document.getElementById('talk-panel-messages');
   if(!msgs.length){
-    el.innerHTML = internalThread
-      ? '<div class="empty" style="padding:24px">まだメッセージがありません。<br>社員メンバーへの連絡・共有に使えます。</div>'
-      : '<div class="empty" style="padding:24px">まだメッセージがありません。<br>発注確定するとここに発注書が届きます。</div>';
+    el.innerHTML = chatBookmarkFilter
+      ? '<div class="empty" style="padding:24px">ブックマークしたメッセージはありません。</div>'
+      : (internalThread
+        ? '<div class="empty" style="padding:24px">まだメッセージがありません。<br>社員メンバーへの連絡・共有に使えます。</div>'
+        : '<div class="empty" style="padding:24px">まだメッセージがありません。<br>発注確定するとここに発注書が届きます。</div>');
     return;
   }
   let lastDate='';
@@ -136,7 +275,8 @@ function renderTalkPanelMessages(){
       const o=m.orderData;
       const itemRows=o.items.slice(0,4).map(i=>`<div class="ocb-row"><span>${i.name}×${i.qty}${i.unit}</span><span>¥${fmt(i.price*i.qty)}</span></div>`).join('')
         +(o.items.length>4?`<div style="font-size:11px;color:var(--text-muted);padding:3px 0">他${o.items.length-4}品目…</div>`:'');
-      return `${sep}<div class="talk-bubble me">
+      return `${sep}<div class="talk-bubble me" data-mid="${m.id}">
+        ${replyRefHtml(m)}
         <div class="order-card-bubble">
           <div class="ocb-head">
             <svg viewBox="0 0 24 24" fill="none" stroke="#d4a96a" width="15" height="15" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -157,7 +297,7 @@ function renderTalkPanelMessages(){
             </button>`}
           </div>
         </div>
-        <div class="ts">${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+        <div class="ts">${time}${msgMarks(m)}</div>
         ${reactionsHtml(m,true)}
       </div>`;
     }
@@ -165,19 +305,21 @@ function renderTalkPanelMessages(){
     const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';
     if(m.type==='file'){
       const isImage=(m.fileMime||'').startsWith('image/');
-      return `${sep}<div class="talk-bubble ${isMe?'me':'them'}">
+      return `${sep}<div class="talk-bubble ${isMe?'me':'them'}" data-mid="${m.id}">
+        ${replyRefHtml(m)}
         ${isImage
           ? `<a href="${m.fileUrl}" target="_blank" rel="noopener"><img src="${m.fileUrl}" alt="${esc(m.fileName||'')}" style="max-width:200px;max-height:200px;border-radius:8px;display:block"></a>`
           : `<a href="${m.fileUrl}" target="_blank" rel="noopener" download class="bbl" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:inherit">
               <span style="font-size:18px">📄</span><span style="word-break:break-all">${esc(m.fileName||'資料')}</span>
             </a>`}
-        <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+        <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}${msgMarks(m)}</div>
         ${reactionsHtml(m,isMe)}
       </div>`;
     }
-    return `${sep}<div class="talk-bubble ${isMe?'me':'them'}">
+    return `${sep}<div class="talk-bubble ${isMe?'me':'them'}" data-mid="${m.id}">
+      ${replyRefHtml(m)}
       <div class="bbl">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
-      <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}<button onclick="deleteTalkMessage(${m.id})" title="削除" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:11px;margin-left:6px;padding:0">🗑</button></div>
+      <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}${msgMarks(m)}</div>
       ${reactionsHtml(m,isMe)}
     </div>`;
   }).join('');
@@ -189,9 +331,19 @@ function sendTalkPanelMsg(){
   const text=input.value.trim();
   if(!text||!activeTalkPanelSupplier) return;
   if(!talkThreads[activeTalkPanelSupplier]) talkThreads[activeTalkPanelSupplier]=[];
+  // 編集モード：既存メッセージの本文を書き換える
+  if(editingMsgId){
+    const id=editingMsgId;
+    input.value=''; cancelEditMsg();
+    dbEditChatMessage(id,text).then(renderTalkPanelMessages).catch(()=>{});
+    return;
+  }
   const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole!=='supplier') ? 'me' : 'them';
-  input.value='';
-  dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text})
+  // 引用（返信元）を添付
+  const q = quotingMsg;
+  const extra = q ? {replyToId:q.id, replyToSender:q.senderName||(activeTalkPanelSupplier===INTERNAL_THREAD?'':'きよかわ'), replyToText:(q.text||(q.type==='file'?'📎 '+(q.fileName||'ファイル'):q.type==='order'?'📋 発注書':'')).slice(0,80)} : {};
+  input.value=''; cancelQuote();
+  dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text,...extra})
     .then(renderTalkPanelMessages)
     .catch(()=>{});
 }

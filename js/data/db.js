@@ -28,8 +28,12 @@ async function fetchAllData(){
   chatRows.forEach(r=>{
     const name = r.is_internal ? INTERNAL_THREAD : supplierNameById(r.supplier_id);
     if(!talkThreads[name]) talkThreads[name]=[];
-    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{}});
+    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{},replyToText:r.reply_to_text||'',replyToSender:r.reply_to_sender||'',editedAt:r.edited_at||null,bookmarks:r.bookmarks||[]});
   });
+
+  // 既読管理
+  const { data: readRows } = await sb.from('chat_reads').select('*');
+  chatReads = (readRows||[]).map(r=>({userId:r.user_id,userName:r.user_name||'',thread:r.thread,lastReadAt:new Date(r.last_read_at).getTime()}));
 
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
@@ -316,6 +320,37 @@ async function dbToggleReaction(msgId, reaction){
   renderTalkPanelMessages();
 }
 
+// メッセージ本文の編集（自分のテキストのみ想定）
+async function dbEditChatMessage(msgId, newText){
+  const now=new Date().toISOString();
+  const { error } = await sb.from('chat_messages').update({text:newText, edited_at:now}).eq('id',msgId);
+  if(error){showToast('編集に失敗しました：'+error.message);throw error;}
+  for(const k in talkThreads){ const m=(talkThreads[k]||[]).find(x=>x.id===msgId); if(m){m.text=newText;m.editedAt=now;break;} }
+}
+// ブックマークのトグル（自分の名前を付ける／外す）
+async function dbToggleBookmark(msgId){
+  let msg=null;
+  for(const k in talkThreads){ const f=(talkThreads[k]||[]).find(m=>m.id===msgId); if(f){msg=f;break;} }
+  if(!msg) return;
+  const arr=Array.isArray(msg.bookmarks)?[...msg.bookmarks]:[];
+  const me=currentUserDisplayName||'';
+  const i=arr.indexOf(me);
+  if(i>=0) arr.splice(i,1); else arr.push(me);
+  const { error } = await sb.from('chat_messages').update({bookmarks:arr}).eq('id',msgId);
+  if(error){showToast('保存に失敗しました：'+error.message);return;}
+  msg.bookmarks=arr;
+}
+// スレッドを開いた時刻を既読として記録
+async function dbMarkThreadRead(thread){
+  const nowMs=Date.now();
+  const { error } = await sb.from('chat_reads').upsert({
+    user_id:currentUserId, user_name:currentUserDisplayName||'', thread, last_read_at:new Date(nowMs).toISOString()
+  }, { onConflict:'user_id,thread' });
+  if(error){ console.warn('既読記録に失敗', error.message); return; }
+  const ex=chatReads.find(r=>r.userId===currentUserId && r.thread===thread);
+  if(ex) ex.lastReadAt=nowMs; else chatReads.push({userId:currentUserId,userName:currentUserDisplayName||'',thread,lastReadAt:nowMs});
+}
+
 // ── チャット ──
 async function dbAddChatMessage(supplierName, msg){
   const isInternal = supplierName===INTERNAL_THREAD;
@@ -324,11 +359,12 @@ async function dbAddChatMessage(supplierName, msg){
   const { data, error } = await sb.from('chat_messages').insert({
     supplier_id, is_internal:isInternal, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
     file_url:msg.fileUrl||null, file_name:msg.fileName||null, file_mime:msg.fileMime||null, unread:false,
-    sender_name: currentUserDisplayName||''
+    sender_name: currentUserDisplayName||'',
+    reply_to_id:msg.replyToId||null, reply_to_text:msg.replyToText||null, reply_to_sender:msg.replyToSender||null
   }).select().single();
   if(error){showToast('送信に失敗しました：'+error.message);throw error;}
   if(!talkThreads[supplierName]) talkThreads[supplierName]=[];
-  talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,fileUrl:data.file_url,fileName:data.file_name,fileMime:data.file_mime,ts:new Date(data.created_at).getTime(),unread:false,senderName:data.sender_name||'',reactions:{}});
+  talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,fileUrl:data.file_url,fileName:data.file_name,fileMime:data.file_mime,ts:new Date(data.created_at).getTime(),unread:false,senderName:data.sender_name||'',reactions:{},replyToText:data.reply_to_text||'',replyToSender:data.reply_to_sender||'',editedAt:null,bookmarks:[]});
 
   // 通知の送信。失敗してもチャット送信自体は成立させる（msg.silent=trueなら通知しない：自動転記用）
   if(msg.silent) return;
@@ -627,6 +663,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'suppliers'}, ()=>refetchAndRerender('suppliers'))
     .on('postgres_changes',{event:'*',schema:'public',table:'master_items'}, ()=>refetchAndRerender('master_items'))
     .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'}, ()=>refetchAndRerender('chat_messages'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_reads'}, ()=>refetchAndRerender('chat_messages'))
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'}, ()=>refetchAndRerender('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'cost_entries'}, ()=>refetchAndRerender('cost_entries'))
     .on('postgres_changes',{event:'*',schema:'public',table:'site_photos'}, ()=>refetchAndRerender('site_photos'))
