@@ -78,7 +78,7 @@
 .nippo-sum-table th{text-align:left;font-size:10px;color:var(--text-muted);font-weight:600;padding:6px 8px;border-bottom:0.5px solid var(--border-s)}
 .nippo-sum-table td{padding:7px 8px;border-bottom:0.5px solid var(--border)}
 .nippo-sum-table tr:last-child td{border-bottom:none}
-.month-nav{display:flex;align-items:center;gap:8px;margin:4px 0 8px}
+.month-nav{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
 .month-nav .month-lbl{font-size:14px;font-weight:700;min-width:110px;text-align:center}
 
 /* ── 有給 ── */
