@@ -440,30 +440,49 @@ function printDezura(){
   <style>
     @page{size:A3 landscape;margin:8mm}
     body{max-width:none !important;padding:12px !important}
-    table.dz{border-collapse:collapse;width:100%;font-size:9px;table-layout:fixed}
-    table.dz th,table.dz td{border:0.4pt solid #999;padding:2px 1px;overflow:hidden}
-    table.dz th{font-weight:700;text-align:center;font-size:8px}
-    table.dz td:first-child,table.dz th:first-child{width:64px}
-    table.dz th.sum,table.dz td.sum{width:34px}
-    table.st{border-collapse:collapse;font-size:10px;margin-top:10px}
-    table.st th,table.st td{border:0.4pt solid #999;padding:3px 6px}
+    /* 画面表示：横スクロールで各セルを読みやすいサイズに保つ。氏名列は左固定 */
+    .dz-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #ddd;border-radius:6px}
+    table.dz{border-collapse:collapse;font-size:12px}
+    table.dz th,table.dz td{border:0.5px solid #bbb;padding:5px 3px;text-align:center;white-space:nowrap;min-width:26px}
+    table.dz th{font-weight:700;background:#f3efe6;font-size:11px}
+    table.dz td:first-child,table.dz th:first-child{min-width:78px;text-align:left;position:sticky;left:0;background:#fff;z-index:2}
+    table.dz th:first-child{background:#f3efe6}
+    table.dz .sum{min-width:46px}
+    table.st{border-collapse:collapse;font-size:12px;margin-top:10px}
+    table.st th,table.st td{border:0.5px solid #bbb;padding:5px 8px}
     table.st th{background:#f3efe6;font-weight:700}
+    /* 印刷時：A3横1枚に収める（固定レイアウト・小さめ文字・固定列は解除） */
+    @media print{
+      .dz-scroll{overflow:visible !important;border:none !important}
+      table.dz{width:100% !important;table-layout:fixed;font-size:9px}
+      table.dz th,table.dz td{border:0.4pt solid #999;padding:2px 1px;min-width:0 !important;overflow:hidden;position:static !important}
+      table.dz th{font-size:8px}
+      table.dz td:first-child,table.dz th:first-child{width:64px;min-width:0 !important}
+      table.dz .sum{width:34px;min-width:0 !important}
+      table.st{font-size:10px}
+      table.st th,table.st td{border:0.4pt solid #999;padding:3px 6px}
+    }
   </style>
   <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
     <h2 style="font-size:16px;margin:0">出面表　${y}年${m}月度</h2>
     <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
     <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　休=休日出勤　有=有給　半=半休　振=振替休日　※休日出勤・有給・振替は承認済みのみ</span>
   </div>
+  <div style="font-size:10px;color:#888;margin-bottom:4px">← 横スクロールで日付が見られます（氏名は固定）</div>
+  <div class="dz-scroll">
   <table class="dz">
     <tr><th>氏名</th>${head}<th class="sum">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum">有給<br>日数</th><th class="sum">振休<br>日数</th></tr>
     ${rows}
   </table>
+  </div>
   <div style="font-size:11px;font-weight:700;margin-top:12px">現場別人工集計（実働8時間＝1.0人工。日報の実働から算出）</div>
+  <div class="dz-scroll">
   <table class="st">
     <tr><th style="width:30px">No</th><th style="min-width:180px">現場（工事）</th><th style="width:60px">人工計</th><th>内訳（社員別）</th></tr>
     ${siteRows}
     <tr><td></td><td style="font-weight:700;text-align:right">合計</td><td style="text-align:right;font-weight:700">${fmtNinku(siteTotal)}</td><td></td></tr>
   </table>
+  </div>
   <div style="font-size:9px;color:#555;margin-top:6px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
 
   printHtml(`出面表 ${y}年${m}月度`, html);
