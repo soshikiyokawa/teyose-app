@@ -96,11 +96,15 @@ async function openPdfBackupList() {
 
 // PDF印刷ユーティリティ（ポップアップブロック対応）
 function printHtml(title, body){
-  const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${title}</title><style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}body{font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}table{width:100%;border-collapse:collapse}@media print{@page{margin:15mm}button{display:none}}</style></head><body>${body}</body></html>`;
+  // 画面上部に「印刷」「閉じる」バーを常設（印刷時は非表示）。スマホで戻れなくなるのを防ぐ
+  const bar=`<div class="noprint" style="position:sticky;top:0;z-index:99;display:flex;gap:8px;justify-content:flex-end;align-items:center;background:#f7f3eb;border-bottom:1px solid #d8cdb8;padding:8px 12px;margin:-32px -32px 20px">
+    <button onclick="window.print()" style="border:none;background:#8b6340;color:#fff;font-size:14px;font-weight:700;padding:8px 18px;border-radius:8px;cursor:pointer">🖨 印刷</button>
+    <button onclick="window.close()" style="border:1px solid #c8bfae;background:#fff;color:#5c3d1e;font-size:14px;font-weight:700;padding:8px 18px;border-radius:8px;cursor:pointer">✕ 閉じる</button>
+  </div>`;
+  const html=`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${title}</title><style>*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact}body{font-family:'Helvetica Neue','Hiragino Sans',sans-serif;color:#111;padding:32px;max-width:800px;margin:0 auto}table{width:100%;border-collapse:collapse}@media print{@page{margin:15mm}button,.noprint{display:none !important}body{padding:0}}</style></head><body>${bar}${body}</body></html>`;
   const win=window.open('','_blank');
   if(win){
     win.document.write(html);win.document.close();
-    setTimeout(()=>win.print(),500);
     return true;
   }
   // フォールバック：非表示iframeで印刷
