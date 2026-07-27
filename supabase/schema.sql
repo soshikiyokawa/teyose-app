@@ -11,6 +11,7 @@ create table public.suppliers (
   email text default '',
   cats text default '',
   note text default '',
+  chatwork_room_id text default '', -- 設定するとこの発注先チャットのきよかわ側発言をChatWorkの当該ルームへ転送
   sort_order integer not null default 0,
   created_at timestamptz default now()
 );

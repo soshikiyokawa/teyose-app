@@ -13,7 +13,7 @@ function supplierNameById(id){
 async function fetchAllData(){
   const { data: supplierRows, error: supErr } = await sb.from('suppliers').select('*').order('sort_order').order('id');
   if(supErr) throw supErr;
-  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',sortOrder:r.sort_order}));
+  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',chatworkRoomId:r.chatwork_room_id||'',sortOrder:r.sort_order}));
   supplierIdSeq = Math.max(0,...suppliers.map(s=>s.id))+1;
 
   const { data: itemRows, error: itemErr } = await sb.from('master_items').select('*').order('sort_order').order('id');
@@ -178,12 +178,12 @@ async function dbSaveEstimateDefault(type,sectionsData){
 
 // ── 発注先 ──
 async function dbAddSupplier(item){
-  const { data, error } = await sb.from('suppliers').insert({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note}).select().single();
+  const { data, error } = await sb.from('suppliers').insert({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||''}).select().single();
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   suppliers.push({id:data.id,...item});
 }
 async function dbUpdateSupplier(id,item){
-  const { error } = await sb.from('suppliers').update({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note}).eq('id',id);
+  const { error } = await sb.from('suppliers').update({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||''}).eq('id',id);
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
 }
 async function dbDeleteSupplier(id){
@@ -374,9 +374,19 @@ async function dbAddChatMessage(supplierName, msg){
     dbSendPush('employee', null, `${INTERNAL_THREAD} ${currentUserDisplayName||''}`, preview, currentUserId).catch(()=>{});
   } else if(msg.role==='me'){
     dbSendPush('supplier', supplier_id, supplierName, preview).catch(()=>{});
+    // きよかわ→発注先：ChatWorkルームが設定されていれば転送（片方向）
+    dbForwardToChatWork(supplier_id, currentUserDisplayName||'', preview).catch(()=>{});
   } else {
     dbSendPush('staff', null, supplierName, preview).catch(()=>{});
   }
+}
+
+// 発注先チャットのきよかわ側発言をChatWorkへ転送（発注先にルームID設定がある場合のみ）
+async function dbForwardToChatWork(supplierId, senderName, text){
+  if(!supplierId || !text) return;
+  const sup = suppliers.find(s=>s.id===supplierId);
+  if(!sup || !sup.chatworkRoomId) return; // ルーム未設定なら送らない（無駄打ち防止）
+  await sb.functions.invoke('chatwork-forward', { body:{ supplierId, senderName, text } });
 }
 
 // チャット添付ファイル（写真・PDF等）をSupabase Storageにアップロードし、公開URLを返す

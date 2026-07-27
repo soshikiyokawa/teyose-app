@@ -1331,6 +1331,7 @@
     <div class="fg" style="margin-bottom:10px"><label>電話番号</label><input id="s-tel" placeholder="例：082-000-0000" type="tel"></div>
     <div class="fg" style="margin-bottom:10px"><label>メールアドレス</label><input id="s-email" placeholder="例：tanaka@example.com" type="email"></div>
     <div class="fg" style="margin-bottom:10px"><label>取扱カテゴリ（メモ）</label><input id="s-cats" placeholder="例：木材、合板"></div>
+    <div class="fg" style="margin-bottom:10px"><label>ChatWork ルームID（任意）</label><input id="s-chatwork" placeholder="例：123456789" inputmode="numeric"><div style="font-size:10px;color:var(--text-muted);margin-top:2px">設定すると、この発注先チャットで送った内容がChatWorkの該当ルームにも自動投稿されます</div></div>
     <div class="fg"><label>備考</label><textarea id="s-note" placeholder="支払条件、営業時間など" style="min-height:50px"></textarea></div>
     <div class="modal-actions">
       <button class="btn danger" id="supplier-delete-btn" onclick="deleteSupplier()" style="display:none">
@@ -1452,7 +1453,7 @@
 <script src="js/state.js?v=170"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=170"></script>
+<script src="js/data/db.js?v=173"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
@@ -1482,7 +1483,7 @@
 <script src="js/schedule.js?v=139"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=138"></script>
+<script src="js/order/supplier-master.js?v=173"></script>
 <script src="js/order/item-master.js?v=163"></script>
 <script src="js/order/order-cart.js?v=154"></script>
 <script src="js/order/order-confirm.js?v=154"></script>

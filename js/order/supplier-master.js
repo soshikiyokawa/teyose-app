@@ -70,8 +70,8 @@ async function saveSupplierOrder(){
 function openSupplierEdit(id){
   editingSupplierId=id;
   document.getElementById('supplier-modal-title').textContent=id===-1?'発注先を追加':'発注先を編集';
-  if(id===-1){['s-name','s-contact','s-tel','s-email','s-cats','s-note'].forEach(i=>document.getElementById(i).value='');}
-  else{const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('s-name').value=s.name;document.getElementById('s-contact').value=s.contact;document.getElementById('s-tel').value=s.tel;document.getElementById('s-email').value=s.email;document.getElementById('s-cats').value=s.cats;document.getElementById('s-note').value=s.note;}
+  if(id===-1){['s-name','s-contact','s-tel','s-email','s-cats','s-note','s-chatwork'].forEach(i=>document.getElementById(i).value='');}
+  else{const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('s-name').value=s.name;document.getElementById('s-contact').value=s.contact;document.getElementById('s-tel').value=s.tel;document.getElementById('s-email').value=s.email;document.getElementById('s-cats').value=s.cats;document.getElementById('s-note').value=s.note;document.getElementById('s-chatwork').value=s.chatworkRoomId||'';}
   document.getElementById('supplier-delete-btn').style.display=id===-1?'none':'inline-flex';
   document.getElementById('supplier-modal').classList.add('open');
 }
@@ -91,7 +91,7 @@ async function deleteSupplier(){
   showToast('発注先を削除しました');
 }
 async function saveSupplier(){
-  const item={name:document.getElementById('s-name').value.trim(),contact:document.getElementById('s-contact').value.trim(),tel:document.getElementById('s-tel').value.trim(),email:document.getElementById('s-email').value.trim(),cats:document.getElementById('s-cats').value.trim(),note:document.getElementById('s-note').value.trim()};
+  const item={name:document.getElementById('s-name').value.trim(),contact:document.getElementById('s-contact').value.trim(),tel:document.getElementById('s-tel').value.trim(),email:document.getElementById('s-email').value.trim(),cats:document.getElementById('s-cats').value.trim(),note:document.getElementById('s-note').value.trim(),chatworkRoomId:document.getElementById('s-chatwork').value.trim()};
   if(!item.name){alert('発注先名を入力してください');return;}
   try{
     if(editingSupplierId===-1) await dbAddSupplier(item);
