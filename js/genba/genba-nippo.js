@@ -4,6 +4,11 @@
 
 const NIPPO_STANDARD_MINUTES = 480;
 
+// 出面表・集計での社員の並び順（この順で先頭から。ここに無い人は末尾に五十音順）
+const EMPLOYEE_ORDER = ['清川創史','清川伸二','清川太視','清川説志','原口晴郎','山口大輔','梅田昭文','石橋実咲','梶原大地'];
+function empOrderIndex(name){ const i=EMPLOYEE_ORDER.indexOf(name); return i<0?999:i; }
+function cmpEmployee(nameA, nameB){ return empOrderIndex(nameA)-empOrderIndex(nameB) || String(nameA).localeCompare(String(nameB),'ja'); }
+
 // 残業の承認者（変更する場合は supabase/migration-genba3.sql の app_is_ot_approver と
 // supabase/functions/ot-remind の APPROVERS も合わせて変更すること）
 const OT_APPROVERS = ['清川創史','清川太視','清川説志','清川伸二','原口晴郎'];
@@ -262,7 +267,7 @@ function renderNippo(){
       const u = byUser[n.userId] = byUser[n.userId]||{name:n.userName||'（名前未設定）',dates:new Set(),work:0,overtime:0};
       u.dates.add(n.workDate); u.work += n.workMinutes; u.overtime += n.overtimeMinutes;
     });
-    const userIds = Object.keys(byUser);
+    const userIds = Object.keys(byUser).sort((a,b)=>cmpEmployee(byUser[a].name, byUser[b].name));
     document.getElementById('nippo-summary').innerHTML = userIds.length
       ? `<table class="nippo-sum-table">
           <tr><th>社員</th><th style="text-align:right">出勤</th><th style="text-align:right">実働</th><th style="text-align:right">残業</th></tr>
@@ -379,7 +384,7 @@ function printDezura(){
     }
   });
 
-  const userIds = Object.keys(users).sort((a,b)=>users[a].name.localeCompare(users[b].name,'ja'));
+  const userIds = Object.keys(users).sort((a,b)=>cmpEmployee(users[a].name, users[b].name));
   if(!userIds.length){ showToast('この期間の勤怠データがありません'); return; }
 
   const yobi = ['日','月','火','水','木','金','土'];
