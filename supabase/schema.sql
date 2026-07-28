@@ -40,6 +40,9 @@ create table public.projects (
   end_date date,                -- 完工予定日
   map_lat double precision,     -- 工事場所の地図ピン
   map_lng double precision,
+  parking_address text default '', -- 契約済み駐車場の住所
+  parking_lat double precision,    -- 駐車場の地図ピン
+  parking_lng double precision,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -229,6 +232,7 @@ create table public.drawings (
   id bigint generated always as identity primary key,
   project_id bigint not null references public.projects(id) on delete cascade,
   folder_id bigint references public.site_folders(id) on delete set null,
+  kind text not null default 'drawing', -- 'drawing'＝工事図面／'parking'＝駐車場の区画図など
   file_url text not null,
   file_name text not null,
   file_mime text default '',

@@ -39,7 +39,7 @@ function drawingViewsLabel(id){
 
 // 表示中フォルダ直下の図面一覧
 function fbDrawingListHtml(){
-  const list = drawings.filter(d=>d.projectId===fbProjectId && (d.folderId||null)===(fbFolderId||null));
+  const list = drawings.filter(d=>d.projectId===fbProjectId && (d.kind||'drawing')==='drawing' && (d.folderId||null)===(fbFolderId||null));
   if(!list.length) return '<div class="empty">このフォルダに図面はありません。「＋ 図面」から登録できます（PDF・画像）</div>';
   return `<div class="card" style="padding:0;overflow:hidden">` + list.map(d=>{
     const isPdf = /pdf/i.test(d.fileMime) || /\.pdf$/i.test(d.fileName);

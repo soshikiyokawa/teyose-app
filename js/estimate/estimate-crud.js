@@ -439,6 +439,12 @@ function fillProjectInfoTab(p){
   window._currentMapLat = p?.mapLat||null;
   window._currentMapLng = p?.mapLng||null;
   updateMapPinIndicator && updateMapPinIndicator();
+  // 契約済み駐車場
+  sv('est-parking', p?.parkingAddress);
+  window._parkingLat = p?.parkingLat||null;
+  window._parkingLng = p?.parkingLng||null;
+  updateParkingPinIndicator && updateParkingPinIndicator();
+  renderParkingDocs && renderParkingDocs();
 }
 
 async function saveProjectInfo(){
@@ -455,7 +461,10 @@ async function saveProjectInfo(){
     startDate: document.getElementById('est-start-date').value||'',
     endDate: document.getElementById('est-end-date').value||'',
     mapLat: window._currentMapLat||null,
-    mapLng: window._currentMapLng||null
+    mapLng: window._currentMapLng||null,
+    parkingAddress: document.getElementById('est-parking')?.value.trim()||'',
+    parkingLat: window._parkingLat||null,
+    parkingLng: window._parkingLng||null
   };
   let savedId;
   try{ savedId=await dbSaveProject(proj); }catch(e){ return; }

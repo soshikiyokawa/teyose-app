@@ -156,7 +156,8 @@ function renderInfoGenbaSections(){
   if(!pc) return;
   const pid = selectedProject?.id || null;
   pc.textContent = pid ? sitePhotos.filter(p=>p.projectId===pid).length+'枚' : '—';
-  document.getElementById('info-drawing-count').textContent = pid ? drawings.filter(d=>d.projectId===pid).length+'件' : '—';
+  document.getElementById('info-drawing-count').textContent = pid ? drawings.filter(d=>d.projectId===pid && (d.kind||'drawing')==='drawing').length+'件' : '—';
+  renderParkingDocs();
 }
 function openInfoFileBrowser(kind){
   openFileBrowser(kind, selectedProject?.id || null);

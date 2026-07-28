@@ -38,7 +38,7 @@ async function fetchAllData(){
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
     const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
-    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,updatedAt:r.updated_at}));
+    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,updatedAt:r.updated_at}));
 
     await fetchGenbaData();
   }
@@ -91,6 +91,7 @@ function rowToEstimate(r){
 async function dbSaveProject(proj){
   const row={name:proj.name,client_name:proj.clientName,type:proj.type,address:proj.address,note:proj.note,
     start_date:proj.startDate||null,end_date:proj.endDate||null,map_lat:proj.mapLat??null,map_lng:proj.mapLng??null,
+    parking_address:proj.parkingAddress||'',parking_lat:proj.parkingLat??null,parking_lng:proj.parkingLng??null,
     updated_at:new Date().toISOString()};
   if(proj.id){
     // 案件名が変わった場合、紐づく見積のproject_nameも一括更新する
@@ -446,7 +447,7 @@ async function fetchGenbaData(){
   sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
 
   const { data: drawingRows } = await sb.from('drawings').select('*').order('created_at',{ascending:false});
-  drawings = (drawingRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime||'',note:r.note||'',uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
+  drawings = (drawingRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,kind:r.kind||'drawing',fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime||'',note:r.note||'',uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
 
   const { data: folderRows } = await sb.from('site_folders').select('*').order('name');
   siteFolders = (folderRows||[]).map(r=>({id:r.id,projectId:r.project_id,kind:r.kind,parentId:r.parent_id||null,name:r.name,createdBy:r.created_by}));
@@ -493,7 +494,7 @@ async function dbDeleteSitePhoto(id){
 
 async function dbAddDrawing(d){
   const { data, error } = await sb.from('drawings').insert({
-    project_id:d.projectId, folder_id:d.folderId||null, file_url:d.fileUrl, file_name:d.fileName, file_mime:d.fileMime||'', note:d.note||'',
+    project_id:d.projectId, folder_id:d.folderId||null, kind:d.kind||'drawing', file_url:d.fileUrl, file_name:d.fileName, file_mime:d.fileMime||'', note:d.note||'',
     uploaded_by:currentUserId, uploader_name:currentUserDisplayName||''
   }).select().single();
   if(error){showToast('図面の登録に失敗しました：'+error.message);throw error;}
