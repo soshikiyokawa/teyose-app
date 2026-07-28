@@ -424,17 +424,21 @@ function printDezura(){
   };
   const siteNames = Object.keys(sites).sort((a,b)=>sites[a].no-sites[b].no);
   const siteTotal = siteNames.reduce((s,n)=>s+sites[n].total,0);
+  // 社員名を列に（上の表と同じ並び）。各セルはその現場でのその社員の人工数
+  const empNames = userIds.map(uid=>users[uid].name);
+  const empTotals = {}; empNames.forEach(e=>empTotals[e]=0);
+  const empHead = empNames.map(e=>`<th style="min-width:52px;white-space:nowrap">${esc(e)}</th>`).join('');
   const siteRows = siteNames.map(name=>{
     const st = sites[name];
-    const breakdown = Object.keys(st.byUser).sort((a,b)=>st.byUser[b]-st.byUser[a])
-      .map(un=>`${esc(un)} ${fmtNinku(st.byUser[un])}`).join('、');
+    const cells = empNames.map(e=>{ const v=st.byUser[e]||0; empTotals[e]+=v; return `<td style="text-align:right">${v?fmtNinku(v):''}</td>`; }).join('');
     return `<tr>
       <td style="text-align:center;font-weight:700">${st.no}</td>
-      <td>${esc(name)}</td>
+      <td style="white-space:nowrap">${esc(name)}</td>
       <td style="text-align:right;font-weight:700">${fmtNinku(st.total)}</td>
-      <td>${breakdown}</td>
+      ${cells}
     </tr>`;
   }).join('');
+  const empTotalCells = empNames.map(e=>`<td style="text-align:right;font-weight:700">${empTotals[e]?fmtNinku(empTotals[e]):''}</td>`).join('');
 
   const html = `
   <style>
@@ -478,9 +482,9 @@ function printDezura(){
   <div style="font-size:11px;font-weight:700;margin-top:12px">現場別人工集計（実働8時間＝1.0人工。日報の実働から算出）</div>
   <div class="dz-scroll">
   <table class="st">
-    <tr><th style="width:30px">No</th><th style="min-width:180px">現場（工事）</th><th style="width:60px">人工計</th><th>内訳（社員別）</th></tr>
+    <tr><th style="width:30px">No</th><th style="min-width:160px">現場（工事）</th><th style="width:56px">人工計</th>${empHead}</tr>
     ${siteRows}
-    <tr><td></td><td style="font-weight:700;text-align:right">合計</td><td style="text-align:right;font-weight:700">${fmtNinku(siteTotal)}</td><td></td></tr>
+    <tr style="background:#f7f3eb"><td></td><td style="font-weight:700;text-align:right">合計</td><td style="text-align:right;font-weight:700">${fmtNinku(siteTotal)}</td>${empTotalCells}</tr>
   </table>
   </div>
   <div style="font-size:9px;color:#555;margin-top:6px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
