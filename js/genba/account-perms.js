@@ -53,7 +53,13 @@ function closeAccountPerms(){ document.getElementById('acct-modal').classList.re
 function renderAccountPerms(){
   const el=document.getElementById('acct-list');
   if(!allProfiles.length){ el.innerHTML='<div class="empty" style="padding:12px">アカウントがありません</div>'; return; }
-  el.innerHTML=allProfiles.map(p=>{
+  // 並び順：社員（指定の固定順）→ 業者。社員内は EMPLOYEE_ORDER、業者は末尾に名前順
+  const rank = p => p.role==='supplier' ? 1 : 0;
+  const cmpName = (typeof cmpEmployee==='function')
+    ? cmpEmployee
+    : (a,b)=>String(a).localeCompare(String(b),'ja');
+  const list = allProfiles.slice().sort((a,b)=> rank(a)-rank(b) || cmpName(a.displayName||'', b.displayName||''));
+  el.innerHTML=list.map(p=>{
     const isSelf=p.id===currentUserId;
     // 業者のときだけ所属発注先を選ばせる（在庫分は除く）
     const supSel = p.role==='supplier'
