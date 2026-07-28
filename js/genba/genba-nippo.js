@@ -4,6 +4,10 @@
 
 const NIPPO_STANDARD_MINUTES = 480;
 
+// 他人の日報を編集できる人（この人だけ。他は自分の日報のみ編集可）
+const NIPPO_EDITOR = '清川創史';
+function canEditOthersNippo(){ return currentUserDisplayName === NIPPO_EDITOR; }
+
 // 出面表・集計での社員の並び順（この順で先頭から。ここに無い人は末尾に五十音順）
 const EMPLOYEE_ORDER = ['清川創史','清川伸二','清川太視','清川説志','原口晴郎','山口大輔','梅田昭文','石橋実咲','梶原大地'];
 function empOrderIndex(name){ const i=EMPLOYEE_ORDER.indexOf(name); return i<0?999:i; }
@@ -180,8 +184,11 @@ async function rejectOtNippo(id){
 function editNippo(id){
   const n = dailyReports.find(x=>x.id===id);
   if(!n) return;
-  // 自分の日報以外はstaffのみ編集可
-  if(currentUserRole!=='staff' && n.userId!==currentUserId) return;
+  // 自分の日報以外を編集できるのは清川創史のみ（他は閲覧のみ）
+  if(n.userId!==currentUserId && !canEditOthersNippo()){
+    showToast('他の人の日報は編集できません');
+    return;
+  }
   editingNippoId = id;
   document.getElementById('nippo-date').value = n.workDate;
   renderGenbaProjectSelects();
@@ -201,7 +208,7 @@ function editNippo(id){
   document.getElementById('nippo-break').value = String(n.breakMinutes);
   document.getElementById('nippo-ot-approver').value = n.otApproverName||'';
   document.getElementById('nippo-form-title').textContent =
-    (currentUserRole==='staff' && n.userId!==currentUserId ? `日報を編集（${n.userName}）` : '日報を編集');
+    (n.userId!==currentUserId ? `日報を編集（${n.userName}）` : '日報を編集');
   document.getElementById('nippo-cancel-btn').style.display = '';
   document.getElementById('nippo-delete-btn').style.display = '';
   nippoRecalc();
@@ -307,7 +314,7 @@ function renderNippo(){
     return;
   }
   wrap.innerHTML = list.map(n=>`
-    <div class="nippo-row" onclick="editNippo(${n.id})">
+    <div class="nippo-row" onclick="editNippo(${n.id})" style="${(n.userId===currentUserId||canEditOthersNippo())?'':'cursor:default'}">
       <div style="flex-shrink:0;width:64px">
         <div style="font-size:12px;font-weight:700">${gbDateLabel(n.workDate)}</div>
         ${currentUserRole==='staff'?`<div style="font-size:10px;color:var(--text-muted)">${esc(n.userName)}</div>`:''}
