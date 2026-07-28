@@ -96,3 +96,11 @@
 .pv-nav:hover{background:rgba(0,0,0,.55)}
 .pv-nav-l{left:6px}
 .pv-nav-r{right:6px}
+
+/* 写真の複数選択 */
+.photo-sel-bar{display:flex;align-items:center;gap:6px;padding:6px 0 2px;flex-wrap:wrap}
+.photo-cell.photo-selected{outline:3px solid var(--accent);outline-offset:-3px}
+.photo-cell.photo-selected img{opacity:.75}
+.photo-check{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.9);
+  border:1.5px solid var(--accent);color:var(--accent-t);font-size:13px;font-weight:800;line-height:17px;text-align:center}
+.photo-cell.photo-selected .photo-check{background:var(--accent);color:#fff;border-color:var(--accent)}

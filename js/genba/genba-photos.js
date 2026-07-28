@@ -50,20 +50,87 @@ async function onFbPhotoInput(input){
   await refreshGenba();
 }
 
+// ── 複数選択（一括で移動・削除） ──
+let photoSelectMode = false;
+let selectedPhotoIds = new Set();
+
+function togglePhotoSelectMode(){
+  photoSelectMode = !photoSelectMode;
+  selectedPhotoIds.clear();
+  refreshFB();
+}
+function togglePhotoSelect(id){
+  if(selectedPhotoIds.has(id)) selectedPhotoIds.delete(id);
+  else selectedPhotoIds.add(id);
+  refreshFB();
+}
+function selectAllPhotos(){
+  const ids = _currentPhotoList();
+  const allSelected = ids.length && ids.every(id=>selectedPhotoIds.has(id));
+  selectedPhotoIds = allSelected ? new Set() : new Set(ids);
+  refreshFB();
+}
+
+// 選択した写真をまとめてフォルダ移動
+function openBulkMovePhotos(){
+  if(!selectedPhotoIds.size){ showToast('写真を選択してください'); return; }
+  fbMoving = {kind:'photo', bulk:[...selectedPhotoIds]};
+  const listEl = document.getElementById('fb-move-list');
+  const rows = [{id:null, name:'📂 すべて（フォルダなし）', depth:0}];
+  (function walk(parentId, depth){
+    siteFolders.filter(f=>f.projectId===fbProjectId && f.kind==='photo' && (f.parentId||null)===(parentId||null))
+      .forEach(f=>{ rows.push({id:f.id, name:'📁 '+f.name, depth}); walk(f.id, depth+1); });
+  })(null, 1);
+  listEl.innerHTML = `<div style="font-size:11px;color:var(--text-muted);padding:4px 10px">選択中の${selectedPhotoIds.size}枚を移動します</div>`
+    + rows.map(r=>`<button class="fb-move-row" style="padding-left:${10+r.depth*18}px" onclick="fbMoveTo(${r.id})">${esc(r.name)}</button>`).join('');
+  document.getElementById('fb-move-modal').classList.add('open');
+}
+
+// 選択した写真をまとめて削除
+async function bulkDeletePhotos(){
+  const ids = [...selectedPhotoIds];
+  if(!ids.length){ showToast('写真を選択してください'); return; }
+  if(!confirm(`選択した${ids.length}枚の写真を削除しますか？\nこの操作は元に戻せません。`)) return;
+  for(const id of ids){
+    try{ await dbDeleteSitePhoto(id); }catch(e){ return; }
+  }
+  selectedPhotoIds.clear();
+  photoSelectMode = false;
+  showToast(`${ids.length}枚を削除しました`);
+  await refreshGenba();
+}
+
 // 表示中フォルダ直下の写真グリッド（撮影日ごとにグループ表示）
 function fbPhotoGridHtml(){
   const list = sitePhotos.filter(p=>p.projectId===fbProjectId && (p.folderId||null)===(fbFolderId||null));
   if(!list.length) return '<div class="empty">このフォルダに写真はありません。「＋ 写真」から登録できます</div>';
+
+  // 選択モードの操作バー
+  const bar = photoSelectMode
+    ? `<div class="photo-sel-bar">
+        <button class="btn xs" onclick="selectAllPhotos()">全選択/解除</button>
+        <span style="flex:1;font-size:12px;font-weight:700;color:var(--accent-t)">${selectedPhotoIds.size}枚を選択中</span>
+        <button class="btn xs" onclick="openBulkMovePhotos()" ${selectedPhotoIds.size?'':'disabled'}>移動</button>
+        <button class="btn xs danger" onclick="bulkDeletePhotos()" ${selectedPhotoIds.size?'':'disabled'}>削除</button>
+        <button class="btn xs" onclick="togglePhotoSelectMode()">終了</button>
+      </div>`
+    : `<div class="photo-sel-bar"><span style="flex:1;font-size:11px;color:var(--text-muted)">タップで拡大表示</span>
+        <button class="btn xs" onclick="togglePhotoSelectMode()">選択</button></div>`;
+
   const byDate = {};
   list.forEach(p=>{ (byDate[p.shotDate] = byDate[p.shotDate]||[]).push(p); });
-  return Object.keys(byDate).sort().reverse().map(date=>`
+  return bar + Object.keys(byDate).sort().reverse().map(date=>`
     <div class="photo-date-lbl">${gbDateLabel(date)}<span style="font-weight:400;color:var(--text-muted)">　${byDate[date].length}枚</span></div>
     <div class="photo-grid">
-      ${byDate[date].map(p=>`
-        <div class="photo-cell" onclick="openPhotoViewer(${p.id})">
+      ${byDate[date].map(p=>{
+        const sel = selectedPhotoIds.has(p.id);
+        const onClick = photoSelectMode ? `togglePhotoSelect(${p.id})` : `openPhotoViewer(${p.id})`;
+        return `<div class="photo-cell${sel?' photo-selected':''}" onclick="${onClick}">
           <img src="${esc(p.url)}" loading="lazy" alt="">
+          ${photoSelectMode ? `<div class="photo-check">${sel?'✓':''}</div>` : ''}
           ${p.caption ? `<div class="photo-cap">${esc(p.caption)}</div>` : ''}
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>`).join('');
 }
 

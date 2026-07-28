@@ -144,9 +144,17 @@ function closeFbMove(){
 }
 async function fbMoveTo(folderId){
   if(!fbMoving) return;
-  await dbMoveItem(fbMoving.kind, fbMoving.id, folderId);
+  // 複数選択（bulk）と単体の両方に対応
+  const kind = fbMoving.kind;
+  const isBulk = !!fbMoving.bulk;
+  const ids = fbMoving.bulk || [fbMoving.id];
+  for(const id of ids){
+    try{ await dbMoveItem(kind, id, folderId); }catch(e){ return; }
+  }
   closeFbMove();
-  showToast('移動しました');
+  // 一括移動の場合は選択モードを終了
+  if(isBulk && typeof selectedPhotoIds!=='undefined'){ selectedPhotoIds.clear(); photoSelectMode = false; }
+  showToast(ids.length>1 ? `${ids.length}枚を移動しました` : '移動しました');
   await refreshGenba();
 }
 
