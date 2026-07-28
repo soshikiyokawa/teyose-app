@@ -20,8 +20,30 @@ function updateMapPinIndicator(){
 
 let _leafletMap = null, _leafletMarker = null;
 
+// 工事場所（案件情報タブの入力欄。未入力なら選択中の案件の住所）を取得
+function _currentSiteAddress(){
+  const v = document.getElementById('est-site')?.value.trim();
+  return v || selectedProject?.address || '';
+}
+
+// 住所から緯度経度を検索（日本国内優先。番地入りで見つからなければ番地を落として再検索）
+async function _geocodeAddress(addr){
+  const tryFetch = async q => {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&countrycodes=jp&limit=1&q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    return data.length ? L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon)) : null;
+  };
+  let hit = await tryFetch(addr);
+  if(!hit){
+    // 「1-2-3」のような番地部分を削って市区町村レベルで再検索
+    const rough = addr.replace(/[0-9０-９][-‐－0-9０-９]*\s*$/, '').trim();
+    if(rough && rough !== addr) hit = await tryFetch(rough);
+  }
+  return hit;
+}
+
 async function openMapPicker(){
-  const addr = document.getElementById('est-site')?.value.trim();
+  const addr = _currentSiteAddress();
   document.getElementById('map-picker-overlay').style.display = 'flex';
   await new Promise(r=>setTimeout(r,100));
 
@@ -53,13 +75,12 @@ async function openMapPicker(){
     return;
   }
 
-  // 住所で検索して移動
+  // 工事場所の住所で検索して、その位置を中心に地図を表示
   if(addr){
+    document.getElementById('map-picker-coords').textContent = `「${addr}」を検索中…`;
     try{
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`);
-      const data = await res.json();
-      if(data.length){
-        const latlng = L.latLng(parseFloat(data[0].lat), parseFloat(data[0].lon));
+      const latlng = await _geocodeAddress(addr);
+      if(latlng){
         if(_leafletMarker) _leafletMarker.setLatLng(latlng);
         else _leafletMarker = L.marker(latlng,{draggable:true}).addTo(_leafletMap);
         _leafletMap.setView(latlng, 17);
@@ -69,10 +90,36 @@ async function openMapPicker(){
           document.getElementById('map-picker-coords').textContent = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
         });
       } else {
+        document.getElementById('map-picker-coords').textContent = '地図をタップしてピンを置いてください';
         showToast('住所が見つかりませんでした。地図をタップしてピンを置いてください。');
       }
-    }catch(_){ showToast('住所検索に失敗しました'); }
+    }catch(_){
+      document.getElementById('map-picker-coords').textContent = '地図をタップしてピンを置いてください';
+      showToast('住所検索に失敗しました');
+    }
+  } else {
+    showToast('工事場所を入力すると、その住所を中心に表示します');
   }
+}
+
+// 既にピンがある場合でも、工事場所の住所を中心に開き直す
+async function recenterMapToAddress(){
+  const addr = _currentSiteAddress();
+  if(!addr){ showToast('工事場所が入力されていません'); return; }
+  document.getElementById('map-picker-coords').textContent = `「${addr}」を検索中…`;
+  try{
+    const latlng = await _geocodeAddress(addr);
+    if(!latlng){ showToast('住所が見つかりませんでした'); document.getElementById('map-picker-coords').textContent='地図をタップしてピンを置いてください'; return; }
+    _leafletMap.setView(latlng, 17);
+    if(_leafletMarker){
+      // ピンは動かさず地図だけ移動（座標表示は現在のピンのまま）
+      const p = _leafletMarker.getLatLng();
+      document.getElementById('map-picker-coords').textContent = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
+    } else {
+      document.getElementById('map-picker-coords').textContent = '地図をタップしてピンを置いてください';
+    }
+    showToast(`「${addr}」を表示しました`);
+  }catch(_){ showToast('住所検索に失敗しました'); }
 }
 
 function closeMapPicker(){ document.getElementById('map-picker-overlay').style.display = 'none'; }
