@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
 <link rel="stylesheet" href="css/main.css?v=171">
-<link rel="stylesheet" href="css/schedule.css?v=141">
+<link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -624,6 +624,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         他案件からコピー
       </button>
+      <button class="btn xs" onclick="openMilestones()" title="確認済証発行日・着工日・上棟日などの節目を設定">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><line x1="4" y1="22" x2="4" y2="15"/><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V4s-1 1-4 1-5-2-8-2-4 1-4 1z"/></svg>
+        マイルストーン
+      </button>
       <button class="btn xs" onclick="openBulkShift()">一括変更</button>
       <button class="btn xs" onclick="exportScheduleExcel()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1208,6 +1212,21 @@
 </div>
 
 <!-- 一括工程変更モーダル -->
+<!-- ════ 工程表：マイルストーン ════ -->
+<div class="modal-overlay" id="ms-modal" onclick="if(event.target.id==='ms-modal')closeMilestones()">
+  <div class="modal-sheet" style="max-width:380px">
+    <h3>マイルストーン</h3>
+    <div style="font-size:11px;color:var(--text-sub);margin-bottom:10px;line-height:1.7">
+      日付を入れると工程表に◆で表示されます（空欄にすると消えます）。設定後は「保存」を押してください。
+    </div>
+    <div id="ms-list" style="max-height:55vh;overflow-y:auto"></div>
+    <div class="modal-actions" style="justify-content:space-between">
+      <button class="btn danger" onclick="clearMilestones()">すべて消去</button>
+      <button class="btn primary" onclick="closeMilestones()">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════ 工程表：他案件からコピー ════ -->
 <div class="modal-overlay" id="sch-copy-modal" onclick="if(event.target.id==='sch-copy-modal')closeScheduleCopy()">
   <div class="modal-sheet" style="max-width:380px">
@@ -1505,7 +1524,7 @@
 <script src="js/chusho.js?v=138"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=182"></script>
+<script src="js/schedule.js?v=183"></script>
 
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=173"></script>

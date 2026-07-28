@@ -9,6 +9,10 @@ const GANTT_COLORS = [
 
 // ─ State ─
 let scheduleTasks     = [];
+
+// ─ マイルストーン（工程表の節目。この順で表示・入力する） ─
+const MILESTONE_LABELS = ['確認済証発行日','着工日','配筋検査日','上棟日','中間検査日','木完日','完了検査日','社内検査日','見学会','引渡日'];
+let scheduleMilestones = {};   // {ラベル: 'YYYY-MM-DD'}
 let scheduleTaskSeq   = 1;
 let editingScheduleId = null;
 let scheduleDirty     = false;
@@ -64,7 +68,7 @@ async function loadScheduleForProject() {
   const pName = selectedProject?.name;
   const badge = document.getElementById('sch-proj-name');
   if (badge) badge.textContent = pName || '（案件未選択）';
-  scheduleTasks = []; editingScheduleId = null; editingTaskId = null;
+  scheduleTasks = []; scheduleMilestones = {}; editingScheduleId = null; editingTaskId = null;
   scheduleDirty = false; scheduleTaskSeq = 1; ganttScrollLeft = -1;
 
   if (!pName) { renderGantt(); return; }
@@ -75,6 +79,7 @@ async function loadScheduleForProject() {
 
   if (data) {
     editingScheduleId = data.id;
+    scheduleMilestones = data.milestones || {};
     scheduleTasks = data.tasks || [];
     scheduleTaskSeq = scheduleTasks.length ? Math.max(...scheduleTasks.map(t => t.id)) + 1 : 1;
   }
@@ -85,7 +90,7 @@ async function saveSchedule() {
   const pName = selectedProject?.name;
   if (!pName) { showToast('案件を選択してください'); return; }
 
-  const row = { project_name: pName, tasks: scheduleTasks, updated_at: new Date().toISOString() };
+  const row = { project_name: pName, tasks: scheduleTasks, milestones: scheduleMilestones, updated_at: new Date().toISOString() };
   if (editingScheduleId) {
     const { error } = await sb.from('schedules').update(row).eq('id', editingScheduleId);
     if (error) { showToast('保存に失敗しました: ' + error.message); return; }
@@ -109,6 +114,33 @@ function _notifySchedulePersons(pName) {
   });
 }
 
+// ─ マイルストーン（節目の日付）の編集 ─
+function openMilestones() {
+  if (!selectedProject?.name) { showToast('先に案件を選択してください'); return; }
+  document.getElementById('ms-list').innerHTML = MILESTONE_LABELS.map(label => `
+    <div class="fg" style="margin-bottom:8px">
+      <label>${label}</label>
+      <input type="date" value="${scheduleMilestones[label] || ''}"
+        onchange="setMilestone('${label}', this.value)">
+    </div>`).join('');
+  document.getElementById('ms-modal').classList.add('open');
+}
+function closeMilestones() { document.getElementById('ms-modal').classList.remove('open'); }
+
+function setMilestone(label, val) {
+  if (val) scheduleMilestones[label] = val;
+  else delete scheduleMilestones[label];
+  scheduleDirty = true;
+  renderGantt();
+}
+function clearMilestones() {
+  if (!confirm('マイルストーンをすべて消去しますか？')) return;
+  scheduleMilestones = {};
+  scheduleDirty = true;
+  openMilestones();  // 入力欄を空にして再表示
+  renderGantt();
+}
+
 // ─ 他の案件から工程表をコピー ─
 async function openScheduleCopy() {
   if (!selectedProject?.name) { showToast('先に案件を選択してください'); return; }
@@ -119,17 +151,18 @@ async function openScheduleCopy() {
   document.getElementById('sch-copy-modal').classList.add('open');
 
   // 工程表が保存されている案件だけを選択肢にする（自分自身は除く）
-  const { data, error } = await sb.from('schedules').select('project_name, tasks, updated_at').order('updated_at', { ascending: false });
+  const { data, error } = await sb.from('schedules').select('project_name, tasks, milestones, updated_at').order('updated_at', { ascending: false });
   if (error) { sel.innerHTML = '<option value="">読み込みに失敗しました</option>'; return; }
   const list = (data || []).filter(r => r.project_name !== selectedProject.name && (r.tasks || []).length);
   _schCopySource = {};
-  list.forEach(r => { _schCopySource[r.project_name] = r.tasks || []; });
+  list.forEach(r => { _schCopySource[r.project_name] = r.tasks || []; _schCopyMs[r.project_name] = r.milestones || {}; });
   sel.innerHTML = list.length
     ? '<option value="">コピー元の案件を選択…</option>' + list.map(r =>
         `<option value="${esc(r.project_name)}">${esc(r.project_name)}（${(r.tasks||[]).length}工程）</option>`).join('')
     : '<option value="">コピーできる工程表がありません</option>';
 }
 let _schCopySource = {};
+let _schCopyMs = {};
 
 function closeScheduleCopy() { document.getElementById('sch-copy-modal').classList.remove('open'); }
 
@@ -179,6 +212,10 @@ function doScheduleCopy() {
     done: false,       // 進捗はリセット
   }));
   scheduleTaskSeq = seq;
+  // マイルストーンも同じ日数だけずらして引き継ぐ
+  const srcMs = _schCopyMs[name] || {};
+  scheduleMilestones = {};
+  Object.keys(srcMs).forEach(k => { if (srcMs[k]) scheduleMilestones[k] = shift(srcMs[k], diff); });
   scheduleDirty = true;
   closeScheduleCopy();
   renderGantt();
@@ -653,6 +690,30 @@ function renderGantt() {
   const todayLine = (todayOff>=0&&todayOff<totalDays)
     ? `<div class="gantt-today-line" style="left:${todayOff*GANTT_CELL_W+Math.floor(GANTT_CELL_W/2)}px"></div>` : '';
 
+  // マイルストーン：各行に縦線／上部の帯に◆ラベル（同日が重なる場合は段をずらす）
+  const msVisible = MILESTONE_LABELS
+    .filter(l => scheduleMilestones[l])
+    .map(label => ({ label, date: scheduleMilestones[label], off: diffDays(ganttD0str, scheduleMilestones[label]) }))
+    .filter(m => m.off >= 0 && m.off < totalDays)
+    .sort((a,b) => a.off - b.off);
+
+  const msLines = msVisible.map(m =>
+    `<div class="gantt-ms-line" style="left:${m.off*GANTT_CELL_W + Math.floor(GANTT_CELL_W/2)}px"></div>`).join('');
+
+  const msTierUsed = {};
+  const msFlags = msVisible.map(m => {
+    const tier = msTierUsed[m.off] = (msTierUsed[m.off] || 0) + 1;
+    return `<div class="gantt-ms-flag" style="left:${m.off*GANTT_CELL_W + Math.floor(GANTT_CELL_W/2)}px;top:${2 + (tier-1)*18}px"
+      title="${esc(m.label)} ${m.date}">◆ ${esc(m.label)}</div>`;
+  }).join('');
+  const msTierMax = Math.max(0, ...Object.values(msTierUsed));
+  const msBand = msVisible.length
+    ? `<div class="gantt-ms-band" style="width:${W}px;height:${msTierMax*18 + 6}px">${msFlags}</div>` : '';
+
+  // 日付ヘッダー上のマーク（◆）
+  const msHeadMarks = msVisible.map(m =>
+    `<div class="gantt-ms-head" style="left:${m.off*GANTT_CELL_W}px;width:${GANTT_CELL_W}px" title="${esc(m.label)}">◆</div>`).join('');
+
   // Visible tasks
   const collapsedIds = new Set(scheduleTasks.filter(t=>t.level===0&&t.collapsed).map(t=>t.id));
   const visible = scheduleTasks.filter(t=>t.level===0||!collapsedIds.has(t.parentId));
@@ -706,7 +767,7 @@ function renderGantt() {
       : '';
 
     rightRows += `<div class="gantt-row gantt-row-right ${isActive?'tes-active-bg':''}" style="width:${W}px">
-      ${stripes}${todayLine}${barHtml}
+      ${stripes}${msLines}${todayLine}${barHtml}
     </div>`;
   });
 
@@ -726,10 +787,10 @@ function renderGantt() {
       <div class="gantt-right-panel">
         <div class="gantt-head-right" id="gantt-head-right">
           <div class="gantt-month-row" style="width:${W}px">${monthRow}</div>
-          <div class="gantt-day-row"   style="width:${W}px">${dayRow}</div>
+          <div class="gantt-day-row"   style="width:${W}px">${dayRow}<div class="gantt-ms-head-layer">${msHeadMarks}</div></div>
           <div class="gantt-wd-row"    style="width:${W}px">${wdRow}</div>
         </div>
-        <div class="gantt-body-right" id="gantt-body-right">${rightRows}</div>
+        <div class="gantt-body-right" id="gantt-body-right">${msBand}${rightRows}</div>
       </div>
     </div>
   `;

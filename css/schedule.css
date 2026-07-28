@@ -318,3 +318,14 @@ body.sch-preview .gantt-drag-hdl { display: none; }
   .tes-fields { gap: 8px 10px; }
   .tes-field input[type=date] { width: 100px; }
 }
+
+/* ── マイルストーン（工程表の節目） ── */
+.gantt-day-row { position: relative; }
+.gantt-ms-head-layer { position: absolute; inset: 0; pointer-events: none; }
+.gantt-ms-head { position: absolute; top: 0; text-align: center; font-size: 9px; line-height: 1; color: #8b6340; }
+/* 各行を貫く縦線 */
+.gantt-ms-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #8b6340; opacity: .45; z-index: 2; pointer-events: none; }
+/* 上部のラベル帯 */
+.gantt-ms-band { position: relative; background: var(--surface-1, #fffdf9); border-bottom: 1px solid var(--border, #e0d9cc); }
+.gantt-ms-flag { position: absolute; transform: translateX(-2px); white-space: nowrap; font-size: 10px; font-weight: 700;
+  color: #5c3d1e; background: #f5ede3; border: 1px solid #d8c3a8; border-radius: 4px; padding: 1px 6px; line-height: 14px; z-index: 4; }
