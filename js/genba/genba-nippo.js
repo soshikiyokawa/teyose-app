@@ -389,6 +389,16 @@ function printDezura(){
     }
   });
 
+  // 休日判定（勤務カレンダー基準。未設定の区分は土日を休みとみなすフォールバック）
+  const _profByUser = {}; (typeof allProfiles!=='undefined'?allProfiles:[]).forEach(p=>{ _profByUser[p.id]=p; });
+  function isHolidayForUser(uid, dateStr, dow){
+    const p = _profByUser[uid];
+    const cal = (p && p.workGroup==='訓練校生') ? 'trainee' : 'regular';
+    const set = (typeof workHolidays!=='undefined' && workHolidays) ? workHolidays[cal] : null;
+    if(set && set.size) return set.has(dateStr);   // カレンダー設定済み→それに従う
+    return dow===0 || dow===6;                       // 未設定→土日を休みとみなす
+  }
+
   const userIds = Object.keys(users).sort((a,b)=>cmpEmployee(users[a].name, users[b].name));
   if(!userIds.length){ showToast('この期間の勤怠データがありません'); return; }
 
@@ -409,10 +419,19 @@ function printDezura(){
       const special = u.marks[s]||'';           // 休・有・半・振
       const siteCell = u.siteByDate[s];         // 日報から：現場番号＋残業
       const siteTxt = siteCell ? [...siteCell.nos].sort((a,b)=>a-b).join('·') + (siteCell.ot?'＊':'') : '';
-      const mk = special + siteTxt;             // 例：「1」「1·2＊」「休1」「有」
       const wd = d.getDay();
-      const bg = mk?'' : (wd===0?'background:#fdf3f3':wd===6?'background:#f3f7fd':'');
-      const color = special==='休'?'color:#b5302a;font-weight:700':special==='有'||special==='半'?'color:#2e7d52;font-weight:700':special==='振'?'color:#8a6000;font-weight:700':(siteCell?.ot?'font-weight:700':'');
+      let mk = special + siteTxt;                // 例：「1」「1·2＊」「休1」「有」
+      // 休日（勤務カレンダー基準）で活動が無ければ「－」。残る空欄＝出勤日なのに未入力
+      if(!mk && isHolidayForUser(uid, s, wd)) mk = '－';
+      const missing = !mk;                       // 出勤日で記入なし
+      const bg = mk==='－' ? 'background:#f2efe8'
+               : missing   ? 'background:#ffe0b2'  // 未入力を目立たせる
+               : '';
+      const color = special==='休'?'color:#b5302a;font-weight:700'
+        : (special==='有'||special==='半')?'color:#2e7d52;font-weight:700'
+        : special==='振'?'color:#8a6000;font-weight:700'
+        : mk==='－'?'color:#bbb'
+        : (siteCell?.ot?'font-weight:700':'');
       return `<td style="text-align:center;${bg};${color}">${mk}</td>`;
     }).join('');
     return `<tr>
@@ -480,7 +499,7 @@ function printDezura(){
   <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
     <h2 style="font-size:16px;margin:0">出面表　${y}年${m}月度</h2>
     <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
-    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　休=休日出勤　有=有給　半=半休　振=振替休日　※休日出勤・有給・振替は承認済みのみ</span>
+    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　休=休日出勤　有=有給　半=半休　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　※休日出勤・有給・振替は承認済みのみ</span>
   </div>
   <div style="font-size:10px;color:#888;margin-bottom:4px">← 横スクロールで日付が見られます（氏名は固定）</div>
   <div class="dz-scroll">
