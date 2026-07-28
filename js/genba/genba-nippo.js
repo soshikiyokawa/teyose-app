@@ -416,7 +416,7 @@ function printDezura(){
   const head = dates.map(d=>{
     const wd = d.getDay();
     const bg = wd===0?'#fde8e8':wd===6?'#e8f0fd':'#f3efe6';
-    return `<th style="background:${bg}"><div>${d.getMonth()+1===start.getMonth()+1&&d.getDate()===21||d.getDate()===1?`${d.getMonth()+1}/`:''}${d.getDate()}</div><div style="font-weight:400">${yobi[wd]}</div></th>`;
+    return `<th class="${wd===0?'dz-sun':''}" style="background:${bg}"><div>${d.getMonth()+1===start.getMonth()+1&&d.getDate()===21||d.getDate()===1?`${d.getMonth()+1}/`:''}${d.getDate()}</div><div style="font-weight:400">${yobi[wd]}</div></th>`;
   }).join('');
 
   const rows = userIds.map(uid=>{
@@ -439,17 +439,17 @@ function printDezura(){
         : special==='振'?'color:#8a6000;font-weight:700'
         : mk==='－'?'color:#bbb'
         : (siteCell?.ot?'font-weight:700':'');
-      return `<td style="text-align:center;${bg};${color}">${mk}</td>`;
+      return `<td class="${wd===0?'dz-sun':''}" style="text-align:center;${bg};${color}">${mk}</td>`;
     }).join('');
     return `<tr>
       <td style="white-space:nowrap;font-weight:700">${esc(u.name)}</td>
       ${cells}
-      <td style="text-align:right">${u.days.size}</td>
-      <td style="text-align:right">${fmtH(u.work)}</td>
-      <td style="text-align:right;${u.overtime>0?'font-weight:700':''}">${u.overtime>0?fmtH(u.overtime):''}</td>
-      <td style="text-align:right">${u.holidayDays||''}</td>
-      <td style="text-align:right">${u.leaveDays||''}</td>
-      <td style="text-align:right">${u.subDays||''}</td>
+      <td class="sum sum-first" style="text-align:right">${u.days.size}</td>
+      <td class="sum" style="text-align:right">${fmtH(u.work)}</td>
+      <td class="sum" style="text-align:right;${u.overtime>0?'font-weight:700':''}">${u.overtime>0?fmtH(u.overtime):''}</td>
+      <td class="sum" style="text-align:right">${u.holidayDays||''}</td>
+      <td class="sum" style="text-align:right">${u.leaveDays||''}</td>
+      <td class="sum" style="text-align:right">${u.subDays||''}</td>
     </tr>`;
   }).join('');
 
@@ -493,14 +493,23 @@ function printDezura(){
     table.st th{background:#f3efe6;font-weight:700}
     /* 印刷時：A3横1枚に収める（固定レイアウト・小さめ文字・固定列は解除） */
     @media print{
+      /* 背景色（休日・未入力の色分け）を印刷にも出す */
+      *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
       .dz-scroll{overflow:visible !important;border:none !important}
-      table.dz{width:100% !important;table-layout:fixed;font-size:9px}
-      table.dz th,table.dz td{border:0.4pt solid #999;padding:2px 1px;min-width:0 !important;overflow:hidden;position:static !important}
-      table.dz th{font-size:8px}
+      table.dz{width:100% !important;table-layout:fixed;font-size:9px;border-collapse:collapse}
+      /* 薄いグレーの罫線をすべてのセルに */
+      table.dz th,table.dz td{border:0.3pt solid #b9b9b9 !important;padding:2px 1px;min-width:0 !important;overflow:hidden;position:static !important}
+      table.dz th{font-size:8px;background:#f0ece3 !important}
       table.dz td:first-child,table.dz th:first-child{width:64px;min-width:0 !important}
       table.dz .sum{width:34px;min-width:0 !important}
-      table.st{font-size:10px}
-      table.st th,table.st td{border:0.4pt solid #999;padding:3px 6px}
+      /* 氏名列の右・集計列の左と、日曜（週の区切り）だけ少し濃くして区切りを分かりやすく */
+      table.dz th:first-child,table.dz td:first-child{border-right:0.7pt solid #8a8a8a !important}
+      table.dz th.sum-first,table.dz td.sum-first{border-left:0.7pt solid #8a8a8a !important}
+      table.dz th.dz-sun,table.dz td.dz-sun{border-left:0.7pt solid #8a8a8a !important}
+      table.dz tr:last-child td{border-bottom:0.7pt solid #8a8a8a !important}
+      table.st{font-size:10px;border-collapse:collapse}
+      table.st th,table.st td{border:0.3pt solid #b9b9b9 !important;padding:3px 6px}
+      table.st th{background:#f0ece3 !important}
     }
   </style>
   <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
@@ -511,7 +520,7 @@ function printDezura(){
   <div style="font-size:10px;color:#888;margin-bottom:4px">← 横スクロールで日付が見られます（氏名は固定）</div>
   <div class="dz-scroll">
   <table class="dz">
-    <tr><th>氏名</th>${head}<th class="sum">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum">有給<br>日数</th><th class="sum">振休<br>日数</th></tr>
+    <tr><th>氏名</th>${head}<th class="sum sum-first">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum">有給<br>日数</th><th class="sum">振休<br>日数</th></tr>
     ${rows}
   </table>
   </div>
