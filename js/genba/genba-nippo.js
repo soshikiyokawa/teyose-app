@@ -337,9 +337,14 @@ function dzDateStr(d){
 }
 
 function printDezura(){
-  const [y,m] = (nippoMonth||gbThisMonth()).split('-').map(Number);
-  const start = new Date(y, m-2, 21); // 前月21日
-  const end = new Date(y, m-1, 20);   // 当月20日
+  // 本日を基準に、進行中の締め期間（20日締め）を表示する。
+  // 21日以降＝当月21日〜翌月20日／20日以前＝前月21日〜当月20日
+  const t = new Date();
+  const afterCutoff = t.getDate() >= 21;
+  const start = new Date(t.getFullYear(), t.getMonth() + (afterCutoff ? 0 : -1), 21);
+  const end   = new Date(t.getFullYear(), t.getMonth() + (afterCutoff ? 1 : 0), 20);
+  const y = end.getFullYear();      // 「◯月度」は締め日（end）の年月で表す
+  const m = end.getMonth() + 1;
   const dates = [];
   for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) dates.push(new Date(d));
   const inPeriod = s => s && s>=dzDateStr(start) && s<=dzDateStr(end);
