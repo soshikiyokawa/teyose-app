@@ -67,24 +67,83 @@ function fbPhotoGridHtml(){
     </div>`).join('');
 }
 
-// ── ビューア ──
+// ── ビューア（スワイプ・矢印で前後の写真へ送れる） ──
+let _viewerList = [];   // 表示中フォルダの写真ID一覧（グリッドと同じ並び）
+
+// 今開いているフォルダの写真を、画面と同じ順（撮影日の新しい順→同日内は表示順）で返す
+function _currentPhotoList(){
+  const list = sitePhotos.filter(p=>p.projectId===fbProjectId && (p.folderId||null)===(fbFolderId||null));
+  const byDate = {};
+  list.forEach(p=>{ (byDate[p.shotDate] = byDate[p.shotDate]||[]).push(p); });
+  return Object.keys(byDate).sort().reverse().flatMap(d=>byDate[d]).map(p=>p.id);
+}
+
 function openPhotoViewer(id){
+  const p = sitePhotos.find(x=>x.id===id);
+  if(!p) return;
+  _viewerList = _currentPhotoList();
+  if(!_viewerList.includes(id)) _viewerList = [id];
+  _showPhotoInViewer(id);
+  document.getElementById('photo-viewer').classList.add('open');
+}
+
+function _showPhotoInViewer(id){
   const p = sitePhotos.find(x=>x.id===id);
   if(!p) return;
   viewingPhotoId = id;
   document.getElementById('photo-viewer-img').src = p.url;
+  const idx = _viewerList.indexOf(id);
+  const counter = _viewerList.length>1 ? `　（${idx+1}/${_viewerList.length}）` : '';
   document.getElementById('photo-viewer-meta').textContent =
-    gbDateLabel(p.shotDate) + (p.uploaderName ? '　'+p.uploaderName : '');
+    gbDateLabel(p.shotDate) + (p.uploaderName ? '　'+p.uploaderName : '') + counter;
   document.getElementById('photo-viewer-caption').value = p.caption||'';
   const canDelete = currentUserRole==='staff' || p.uploadedBy===currentUserId;
   document.getElementById('photo-viewer-delete').style.display = canDelete ? '' : 'none';
-  document.getElementById('photo-viewer').classList.add('open');
+  // 前後ボタンの表示（1枚だけなら隠す）
+  const multi = _viewerList.length>1;
+  const prev=document.getElementById('photo-viewer-prev'), next=document.getElementById('photo-viewer-next');
+  if(prev) prev.style.display = multi ? '' : 'none';
+  if(next) next.style.display = multi ? '' : 'none';
 }
+
+// step: -1=前へ / +1=次へ（端で止まる）
+function stepPhoto(step){
+  if(_viewerList.length<2) return;
+  const i = _viewerList.indexOf(viewingPhotoId);
+  const ni = i + step;
+  if(i<0 || ni<0 || ni>=_viewerList.length) return;
+  _showPhotoInViewer(_viewerList[ni]);
+}
+
 function closePhotoViewer(){
   document.getElementById('photo-viewer').classList.remove('open');
   document.getElementById('photo-viewer-img').src = '';
   viewingPhotoId = null;
+  _viewerList = [];
 }
+
+// スワイプ（横）とキーボード（←→・Esc）で送る
+(function initPhotoViewerNav(){
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const wrap = document.getElementById('photo-viewer-img-wrap');
+    if(wrap){
+      let sx=0, sy=0, moved=false;
+      wrap.addEventListener('touchstart', e=>{ const t=e.changedTouches[0]; sx=t.clientX; sy=t.clientY; moved=false; }, {passive:true});
+      wrap.addEventListener('touchmove', ()=>{ moved=true; }, {passive:true});
+      wrap.addEventListener('touchend', e=>{
+        if(!moved) return;
+        const t=e.changedTouches[0], dx=t.clientX-sx, dy=t.clientY-sy;
+        if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)) stepPhoto(dx<0 ? 1 : -1); // 左スワイプ＝次へ
+      }, {passive:true});
+    }
+    document.addEventListener('keydown', e=>{
+      if(!document.getElementById('photo-viewer')?.classList.contains('open')) return;
+      if(e.key==='ArrowRight') stepPhoto(1);
+      else if(e.key==='ArrowLeft') stepPhoto(-1);
+      else if(e.key==='Escape') closePhotoViewer();
+    });
+  });
+})();
 async function savePhotoCaption(){
   const p = sitePhotos.find(x=>x.id===viewingPhotoId);
   if(!p) return;
@@ -104,8 +163,17 @@ function moveViewingPhoto(){
 async function deleteViewingPhoto(){
   if(viewingPhotoId==null) return;
   if(!confirm('この写真を削除しますか？')) return;
-  await dbDeleteSitePhoto(viewingPhotoId);
-  closePhotoViewer();
+  const deletedId = viewingPhotoId;
+  await dbDeleteSitePhoto(deletedId);
+  // 削除後は同じフォルダの次（無ければ前）の写真へ。最後の1枚なら閉じる
+  const i = _viewerList.indexOf(deletedId);
+  _viewerList = _viewerList.filter(x=>x!==deletedId);
+  sitePhotos = sitePhotos.filter(p=>p.id!==deletedId);
+  if(_viewerList.length){
+    _showPhotoInViewer(_viewerList[Math.min(i, _viewerList.length-1)]);
+  } else {
+    closePhotoViewer();
+  }
   showToast('写真を削除しました');
   await refreshGenba();
 }

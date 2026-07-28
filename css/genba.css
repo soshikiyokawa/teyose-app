@@ -88,3 +88,11 @@
 .status-badge.pending{background:var(--warn-bg);color:var(--warn-t)}
 .status-badge.approved{background:var(--ok-bg);color:var(--ok-t)}
 .status-badge.rejected{background:var(--danger-bg);color:var(--danger)}
+
+/* 写真ビューアの前後ナビ */
+#photo-viewer-img-wrap{position:relative}
+.pv-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:60px;border:none;border-radius:8px;
+  background:rgba(0,0,0,.35);color:#fff;font-size:30px;line-height:1;cursor:pointer;z-index:5;display:flex;align-items:center;justify-content:center;padding:0}
+.pv-nav:hover{background:rgba(0,0,0,.55)}
+.pv-nav-l{left:6px}
+.pv-nav-r{right:6px}
