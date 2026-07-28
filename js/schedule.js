@@ -109,6 +109,82 @@ function _notifySchedulePersons(pName) {
   });
 }
 
+// ─ 他の案件から工程表をコピー ─
+async function openScheduleCopy() {
+  if (!selectedProject?.name) { showToast('先に案件を選択してください'); return; }
+  const sel = document.getElementById('sch-copy-from');
+  sel.innerHTML = '<option value="">読み込み中…</option>';
+  document.getElementById('sch-copy-start').value = '';
+  document.getElementById('sch-copy-info').textContent = '';
+  document.getElementById('sch-copy-modal').classList.add('open');
+
+  // 工程表が保存されている案件だけを選択肢にする（自分自身は除く）
+  const { data, error } = await sb.from('schedules').select('project_name, tasks, updated_at').order('updated_at', { ascending: false });
+  if (error) { sel.innerHTML = '<option value="">読み込みに失敗しました</option>'; return; }
+  const list = (data || []).filter(r => r.project_name !== selectedProject.name && (r.tasks || []).length);
+  _schCopySource = {};
+  list.forEach(r => { _schCopySource[r.project_name] = r.tasks || []; });
+  sel.innerHTML = list.length
+    ? '<option value="">コピー元の案件を選択…</option>' + list.map(r =>
+        `<option value="${esc(r.project_name)}">${esc(r.project_name)}（${(r.tasks||[]).length}工程）</option>`).join('')
+    : '<option value="">コピーできる工程表がありません</option>';
+}
+let _schCopySource = {};
+
+function closeScheduleCopy() { document.getElementById('sch-copy-modal').classList.remove('open'); }
+
+// コピー元を選んだら、元の開始日を初期値として入れる
+function schCopySourceChanged() {
+  const name = document.getElementById('sch-copy-from').value;
+  const tasks = _schCopySource[name] || [];
+  const info = document.getElementById('sch-copy-info');
+  if (!tasks.length) { info.textContent = ''; return; }
+  const starts = tasks.map(t => t.start).filter(Boolean).sort();
+  const ends   = tasks.map(t => t.end).filter(Boolean).sort();
+  const first = starts[0], last = ends[ends.length - 1];
+  document.getElementById('sch-copy-start').value = first || '';
+  info.textContent = `元の期間：${first || '—'} 〜 ${last || '—'}（${tasks.length}工程）`;
+}
+
+function doScheduleCopy() {
+  const name = document.getElementById('sch-copy-from').value;
+  const tasks = _schCopySource[name] || [];
+  if (!name || !tasks.length) { showToast('コピー元の案件を選択してください'); return; }
+  const newStart = document.getElementById('sch-copy-start').value;
+  if (!newStart) { showToast('開始日を入力してください'); return; }
+
+  const starts = tasks.map(t => t.start).filter(Boolean).sort();
+  const origStart = starts[0];
+  // 元の開始日からのズレ日数だけ全工程をスライド（工程間の間隔・期間は保持）
+  const diff = origStart ? diffDays(origStart, newStart) : 0;
+  // タイムゾーンの影響を受けずに日数を加算する（addDaysStrはUTC変換で1日ずれるため）
+  const shift = (s, n) => {
+    const [y, m, d] = s.split('-').map(Number);
+    const t = new Date(Date.UTC(y, m - 1, d + n));
+    return t.toISOString().slice(0, 10);
+  };
+
+  if (scheduleTasks.length && !confirm(`現在の工程表（${scheduleTasks.length}工程）を破棄して、「${name}」の工程表で置き換えますか？`)) return;
+
+  // IDを振り直しつつ親子関係を保つ
+  const idMap = {};
+  let seq = 1;
+  tasks.forEach(t => { idMap[t.id] = seq++; });
+  scheduleTasks = tasks.map(t => ({
+    ...t,
+    id: idMap[t.id],
+    parentId: t.parentId ? (idMap[t.parentId] || null) : null,
+    start: t.start ? shift(t.start, diff) : t.start,
+    end:   t.end   ? shift(t.end,   diff) : t.end,
+    done: false,       // 進捗はリセット
+  }));
+  scheduleTaskSeq = seq;
+  scheduleDirty = true;
+  closeScheduleCopy();
+  renderGantt();
+  showToast(`「${name}」から${scheduleTasks.length}工程をコピーしました（保存を押してください）`);
+}
+
 // ─ Task CRUD ─
 function schAddTask(level, parentId) {
   if (!selectedProject?.name) { showToast('案件を選択してください'); return; }

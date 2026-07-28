@@ -620,6 +620,10 @@
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">
       <button class="btn xs" onclick="ganttScrollToToday()">今日</button>
       <button class="btn xs" onclick="schAddTask(0,null)">＋ 大工程</button>
+      <button class="btn xs" onclick="openScheduleCopy()" title="他の案件の工程表をコピーして作成">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        他案件からコピー
+      </button>
       <button class="btn xs" onclick="openBulkShift()">一括変更</button>
       <button class="btn xs" onclick="exportScheduleExcel()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1204,6 +1208,27 @@
 </div>
 
 <!-- 一括工程変更モーダル -->
+<!-- ════ 工程表：他案件からコピー ════ -->
+<div class="modal-overlay" id="sch-copy-modal" onclick="if(event.target.id==='sch-copy-modal')closeScheduleCopy()">
+  <div class="modal-sheet" style="max-width:380px">
+    <h3>他の案件から工程表をコピー</h3>
+    <div class="fg" style="margin-bottom:10px"><label>コピー元の案件</label>
+      <select id="sch-copy-from" onchange="schCopySourceChanged()"></select>
+      <div id="sch-copy-info" style="font-size:11px;color:var(--text-muted);margin-top:3px"></div>
+    </div>
+    <div class="fg" style="margin-bottom:6px"><label>この案件の開始日</label>
+      <input type="date" id="sch-copy-start">
+    </div>
+    <div style="font-size:11px;color:var(--text-sub);line-height:1.7">
+      各工程の期間と間隔を保ったまま、指定した開始日にずらしてコピーします。担当者・色もそのまま引き継ぎ、進捗（完了チェック）はリセットされます。
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeScheduleCopy()">キャンセル</button>
+      <button class="btn primary" onclick="doScheduleCopy()">コピーする</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="bulk-shift-modal" onclick="if(event.target.id==='bulk-shift-modal')document.getElementById('bulk-shift-modal').classList.remove('open')">
   <div class="modal-sheet" style="max-width:340px">
     <h3>工程の一括変更</h3>
@@ -1480,7 +1505,7 @@
 <script src="js/chusho.js?v=138"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=139"></script>
+<script src="js/schedule.js?v=182"></script>
 
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=173"></script>
