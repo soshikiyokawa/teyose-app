@@ -277,3 +277,107 @@ function renderSections(){
   const gMargin=gTotal>0?((gTotal-gCost)/gTotal*100):0;
   document.getElementById('est-grand').textContent=`¥${fmt(gTotal)}　粗利 ${gMargin.toFixed(1)}%`;
 }
+
+// ════ かんたん入力：請負金額と原価合計だけで見積を作る ════
+
+// 税込金額と税率から、税抜金額を求める
+// 「税抜＋消費税」が入力した税込金額に一致する額を探す。
+// 端数の関係でぴったり一致しない金額（例：5,000,000円・10%）もあるため、
+// その場合は最も近く、かつ入力額を超えない側を選ぶ。
+function netFromGross(gross, rate){
+  const g = Math.max(0, Math.round(gross));
+  if(g<=0) return 0;
+  const total = n => n + Math.round(n*rate/100);
+  const base = Math.round(g/(1+rate/100));
+  let best = base;
+  for(let n=Math.max(0,base-2); n<=base+2; n++){
+    const d = total(n) - g, bd = total(best) - g;
+    if(Math.abs(d) < Math.abs(bd) || (Math.abs(d)===Math.abs(bd) && d<bd)) best = n;
+  }
+  return Math.max(0, best);
+}
+
+// 明細に中身が入っているか（工事・品目名か金額のある行があるか）
+function hasEstItems(){
+  return sections.some(s=>s.items.some(i=>(i.name||'').trim() || i.cost>0 || i.price>0));
+}
+
+function openSimpleEst(){
+  const s=document.getElementById('se-tax');
+  if(s) s.value = document.getElementById('tax-rate').value || 10;
+  // 既に単純な1行だけの明細なら、その内容を初期値として引き継ぐ
+  const one = sections.length===1 && sections[0].items.length===1 ? sections[0].items[0] : null;
+  const rate = parseFloat(s?.value)||10;
+  if(one && one.price>0){
+    const gross = Math.round(one.qty*one.price) + Math.round(Math.round(one.qty*one.price)*rate/100);
+    payAmtLoad('se-amount', gross);
+    payAmtLoad('se-cost', Math.round(one.qty*one.cost));
+  } else {
+    payAmtLoad('se-amount', 0);
+    payAmtLoad('se-cost', 0);
+  }
+  renderSimpleEstPreview();
+  document.getElementById('simple-est-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('se-amount')?.focus(),100);
+}
+
+function closeSimpleEst(){
+  document.getElementById('simple-est-modal').classList.remove('open');
+}
+
+function simpleEstValues(){
+  const gross = payAmtVal('se-amount');
+  const cost  = payAmtVal('se-cost');
+  const rate  = parseFloat(document.getElementById('se-tax').value)||0;
+  const net   = netFromGross(gross, rate);
+  const tax   = Math.round(net*rate/100);
+  const profit= net - cost;
+  const margin= net>0 ? profit/net*100 : 0;
+  return {gross, cost, rate, net, tax, total:net+tax, profit, margin};
+}
+
+function renderSimpleEstPreview(){
+  const el=document.getElementById('se-preview');
+  if(!el) return;
+  const {gross, net, tax, total, cost, profit, margin} = simpleEstValues();
+  if(!gross){
+    el.innerHTML='<span style="color:var(--text-muted)">請負金額を入力してください</span>';
+    return;
+  }
+  const warn = (profit<0 ? '<div style="color:var(--danger);font-weight:600">※ 原価が請負金額（税抜）を上回っています</div>' : '')
+    + (total!==gross ? `<div style="color:var(--text-muted)">※ 端数の関係で見積合計は¥${fmt(total)}になります（入力額との差 ${total-gross>0?'+':''}${total-gross}円）</div>` : '');
+  el.innerHTML=
+    `<div style="display:flex;justify-content:space-between"><span>工事費（税抜）</span><span>¥${fmt(net)}</span></div>`+
+    `<div style="display:flex;justify-content:space-between"><span>消費税</span><span>¥${fmt(tax)}</span></div>`+
+    `<div style="display:flex;justify-content:space-between;font-weight:700"><span>合計（税込）</span><span>¥${fmt(total)}</span></div>`+
+    `<div style="display:flex;justify-content:space-between;color:var(--text-sub)"><span>原価合計</span><span>¥${fmt(cost)}</span></div>`+
+    `<div style="display:flex;justify-content:space-between;color:var(--accent-t);font-weight:600"><span>粗利益</span><span>¥${fmt(profit)}（${margin.toFixed(1)}%）</span></div>`+
+    warn;
+}
+
+// 入力内容を「工事一式」1行の明細として反映する（doSave=true なら続けて保存）
+async function applySimpleEst(doSave){
+  const {gross, cost, rate, net, margin} = simpleEstValues();
+  if(gross<=0){ showToast('請負金額を入力してください'); return; }
+  if(hasEstItems() && !confirm('入力済みの明細は「工事一式」1行に置き換えられます。よろしいですか？')) return;
+
+  sections=[{id:secSeq++,name:'工事一式',open:true,items:[
+    {id:itemSeq++,name:'工事一式',spec:'',unit:'式',qty:1,cost:cost,margin:Math.round(margin*10)/10,price:net}
+  ]}];
+  document.getElementById('discount-amount').value='0';
+  document.getElementById('tax-rate').value=String(rate);
+  if(document.getElementById('se-fill-contract')?.checked) payAmtLoad('est-contract-amount', gross);
+
+  estDirty=true;
+  renderSections();
+  renderSumBreakdown();
+  recalcSum();
+  closeSimpleEst();
+
+  if(doSave){
+    await saveEstimate();
+  } else {
+    estSubTab('summary');
+    showToast('明細に反映しました');
+  }
+}
