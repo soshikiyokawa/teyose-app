@@ -43,3 +43,9 @@
 .member-check{width:20px;height:20px;flex-shrink:0;border-radius:50%;border:1.5px solid var(--border-s);
   color:#fff;font-size:12px;font-weight:800;line-height:18px;text-align:center}
 .member-row.on .member-check{background:var(--accent);border-color:var(--accent)}
+
+/* 参加メンバーの要約タグ（折り返して表示） */
+.member-tag{display:inline-block;max-width:100%;font-size:11px;line-height:1.5;padding:2px 8px;border-radius:99px;
+  background:var(--accent-bg);color:var(--accent-t);border:1px solid var(--accent);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.member-tag.more{background:var(--surface2);color:var(--text-sub);border-color:var(--border-s);cursor:pointer;font-family:inherit}

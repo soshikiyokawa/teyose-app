@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=192">
+<link rel="stylesheet" href="css/main.css?v=193">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -139,7 +139,7 @@
         <div class="fg"><label>完工予定日</label><input type="date" id="est-end-date"></div>
         <div class="fg full"><label>参加メンバー（案件チャット）</label>
           <div style="display:flex;align-items:center;gap:8px">
-            <div id="proj-members-summary" style="flex:1;min-width:0;font-size:12px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">未設定</div>
+            <div id="proj-members-summary" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;color:var(--text-sub)">未設定</div>
             <button type="button" class="btn sm" onclick="openMemberPicker()" style="flex-shrink:0">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               メンバー
@@ -1603,7 +1603,7 @@
 <script src="js/estimate/estimate-master.js?v=138"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
 <script src="js/estimate/estimate-crud.js?v=191"></script>
-<script src="js/estimate/parking.js?v=192"></script>
+<script src="js/estimate/parking.js?v=193"></script>
 <script src="js/estimate/estimate-pdf.js?v=138"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 

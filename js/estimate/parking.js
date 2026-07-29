@@ -51,12 +51,25 @@ function toggleProjectMember(name){
   renderProjectMembers();
 }
 
-// 案件情報タブの要約表示
+// 案件情報タブの要約表示（チップを折り返し表示。多い場合は「他◯人」でまとめる）
+let _membersExpanded = false;
 function renderProjectMembers(){
   const el = document.getElementById('proj-members-summary');
   if(!el) return;
-  el.textContent = projectMembers.length ? `${projectMembers.length}人：${projectMembers.join('、')}` : '未設定';
+  if(!projectMembers.length){
+    el.innerHTML = '<span style="color:var(--text-muted)">未設定</span>';
+    return;
+  }
+  const MAX = 6;
+  const show = _membersExpanded ? projectMembers : projectMembers.slice(0, MAX);
+  const rest = projectMembers.length - show.length;
+  el.innerHTML =
+    `<span style="font-size:11px;color:var(--text-muted);margin-right:2px">${projectMembers.length}人</span>` +
+    show.map(n=>`<span class="member-tag">${esc(n)}</span>`).join('') +
+    (rest>0 ? `<button type="button" class="member-tag more" onclick="toggleMembersExpanded()">＋他${rest}人</button>` : '') +
+    (_membersExpanded && projectMembers.length>MAX ? `<button type="button" class="member-tag more" onclick="toggleMembersExpanded()">閉じる</button>` : '');
 }
+function toggleMembersExpanded(){ _membersExpanded = !_membersExpanded; renderProjectMembers(); }
 
 // ════ 契約済み駐車場（住所・地図ピン・区画図などの資料） ════
 // 住所とピンは案件（projects）に保存。資料は drawings に kind='parking' で保存する。
