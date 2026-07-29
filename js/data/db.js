@@ -41,6 +41,7 @@ async function fetchAllData(){
     projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,updatedAt:r.updated_at}));
 
     await fetchGenbaData();
+    await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
   }
 
   // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）
@@ -371,8 +372,15 @@ async function dbAddChatMessage(supplierName, msg){
   if(msg.silent) return;
   const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}` : msg.type==='file' ? `📎 ${msg.fileName||'ファイル'}` : (msg.text||'');
   if(isInternal){
-    // 社内チャット：自分以外の社員全員（staff＋carpenter）へ
-    dbSendPush('employee', null, `${INTERNAL_THREAD} ${currentUserDisplayName||''}`, preview, currentUserId).catch(()=>{});
+    const title = `${INTERNAL_THREAD} ${currentUserDisplayName||''}`;
+    if(Array.isArray(msg.notifyNames) && msg.notifyNames.length){
+      // 宛先が指定されている場合はその人にだけ通知（自分は除く）
+      const names = msg.notifyNames.filter(n=>n!==currentUserDisplayName);
+      if(names.length) dbSendPushToNames(names, title, preview).catch(()=>{});
+    } else {
+      // 既定：自分以外の社員全員（staff＋carpenter）へ
+      dbSendPush('employee', null, title, preview, currentUserId).catch(()=>{});
+    }
   } else if(msg.role==='me'){
     dbSendPush('supplier', supplier_id, supplierName, preview).catch(()=>{});
     // きよかわ→発注先：ChatWorkルームが設定されていれば転送（片方向）
@@ -408,11 +416,13 @@ async function fetchWorkCalendar(){
   const { data: rows } = await sb.from('work_holidays').select('*');
   workHolidays = {regular:new Set(), trainee:new Set()};
   (rows||[]).forEach(r=>{ (workHolidays[r.cal]||(workHolidays[r.cal]=new Set())).add(r.holiday_date); });
-  // 事務のみ：社員区分の割り当て用に全プロフィールを取得（RLSでstaffは全件可）
-  if(currentUserRole==='staff'){
-    const { data: profs } = await sb.from('profiles').select('id, display_name, role, work_group, supplier_id').order('display_name');
-    allProfiles = (profs||[]).map(p=>({id:p.id,displayName:p.display_name||'',role:p.role,workGroup:p.work_group||'',supplierId:p.supplier_id||null}));
-  }
+}
+
+// 社員一覧（区分の割り当て・チャットの通知先選択に使う）。社員なら誰でも取得
+async function fetchProfiles(){
+  if(currentUserRole==='supplier') return;
+  const { data: profs } = await sb.from('profiles').select('id, display_name, role, work_group, supplier_id').order('display_name');
+  allProfiles = (profs||[]).map(p=>({id:p.id,displayName:p.display_name||'',role:p.role,workGroup:p.work_group||'',supplierId:p.supplier_id||null}));
 }
 // アカウントの権限（role）と所属発注先を更新（管理者のみ）
 async function dbSetRole(userId, role, supplierId){

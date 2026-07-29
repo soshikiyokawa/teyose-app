@@ -1,3 +1,46 @@
+// ════ 社内チャットの通知先（ALL＝全員／個別指定） ════
+let notifyTargets = [];   // 空＝ALL（全員）。表示名の配列
+
+// 社員（staff＋carpenter）の表示名一覧。自分は除く
+function _employeeNames(){
+  return (typeof allProfiles!=='undefined' ? allProfiles : [])
+    .filter(p=>p.role!=='supplier' && p.displayName && p.displayName!==currentUserDisplayName)
+    .map(p=>p.displayName);
+}
+
+function openNotifyPicker(){
+  const names = _employeeNames();
+  const el = document.getElementById('notify-picker');
+  el.innerHTML =
+    `<button class="notify-opt${notifyTargets.length?'':' mine'}" onclick="pickNotifyAll()">
+       <span style="font-weight:800">ALL（全員に通知）</span>
+     </button>` +
+    (names.length
+      ? names.map(n=>`<button class="notify-opt${notifyTargets.includes(n)?' mine':''}" onclick="toggleNotifyTarget('${n.replace(/'/g,"\\'")}')">
+           ${notifyTargets.includes(n)?'✓ ':''}${esc(n)}
+         </button>`).join('')
+      : '<div style="font-size:12px;color:var(--text-muted);padding:8px">他の社員が登録されていません</div>');
+  document.getElementById('notify-modal').classList.add('open');
+}
+function closeNotifyPicker(){ document.getElementById('notify-modal').classList.remove('open'); updateNotifyLabel(); }
+function pickNotifyAll(){ notifyTargets = []; closeNotifyPicker(); }
+function toggleNotifyTarget(name){
+  const i = notifyTargets.indexOf(name);
+  if(i>=0) notifyTargets.splice(i,1); else notifyTargets.push(name);
+  openNotifyPicker();  // 選択状態を反映して開き直す
+}
+
+// 入力欄の上に現在の通知先を表示
+function updateNotifyLabel(){
+  const bar = document.getElementById('talk-notify-bar');
+  if(!bar) return;
+  const internal = activeTalkPanelSupplier===INTERNAL_THREAD;
+  bar.style.display = internal ? 'flex' : 'none';
+  if(!internal) return;
+  const label = notifyTargets.length ? notifyTargets.join('、') : 'ALL（全員）';
+  document.getElementById('talk-notify-label').textContent = label;
+}
+
 // ════ チャットのリアクション（スタンプ） ════
 const REACTION_PALETTE = ['👍','👏','🙏','ありがとうございます','お大事に','お疲れ様です','お願いします','おめでとうございます','ご安全に','承知しました','済','了解です'];
 let reactingMsgId = null;
@@ -224,6 +267,8 @@ function openTalkPanelThread(supName){
   (talkThreads[supName]||[]).forEach(m=>m.unread=false);
   document.getElementById('nav-talk-dot').style.display='none';
   cancelQuote(); cancelEditMsg();
+  notifyTargets = [];        // スレッドを開くたび通知先はALLに戻す
+  updateNotifyLabel();
   setupMsgMenuHandlers();
   renderTalkPanelMessages();
   dbMarkThreadRead(threadKeyOf(supName)).catch(()=>{}); // 開いた時刻を既読として記録
@@ -343,7 +388,9 @@ function sendTalkPanelMsg(){
   const q = quotingMsg;
   const extra = q ? {replyToId:q.id, replyToSender:q.senderName||(activeTalkPanelSupplier===INTERNAL_THREAD?'':'きよかわ'), replyToText:(q.text||(q.type==='file'?'📎 '+(q.fileName||'ファイル'):q.type==='order'?'📋 発注書':'')).slice(0,80)} : {};
   input.value=''; cancelQuote();
-  dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text,...extra})
+  // 社内チャットは通知先の指定を反映（空＝ALL）
+  const notify = (activeTalkPanelSupplier===INTERNAL_THREAD && notifyTargets.length) ? {notifyNames:[...notifyTargets]} : {};
+  dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text,...extra,...notify})
     .then(renderTalkPanelMessages)
     .catch(()=>{});
 }

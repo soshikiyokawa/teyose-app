@@ -45,7 +45,7 @@ async function inviteAccount(){
   document.getElementById('inv-email').value='';
   document.getElementById('inv-name').value='';
   showToast(`${displayName}さんに招待メールを送信しました`);
-  try{ await fetchWorkCalendar(); }catch(e){} // allProfilesを取り直して一覧に反映
+  try{ await fetchProfiles(); }catch(e){} // allProfilesを取り直して一覧に反映
   renderAccountPerms();
 }
 function closeAccountPerms(){ document.getElementById('acct-modal').classList.remove('open'); }

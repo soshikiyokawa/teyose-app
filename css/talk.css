@@ -78,3 +78,8 @@
 .msg-menu-item .mmi-icon{width:22px;text-align:center;font-size:15px;flex-shrink:0}
 .read-member{font-size:13px;padding:8px 10px;border-bottom:0.5px solid var(--border);color:var(--accent-t)}
 .read-member:last-child{border-bottom:none}
+
+/* 社内チャットの通知先選択 */
+.notify-opt{display:block;width:100%;text-align:left;border:1px solid var(--border-s);background:var(--surface2);
+  font-family:inherit;font-size:13px;color:var(--text);padding:9px 12px;border-radius:8px;cursor:pointer}
+.notify-opt.mine{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-t);font-weight:700}
