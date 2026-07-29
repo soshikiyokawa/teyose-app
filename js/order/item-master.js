@@ -39,9 +39,8 @@ function renderMaster(){
       const row = document.createElement('div');
       row.className = 'master-item draggable';
       row.dataset.id = m.id;
-      row.draggable = currentUserRole!=='supplier';
       row.innerHTML = `
-        <div class="drag-handle staff-only" title="ドラッグで並び替え">⠿</div>
+        <div class="drag-handle staff-only" title="つかんで並び替え">⠿</div>
         <div class="mi-info">
           <div class="mi-row">
             <span class="mi-item-name">${n}</span>
@@ -54,38 +53,22 @@ function renderMaster(){
         <button class="mi-edit-btn-sm staff-only" onclick="duplicateMasterItem(${m.id})" title="この品目を複製して次の品目を追加">複製</button>
         <button class="mi-edit-btn-sm" onclick="openMasterEdit(${m.id})">${currentUserRole!=='supplier'?'編集':'単価編集'}</button>`;
 
-      row.addEventListener('dragstart', e=>{
-        dragSrcId = m.id;
-        setTimeout(()=>row.classList.add('dragging'),0);
-        e.dataTransfer.effectAllowed='move';
-      });
-      row.addEventListener('dragend', ()=>{
-        row.classList.remove('dragging');
-        document.querySelectorAll('.master-item').forEach(r=>r.classList.remove('drag-over'));
-      });
-      row.addEventListener('dragover', e=>{
-        e.preventDefault();
-        if(dragSrcId !== m.id){
-          document.querySelectorAll('.master-item').forEach(r=>r.classList.remove('drag-over'));
-          row.classList.add('drag-over');
-        }
-      });
-      row.addEventListener('dragleave', ()=>row.classList.remove('drag-over'));
-      row.addEventListener('drop', e=>{
-        e.preventDefault();
-        if(dragSrcId === m.id) return;
-        const fromIdx = master.findIndex(x=>x.id===dragSrcId);
-        const toIdx   = master.findIndex(x=>x.id===m.id);
-        if(fromIdx<0||toIdx<0) return;
-        const [moved] = master.splice(fromIdx,1);
-        master.splice(toIdx,0,moved);
-        masterDirty = true;
-        renderMaster();
-      });
-
       el.appendChild(row);
     });
   });
+
+  // 「⠿」をつかんで並び替え（パソコンのマウスでもスマホの指でも動く）
+  if(currentUserRole!=='supplier'){
+    enableDragSort(el, '.master-item', (fromId, toId)=>{
+      const fromIdx = master.findIndex(x=>String(x.id)===String(fromId));
+      const toIdx   = master.findIndex(x=>String(x.id)===String(toId));
+      if(fromIdx<0||toIdx<0) return;
+      const [moved] = master.splice(fromIdx,1);
+      master.splice(toIdx,0,moved);
+      masterDirty = true;
+      renderMaster();
+    });
+  }
 }
 
 async function saveMasterOrder(){

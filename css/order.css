@@ -82,3 +82,11 @@
 
 /* カート内の品目名（長くても崩れないよう折り返す） */
 .cart-name{flex:1;min-width:0;overflow-wrap:anywhere}
+
+/* ── 並び替えハンドル：指でつかめるように（タッチ中の画面スクロールを止める） ── */
+.drag-handle{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  min-width:26px;min-height:34px;display:flex;align-items:center;justify-content:center}
+.drag-handle:active{cursor:grabbing;color:var(--accent)}
+/* 並び替え中は文字選択やスクロールが起きないようにする */
+body.drag-sorting{user-select:none;-webkit-user-select:none;overscroll-behavior:none}
+body.drag-sorting .drag-handle{cursor:grabbing}

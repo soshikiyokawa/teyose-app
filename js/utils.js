@@ -119,3 +119,85 @@ function printHtml(title, body){
   setTimeout(()=>{iframe.contentWindow.focus();iframe.contentWindow.print();},500);
   return false;
 }
+
+// ════ 一覧のドラッグ並び替え（マウス・指のどちらでも動く） ════
+// HTML5のドラッグ＆ドロップはスマホのタッチでは動かないため、
+// ポインタイベント（マウス・タッチ共通）で「⠿」ハンドルをつかんで並び替える。
+//
+//   enableDragSort(一覧の要素, '行のセレクタ', (動かす行のid, 落とす先のid)=>{...})
+//
+function enableDragSort(container, rowSelector, onDrop){
+  if(!container) return;
+  // 一覧は並び替えのたびに描き直されるため、同じ要素に何度も登録しない
+  // （重複させると1回の操作で並び替えが2回走ってしまう）
+  container._dragSortRowSelector = rowSelector;
+  container._dragSortOnDrop = onDrop;
+  if(container._dragSortBound) return;
+  container._dragSortBound = true;
+
+  let srcRow=null, srcId=null, overRow=null, scrollTimer=null;
+  const rowsSel = ()=>container._dragSortRowSelector;   // 最新の設定を container から読む
+
+  const clearOver=()=>{
+    container.querySelectorAll(rowsSel()).forEach(r=>r.classList.remove("drag-over"));
+    overRow=null;
+  };
+  const finish=()=>{
+    if(scrollTimer){ cancelAnimationFrame(scrollTimer); scrollTimer=null; }
+    if(srcRow) srcRow.classList.remove('dragging');
+    document.body.classList.remove('drag-sorting');
+    clearOver();
+    srcRow=null; srcId=null;
+  };
+
+  // 画面の上端・下端に近づいたら自動でスクロールする（長い一覧用）
+  const autoScroll=(y)=>{
+    const margin=70, speed=12;
+    const step=()=>{
+      if(!srcRow) return;
+      if(y<margin) window.scrollBy(0,-speed);
+      else if(y>window.innerHeight-margin) window.scrollBy(0,speed);
+      scrollTimer=requestAnimationFrame(step);
+    };
+    if(scrollTimer) cancelAnimationFrame(scrollTimer);
+    if(y<margin || y>window.innerHeight-margin) scrollTimer=requestAnimationFrame(step);
+    else scrollTimer=null;
+  };
+
+  container.addEventListener('pointerdown', e=>{
+    const handle=e.target.closest('.drag-handle');
+    if(!handle || !container.contains(handle)) return;
+    const row=handle.closest(rowsSel());
+    if(!row) return;
+    e.preventDefault();                    // タッチ中の画面スクロール・文字選択を止める
+    srcRow=row; srcId=row.dataset.id;
+    row.classList.add('dragging');
+    document.body.classList.add('drag-sorting');
+    handle.setPointerCapture?.(e.pointerId);
+  });
+
+  container.addEventListener('pointermove', e=>{
+    if(!srcRow) return;
+    e.preventDefault();
+    // 指・カーソルの真下にある行を探す（ハンドルがポインタを占有するため座標で判定する）
+    const el=document.elementFromPoint(e.clientX, e.clientY);
+    const row=el && el.closest ? el.closest(rowsSel()) : null;
+    if(row && container.contains(row) && row!==srcRow){
+      if(row!==overRow){ clearOver(); row.classList.add('drag-over'); overRow=row; }
+    } else if(!row){
+      clearOver();
+    }
+    autoScroll(e.clientY);
+  });
+
+  const drop=()=>{
+    if(!srcRow) return;
+    const toId = overRow?.dataset.id;
+    const fromId = srcId;
+    finish();
+    if(toId && fromId && toId!==fromId) container._dragSortOnDrop(fromId, toId);
+  };
+  container.addEventListener('pointerup', drop);
+  container.addEventListener('pointercancel', finish);
+  container.addEventListener('lostpointercapture', ()=>{ if(srcRow) drop(); });
+}

@@ -73,44 +73,25 @@ function renderEstCategoryMaster(){
   cats.forEach(c=>{
     const row=document.createElement('div');
     row.className='draggable';
-    row.draggable=true;
     row.dataset.id=c.id;
     row.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:0.5px solid var(--border)';
     row.innerHTML=`
-      <div class="drag-handle" title="ドラッグで並び替え">⠿</div>
+      <div class="drag-handle" title="つかんで並び替え">⠿</div>
       <div style="flex:1;font-size:13px;font-weight:700">${esc(c.name)}</div>
       <button style="padding:4px 9px;border-radius:6px;font-size:11px;border:0.5px solid var(--border);background:var(--surface2);cursor:pointer;font-family:inherit;color:var(--text-sub);white-space:nowrap" onclick="openEstCatEdit(${c.id})">編集</button>`;
 
-    row.addEventListener('dragstart', e=>{
-      dragSrcEstCatId = c.id;
-      setTimeout(()=>row.classList.add('dragging'),0);
-      e.dataTransfer.effectAllowed='move';
-    });
-    row.addEventListener('dragend', ()=>{
-      row.classList.remove('dragging');
-      document.querySelectorAll('#estcat-master-list .draggable').forEach(r=>r.classList.remove('drag-over'));
-    });
-    row.addEventListener('dragover', e=>{
-      e.preventDefault();
-      if(dragSrcEstCatId !== c.id){
-        document.querySelectorAll('#estcat-master-list .draggable').forEach(r=>r.classList.remove('drag-over'));
-        row.classList.add('drag-over');
-      }
-    });
-    row.addEventListener('dragleave', ()=>row.classList.remove('drag-over'));
-    row.addEventListener('drop', e=>{
-      e.preventDefault();
-      if(dragSrcEstCatId === c.id) return;
-      const fromIdx = estimateCategories.findIndex(x=>x.id===dragSrcEstCatId);
-      const toIdx   = estimateCategories.findIndex(x=>x.id===c.id);
-      if(fromIdx<0||toIdx<0) return;
-      const [moved] = estimateCategories.splice(fromIdx,1);
-      estimateCategories.splice(toIdx,0,moved);
-      estCatDirty = true;
-      renderEstCategoryMaster();
-    });
-
     el.appendChild(row);
+  });
+
+  // 「⠿」をつかんで並び替え（パソコンのマウスでもスマホの指でも動く）
+  enableDragSort(el, '.draggable', (fromId, toId)=>{
+    const fromIdx = estimateCategories.findIndex(x=>String(x.id)===String(fromId));
+    const toIdx   = estimateCategories.findIndex(x=>String(x.id)===String(toId));
+    if(fromIdx<0||toIdx<0) return;
+    const [moved] = estimateCategories.splice(fromIdx,1);
+    estimateCategories.splice(toIdx,0,moved);
+    estCatDirty = true;
+    renderEstCategoryMaster();
   });
 }
 
@@ -195,11 +176,10 @@ function renderEstPresetMaster(){
   items.forEach(p=>{
     const row=document.createElement('div');
     row.className='draggable';
-    row.draggable=true;
     row.dataset.id=p.id;
     row.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:0.5px solid var(--border)';
     row.innerHTML=`
-      <div class="drag-handle" title="ドラッグで並び替え">⠿</div>
+      <div class="drag-handle" title="つかんで並び替え">⠿</div>
       <div style="flex:1">
         <div style="font-size:13px;font-weight:700">${esc(p.name)}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc(p.cat)}　単位：${esc(p.unit)}　原価：¥${fmt(p.cost)}</div>
@@ -207,36 +187,18 @@ function renderEstPresetMaster(){
       <button class="mi-edit-btn-sm" onclick="duplicateEstPreset(${p.id})" title="この品目を複製して次の品目を追加">複製</button>
       <button style="padding:4px 9px;border-radius:6px;font-size:11px;border:0.5px solid var(--border);background:var(--surface2);cursor:pointer;font-family:inherit;color:var(--text-sub);white-space:nowrap" onclick="openEstPresetEdit(${p.id})">編集</button>`;
 
-    row.addEventListener('dragstart', e=>{
-      dragSrcEstPresetId = p.id;
-      setTimeout(()=>row.classList.add('dragging'),0);
-      e.dataTransfer.effectAllowed='move';
-    });
-    row.addEventListener('dragend', ()=>{
-      row.classList.remove('dragging');
-      document.querySelectorAll('#estpreset-master-list .draggable').forEach(r=>r.classList.remove('drag-over'));
-    });
-    row.addEventListener('dragover', e=>{
-      e.preventDefault();
-      if(dragSrcEstPresetId !== p.id){
-        document.querySelectorAll('#estpreset-master-list .draggable').forEach(r=>r.classList.remove('drag-over'));
-        row.classList.add('drag-over');
-      }
-    });
-    row.addEventListener('dragleave', ()=>row.classList.remove('drag-over'));
-    row.addEventListener('drop', e=>{
-      e.preventDefault();
-      if(dragSrcEstPresetId === p.id) return;
-      const fromIdx = estimatePresets.findIndex(x=>x.id===dragSrcEstPresetId);
-      const toIdx   = estimatePresets.findIndex(x=>x.id===p.id);
-      if(fromIdx<0||toIdx<0) return;
-      const [moved] = estimatePresets.splice(fromIdx,1);
-      estimatePresets.splice(toIdx,0,moved);
-      estPresetDirty = true;
-      renderEstPresetMaster();
-    });
-
     el.appendChild(row);
+  });
+
+  // 「⠿」をつかんで並び替え（パソコンのマウスでもスマホの指でも動く）
+  enableDragSort(el, '.draggable', (fromId, toId)=>{
+    const fromIdx = estimatePresets.findIndex(x=>String(x.id)===String(fromId));
+    const toIdx   = estimatePresets.findIndex(x=>String(x.id)===String(toId));
+    if(fromIdx<0||toIdx<0) return;
+    const [moved] = estimatePresets.splice(fromIdx,1);
+    estimatePresets.splice(toIdx,0,moved);
+    estPresetDirty = true;
+    renderEstPresetMaster();
   });
 }
 
