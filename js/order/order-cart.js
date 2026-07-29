@@ -187,7 +187,7 @@ function renderCart(){
   card.style.display='block';
   ci.innerHTML=cart.map((c,i)=>`
     <div class="cart-item">
-      <div style="flex:1">
+      <div class="cart-name">
         <div style="font-size:13px;font-weight:500">${c.name}</div>
         <div style="font-size:11px;color:var(--text-muted)">¥${fmt(c.cost)}/${c.unit}</div>
       </div>
