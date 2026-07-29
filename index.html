@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=198">
+<link rel="stylesheet" href="css/main.css?v=200">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -979,6 +979,15 @@
   </div>
 </div>
 
+<!-- ════ 通知の設定（バナー・サウンド・バッジ） ════ -->
+<div class="modal-overlay" id="notify-settings-modal" style="z-index:460" onclick="if(event.target===this)closeNotifySettings()">
+  <div class="modal-sheet" style="max-width:400px">
+    <h3>通知の設定</h3>
+    <div id="notify-settings-body" style="max-height:66vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn primary" style="width:100%;justify-content:center" onclick="closeNotifySettings()">閉じる</button></div>
+  </div>
+</div>
+
 <!-- ════ 社内チャットの通知先選択 ════ -->
 <div class="modal-overlay" id="notify-modal" style="z-index:460" onclick="if(event.target===this)closeNotifyPicker()">
   <div class="modal-sheet" style="max-width:340px">
@@ -1192,7 +1201,7 @@
   <button class="main-nav-btn" id="nav-talk" onclick="toggleTalkPanel()">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     チャット
-    <span id="nav-talk-dot" style="display:none;position:absolute;top:8px;right:calc(50% - 16px);width:7px;height:7px;background:var(--danger);border-radius:50%"></span>
+    <span id="nav-talk-dot" style="display:none;position:absolute;top:4px;left:calc(50% + 6px);min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;align-items:center;justify-content:center;background:var(--danger);color:#fff;border-radius:99px;font-size:10px;font-weight:800;line-height:1">0</span>
   </button>
 </nav>
 
@@ -1214,7 +1223,7 @@
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:4px">
-          <button onclick="enablePushNotifications()" title="この端末で通知を有効にする" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:16px;line-height:1;padding:2px">🔔</button>
+          <button onclick="openNotifySettings()" title="通知の設定（バナー・サウンド・バッジ）" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:16px;line-height:1;padding:2px">🔔</button>
           <button onclick="toggleTalkPanel()" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:20px;line-height:1;padding:2px">×</button>
         </div>
       </div>
@@ -1633,16 +1642,16 @@
 <script src="js/state.js?v=191"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=192"></script>
+<script src="js/data/db.js?v=199"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=192"></script>
+<script src="js/talk.js?v=199"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=138"></script>
+<script src="js/push.js?v=199"></script>
 
 <!-- 見積 -->
 <script src="js/estimate/estimate-tabs.js?v=146"></script>
@@ -1686,6 +1695,6 @@
 <script src="js/init.js?v=169"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=194"></script>
+<script src="js/auth.js?v=199"></script>
 </body>
 </html>

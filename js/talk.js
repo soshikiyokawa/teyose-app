@@ -230,16 +230,11 @@ function renderTalkPanelList(){
   document.getElementById('talk-panel-list').style.display='flex';
   document.getElementById('talk-panel-detail').style.display='none';
   // 社内チャット → 案件チャット → 発注先チャットの順で表示
-  const isEmployee = currentUserRole==='staff' || currentUserRole==='carpenter';
   // 案件チャット：管理者は全案件、それ以外（一般社員・業者）は参加している案件のみ
-  const projNames = projects
-    .filter(p=>currentUserRole==='staff' || (p.members||[]).includes(currentUserDisplayName))
-    .map(p=>projectThreadName(p.id));
-  const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])]
-    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n));
-  const allSups=[...(isEmployee?[INTERNAL_THREAD]:[]), ...projNames, ...supNames];
+  const allSups=visibleThreadNames();
   const el=document.getElementById('talk-panel-thread-list');
   if(!allSups.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
+  updateChatBadge();
   el.innerHTML=allSups.map(name=>{
     const isInternal=name===INTERNAL_THREAD;
     const isProject=isProjectThread(name);
@@ -248,7 +243,7 @@ function renderTalkPanelList(){
     const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text)
       :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':'タップしてトークを開始');
     const sup=suppliers.find(s=>s.name===name);
-    const unread=msgs.filter(m=>m.unread).length;
+    const unread=chatUnreadFor(name);
     return `<div class="sup-thread-row" onclick="openTalkPanelThread('${name.replace(/'/g,"\\'")}')">
       <div class="sup-thread-icon">${isInternal?'🏡':isProject?'🏗':'🏪'}</div>
       <div class="sup-thread-info">
@@ -277,20 +272,63 @@ function openTalkPanelThread(supName){
     : (sup?.tel?'📞 '+sup.tel+(sup.email?' · ✉ '+sup.email:''):'');
   document.getElementById('talk-panel-list').style.display='none';
   document.getElementById('talk-panel-detail').style.display='flex';
-  // 未読クリア＋引用/編集状態をリセット
-  (talkThreads[supName]||[]).forEach(m=>m.unread=false);
-  document.getElementById('nav-talk-dot').style.display='none';
   cancelQuote(); cancelEditMsg();
   notifyTargets = [];        // スレッドを開くたび通知先はALLに戻す
   updateNotifyLabel();
   setupMsgMenuHandlers();
   renderTalkPanelMessages();
-  dbMarkThreadRead(threadKeyOf(supName)).catch(()=>{}); // 開いた時刻を既読として記録
+  // 開いた時刻を既読として記録し、未読バッジを更新する
+  dbMarkThreadRead(threadKeyOf(supName)).then(updateChatBadge).catch(()=>{});
+  updateChatBadge();
   setTimeout(()=>document.getElementById('talk-panel-input').focus(),200);
 }
 
 // スレッド名 → 既読管理のキー
-function threadKeyOf(name){ return name===INTERNAL_THREAD ? 'internal' : 'supplier:'+(supplierIdByName(name)||'?'); }
+function threadKeyOf(name){
+  if(name===INTERNAL_THREAD) return 'internal';
+  if(isProjectThread(name)) return 'project:'+(projectThreadIds[name]||'?');
+  return 'supplier:'+(supplierIdByName(name)||'?');
+}
+
+// ════ 未読件数（自分が最後にスレッドを開いた時刻より後の、他人のメッセージ） ════
+
+function myLastReadAt(threadName){
+  const key=threadKeyOf(threadName);
+  const rec=chatReads.find(r=>r.userId===currentUserId && r.thread===key);
+  return rec ? rec.lastReadAt : 0;
+}
+
+function chatUnreadFor(threadName){
+  const last=myLastReadAt(threadName);
+  return (talkThreads[threadName]||[]).filter(m=>m.ts>last && m.senderName!==currentUserDisplayName).length;
+}
+
+// 自分が見られるスレッドの一覧（未読集計・スレッド一覧で共通に使う）
+function visibleThreadNames(){
+  const isEmployee = currentUserRole==='staff' || currentUserRole==='carpenter';
+  const projNames = projects
+    .filter(p=>currentUserRole==='staff' || (p.members||[]).includes(currentUserDisplayName))
+    .map(p=>projectThreadName(p.id));
+  const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])]
+    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n));
+  return [...(isEmployee?[INTERNAL_THREAD]:[]), ...projNames, ...supNames];
+}
+
+function chatUnreadTotal(){
+  return visibleThreadNames().reduce((s,n)=>s+chatUnreadFor(n),0);
+}
+
+// ナビの「チャット」ボタンに未読件数を表示し、アプリアイコンのバッジも更新する
+function updateChatBadge(){
+  const n=chatUnreadTotal();
+  const el=document.getElementById('nav-talk-dot');
+  if(el){
+    el.textContent = n>99 ? '99+' : (n||'');
+    el.style.display = n ? 'flex' : 'none';
+  }
+  setAppBadgeCount(n);
+  return n;
+}
 
 function closeTalkPanelThread(){
   activeTalkPanelSupplier=null;

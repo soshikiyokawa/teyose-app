@@ -723,6 +723,23 @@ function subscribeRealtime(){
     .subscribe();
 }
 
+// 新着メッセージ（自分以外の投稿）が増えたら、着信音を鳴らして未読バッジを更新する
+let _lastChatMsgId = null;
+function latestChatMsgId(){
+  let max=0, mine=true;
+  Object.values(talkThreads).forEach(list=>(list||[]).forEach(m=>{
+    if(typeof m.id==='number' && m.id>max){ max=m.id; mine = m.senderName===currentUserDisplayName; }
+  }));
+  return {max, mine};
+}
+function notifyNewChatMessages(){
+  const {max, mine} = latestChatMsgId();
+  const isNew = _lastChatMsgId!==null && max>_lastChatMsgId && !mine;
+  _lastChatMsgId = max;
+  if(isNew) playChatChime();
+  updateChatBadge();
+}
+
 async function refetchAndRerender(table){
   try{
     await fetchAllData();
@@ -733,9 +750,15 @@ async function refetchAndRerender(table){
   }
   if(table==='master_items' && document.getElementById('ordersub-master')?.classList.contains('active')) renderMaster();
   if(table==='chat_messages'){
+    notifyNewChatMessages();   // 着信音・未読バッジ
     if(talkPanelOpen){
-      if(activeTalkPanelSupplier) renderTalkPanelMessages();
-      else renderTalkPanelList();
+      if(activeTalkPanelSupplier){
+        renderTalkPanelMessages();
+        // 開いているスレッドは読んだものとして扱う
+        dbMarkThreadRead(threadKeyOf(activeTalkPanelSupplier)).then(updateChatBadge).catch(()=>{});
+      } else {
+        renderTalkPanelList();
+      }
     }
   }
   if((table==='orders'||table==='cost_entries') && (currentUserRole==='staff'||currentUserRole==='carpenter')){

@@ -86,6 +86,8 @@ async function bootstrapApp(){
 
   subscribeRealtime();
   appTouchLastSeen();
+  notifyNewChatMessages();   // 未読件数の初期表示（着信音は鳴らさない）
+  pushNotifyPrefToSW();      // 通知の設定（バナー・サウンド）をService Workerへ
 
   // 招待メール・パスワード再設定のリンクから来た場合：パスワード設定を求める
   if(APP_NEEDS_PASSWORD_SETUP && !window._passwordSetupDone){

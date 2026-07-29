@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v198';
+const CACHE_NAME = 'teyose-v200';
 const ASSETS = [
   './',
   './index.html',
@@ -75,9 +75,13 @@ self.addEventListener('fetch', e=>{
   );
 });
 
-// ── バージョン取得 ──
+// ── 通知の設定（バナー・サウンド・バッジ）。アプリ側から受け取って保持する ──
+let notifyPref = { banner:true, sound:true, badge:true };
+
 self.addEventListener('message', e=>{
   if(e.data?.type==='GET_VERSION') e.ports[0]?.postMessage({version:CACHE_NAME});
+  if(e.data?.type==='NOTIFY_PREF' && e.data.pref) notifyPref = {...notifyPref, ...e.data.pref};
+  if(e.data?.type==='CLEAR_BADGE'){ try{ self.registration.getNotifications().then(ns=>ns.forEach(n=>n.close())); }catch(_){} }
 });
 
 // ── プッシュ通知 ──
@@ -85,27 +89,54 @@ self.addEventListener('push', e=>{
   let data = {};
   try{ data = e.data.json(); }catch(_){}
   const title = data.title || '手寄';
-  e.waitUntil(self.registration.showNotification(title, {
-    body: data.body || '',
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    data: { tab: data.tab || null } // タップ時に開くタブ（例：'genba/nippo'）
-  }));
+  // プッシュを受け取ったら必ず通知を出す決まり（userVisibleOnly）のため、
+  // 「内容を表示しない」設定のときは本文だけ伏せる
+  e.waitUntil((async ()=>{
+    const opts = {
+      body: notifyPref.banner ? (data.body || '') : '新しいお知らせがあります',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: data.tab || 'teyose',        // 同じ種類の通知はまとめる
+      timestamp: Date.now(),
+      data: { tab: data.tab || null }   // タップ時に開くタブ（例：'genba/nippo'）
+    };
+    if(notifyPref.sound){
+      opts.renotify = true;             // まとめても、届くたびに音で知らせる
+      opts.vibrate = [180,80,180];
+    } else {
+      opts.silent = true;               // サウンドOFF（バイブ指定と併用できないため分ける）
+    }
+    await self.registration.showNotification(title, opts);
+    // アプリアイコンのバッジ：未読の通知件数を表示する
+    if(notifyPref.badge){
+      try{
+        const list = await self.registration.getNotifications();
+        if(self.navigator?.setAppBadge) await self.navigator.setAppBadge(list.length || 1);
+      }catch(_){}
+    }
+  })());
 });
 
 self.addEventListener('notificationclick', e=>{
   e.notification.close();
   const tab = e.notification.data?.tab || null;
-  e.waitUntil(
-    self.clients.matchAll({type:'window'}).then(list=>{
-      const existing = list.find(c=>'focus' in c);
-      if(existing){
-        // 開いているアプリを前面にして、該当タブへ移動させる
-        if(tab) existing.postMessage({type:'OPEN_TAB', tab});
-        return existing.focus();
+  e.waitUntil((async ()=>{
+    // 開いた通知の分だけバッジを減らす（アプリ側が開けば正確な未読件数で上書きされる）
+    try{
+      const list = await self.registration.getNotifications();
+      if(self.navigator?.setAppBadge){
+        if(list.length) await self.navigator.setAppBadge(list.length);
+        else await self.navigator.clearAppBadge?.();
       }
-      // 未起動の場合はハッシュ付きで起動し、ログイン復元後にアプリ側が該当タブを開く
-      if(self.clients.openWindow) return self.clients.openWindow(tab ? './#'+tab : './');
-    })
-  );
+    }catch(_){}
+    const list = await self.clients.matchAll({type:'window'});
+    const existing = list.find(c=>'focus' in c);
+    if(existing){
+      // 開いているアプリを前面にして、該当タブへ移動させる
+      if(tab) existing.postMessage({type:'OPEN_TAB', tab});
+      return existing.focus();
+    }
+    // 未起動の場合はハッシュ付きで起動し、ログイン復元後にアプリ側が該当タブを開く
+    if(self.clients.openWindow) return self.clients.openWindow(tab ? './#'+tab : './');
+  })());
 });
