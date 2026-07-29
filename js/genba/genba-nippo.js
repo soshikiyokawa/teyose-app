@@ -9,7 +9,7 @@ const NIPPO_EDITOR = '清川創史';
 function canEditOthersNippo(){ return currentUserDisplayName === NIPPO_EDITOR; }
 
 // 出面表・集計での社員の並び順（この順で先頭から。ここに無い人は末尾に五十音順）
-const EMPLOYEE_ORDER = ['清川創史','清川伸二','清川太視','清川説志','原口晴郎','山口大輔','梅田昭文','石橋実咲','梶原大地'];
+const EMPLOYEE_ORDER = ['清川創史','清川伸二','清川太視','清川説志','清川優香','原口晴郎','山口大輔','梅田昭文','石橋実咲','梶原大地'];
 function empOrderIndex(name){ const i=EMPLOYEE_ORDER.indexOf(name); return i<0?999:i; }
 function cmpEmployee(nameA, nameB){ return empOrderIndex(nameA)-empOrderIndex(nameB) || String(nameA).localeCompare(String(nameB),'ja'); }
 

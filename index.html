@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=206">
+<link rel="stylesheet" href="css/main.css?v=207">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -807,10 +807,10 @@
     </div>
 
     <!-- 有給残日数（就業規則 第54条にもとづく自動計算） -->
-    <div class="section-lbl" style="margin-top:0">有給残日数</div>
+    <div class="section-lbl" id="leave-balance-lbl" style="margin-top:0">有給残日数</div>
     <div class="card" id="leave-balance" style="padding:0;overflow:hidden;margin-bottom:14px"></div>
 
-    <div class="section-lbl">有給を申請する</div>
+    <div class="section-lbl" id="leave-apply-lbl">有給を申請する</div>
     <div class="card" style="padding:12px">
       <div class="form-grid">
         <div class="fg"><label>種別</label>
@@ -1761,9 +1761,9 @@
 <script src="js/genba/genba-files.js?v=189"></script>
 <script src="js/genba/genba-photos.js?v=189"></script>
 <script src="js/genba/genba-drawings.js?v=186"></script>
-<script src="js/genba/genba-nippo.js?v=188"></script>
-<script src="js/genba/leave-balance.js?v=206"></script>
-<script src="js/genba/genba-leave.js?v=205"></script>
+<script src="js/genba/genba-nippo.js?v=207"></script>
+<script src="js/genba/leave-balance.js?v=207"></script>
+<script src="js/genba/genba-leave.js?v=207"></script>
 <script src="js/genba/genba-holiday.js?v=165"></script>
 <script src="js/genba/work-calendar.js?v=162"></script>
 <script src="js/genba/account-perms.js?v=190"></script>

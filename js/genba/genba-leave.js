@@ -29,7 +29,7 @@ function leaveDaysRecalc(){
   const warn = document.getElementById('leave-days-warn');
   if(warn){
     const prof = allProfiles.find(p=>p.id===currentUserId);
-    if(days>0 && prof?.hireDate){
+    if(days>0 && prof?.hireDate && !isLeaveExempt(prof)){
       const L = leaveLedger(currentUserId);
       const left = L.remain - L.pending - days;
       warn.style.display = left<0 ? '' : 'none';

@@ -11,6 +11,16 @@
 //  ※ 出勤率80％以上（第2項・第3項）は満たしている前提で計算します。
 //     満たさない年があった場合は「調整」で日数を差し引いてください。
 
+// 役員は年次有給休暇の対象外（残日数の表示・管理を行わない）
+const LEAVE_EXEMPT_NAMES = ['清川創史','清川伸二','清川太視','清川説志','清川優香'];
+function isLeaveExempt(profOrName){
+  const p = typeof profOrName==='string'
+    ? (typeof allProfiles!=='undefined'?allProfiles:[]).find(x=>x.displayName===profOrName)
+    : profOrName;
+  const name = typeof profOrName==='string' ? profOrName : (p?.displayName||'');
+  return LEAVE_EXEMPT_NAMES.includes(name) || p?.workGroup==='役員';
+}
+
 const LEAVE_GRANT_DAYS = [10,11,12,14,16,18,20];   // 1回目〜7回目以降
 const LEAVE_DUTY_DAYS  = 5;                        // 第10項：年5日の取得義務
 const LEAVE_EXPIRE_YEARS = 2;                      // 第5項：付与から2年で時効
@@ -136,6 +146,14 @@ function leaveWorkdaysBetween(start, end, userId){
 function renderLeaveBalance(){
   const el=document.getElementById('leave-balance');
   if(!el) return;
+  const lbl=document.getElementById('leave-balance-lbl');
+  const applyLbl=document.getElementById('leave-apply-lbl');
+  // 役員は対象外：残日数の欄そのものを表示しない
+  const exempt=isLeaveExempt(currentUserDisplayName);
+  el.style.display = exempt ? 'none' : '';
+  if(lbl) lbl.style.display = exempt ? 'none' : '';
+  if(applyLbl) applyLbl.style.marginTop = exempt ? '0' : '';
+  if(exempt) return;
   if(typeof leaveColumnsReady!=='undefined' && !leaveColumnsReady){
     el.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--text-sub);line-height:1.7">
       残日数の管理を使うには、データベースの準備が必要です。<br>
@@ -212,7 +230,7 @@ function renderLeaveAdmin(){
   if(currentUserRole!=='staff' || (typeof leaveColumnsReady!=='undefined' && !leaveColumnsReady)){ wrap.style.display='none'; return; }
   wrap.style.display='';
   const list=(typeof allProfiles!=='undefined'?allProfiles:[])
-    .filter(p=>p.role==='staff'||p.role==='carpenter')
+    .filter(p=>(p.role==='staff'||p.role==='carpenter') && !isLeaveExempt(p))   // 役員は対象外
     .sort((a,b)=>cmpEmployee(a.displayName,b.displayName));
   document.getElementById('leave-admin-list').innerHTML = list.map(p=>{
     if(!p.hireDate){
