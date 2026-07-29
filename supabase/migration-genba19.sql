@@ -18,6 +18,12 @@ language sql stable security definer as $$
   ), false)
 $$;
 
+-- 業者（supplier）も、自分が参加メンバーの案件だけは参照できるようにする
+-- （案件チャットのスレッド名表示に必要。編集は従来どおり不可）
+drop policy if exists projects_member_select on public.projects;
+create policy projects_member_select on public.projects
+  for select using (app_is_project_member(id));
+
 -- チャットのRLSを案件チャット対応に更新
 --   案件チャット（project_id あり）＝参加メンバー または staff
 --   社内チャット（is_internal）    ＝社員（staff＋carpenter）

@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=191">
+<link rel="stylesheet" href="css/main.css?v=192">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -138,8 +138,14 @@
         <div class="fg"><label>着工予定日</label><input type="date" id="est-start-date"></div>
         <div class="fg"><label>完工予定日</label><input type="date" id="est-end-date"></div>
         <div class="fg full"><label>参加メンバー（案件チャット）</label>
-          <div id="proj-members" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-          <div style="font-size:10px;color:var(--text-muted);margin-top:3px">選んだ人がこの案件のチャットに参加します（管理者は常に参加できます）</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div id="proj-members-summary" style="flex:1;min-width:0;font-size:12px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">未設定</div>
+            <button type="button" class="btn sm" onclick="openMemberPicker()" style="flex-shrink:0">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              メンバー
+            </button>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:3px">選んだ社員・業者がこの案件のチャットに参加します（管理者は常に参加できます）</div>
         </div>
       </div>
     </div>
@@ -913,6 +919,19 @@
   </div>
 </div>
 
+<!-- ════ 案件の参加メンバー選択（社員・業者） ════ -->
+<div class="modal-overlay" id="member-modal" style="z-index:330" onclick="if(event.target===this)closeMemberPicker()">
+  <div class="modal-sheet" style="max-width:400px">
+    <h3>参加メンバー</h3>
+    <div style="font-size:11px;color:var(--text-sub);margin-bottom:10px;line-height:1.7">
+      この案件のチャットに参加する人を選びます。タップで追加／削除できます（管理者は常に参加できます）。
+    </div>
+    <input id="member-search" placeholder="名前で絞り込み" oninput="renderMemberPicker()" autocomplete="off" style="width:100%;margin-bottom:8px">
+    <div id="member-picker" style="max-height:52vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn primary" style="width:100%;justify-content:center" onclick="closeMemberPicker()">決定</button></div>
+  </div>
+</div>
+
 <!-- ════ 社内チャットの通知先選択 ════ -->
 <div class="modal-overlay" id="notify-modal" style="z-index:460" onclick="if(event.target===this)closeNotifyPicker()">
   <div class="modal-sheet" style="max-width:340px">
@@ -1567,13 +1586,13 @@
 <script src="js/state.js?v=191"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=191"></script>
+<script src="js/data/db.js?v=192"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=191"></script>
+<script src="js/talk.js?v=192"></script>
 
 <!-- プッシュ通知 -->
 <script src="js/push.js?v=138"></script>
@@ -1584,7 +1603,7 @@
 <script src="js/estimate/estimate-master.js?v=138"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
 <script src="js/estimate/estimate-crud.js?v=191"></script>
-<script src="js/estimate/parking.js?v=191"></script>
+<script src="js/estimate/parking.js?v=192"></script>
 <script src="js/estimate/estimate-pdf.js?v=138"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 

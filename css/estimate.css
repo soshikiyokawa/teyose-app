@@ -34,3 +34,12 @@
 .member-chip{font-size:12px;font-family:inherit;padding:5px 10px;border-radius:99px;border:1px solid var(--border-s);
   background:var(--surface2);color:var(--text-sub);cursor:pointer}
 .member-chip.on{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-t);font-weight:700}
+
+/* メンバー選択モーダルの行 */
+.member-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:none;background:none;
+  font-family:inherit;font-size:13px;color:var(--text);padding:9px 8px;border-radius:8px;cursor:pointer}
+.member-row:hover{background:var(--surface2)}
+.member-row.on{background:var(--accent-bg);color:var(--accent-t);font-weight:700}
+.member-check{width:20px;height:20px;flex-shrink:0;border-radius:50%;border:1.5px solid var(--border-s);
+  color:#fff;font-size:12px;font-weight:800;line-height:18px;text-align:center}
+.member-row.on .member-check{background:var(--accent);border-color:var(--accent)}

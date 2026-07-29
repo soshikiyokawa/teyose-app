@@ -53,6 +53,12 @@ async function fetchAllData(){
 
     await fetchGenbaData();
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
+  } else if(currentUserRole==='supplier'){
+    // 業者：案件チャットのスレッド名表示のため、参加している案件だけ取得（RLSで自動的に絞られる）
+    const { data: projectRows } = await sb.from('projects').select('id, name, members');
+    projects = (projectRows||[])
+      .filter(r=>(r.members||[]).includes(currentUserDisplayName))
+      .map(r=>({id:r.id,name:r.name,members:r.members||[]}));
   }
 
   // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）

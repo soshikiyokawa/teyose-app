@@ -231,11 +231,10 @@ function renderTalkPanelList(){
   document.getElementById('talk-panel-detail').style.display='none';
   // 社内チャット → 案件チャット → 発注先チャットの順で表示
   const isEmployee = currentUserRole==='staff' || currentUserRole==='carpenter';
-  // 案件チャット：管理者は全案件、一般社員は参加している案件のみ
-  const projNames = isEmployee
-    ? projects.filter(p=>currentUserRole==='staff' || (p.members||[]).includes(currentUserDisplayName))
-        .map(p=>projectThreadName(p.id))
-    : [];
+  // 案件チャット：管理者は全案件、それ以外（一般社員・業者）は参加している案件のみ
+  const projNames = projects
+    .filter(p=>currentUserRole==='staff' || (p.members||[]).includes(currentUserDisplayName))
+    .map(p=>projectThreadName(p.id));
   const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])]
     .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n));
   const allSups=[...(isEmployee?[INTERNAL_THREAD]:[]), ...projNames, ...supNames];

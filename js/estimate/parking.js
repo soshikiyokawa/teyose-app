@@ -1,23 +1,61 @@
-// ════ 案件の参加メンバー（案件チャットの参加者） ════
+// ════ 案件の参加メンバー（案件チャットの参加者：社員＋業者） ════
 let projectMembers = [];   // 表示名の配列
 
-function renderProjectMembers(){
-  const el = document.getElementById('proj-members');
-  if(!el) return;
-  const names = (typeof allProfiles!=='undefined' ? allProfiles : [])
-    .filter(p=>p.role!=='supplier' && p.displayName)
-    .map(p=>p.displayName)
-    .sort((a,b)=> (typeof cmpEmployee==='function' ? cmpEmployee(a,b) : String(a).localeCompare(String(b),'ja')));
-  if(!names.length){ el.innerHTML='<span style="font-size:11px;color:var(--text-muted)">社員が登録されていません</span>'; return; }
-  el.innerHTML = names.map(n=>`
-    <button type="button" class="member-chip${projectMembers.includes(n)?' on':''}" onclick="toggleProjectMember('${n.replace(/'/g,"\\'")}')">
-      ${projectMembers.includes(n)?'✓ ':''}${esc(n)}
-    </button>`).join('');
+// 選択候補：社員（役職順）＋業者アカウント（発注先の担当者）
+function _memberCandidates(){
+  const profs = (typeof allProfiles!=='undefined' ? allProfiles : []).filter(p=>p.displayName);
+  const emp = profs.filter(p=>p.role!=='supplier')
+    .map(p=>({name:p.displayName, kind:'社員'}))
+    .sort((a,b)=> (typeof cmpEmployee==='function' ? cmpEmployee(a.name,b.name) : a.name.localeCompare(b.name,'ja')));
+  const sup = profs.filter(p=>p.role==='supplier')
+    .map(p=>({name:p.displayName, kind:'業者', supplierName:(suppliers.find(s=>s.id===p.supplierId)?.name)||''}))
+    .sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  // 参加者に居るが候補に無い名前（退職者など）も末尾に出して削除できるようにする
+  const known = new Set([...emp,...sup].map(m=>m.name));
+  const extra = projectMembers.filter(n=>!known.has(n)).map(n=>({name:n, kind:'その他'}));
+  return [...emp, ...sup, ...extra];
 }
+
+function openMemberPicker(){
+  const s=document.getElementById('member-search'); if(s) s.value='';
+  renderMemberPicker();
+  document.getElementById('member-modal').classList.add('open');
+}
+function closeMemberPicker(){
+  document.getElementById('member-modal').classList.remove('open');
+  renderProjectMembers();
+}
+
+function renderMemberPicker(){
+  const el = document.getElementById('member-picker');
+  if(!el) return;
+  const kw = (document.getElementById('member-search')?.value||'').trim().toLowerCase();
+  const list = _memberCandidates().filter(m=>!kw || m.name.toLowerCase().includes(kw) || (m.supplierName||'').toLowerCase().includes(kw));
+  if(!list.length){ el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:10px">該当する人がいません</div>'; return; }
+  let html='', lastKind='';
+  list.forEach(m=>{
+    if(m.kind!==lastKind){ html+=`<div class="section-lbl" style="margin:10px 0 4px">${m.kind}</div>`; lastKind=m.kind; }
+    const on = projectMembers.includes(m.name);
+    html += `<button type="button" class="member-row${on?' on':''}" onclick="toggleProjectMember('${m.name.replace(/'/g,"\\'")}')">
+      <span class="member-check">${on?'✓':''}</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}${m.supplierName?`<span style="font-size:11px;color:var(--text-muted)">（${esc(m.supplierName)}）</span>`:''}</span>
+    </button>`;
+  });
+  el.innerHTML = html;
+}
+
 function toggleProjectMember(name){
   const i = projectMembers.indexOf(name);
   if(i>=0) projectMembers.splice(i,1); else projectMembers.push(name);
+  renderMemberPicker();
   renderProjectMembers();
+}
+
+// 案件情報タブの要約表示
+function renderProjectMembers(){
+  const el = document.getElementById('proj-members-summary');
+  if(!el) return;
+  el.textContent = projectMembers.length ? `${projectMembers.length}人：${projectMembers.join('、')}` : '未設定';
 }
 
 // ════ 契約済み駐車場（住所・地図ピン・区画図などの資料） ════
