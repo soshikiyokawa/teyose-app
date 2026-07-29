@@ -21,6 +21,7 @@ async function doLogin(){
 }
 
 async function doLogout(){
+  try{ localStorage.removeItem(APP_LAST_SEEN_KEY); }catch(_){}
   await sb.auth.signOut();
   location.reload();
 }
@@ -28,6 +29,17 @@ async function doLogout(){
 async function bootstrapApp(){
   const { data: sessionData } = await sb.auth.getSession();
   if(!sessionData.session){
+    document.getElementById('login-overlay').classList.add('open');
+    return;
+  }
+
+  // 一定期間（7日）アプリを開いていない場合は、安全のため再ログインを求める
+  if(!APP_NEEDS_PASSWORD_SETUP && appIdleTooLong()){
+    try{ localStorage.removeItem(APP_LAST_SEEN_KEY); }catch(_){}
+    await sb.auth.signOut();
+    const errEl = document.getElementById('login-error');
+    errEl.textContent = 'しばらくご利用が無かったため、安全のため再度ログインをお願いします';
+    errEl.style.display='block';
     document.getElementById('login-overlay').classList.add('open');
     return;
   }
@@ -73,6 +85,7 @@ async function bootstrapApp(){
   }
 
   subscribeRealtime();
+  appTouchLastSeen();
 
   // 招待メール・パスワード再設定のリンクから来た場合：パスワード設定を求める
   if(APP_NEEDS_PASSWORD_SETUP && !window._passwordSetupDone){
@@ -106,6 +119,11 @@ async function saveInvitePassword(){
   document.getElementById('invite-pass-modal').classList.remove('open');
   showToast('パスワードを設定しました。次回からこのパスワードでログインできます');
 }
+
+// 利用中は最終利用日時を更新し続ける（7日の起算点をリセット）
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && currentUserId) appTouchLastSeen(); });
+window.addEventListener('pagehide', ()=>{ if(currentUserId) appTouchLastSeen(); });
+setInterval(()=>{ if(!document.hidden && currentUserId) appTouchLastSeen(); }, 5*60*1000);
 
 // 初回読み込み時：既存セッションがあれば自動ログイン
 (async ()=>{
