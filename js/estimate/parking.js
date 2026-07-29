@@ -1,3 +1,25 @@
+// ════ 案件の参加メンバー（案件チャットの参加者） ════
+let projectMembers = [];   // 表示名の配列
+
+function renderProjectMembers(){
+  const el = document.getElementById('proj-members');
+  if(!el) return;
+  const names = (typeof allProfiles!=='undefined' ? allProfiles : [])
+    .filter(p=>p.role!=='supplier' && p.displayName)
+    .map(p=>p.displayName)
+    .sort((a,b)=> (typeof cmpEmployee==='function' ? cmpEmployee(a,b) : String(a).localeCompare(String(b),'ja')));
+  if(!names.length){ el.innerHTML='<span style="font-size:11px;color:var(--text-muted)">社員が登録されていません</span>'; return; }
+  el.innerHTML = names.map(n=>`
+    <button type="button" class="member-chip${projectMembers.includes(n)?' on':''}" onclick="toggleProjectMember('${n.replace(/'/g,"\\'")}')">
+      ${projectMembers.includes(n)?'✓ ':''}${esc(n)}
+    </button>`).join('');
+}
+function toggleProjectMember(name){
+  const i = projectMembers.indexOf(name);
+  if(i>=0) projectMembers.splice(i,1); else projectMembers.push(name);
+  renderProjectMembers();
+}
+
 // ════ 契約済み駐車場（住所・地図ピン・区画図などの資料） ════
 // 住所とピンは案件（projects）に保存。資料は drawings に kind='parking' で保存する。
 

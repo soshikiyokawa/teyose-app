@@ -1,8 +1,12 @@
 // ════ 社内チャットの通知先（ALL＝全員／個別指定） ════
 let notifyTargets = [];   // 空＝ALL（全員）。表示名の配列
 
-// 社員（staff＋carpenter）の表示名一覧。自分は除く
+// 通知先の候補。案件チャットは参加メンバー、社内チャットは社員全員（いずれも自分は除く）
 function _employeeNames(){
+  if(isProjectThread(activeTalkPanelSupplier)){
+    const p = projects.find(x=>x.id===projectThreadIds[activeTalkPanelSupplier]);
+    return (p?.members||[]).filter(n=>n!==currentUserDisplayName);
+  }
   return (typeof allProfiles!=='undefined' ? allProfiles : [])
     .filter(p=>p.role!=='supplier' && p.displayName && p.displayName!==currentUserDisplayName)
     .map(p=>p.displayName);
@@ -34,10 +38,11 @@ function toggleNotifyTarget(name){
 function updateNotifyLabel(){
   const bar = document.getElementById('talk-notify-bar');
   if(!bar) return;
-  const internal = activeTalkPanelSupplier===INTERNAL_THREAD;
-  bar.style.display = internal ? 'flex' : 'none';
-  if(!internal) return;
-  const label = notifyTargets.length ? notifyTargets.join('、') : 'ALL（全員）';
+  const showBar = activeTalkPanelSupplier===INTERNAL_THREAD || isProjectThread(activeTalkPanelSupplier);
+  bar.style.display = showBar ? 'flex' : 'none';
+  if(!showBar) return;
+  const label = notifyTargets.length ? notifyTargets.join('、')
+    : (isProjectThread(activeTalkPanelSupplier) ? 'ALL（参加メンバー）' : 'ALL（全員）');
   document.getElementById('talk-notify-label').textContent = label;
 }
 
@@ -111,7 +116,7 @@ function findMsg(mid){ return (talkThreads[activeTalkPanelSupplier]||[]).find(m=
 function openMsgMenu(mid){
   const m=findMsg(mid); if(!m) return;
   menuMsgId=mid;
-  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD;
+  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD || isProjectThread(activeTalkPanelSupplier);
   const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';
   const isMine = m.senderName===currentUserDisplayName; // 自分が送信した本人か
   const canEdit = isMine && m.type==='text';
@@ -224,21 +229,29 @@ function toggleTalkPanel(){
 function renderTalkPanelList(){
   document.getElementById('talk-panel-list').style.display='flex';
   document.getElementById('talk-panel-detail').style.display='none';
-  // 社内チャット（きよかわ社員のみ）を先頭に固定。発注先スレッドはstaffのみ／supplierは自社のみ
+  // 社内チャット → 案件チャット → 発注先チャットの順で表示
   const isEmployee = currentUserRole==='staff' || currentUserRole==='carpenter';
-  const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])].filter(n=>n!==INTERNAL_THREAD);
-  const allSups=[...(isEmployee?[INTERNAL_THREAD]:[]), ...supNames];
+  // 案件チャット：管理者は全案件、一般社員は参加している案件のみ
+  const projNames = isEmployee
+    ? projects.filter(p=>currentUserRole==='staff' || (p.members||[]).includes(currentUserDisplayName))
+        .map(p=>projectThreadName(p.id))
+    : [];
+  const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])]
+    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n));
+  const allSups=[...(isEmployee?[INTERNAL_THREAD]:[]), ...projNames, ...supNames];
   const el=document.getElementById('talk-panel-thread-list');
   if(!allSups.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
   el.innerHTML=allSups.map(name=>{
     const isInternal=name===INTERNAL_THREAD;
+    const isProject=isProjectThread(name);
     const msgs=talkThreads[name]||[];
     const last=msgs[msgs.length-1];
-    const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text):(isInternal?'社員メンバーの連絡用':'タップしてトークを開始');
+    const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text)
+      :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':'タップしてトークを開始');
     const sup=suppliers.find(s=>s.name===name);
     const unread=msgs.filter(m=>m.unread).length;
     return `<div class="sup-thread-row" onclick="openTalkPanelThread('${name.replace(/'/g,"\\'")}')">
-      <div class="sup-thread-icon">${isInternal?'🏡':'🏪'}</div>
+      <div class="sup-thread-icon">${isInternal?'🏡':isProject?'🏗':'🏪'}</div>
       <div class="sup-thread-info">
         <div class="sup-thread-name">${name}</div>
         <div class="sup-thread-preview">${preview}</div>
@@ -260,6 +273,8 @@ function openTalkPanelThread(supName){
   document.getElementById('talk-panel-title').textContent=supName;
   document.getElementById('talk-panel-meta').textContent=
     supName===INTERNAL_THREAD ? '社員メンバーのみ表示されます'
+    : isProjectThread(supName) ? (()=>{ const p=projects.find(x=>x.id===projectThreadIds[supName]);
+        const ms=(p?.members||[]); return ms.length?('参加：'+ms.join('、')):'参加メンバー未設定（案件情報で選択できます）'; })()
     : (sup?.tel?'📞 '+sup.tel+(sup.email?' · ✉ '+sup.email:''):'');
   document.getElementById('talk-panel-list').style.display='none';
   document.getElementById('talk-panel-detail').style.display='flex';
@@ -297,7 +312,7 @@ function msgMarks(m){
 }
 
 function renderTalkPanelMessages(){
-  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD;
+  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD || isProjectThread(activeTalkPanelSupplier);
   let msgs=talkThreads[activeTalkPanelSupplier]||[];
   if(chatBookmarkFilter) msgs=msgs.filter(m=>Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName));
   document.getElementById('talk-bm-filter')?.classList.toggle('active',chatBookmarkFilter);

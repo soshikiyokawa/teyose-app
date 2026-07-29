@@ -40,6 +40,9 @@ let activeTalkPanelSupplier = null;
 let talkThreads = {};
 // 社内チャット（きよかわ社員のみ）のスレッド名。suppliersとは別枠で常に一覧の先頭に表示する
 const INTERNAL_THREAD = 'きよかわ（社員）';
+// 案件チャットのスレッド名は「案件：<案件名>」。案件IDとの対応は projectThreadIds に持つ
+const PROJECT_THREAD_PREFIX = '案件：';
+let projectThreadIds = {};   // {スレッド名: projectId}
 let chatReads = [];          // 既読管理（{userId,userName,thread,lastReadAt}）
 let quotingMsg = null;       // 引用中のメッセージ
 let editingMsgId = null;     // 編集中のメッセージID

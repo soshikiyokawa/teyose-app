@@ -1,5 +1,14 @@
 // ════ Supabase データ層（取得・保存・複数端末リアルタイム同期） ════
 
+// 案件チャットのスレッド名（「案件：〇〇邸」）。IDとの対応も記録する
+function projectThreadName(projectId){
+  const p = projects.find(x=>x.id===projectId);
+  const name = PROJECT_THREAD_PREFIX + (p ? p.name : '（削除された案件）');
+  projectThreadIds[name] = projectId;
+  return name;
+}
+function isProjectThread(threadName){ return String(threadName||'').startsWith(PROJECT_THREAD_PREFIX); }
+
 function supplierIdByName(name){
   const s = suppliers.find(x=>x.name===name);
   return s ? s.id : null;
@@ -26,7 +35,9 @@ async function fetchAllData(){
   if(chatErr) throw chatErr;
   talkThreads = {};
   chatRows.forEach(r=>{
-    const name = r.is_internal ? INTERNAL_THREAD : supplierNameById(r.supplier_id);
+    const name = r.project_id ? projectThreadName(r.project_id)
+               : r.is_internal ? INTERNAL_THREAD
+               : supplierNameById(r.supplier_id);
     if(!talkThreads[name]) talkThreads[name]=[];
     talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{},replyToText:r.reply_to_text||'',replyToSender:r.reply_to_sender||'',editedAt:r.edited_at||null,bookmarks:r.bookmarks||[]});
   });
@@ -38,7 +49,7 @@ async function fetchAllData(){
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
     const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
-    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,updatedAt:r.updated_at}));
+    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],updatedAt:r.updated_at}));
 
     await fetchGenbaData();
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
@@ -93,6 +104,7 @@ async function dbSaveProject(proj){
   const row={name:proj.name,client_name:proj.clientName,type:proj.type,address:proj.address,note:proj.note,
     start_date:proj.startDate||null,end_date:proj.endDate||null,map_lat:proj.mapLat??null,map_lng:proj.mapLng??null,
     parking_address:proj.parkingAddress||'',parking_lat:proj.parkingLat??null,parking_lng:proj.parkingLng??null,
+    members:proj.members||[],
     updated_at:new Date().toISOString()};
   if(proj.id){
     // 案件名が変わった場合、紐づく見積のproject_nameも一括更新する
@@ -355,11 +367,13 @@ async function dbMarkThreadRead(thread){
 
 // ── チャット ──
 async function dbAddChatMessage(supplierName, msg){
+  const isProject = isProjectThread(supplierName);
+  const project_id = isProject ? (projectThreadIds[supplierName]||null) : null;
   const isInternal = supplierName===INTERNAL_THREAD;
-  const supplier_id = isInternal ? null : supplierIdByName(supplierName);
-  if(!isInternal && !supplier_id) return;
+  const supplier_id = (isInternal||isProject) ? null : supplierIdByName(supplierName);
+  if(!isInternal && !isProject && !supplier_id) return;
   const { data, error } = await sb.from('chat_messages').insert({
-    supplier_id, is_internal:isInternal, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
+    supplier_id, project_id, is_internal:isInternal, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
     file_url:msg.fileUrl||null, file_name:msg.fileName||null, file_mime:msg.fileMime||null, unread:false,
     sender_name: currentUserDisplayName||'',
     reply_to_id:msg.replyToId||null, reply_to_text:msg.replyToText||null, reply_to_sender:msg.replyToSender||null
@@ -371,7 +385,12 @@ async function dbAddChatMessage(supplierName, msg){
   // 通知の送信。失敗してもチャット送信自体は成立させる（msg.silent=trueなら通知しない：自動転記用）
   if(msg.silent) return;
   const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}` : msg.type==='file' ? `📎 ${msg.fileName||'ファイル'}` : (msg.text||'');
-  if(isInternal){
+  if(isProject){
+    // 案件チャット：参加メンバー（自分以外）へ通知
+    const proj = projects.find(p=>p.id===project_id);
+    const names = (proj?.members||[]).filter(n=>n!==currentUserDisplayName);
+    if(names.length) dbSendPushToNames(names, `${supplierName} ${currentUserDisplayName||''}`, preview, null).catch(()=>{});
+  } else if(isInternal){
     const title = `${INTERNAL_THREAD} ${currentUserDisplayName||''}`;
     if(Array.isArray(msg.notifyNames) && msg.notifyNames.length){
       // 宛先が指定されている場合はその人にだけ通知（自分は除く）

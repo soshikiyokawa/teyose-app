@@ -445,6 +445,11 @@ function fillProjectInfoTab(p){
   window._parkingLng = p?.parkingLng||null;
   updateParkingPinIndicator && updateParkingPinIndicator();
   renderParkingDocs && renderParkingDocs();
+  // 案件チャットの参加メンバー
+  if(typeof projectMembers!=='undefined'){
+    projectMembers = [...(p?.members||[])];
+    renderProjectMembers && renderProjectMembers();
+  }
 }
 
 async function saveProjectInfo(){
@@ -464,7 +469,8 @@ async function saveProjectInfo(){
     mapLng: window._currentMapLng||null,
     parkingAddress: document.getElementById('est-parking')?.value.trim()||'',
     parkingLat: window._parkingLat||null,
-    parkingLng: window._parkingLng||null
+    parkingLng: window._parkingLng||null,
+    members: (typeof projectMembers!=='undefined') ? [...projectMembers] : (base.members||[])
   };
   let savedId;
   try{ savedId=await dbSaveProject(proj); }catch(e){ return; }
