@@ -238,9 +238,119 @@ function renderLeaveAdmin(){
       <div style="text-align:right;white-space:nowrap">
         <div style="font-size:16px;font-weight:800;color:${L.remain<=0?'var(--danger)':'var(--accent-t)'}">${lvNum(L.remain)}<span style="font-size:11px">日</span></div>
       </div>
+      <button class="btn xs" onclick="openLeaveRecord('${p.id}')">実績</button>
       <button class="btn xs" onclick="openLeaveSetting('${p.id}')">設定</button>
     </div></div>`;
   }).join('') || '<div class="empty" style="padding:14px">社員がいません</div>';
+}
+
+// ════ 取得実績の入力（アプリを使い始める前に取得した分を登録する） ════
+// 登録した分は承認済みの記録として残り、残日数と年5日の取得義務にそのまま反映される。
+
+let _leaveRecordUserId=null;
+
+function openLeaveRecord(userId){
+  const p=(typeof allProfiles!=='undefined'?allProfiles:[]).find(x=>x.id===userId);
+  if(!p) return;
+  _leaveRecordUserId=userId;
+  document.getElementById('leave-record-name').textContent=p.displayName;
+  document.getElementById('leave-record-type').value='全日';
+  document.getElementById('leave-record-start').value='';
+  document.getElementById('leave-record-end').value='';
+  leaveRecordTypeChanged();
+  renderLeaveRecord();
+  document.getElementById('leave-record-modal').classList.add('open');
+}
+function closeLeaveRecord(){
+  document.getElementById('leave-record-modal').classList.remove('open');
+  _leaveRecordUserId=null;
+  renderLeave();
+}
+function leaveRecordTypeChanged(){
+  const half=document.getElementById('leave-record-type').value!=='全日';
+  document.getElementById('leave-record-end-wrap').style.display=half?'none':'';
+  leaveRecordDaysRecalc();
+}
+function leaveRecordDaysRecalc(){
+  const type=document.getElementById('leave-record-type').value;
+  const start=document.getElementById('leave-record-start').value;
+  let end=document.getElementById('leave-record-end').value;
+  let days=0;
+  if(type!=='全日') days = start?0.5:0;
+  else if(start){
+    if(!end || end<start) end=start;
+    days = leaveWorkdaysBetween(start, end, _leaveRecordUserId);
+  }
+  document.getElementById('leave-record-days').textContent = days>0 ? lvNum(days)+'日' : '—';
+  return days;
+}
+
+function renderLeaveRecord(){
+  const p=(typeof allProfiles!=='undefined'?allProfiles:[]).find(x=>x.id===_leaveRecordUserId);
+  if(!p) return;
+  const L=p.hireDate ? leaveLedger(_leaveRecordUserId) : null;
+
+  // 見出し：年5日の取得義務の期間と消化状況
+  const head=document.getElementById('leave-record-duty');
+  if(L && L.duty){
+    const done=L.duty.left<=0;
+    head.innerHTML=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span>年5日の取得義務</span>
+        <span style="color:var(--text-muted)">${lvLabel(L.duty.from)}〜${lvLabel(L.duty.deadline)}</span>
+        <span style="margin-left:auto;font-weight:800;color:${done?'var(--ok-t)':'var(--warn-t)'}">
+          ${lvNum(L.duty.taken)}／${L.duty.required}日${done?'　達成':'　あと'+lvNum(L.duty.left)+'日'}</span>
+      </div>
+      <div style="margin-top:3px;color:var(--text-muted)">残日数 ${lvNum(L.remain)}日</div>`;
+  } else {
+    head.innerHTML='<span style="color:var(--text-muted)">雇用契約開始日を「設定」から登録すると、義務日数と残日数を表示します</span>';
+  }
+
+  // 一覧：この義務期間（未設定なら今年）の取得記録
+  const from = L&&L.duty ? L.duty.from : lvStr(new Date().getFullYear(),1,1);
+  const to   = L&&L.duty ? L.duty.deadline : lvStr(new Date().getFullYear(),12,31);
+  const list=(typeof leaveRequests!=='undefined'?leaveRequests:[])
+    .filter(lr=>lr.userId===_leaveRecordUserId && lr.status==='approved' && lr.startDate>=from && lr.startDate<=to)
+    .sort((a,b)=> a.startDate<b.startDate?-1:a.startDate>b.startDate?1:0);
+  document.getElementById('leave-record-list').innerHTML = list.length
+    ? list.map(lr=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:0.5px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:700">${leavePeriodLabel(lr)}<span style="font-weight:400;color:var(--text-muted)">　${lvNum(Number(lr.days))}日</span></div>
+          ${lr.reason?`<div style="font-size:10px;color:var(--text-muted)">${esc(lr.reason)}</div>`:''}
+        </div>
+        <button class="btn xs danger" onclick="deleteLeaveRecord(${lr.id})">削除</button>
+      </div>`).join('')
+    : '<div style="padding:8px 2px;font-size:11px;color:var(--text-muted)">この期間の取得記録はありません</div>';
+}
+
+async function addLeaveRecord(){
+  if(!_leaveRecordUserId) return;
+  const p=(typeof allProfiles!=='undefined'?allProfiles:[]).find(x=>x.id===_leaveRecordUserId);
+  const type=document.getElementById('leave-record-type').value;
+  const start=document.getElementById('leave-record-start').value;
+  let end=document.getElementById('leave-record-end').value;
+  if(!start){ showToast('取得日を入力してください'); return; }
+  if(type!=='全日' || !end || end<start) end=start;
+  const days=leaveRecordDaysRecalc();
+  if(days<=0){ showToast('選んだ期間に出勤日がありません（勤務カレンダーの休日は有給になりません）'); return; }
+  const note=document.getElementById('leave-record-note').value.trim();
+  await dbAddLeaveRecord({userId:_leaveRecordUserId, userName:p?.displayName||'',
+    startDate:start, endDate:end, leaveType:type, days, reason:note||'（実績入力）'});
+  document.getElementById('leave-record-start').value='';
+  document.getElementById('leave-record-end').value='';
+  await refreshGenba();
+  renderLeaveRecord();
+  leaveRecordDaysRecalc();
+  showToast('取得実績を登録しました');
+}
+
+async function deleteLeaveRecord(id){
+  const lr=(typeof leaveRequests!=='undefined'?leaveRequests:[]).find(x=>x.id===id);
+  if(!lr) return;
+  if(!confirm(`${lr.userName}さんの記録（${leavePeriodLabel(lr)}　${lvNum(Number(lr.days))}日）を削除しますか？`)) return;
+  await dbDeleteLeaveRequest(id);
+  await refreshGenba();
+  renderLeaveRecord();
+  showToast('削除しました');
 }
 
 let _leaveSettingUserId=null;

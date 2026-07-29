@@ -645,6 +645,17 @@ async function dbAddLeaveRequest(lr){
     text:`【有給申請】${period}　${lr.days}日${lr.reason?'\n理由：'+lr.reason:''}`}).catch(()=>{});
   return data.id;
 }
+// 管理者：取得実績の代理登録（承認済みとして記録。通知もチャット転記もしない）
+async function dbAddLeaveRecord(rec){
+  const { data, error } = await sb.from('leave_requests').insert({
+    user_id:rec.userId, user_name:rec.userName||'',
+    start_date:rec.startDate, end_date:rec.endDate, leave_type:rec.leaveType, days:rec.days,
+    reason:rec.reason||'（実績入力）', status:'approved',
+    reviewer_name:currentUserDisplayName||'', reviewed_at:new Date().toISOString()
+  }).select().single();
+  if(error){showToast('登録に失敗しました：'+error.message);throw error;}
+  return data.id;
+}
 async function dbReviewLeaveRequest(id, status, note){
   const lr = leaveRequests.find(x=>x.id===id);
   const { error } = await sb.from('leave_requests').update({

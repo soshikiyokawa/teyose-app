@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=205">
+<link rel="stylesheet" href="css/main.css?v=206">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -992,6 +992,41 @@
   </div>
 </div>
 
+<!-- ════ 有給の取得実績を入力 ※管理者のみ ════ -->
+<div class="modal-overlay" id="leave-record-modal" style="z-index:330" onclick="if(event.target===this)closeLeaveRecord()">
+  <div class="modal-sheet" style="max-width:420px">
+    <h3>取得実績の入力</h3>
+    <div style="font-size:13px;font-weight:700;margin-bottom:4px" id="leave-record-name">—</div>
+    <div style="font-size:11px;color:var(--text-sub);line-height:1.7;margin-bottom:10px">
+      アプリを使い始める前に取得した有給を登録します。登録した分は承認済みの記録として残り、残日数と年5日の取得義務に反映されます。
+    </div>
+
+    <div id="leave-record-duty" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.7;margin-bottom:10px"></div>
+
+    <div class="form-grid">
+      <div class="fg"><label>種別</label>
+        <select id="leave-record-type" onchange="leaveRecordTypeChanged()">
+          <option value="全日">全日</option>
+          <option value="午前半休">午前半休</option>
+          <option value="午後半休">午後半休</option>
+        </select>
+      </div>
+      <div class="fg"><label>取得日</label><input type="date" id="leave-record-start" onchange="leaveRecordDaysRecalc()"></div>
+      <div class="fg" id="leave-record-end-wrap"><label>終了日（連続取得時のみ）</label><input type="date" id="leave-record-end" onchange="leaveRecordDaysRecalc()"></div>
+      <div class="fg"><label>日数</label><div id="leave-record-days" style="padding:8px 2px;font-weight:800;font-size:15px">—</div></div>
+      <div class="fg full"><label>メモ</label><input id="leave-record-note" placeholder="（実績入力）"></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin:8px 0 12px">
+      <button class="btn primary" onclick="addLeaveRecord()">この内容で登録</button>
+    </div>
+
+    <div class="section-lbl" style="margin:0 0 4px">この期間の取得記録</div>
+    <div id="leave-record-list" style="max-height:32vh;overflow-y:auto"></div>
+
+    <div class="modal-actions"><button class="btn primary" style="width:100%;justify-content:center" onclick="closeLeaveRecord()">閉じる</button></div>
+  </div>
+</div>
+
 <!-- ════ 有給の設定（雇用契約開始日・調整）※管理者のみ ════ -->
 <div class="modal-overlay" id="leave-setting-modal" style="z-index:330" onclick="if(event.target===this)closeLeaveSetting()">
   <div class="modal-sheet" style="max-width:400px">
@@ -1683,7 +1718,7 @@
 <script src="js/state.js?v=205"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=205"></script>
+<script src="js/data/db.js?v=206"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
@@ -1727,7 +1762,7 @@
 <script src="js/genba/genba-photos.js?v=189"></script>
 <script src="js/genba/genba-drawings.js?v=186"></script>
 <script src="js/genba/genba-nippo.js?v=188"></script>
-<script src="js/genba/leave-balance.js?v=205"></script>
+<script src="js/genba/leave-balance.js?v=206"></script>
 <script src="js/genba/genba-leave.js?v=205"></script>
 <script src="js/genba/genba-holiday.js?v=165"></script>
 <script src="js/genba/work-calendar.js?v=162"></script>
