@@ -229,12 +229,16 @@ function toggleTalkPanel(){
 function renderTalkPanelList(){
   document.getElementById('talk-panel-list').style.display='flex';
   document.getElementById('talk-panel-detail').style.display='none';
-  // 社内チャット → 案件チャット → 発注先チャットの順で表示
   // 案件チャット：管理者は全案件、それ以外（一般社員・業者）は参加している案件のみ
-  const allSups=visibleThreadNames();
+  const names=visibleThreadNames();
   const el=document.getElementById('talk-panel-thread-list');
-  if(!allSups.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
+  if(!names.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
   updateChatBadge();
+  // 最新の書き込みがあるスレッドを上に。書き込みが無いスレッドは下に元の順で並べる
+  const lastTs=n=>{ const l=(talkThreads[n]||[]); return l.length ? l[l.length-1].ts : 0; };
+  const allSups=names.map((n,i)=>({n,i,ts:lastTs(n)}))
+    .sort((a,b)=> b.ts-a.ts || a.i-b.i)
+    .map(x=>x.n);
   el.innerHTML=allSups.map(name=>{
     const isInternal=name===INTERNAL_THREAD;
     const isProject=isProjectThread(name);
