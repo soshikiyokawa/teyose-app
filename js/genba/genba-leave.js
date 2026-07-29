@@ -21,9 +21,23 @@ function leaveDaysRecalc(){
     days = start ? 0.5 : 0;
   } else if(start){
     if(!end || end<start) end = start;
-    days = Math.round((new Date(end)-new Date(start))/86400000)+1;
+    // 勤務カレンダーの休日は有給を消化しないので、出勤日だけを数える
+    days = leaveWorkdaysBetween(start, end, currentUserId);
   }
-  document.getElementById('leave-days-lbl').textContent = days>0 ? days+'日' : '—';
+  document.getElementById('leave-days-lbl').textContent = days>0 ? lvNum(days)+'日' : '—';
+  // 残日数に対する不足を注意表示する（申請自体は止めない）
+  const warn = document.getElementById('leave-days-warn');
+  if(warn){
+    const prof = allProfiles.find(p=>p.id===currentUserId);
+    if(days>0 && prof?.hireDate){
+      const L = leaveLedger(currentUserId);
+      const left = L.remain - L.pending - days;
+      warn.style.display = left<0 ? '' : 'none';
+      warn.textContent = left<0 ? `残日数が${lvNum(-left)}日不足します（残 ${lvNum(L.remain)}日${L.pending?'／申請中 '+lvNum(L.pending)+'日':''}）` : '';
+    } else {
+      warn.style.display='none';
+    }
+  }
   return days;
 }
 
@@ -36,7 +50,10 @@ async function applyLeave(){
   if(!reason){ showToast('理由を入力してください'); return; }
   if(type!=='全日' || !end || end<start) end = start;
   const days = leaveDaysRecalc();
-  if(days<=0){ showToast('日付を確認してください'); return; }
+  if(days<=0){
+    showToast(type==='全日' ? '選んだ期間に出勤日がありません（勤務カレンダーの休日は有給になりません）' : '日付を確認してください');
+    return;
+  }
   await dbAddLeaveRequest({startDate:start, endDate:end, leaveType:type, days, reason});
   document.getElementById('leave-start').value = '';
   document.getElementById('leave-end').value = '';
@@ -98,6 +115,11 @@ async function adminDeleteLeave(id){
 
 function renderLeave(){
   if(!document.getElementById('leave-type').value) document.getElementById('leave-type').value = '全日';
+
+  // ── 残日数（就業規則 第54条にもとづく計算） ──
+  renderLeaveBalance();
+  renderLeaveAdmin();
+  leaveDaysRecalc();
 
   // ── 承認者（清川創史）のみ：承認待ち一覧 ──
   const reviewWrap = document.getElementById('leave-review-wrap');

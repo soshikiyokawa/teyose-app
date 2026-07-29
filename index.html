@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=203">
+<link rel="stylesheet" href="css/main.css?v=205">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -806,7 +806,11 @@
       <div class="card" id="leave-review-list" style="padding:0;overflow:hidden;margin-bottom:14px"></div>
     </div>
 
-    <div class="section-lbl" style="margin-top:0">有給を申請する</div>
+    <!-- 有給残日数（就業規則 第54条にもとづく自動計算） -->
+    <div class="section-lbl" style="margin-top:0">有給残日数</div>
+    <div class="card" id="leave-balance" style="padding:0;overflow:hidden;margin-bottom:14px"></div>
+
+    <div class="section-lbl">有給を申請する</div>
     <div class="card" style="padding:12px">
       <div class="form-grid">
         <div class="fg"><label>種別</label>
@@ -820,6 +824,7 @@
         <div class="fg" id="leave-end-wrap"><label>終了日（連続取得時のみ）</label><input type="date" id="leave-end" onchange="leaveDaysRecalc()"></div>
         <div class="fg"><label>日数</label><div id="leave-days-lbl" style="padding:8px 2px;font-weight:800;font-size:15px">—</div></div>
         <div class="fg full"><label>理由 <span style="color:var(--danger)">*</span></label><input id="leave-reason" placeholder="私用のため など"></div>
+        <div class="fg full"><div id="leave-days-warn" style="display:none;font-size:11px;color:var(--danger);font-weight:700"></div></div>
       </div>
       <div style="display:flex;justify-content:flex-end;margin-top:10px">
         <button class="btn primary" onclick="applyLeave()">申請する</button>
@@ -828,6 +833,14 @@
 
     <div class="section-lbl">自分の申請</div>
     <div class="card" id="leave-my-list" style="padding:0;overflow:hidden"></div>
+
+    <div id="leave-admin-wrap" style="display:none">
+      <div class="section-lbl">社員の有給管理</div>
+      <div class="card" id="leave-admin-list" style="padding:0;overflow:hidden"></div>
+      <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-top:6px">
+        雇用契約開始日から、就業規則 第54条にもとづいて付与日と付与日数を自動計算します。
+      </div>
+    </div>
 
     <div id="leave-all-wrap" style="display:none">
       <div class="section-lbl">社員の取得履歴（今年）</div>
@@ -975,6 +988,34 @@
       <button class="btn" style="flex:1;justify-content:center" onclick="closeSimpleEst()">キャンセル</button>
       <button class="btn" style="flex:1;justify-content:center" onclick="applySimpleEst(false)">明細に反映</button>
       <button class="btn primary" style="flex:1.2;justify-content:center" onclick="applySimpleEst(true)">反映して保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ 有給の設定（雇用契約開始日・調整）※管理者のみ ════ -->
+<div class="modal-overlay" id="leave-setting-modal" style="z-index:330" onclick="if(event.target===this)closeLeaveSetting()">
+  <div class="modal-sheet" style="max-width:400px">
+    <h3>有給の設定</h3>
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px" id="leave-setting-name">—</div>
+
+    <div class="fg" style="margin-bottom:10px"><label>雇用契約開始日</label>
+      <input type="date" id="leave-setting-hire" onchange="renderLeaveSettingPreview()">
+    </div>
+    <div class="fg" style="margin-bottom:10px"><label>調整（±日数）</label>
+      <input type="number" id="leave-setting-adjust" step="0.5" value="0" oninput="renderLeaveSettingPreview()">
+      <div style="font-size:11px;color:var(--text-muted);line-height:1.6;margin-top:3px">
+        アプリを使い始める前の残日数や取得分を反映するときに使います（例：＋5、−2）。
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:10px"><label>調整の理由メモ</label>
+      <input id="leave-setting-note" placeholder="2025年9月末時点の残日数を反映 など">
+    </div>
+
+    <div id="leave-setting-preview" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.8;max-height:34vh;overflow-y:auto"></div>
+
+    <div class="modal-actions" style="display:flex;gap:6px">
+      <button class="btn" style="flex:1;justify-content:center" onclick="closeLeaveSetting()">キャンセル</button>
+      <button class="btn primary" style="flex:1;justify-content:center" onclick="saveLeaveSetting()">保存</button>
     </div>
   </div>
 </div>
@@ -1639,10 +1680,10 @@
 <script src="js/utils.js?v=203"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=191"></script>
+<script src="js/state.js?v=205"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=199"></script>
+<script src="js/data/db.js?v=205"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
@@ -1686,7 +1727,8 @@
 <script src="js/genba/genba-photos.js?v=189"></script>
 <script src="js/genba/genba-drawings.js?v=186"></script>
 <script src="js/genba/genba-nippo.js?v=188"></script>
-<script src="js/genba/genba-leave.js?v=165"></script>
+<script src="js/genba/leave-balance.js?v=205"></script>
+<script src="js/genba/genba-leave.js?v=205"></script>
 <script src="js/genba/genba-holiday.js?v=165"></script>
 <script src="js/genba/work-calendar.js?v=162"></script>
 <script src="js/genba/account-perms.js?v=190"></script>

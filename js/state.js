@@ -25,6 +25,7 @@ let holidayRequests = [];   // 休日出勤申請（同上）
 
 // 勤務カレンダー（休日＝出勤しない日）。{regular:Set<'YYYY-MM-DD'>, trainee:Set<...>}
 let workHolidays = {regular:new Set(), trainee:new Set()};
+let leaveColumnsReady = true;   // 有給の列（migration-genba20.sql）が適用済みか
 let allProfiles = [];       // 事務用：社員区分の割り当てで使う全プロフィール
 let wcCal = 'regular';      // 管理画面で表示中のカレンダー種別
 let wcMonth = null;         // 管理画面で表示中の月（'YYYY-MM'）

@@ -446,8 +446,26 @@ async function fetchWorkCalendar(){
 // 社員一覧（区分の割り当て・チャットの通知先選択に使う）。社員なら誰でも取得
 async function fetchProfiles(){
   if(currentUserRole==='supplier') return;
-  const { data: profs } = await sb.from('profiles').select('id, display_name, role, work_group, supplier_id').order('display_name');
-  allProfiles = (profs||[]).map(p=>({id:p.id,displayName:p.display_name||'',role:p.role,workGroup:p.work_group||'',supplierId:p.supplier_id||null}));
+  // 有給の列（migration-genba20.sql）が未適用でも動くよう、失敗したら従来の列だけで取得する
+  const BASE = 'id, display_name, role, work_group, supplier_id';
+  let { data: profs, error } = await sb.from('profiles').select(BASE+', hire_date, leave_adjust, leave_adjust_note').order('display_name');
+  if(error){
+    leaveColumnsReady = false;
+    ({ data: profs } = await sb.from('profiles').select(BASE).order('display_name'));
+  } else {
+    leaveColumnsReady = true;
+  }
+  allProfiles = (profs||[]).map(p=>({id:p.id,displayName:p.display_name||'',role:p.role,workGroup:p.work_group||'',supplierId:p.supplier_id||null,
+    hireDate:p.hire_date||'', leaveAdjust:Number(p.leave_adjust)||0, leaveAdjustNote:p.leave_adjust_note||''}));
+}
+
+// 有給の設定（雇用契約開始日・調整日数）を保存（管理者のみ）
+async function dbSetLeaveSettings(userId, hireDate, adjust, note){
+  const { error } = await sb.from('profiles')
+    .update({hire_date:hireDate||null, leave_adjust:adjust||0, leave_adjust_note:note||''}).eq('id',userId);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  const p = allProfiles.find(x=>x.id===userId);
+  if(p){ p.hireDate=hireDate||''; p.leaveAdjust=Number(adjust)||0; p.leaveAdjustNote=note||''; }
 }
 // アカウントの権限（role）と所属発注先を更新（管理者のみ）
 async function dbSetRole(userId, role, supplierId){
