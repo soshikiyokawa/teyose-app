@@ -7,6 +7,40 @@ const HOLIDAY_STATUS = {
   rejected: {label:'却下',   cls:'rejected'}
 };
 
+// 事前に振替休日を指定した休日出勤は「労働日の振替」＝休日労働ではないため割増しない。
+// 出勤日より後に申請された場合は事前の振替にできないので、代休扱い（割増あり）とする。
+function isFurikaeHoliday(hr){
+  if(!hr || !hr.substituteDate) return false;
+  const applied = hr.createdAt ? String(hr.createdAt).slice(0,10) : '';
+  return !applied || applied <= hr.workDate;
+}
+// 画面表示用のラベル
+function holidayKindLabel(hr){
+  if(!hr.substituteDate) return {text:'休日労働（割増あり）', color:'var(--danger)'};
+  return isFurikaeHoliday(hr)
+    ? {text:'振替出勤（労働日の振替・割増なし）', color:'var(--accent-t)'}
+    : {text:'代休（出勤日より後の申請のため割増あり）', color:'var(--warn-t)'};
+}
+
+// 振替休日を入れたら、割増の扱いがどうなるかをその場で示す
+function holidaySubstituteChanged(){
+  const el=document.getElementById('holiday-kind-note');
+  if(!el) return;
+  const sub=document.getElementById('holiday-substitute').value;
+  const workDate=document.getElementById('holiday-date').value;
+  const today=gbToday();
+  if(!sub){
+    el.style.color='var(--danger)';
+    el.textContent='振替休日を指定しない場合は休日労働（割増あり）になります';
+  } else if(workDate && workDate < today){
+    el.style.color='var(--warn-t)';
+    el.textContent='出勤日が過ぎているため代休の扱いになります（割増あり）。事前に指定した振替のみ割増なしです';
+  } else {
+    el.style.color='var(--accent-t)';
+    el.textContent='労働日の振替として扱います（休日労働ではないため割増なし）';
+  }
+}
+
 async function applyHoliday(){
   const workDate = document.getElementById('holiday-date').value;
   const projectId = Number(document.getElementById('holiday-project').value)||null;
@@ -114,6 +148,7 @@ function holidayRowHtml(hr, forReview){
         ${nippoNote}
         <div style="font-size:11px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(hr.projectName||'（工事未設定）')}${hr.reason?'　'+esc(hr.reason):''}</div>
         ${hr.substituteDate?`<div style="font-size:11px;color:var(--accent-t)">振替休日：${gbDateLabel(hr.substituteDate)}</div>`:''}
+        ${(()=>{const k=holidayKindLabel(hr);return `<div style="font-size:10px;color:${k.color};font-weight:700">${k.text}</div>`;})()}
         ${hr.status==='pending'?`<div style="font-size:10px;color:var(--text-muted)">承認者：${esc(hr.approverName||'未設定')}</div>`:''}
         ${hr.status!=='pending'?`<div style="font-size:10px;color:var(--text-muted)">${st.label}：${esc(hr.reviewerName)}${hr.reviewNote?'　'+esc(hr.reviewNote):''}</div>`:''}
       </div>

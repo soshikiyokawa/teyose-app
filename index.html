@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=209">
+<link rel="stylesheet" href="css/main.css?v=210">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -863,10 +863,12 @@
     </div>
     <div class="card" style="padding:12px">
       <div class="form-grid">
-        <div class="fg"><label>出勤日 <span style="color:var(--danger)">*</span></label><input type="date" id="holiday-date"></div>
+        <div class="fg"><label>出勤日 <span style="color:var(--danger)">*</span></label><input type="date" id="holiday-date" onchange="holidaySubstituteChanged()"></div>
         <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="holiday-project"></select></div>
         <div class="fg full"><label>作業内容・理由 <span style="color:var(--danger)">*</span></label><input id="holiday-reason" placeholder="例：上棟前の準備のため"></div>
-        <div class="fg"><label>振替休日（任意）</label><input type="date" id="holiday-substitute"></div>
+        <div class="fg"><label>振替休日（任意）</label><input type="date" id="holiday-substitute" onchange="holidaySubstituteChanged()">
+          <div id="holiday-kind-note" style="font-size:10px;line-height:1.6;margin-top:3px;color:var(--danger);font-weight:700">振替休日を指定しない場合は休日労働（割増あり）になります</div>
+        </div>
         <div class="fg"><label>承認者 <span style="color:var(--danger)">*</span></label>
           <select id="holiday-approver">
             <option value="">選択してください</option>
@@ -1820,10 +1822,10 @@
 <script src="js/genba/genba-files.js?v=189"></script>
 <script src="js/genba/genba-photos.js?v=189"></script>
 <script src="js/genba/genba-drawings.js?v=186"></script>
-<script src="js/genba/genba-nippo.js?v=209"></script>
+<script src="js/genba/genba-nippo.js?v=210"></script>
 <script src="js/genba/leave-balance.js?v=207"></script>
 <script src="js/genba/genba-leave.js?v=207"></script>
-<script src="js/genba/genba-holiday.js?v=209"></script>
+<script src="js/genba/genba-holiday.js?v=210"></script>
 <script src="js/genba/license.js?v=208"></script>
 <script src="js/genba/work-calendar.js?v=162"></script>
 <script src="js/genba/account-perms.js?v=190"></script>
