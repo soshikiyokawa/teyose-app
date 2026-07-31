@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=212">
+<link rel="stylesheet" href="css/main.css?v=213">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -898,7 +898,9 @@
   <div class="sub-page" id="genbasub-license">
     <div id="license-busy" style="display:none;padding:10px 12px;margin-bottom:10px;border-radius:8px;background:var(--accent-bg);color:var(--accent-t);font-size:12px;font-weight:700"></div>
     <div id="license-body"></div>
-    <input type="file" id="license-file-input" accept="image/*" capture="environment" style="display:none" onchange="onLicenseFileChange(this)">
+    <!-- 撮影用（カメラが直接開く）と、画像フォルダから選ぶ用を分ける -->
+    <input type="file" id="license-file-camera" accept="image/*" capture="environment" style="display:none" onchange="onLicenseFileChange(this)">
+    <input type="file" id="license-file-pick" accept="image/*" style="display:none" onchange="onLicenseFileChange(this)">
 
     <div id="license-admin-wrap" style="display:none">
       <div class="section-lbl">社員の登録状況</div>
@@ -1824,7 +1826,7 @@
 <script src="js/genba/leave-balance.js?v=207"></script>
 <script src="js/genba/genba-leave.js?v=207"></script>
 <script src="js/genba/genba-holiday.js?v=210"></script>
-<script src="js/genba/license.js?v=208"></script>
+<script src="js/genba/license.js?v=213"></script>
 <script src="js/genba/work-calendar.js?v=162"></script>
 <script src="js/genba/account-perms.js?v=190"></script>
 

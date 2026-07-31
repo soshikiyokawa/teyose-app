@@ -38,6 +38,17 @@ function renderLicense(){
   renderLicenseAdmin();
 }
 
+// 撮影／画像から選ぶ／手入力の3つのボタン
+function licenseButtonsHtml(kind, label){
+  const cam = `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="14" height="14" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`;
+  const pic = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+    <button class="btn primary" onclick="openLicenseCamera('${kind}','camera')">${cam}${label}を撮影</button>
+    <button class="btn" onclick="openLicenseCamera('${kind}','pick')">${pic}写真から選ぶ</button>
+    <button class="btn" onclick="openLicenseEdit('${kind}')">手入力</button>
+  </div>`;
+}
+
 function licenseCardHtml(l, userId, userName, editable){
   const row=(label,value)=>`<div style="display:flex;gap:8px;padding:4px 0;font-size:13px">
       <span style="width:96px;flex-shrink:0;color:var(--text-sub);font-size:12px">${label}</span>
@@ -48,12 +59,7 @@ function licenseCardHtml(l, userId, userName, editable){
     ${row('免許証番号', l.licenseNo ? `<span style="font-weight:700;letter-spacing:.04em">${esc(l.licenseNo)}</span>` : '<span style="color:var(--text-muted)">未登録</span>')}
     ${row('有効期限', lcExpireLabel(l.licenseExpire))}
     <div id="license-photo-wrap" style="margin-top:8px"></div>
-    ${editable?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-      <button class="btn primary" onclick="openLicenseCamera('license')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="14" height="14" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        免許証を撮影して読み取り</button>
-      <button class="btn" onclick="openLicenseEdit('license')">手入力で修正</button>
-    </div>`:''}
+    ${editable?licenseButtonsHtml('license','免許証'):''}
   </div>
 
   <div class="section-lbl">自動車保険</div>
@@ -63,12 +69,7 @@ function licenseCardHtml(l, userId, userName, editable){
     ${row('対物補償', l.liabilityObject ? `<span style="font-weight:700">${esc(l.liabilityObject)}</span>` : '<span style="color:var(--text-muted)">未登録</span>')}
     ${row('満了日', lcExpireLabel(l.insuranceExpire))}
     <div id="insurance-photo-wrap" style="margin-top:8px"></div>
-    ${editable?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
-      <button class="btn primary" onclick="openLicenseCamera('insurance')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="14" height="14" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        保険証券を撮影して読み取り</button>
-      <button class="btn" onclick="openLicenseEdit('insurance')">手入力で修正</button>
-    </div>`:''}
+    ${editable?licenseButtonsHtml('insurance','保険証券'):''}
   </div>
   <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-top:8px">
     写真は本人と管理者だけが見られます。有効期限の1か月前・2週間前・1週間前に通知が届きます。
@@ -126,9 +127,11 @@ function renderLicenseAdmin(){
 // ── 撮影 → 読み取り ──
 let _licenseKind='license';
 
-function openLicenseCamera(kind){
+// source: 'camera'＝その場で撮影／'pick'＝画像フォルダ（写真）から選ぶ
+function openLicenseCamera(kind, source){
   _licenseKind=kind;
-  document.getElementById('license-file-input').click();
+  const id = source==='pick' ? 'license-file-pick' : 'license-file-camera';
+  document.getElementById(id).click();
 }
 
 // 端末の写真は大きいので、長辺1600pxに縮小してから送る（読み取りも保存も速くなる）
