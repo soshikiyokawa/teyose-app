@@ -63,6 +63,24 @@ function cardHolderOf(s){
   return {last4, holder:holder.replace(/[　\s]+/g,'')};
 }
 
+// 利用者の列が無いCSV（Visaなど）向け：先頭の案内行から利用者名とカード番号を拾う
+// 例：「清川　創史　様,4708-64**-****-****,中国ＶＩＳＡ法人カード」
+function cardFileHolder(rows){
+  let holder='', num='';
+  rows.slice(0,3).forEach(r=>(r||[]).forEach(c=>{
+    const s=String(c||'').trim();
+    if(!holder){
+      const m=s.match(/^(.+?)[　\s]*様$/);
+      if(m && !cardDate(s)) holder=m[1].replace(/[　\s]+/g,'');
+    }
+    if(!num){
+      const m=s.match(/(\d{4})[\d\-*＊]{6,}/);   // 4708-64**-****-**** のような表記
+      if(m) num=m[1];
+    }
+  }));
+  return {holder, num};
+}
+
 // ── 列の自動判別 ──
 // JCBはもちろん、Visa（カード会社ごとに書式が違う）も読めるように、
 // 見出しの言い回しと中身の両方から「日付・利用先・金額」の列を推定する。
@@ -128,11 +146,16 @@ function cardParseCsv(text, opt){
   const rows=csvParse(text).filter(r=>r.length && !r.every(c=>!String(c).trim()));
   if(!rows.length) throw new Error('中身が空のCSVです');
 
-  // 支払日（JCBは先頭に「今回のお支払日」がある。無ければ空）
+  // 支払日（JCBは先頭に「今回のお支払日」がある）
   let payDate='';
   for(const r of rows.slice(0,8)){
     const i=r.findIndex(c=>/お支払日|支払日|引落日|振替日/.test(String(c)));
     if(i>=0 && cardDate(r[i+1])){ payDate=cardDate(r[i+1]); break; }
+  }
+  // 支払日が書かれていない形式（Visaなど）は、ファイル名の「202608」から請求月を補う
+  if(!payDate && opt.fileName){
+    const m=String(opt.fileName).match(/(20\d{2})[-_]?(0[1-9]|1[0-2])/);
+    if(m) payDate=`${m[1]}-${m[2]}-01`;
   }
 
   const hi=cardFindHeaderRow(rows);
@@ -152,6 +175,8 @@ function cardParseCsv(text, opt){
   ['user','memo','category','area'].forEach(k=>{ sub[k]= head.length ? cardColByHead(head,k) : -1; });
   // JCBの「お支払い金額」列（利用金額が空の行の保険）
   const payCol = head.length ? head.findIndex(h=>/お支払い金額|支払金額/.test(String(h))) : -1;
+  // 利用者の列が無い場合は、先頭の案内行から拾った利用者をすべての行に使う
+  const fileHolder = sub.user<0 ? cardFileHolder(rows) : {holder:'',num:''};
 
   if(idx.date<0 || idx.merchant<0 || idx.amount<0){
     const missing=[idx.date<0?'日付':'', idx.merchant<0?'利用先':'', idx.amount<0?'金額':''].filter(Boolean).join('・');
@@ -162,6 +187,7 @@ function cardParseCsv(text, opt){
 
   const seen={};
   const list=[];
+  const usedRows=[];   // 実際に明細として読めた行（画面の「例」に使う）
   dataRows.forEach(r=>{
     const useDate=cardDate(r[idx.date]);
     const merchant=String(r[idx.merchant]||'').trim();
@@ -169,10 +195,13 @@ function cardParseCsv(text, opt){
     if(!amount && payCol>=0) amount=cardNum(r[payCol]);   // ETCまとめ行などは支払金額のみ
     if(!merchant || !amount) return;                      // 合計行・空行は取り込まない
     if(/^合計|^総額|^ご請求/.test(merchant)) return;
-    const {last4, holder}= sub.user>=0 ? cardHolderOf(r[sub.user]) : {last4:'',holder:''};
+    const {last4, holder}= sub.user>=0
+      ? cardHolderOf(r[sub.user])
+      : {last4:fileHolder.num, holder:fileHolder.holder};
     // 同じ日・同じ店・同じ金額が複数ある場合に備えて連番を付ける
     const base=`${opt.brand||'JCB'}|${payDate}|${last4}|${useDate}|${merchant}|${amount}`;
     seen[base]=(seen[base]||0)+1;
+    if(usedRows.length<5) usedRows.push(r);
     list.push({
       brand:opt.brand||'JCB',
       payDate, cardLast4:last4, cardHolder:holder,
@@ -183,7 +212,7 @@ function cardParseCsv(text, opt){
       rowKey:`${base}|${seen[base]}`
     });
   });
-  return {payDate, list, head, idx, sample:dataRows.slice(0,5)};
+  return {payDate, list, head, idx, sample: usedRows.length ? usedRows : dataRows.slice(0,5)};
 }
 
 // ── 自動割り当て ──
@@ -307,6 +336,7 @@ function cardRowHtml(c){
 
 // ── CSVの取り込み（JCB／Visa。列は自動判別し、外れたら選び直せる） ──
 let _cardCsvText='';     // 読み込んだCSV本文
+let _cardFileName='';   // 読み込んだファイル名（請求月の補完に使う）
 let _cardParsed=null;    // 判別結果
 
 function cardGuessBrand(filename, text){
@@ -324,9 +354,10 @@ async function onCardCsvChange(input){
   show('CSVを読み込んでいます…');
   try{
     _cardCsvText=await cardReadText(file);
+    _cardFileName=file.name||'';
     const brand=cardGuessBrand(file.name, _cardCsvText);
     try{
-      _cardParsed=cardParseCsv(_cardCsvText, {brand});
+      _cardParsed=cardParseCsv(_cardCsvText, {brand, fileName:_cardFileName});
     }catch(e){
       // 列を判別できなかった場合も、画面で選べるように情報を持って開く
       if(!e.needMapping) throw e;
@@ -348,7 +379,7 @@ function openCardImport(brand){
 }
 function closeCardImport(){
   document.getElementById('card-import-modal').classList.remove('open');
-  _cardCsvText=''; _cardParsed=null;
+  _cardCsvText=''; _cardFileName=''; _cardParsed=null;
 }
 
 // 列の選択肢を作る（見出し名＋先頭行の中身を見本として表示）
@@ -377,6 +408,7 @@ function renderCardImportPreview(){
   const el=document.getElementById('card-import-preview');
   if(!el || !_cardCsvText) return;
   const opt={
+    fileName:_cardFileName,
     brand:document.getElementById('card-import-brand').value,
     date:Number(document.getElementById('card-col-date').value),
     merchant:Number(document.getElementById('card-col-merchant').value),
