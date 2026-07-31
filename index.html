@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=208">
+<link rel="stylesheet" href="css/main.css?v=209">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -858,6 +858,9 @@
     </div>
 
     <div class="section-lbl" style="margin-top:0">休日出勤を申請する</div>
+    <div style="background:var(--warn-bg);color:var(--warn-t);border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.7;margin-bottom:8px">
+      休日出勤の手当は<b>働いた時間数</b>で計算します。この申請とは別に、<b>当日の日報も必ず提出</b>してください。
+    </div>
     <div class="card" style="padding:12px">
       <div class="form-grid">
         <div class="fg"><label>出勤日 <span style="color:var(--danger)">*</span></label><input type="date" id="holiday-date"></div>
@@ -1001,6 +1004,18 @@
       <button class="btn" style="flex:1;justify-content:center" onclick="closeSimpleEst()">キャンセル</button>
       <button class="btn" style="flex:1;justify-content:center" onclick="applySimpleEst(false)">明細に反映</button>
       <button class="btn primary" style="flex:1.2;justify-content:center" onclick="applySimpleEst(true)">反映して保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ 休日出勤の申請後の案内（日報もセットで必要） ════ -->
+<div class="modal-overlay" id="holiday-guide-modal" style="z-index:330" onclick="if(event.target===this)closeHolidayGuide()">
+  <div class="modal-sheet" style="max-width:380px">
+    <h3>申請しました</h3>
+    <div id="holiday-guide-body"></div>
+    <div class="modal-actions" style="display:flex;gap:6px">
+      <button class="btn" style="flex:1;justify-content:center" onclick="closeHolidayGuide()">あとで</button>
+      <button class="btn primary" style="flex:1.3;justify-content:center" onclick="goNippoFromGuide()">日報を書く</button>
     </div>
   </div>
 </div>
@@ -1805,10 +1820,10 @@
 <script src="js/genba/genba-files.js?v=189"></script>
 <script src="js/genba/genba-photos.js?v=189"></script>
 <script src="js/genba/genba-drawings.js?v=186"></script>
-<script src="js/genba/genba-nippo.js?v=207"></script>
+<script src="js/genba/genba-nippo.js?v=209"></script>
 <script src="js/genba/leave-balance.js?v=207"></script>
 <script src="js/genba/genba-leave.js?v=207"></script>
-<script src="js/genba/genba-holiday.js?v=165"></script>
+<script src="js/genba/genba-holiday.js?v=209"></script>
 <script src="js/genba/license.js?v=208"></script>
 <script src="js/genba/work-calendar.js?v=162"></script>
 <script src="js/genba/account-perms.js?v=190"></script>

@@ -23,8 +23,52 @@ async function applyHoliday(){
   document.getElementById('holiday-reason').value = '';
   document.getElementById('holiday-substitute').value = '';
   document.getElementById('holiday-approver').value = '';
-  showToast(`${approverName}さんに休日出勤を申請しました（承認待ち）`);
   await refreshGenba();
+  // 休日出勤手当は時間数で計算するため、当日の日報も必要になる。その場で案内する
+  openHolidayGuide(workDate, approverName, projectId);
+}
+
+// ── 申請後の案内（日報もセットで必要なことを伝える） ──
+let _guideDate=null, _guideProjectId=null;
+function openHolidayGuide(workDate, approverName, projectId){
+  _guideDate=workDate; _guideProjectId=projectId||null;
+  document.getElementById('holiday-guide-body').innerHTML =
+    `<div style="font-size:13px;font-weight:700;margin-bottom:8px">${gbDateLabel(workDate)}の休日出勤を申請しました</div>
+     <div style="font-size:12px;color:var(--text-sub);line-height:1.8">
+       ${esc(approverName)}さんに通知しました。承認をお待ちください。<br><br>
+       <b style="color:var(--danger)">休日出勤の手当は「働いた時間数」で計算します。</b>
+       時間数は日報から集計するため、<b>当日の日報も必ず提出してください</b>。
+       日報が無いと出面表に時間が入らず、手当を計算できません。
+     </div>`;
+  document.getElementById('holiday-guide-modal').classList.add('open');
+}
+function closeHolidayGuide(){
+  document.getElementById('holiday-guide-modal').classList.remove('open');
+  _guideDate=null; _guideProjectId=null;
+}
+// 案内から日報タブへ。日付（と工事）を入れた状態で開く
+function goNippoFromGuide(){
+  const date=_guideDate, pid=_guideProjectId;
+  closeHolidayGuide();
+  genbaTab('nippo');
+  setTimeout(()=>{
+    const dEl=document.getElementById('nippo-date');
+    if(dEl && date) dEl.value=date;
+    const pEl=document.getElementById('nippo-project');
+    if(pEl && pid){ pEl.value=String(pid); if(typeof nippoProjectChanged==='function') nippoProjectChanged(); }
+    document.getElementById('nippo-content')?.focus();
+  },50);
+}
+
+// その日の日報を出しているか（休日出勤の時間数が出せるか）
+function holidayHasNippo(hr){
+  return dailyReports.some(n=>n.userId===hr.userId && n.workDate===hr.workDate);
+}
+
+// 一覧の「日報を書く」から、日付・工事を入れた状態で日報タブを開く
+function goNippoFor(date, projectId){
+  _guideDate=date; _guideProjectId=projectId||null;
+  goNippoFromGuide();
 }
 
 async function cancelHoliday(id){
@@ -55,10 +99,19 @@ async function rejectHoliday(id){
 function holidayRowHtml(hr, forReview){
   const st = HOLIDAY_STATUS[hr.status]||HOLIDAY_STATUS.pending;
   const isMine = hr.userId===currentUserId;
+  // 時間数は日報から集計するため、日報が無い日は目立たせる（却下分は対象外）
+  const needNippo = hr.status!=='rejected' && !holidayHasNippo(hr);
+  const nippoNote = needNippo
+    ? `<div style="font-size:11px;color:var(--danger);font-weight:700;margin-top:2px">
+         ⚠ 日報が未提出です（時間数を計算できません）
+         ${isMine?`<button class="btn xs" style="margin-left:6px" onclick="event.stopPropagation();goNippoFor('${hr.workDate}',${hr.projectId||'null'})">日報を書く</button>`:''}
+       </div>`
+    : '';
   return `<div class="leave-row">
     <div style="display:flex;align-items:center;gap:8px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:700">${gbDateLabel(hr.workDate)}${!isMine?`<span style="font-weight:400;color:var(--text-sub)">　${esc(hr.userName)}</span>`:''}</div>
+        ${nippoNote}
         <div style="font-size:11px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(hr.projectName||'（工事未設定）')}${hr.reason?'　'+esc(hr.reason):''}</div>
         ${hr.substituteDate?`<div style="font-size:11px;color:var(--accent-t)">振替休日：${gbDateLabel(hr.substituteDate)}</div>`:''}
         ${hr.status==='pending'?`<div style="font-size:10px;color:var(--text-muted)">承認者：${esc(hr.approverName||'未設定')}</div>`:''}

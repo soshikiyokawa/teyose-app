@@ -359,7 +359,10 @@ function printDezura(){
   // 社員ごとに日別マークと集計を組み立てる
   // 日別セル：現場番号（同日複数現場は「1·2」、＊＝残業あり）／休＝休日出勤／有＝有給／半＝半休／振＝振替休日
   const users = {}; // userId -> {name, marks:{date:mark}, siteByDate:{date:{nos:Set,ot:bool}}, work, overtime, days, ...}
-  const getU = (id,name)=>users[id] = users[id]||{name:name||'（名前未設定）',marks:{},siteByDate:{},work:0,overtime:0,days:new Set(),holidayDays:0,leaveDays:0,subDays:0};
+  const getU = (id,name)=>users[id] = users[id]||{name:name||'（名前未設定）',marks:{},siteByDate:{},work:0,overtime:0,days:new Set(),
+    holidayDays:0,leaveDays:0,subDays:0,
+    minByDate:{},              // 日ごとの実働（分）＝日報から。休日出勤の時間数に使う
+    holidayDates:new Set()};   // 承認済みの休日出勤日
 
   // 現場（工事）ごとに番号を振り、人工（実働8時間＝1.0人工）を集計する
   const sites = {}; // siteName -> {no, total, byUser:{userName:ninku}}
@@ -372,6 +375,7 @@ function printDezura(){
   dailyReports.filter(n=>inPeriod(n.workDate)).forEach(n=>{
     const u = getU(n.userId, n.userName);
     u.work += n.workMinutes; u.overtime += n.overtimeMinutes; u.days.add(n.workDate);
+    u.minByDate[n.workDate] = (u.minByDate[n.workDate]||0) + n.workMinutes;
     const site = getSite(n.projectName);
     const ninku = n.workMinutes/480;
     site.total += ninku;
@@ -382,7 +386,7 @@ function printDezura(){
   });
   holidayRequests.filter(hr=>hr.status==='approved').forEach(hr=>{
     const u = getU(hr.userId, hr.userName);
-    if(inPeriod(hr.workDate)){ u.marks[hr.workDate]='休'; u.holidayDays++; u.days.add(hr.workDate); }
+    if(inPeriod(hr.workDate)){ u.marks[hr.workDate]='休'; u.holidayDays++; u.days.add(hr.workDate); u.holidayDates.add(hr.workDate); }
     if(inPeriod(hr.substituteDate)){ u.marks[hr.substituteDate]=u.marks[hr.substituteDate]||'振'; u.subDays++; }
   });
   leaveRequests.filter(lr=>lr.status==='approved').forEach(lr=>{
@@ -431,7 +435,13 @@ function printDezura(){
       // 休日（勤務カレンダー基準）で活動が無ければ「－」。残る空欄＝出勤日なのに未入力
       if(!mk && isHolidayForUser(uid, s, wd)) mk = '－';
       const missing = !mk;                       // 出勤日で記入なし
-      const bg = mk==='－' ? 'background:#f2efe8'
+      // 休日出勤の日は、日報の実働時間を2行目に出す（給与計算で使うため）
+      const isHol = u.holidayDates.has(s);
+      const holMin = isHol ? (u.minByDate[s]||0) : 0;
+      const holNoNippo = isHol && !holMin;       // 休日出勤の承認はあるが日報が無い
+      const sub = isHol ? `<div style="font-size:9px;font-weight:700">${holNoNippo?'日報?':fmtH(holMin)}</div>` : '';
+      const bg = holNoNippo ? 'background:#ffcdd2'   // 時間が出せない＝要確認
+               : mk==='－' ? 'background:#f2efe8'
                : missing   ? 'background:#ffe0b2'  // 未入力を目立たせる
                : '';
       const color = special==='休'?'color:#b5302a;font-weight:700'
@@ -439,8 +449,11 @@ function printDezura(){
         : special==='振'?'color:#8a6000;font-weight:700'
         : mk==='－'?'color:#bbb'
         : (siteCell?.ot?'font-weight:700':'');
-      return `<td class="${wd===0?'dz-sun':''}" style="text-align:center;${bg};${color}">${mk}</td>`;
+      return `<td class="${wd===0?'dz-sun':''}" style="text-align:center;${bg};${color}">${mk}${sub}</td>`;
     }).join('');
+    // 休日出勤の実働時間の合計と、日報が無くて時間を出せない日数
+    let holMinTotal=0, holMissing=0;
+    u.holidayDates.forEach(s=>{ const m=u.minByDate[s]||0; holMinTotal+=m; if(!m) holMissing++; });
     return `<tr>
       <td style="white-space:nowrap;font-weight:700">${esc(u.name)}</td>
       ${cells}
@@ -448,6 +461,7 @@ function printDezura(){
       <td class="sum" style="text-align:right">${fmtH(u.work)}</td>
       <td class="sum" style="text-align:right;${u.overtime>0?'font-weight:700':''}">${u.overtime>0?fmtH(u.overtime):''}</td>
       <td class="sum" style="text-align:right">${u.holidayDays||''}</td>
+      <td class="sum" style="text-align:right;${holMissing?'background:#ffcdd2;':''}${holMinTotal?'font-weight:700':''}">${holMinTotal?fmtH(holMinTotal):''}${holMissing?`<div style="font-size:8px;font-weight:700">日報${holMissing}件</div>`:''}</td>
       <td class="sum" style="text-align:right">${u.leaveDays||''}</td>
       <td class="sum" style="text-align:right">${u.subDays||''}</td>
     </tr>`;
@@ -515,12 +529,12 @@ function printDezura(){
   <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
     <h2 style="font-size:16px;margin:0">出面表　${y}年${m}月度</h2>
     <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
-    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　休=休日出勤　有=有給　半=半休　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　※休日出勤・有給・振替は承認済みのみ</span>
+    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　休=休日出勤（下段は日報の実働時間）　有=有給　半=半休　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　<span style="background:#ffcdd2;padding:0 4px">■</span>＝休日出勤の日報が未提出（時間数を計算できません）　※休日出勤・有給・振替は承認済みのみ</span>
   </div>
   <div style="font-size:10px;color:#888;margin-bottom:4px">← 横スクロールで日付が見られます（氏名は固定）</div>
   <div class="dz-scroll">
   <table class="dz">
-    <tr><th>氏名</th>${head}<th class="sum sum-first">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum">有給<br>日数</th><th class="sum">振休<br>日数</th></tr>
+    <tr><th>氏名</th>${head}<th class="sum sum-first">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum">休出<br>(h)</th><th class="sum">有給<br>日数</th><th class="sum">振休<br>日数</th></tr>
     ${rows}
   </table>
   </div>
