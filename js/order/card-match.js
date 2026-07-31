@@ -348,3 +348,69 @@ async function ignoreCardRow(){
 async function refreshCardData(){
   try{ await fetchCardStatements(); }catch(e){ console.warn('カード明細の再取得に失敗',e); }
 }
+
+// ════ 割り当て済みの明細をCSVで出力 ════
+// 元の明細に「案件（現場）・費目・状態・発注番号・税抜金額」を書き足して書き出す。
+// 文字コードはUTF-8（BOM付き）。Excelでそのまま開ける。
+
+const CARD_STATUS_LABEL = {
+  matched:'発注と照合', registered:'原価登録済', unassigned:'未割当', ignored:'対象外'
+};
+
+// 画面で今表示している条件（請求月・状態）と同じ明細を返す
+function cardVisibleRows(){
+  let list=cardStatements.filter(c=>!cardMonth || (c.payDate||'').startsWith(cardMonth));
+  if(cardFilter==='todo')    list=list.filter(c=>c.status==='unassigned');
+  if(cardFilter==='matched') list=list.filter(c=>c.status==='matched'||c.status==='registered');
+  if(cardFilter==='ignored') list=list.filter(c=>c.status==='ignored');
+  return list.sort((a,b)=>(a.useDate||'').localeCompare(b.useDate||'') || (a.merchant||'').localeCompare(b.merchant||''));
+}
+
+function csvCell(v){
+  const s=String(v==null?'':v);
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+
+function exportCardCsv(){
+  const rows=cardVisibleRows();
+  if(!rows.length){ showToast('出力する明細がありません'); return; }
+
+  const head=['請求月','ご利用日','利用者','カード下4桁','ご利用先','ご利用金額(税込)','税抜金額',
+              '案件（現場）','費目','状態','発注番号','国内/海外','摘要'];
+  const body=rows.map(c=>[
+    (c.payDate||'').slice(0,7).replace('-','/'),
+    (c.useDate||'').replace(/-/g,'/'),
+    c.cardHolder||'', c.cardLast4||'', c.merchant||'',
+    Math.round(c.amount||0),
+    Math.round((c.amount||0)/1.1),
+    c.project||'', c.costType||'',
+    CARD_STATUS_LABEL[c.status]||c.status||'',
+    c.orderNo||'', c.area||'', c.memo||''
+  ]);
+
+  // 末尾に案件（現場）ごとの合計を付ける（給与・原価の確認用）
+  const byProject={};
+  rows.forEach(c=>{ if(c.status==='ignored') return;
+    const k=c.project||'（未割当）';
+    byProject[k]=(byProject[k]||0)+Math.round(c.amount||0);
+  });
+  const sum=[[],['■ 案件（現場）別 合計（税込・対象外を除く）'],['案件（現場）','合計']];
+  Object.entries(byProject).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>sum.push([k,v]));
+  sum.push(['合計', Object.values(byProject).reduce((s,v)=>s+v,0)]);
+
+  const csv=[head,...body,...sum].map(r=>r.map(csvCell).join(',')).join('\r\n');
+  const label=(cardMonth||'すべて').replace('-','');
+  const suffix={all:'',todo:'_未割当',matched:'_割当済',ignored:'_対象外'}[cardFilter]||'';
+  cardDownload(`カード明細_${label}${suffix}.csv`, csv);
+  showToast(`${rows.length}件を書き出しました`);
+}
+
+// UTF-8（BOM付き）でダウンロードする
+function cardDownload(filename, text){
+  const blob=new Blob(['﻿'+text], {type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}

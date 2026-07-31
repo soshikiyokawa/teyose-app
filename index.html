@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=214">
+<link rel="stylesheet" href="css/main.css?v=215">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -567,6 +567,10 @@
       <button class="btn primary" onclick="document.getElementById('card-csv-input').click()">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="14" height="14" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         CSVを取り込む
+      </button>
+      <button class="btn" onclick="exportCardCsv()" title="表示中の明細を、割り当て内容を書き足してCSVで出力">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        CSVで出力
       </button>
       <select id="card-month" onchange="cardMonthChanged()" style="width:auto;min-width:150px"></select>
       <input type="file" id="card-csv-input" accept=".csv,text/csv" style="display:none" onchange="onCardCsvChange(this)">
@@ -1858,7 +1862,7 @@
 <script src="js/order/order-cart.js?v=214"></script>
 <script src="js/order/order-confirm.js?v=154"></script>
 <script src="js/order/order-history.js?v=155"></script>
-<script src="js/order/card-match.js?v=214"></script>
+<script src="js/order/card-match.js?v=215"></script>
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
