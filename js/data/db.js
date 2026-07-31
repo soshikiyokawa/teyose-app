@@ -53,6 +53,7 @@ async function fetchAllData(){
 
     await fetchGenbaData();
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
+    await fetchCardStatements();   // カード明細（管理者のみ。テーブルが無くても落とさない）
   } else if(currentUserRole==='supplier'){
     // 業者：案件チャットのスレッド名表示のため、参加している案件だけ取得（RLSで自動的に絞られる）
     const { data: projectRows } = await sb.from('projects').select('id, name, members');
@@ -526,6 +527,44 @@ async function fetchGenbaData(){
     insurer:r.insurer||'', liabilityPerson:r.liability_person||'', liabilityObject:r.liability_object||'',
     insuranceExpire:r.insurance_expire||'', insurancePhoto:r.insurance_photo||'',
     note:r.note||'', updatedAt:r.updated_at, updatedBy:r.updated_by||''}));
+}
+
+// ── カード明細（JCB）──
+async function fetchCardStatements(){
+  if(currentUserRole!=='staff') return;
+  const { data, error } = await sb.from('card_statements').select('*').order('use_date',{ascending:false});
+  cardTableReady = !error;
+  cardStatements = (data||[]).map(r=>({id:r.id, payDate:r.pay_date||'', cardLast4:r.card_last4||'', cardHolder:r.card_holder||'',
+    useDate:r.use_date||'', merchant:r.merchant||'', amount:Number(r.amount)||0, category:r.category||'', area:r.area||'',
+    memo:r.memo||'', project:r.project||'', costType:r.cost_type||'', orderNo:r.order_no||'',
+    costEntryId:r.cost_entry_id||null, status:r.status||'unassigned', rowKey:r.row_key||''}));
+}
+async function dbAddCardStatements(rows){
+  const payload = rows.map(r=>({
+    pay_date:r.payDate||null, card_last4:r.cardLast4||'', card_holder:r.cardHolder||'',
+    use_date:r.useDate||null, merchant:r.merchant||'', amount:r.amount||0,
+    category:r.category||'', area:r.area||'', memo:r.memo||'',
+    project:r.project||'', cost_type:r.costType||'', order_no:r.orderNo||'',
+    status:r.status||'unassigned', row_key:r.rowKey
+  }));
+  // 同じ行が既にある場合は無視する（二重取り込み防止）
+  const { error } = await sb.from('card_statements').upsert(payload, {onConflict:'row_key', ignoreDuplicates:true});
+  if(error){showToast('取り込みに失敗しました：'+error.message);throw error;}
+}
+async function dbUpdateCardStatement(id, patch){
+  const { error } = await sb.from('card_statements').update({...patch, updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+}
+// カード明細から原価を1件登録する（税込→税抜に換算）
+async function dbRegisterCardCost(row, {project, costType, name}){
+  const amountEx = Math.round(Number(row.amount||0)/1.1);
+  const { data, error } = await sb.from('cost_entries').insert({
+    date:row.useDate||null, project:project||'', name:name||row.merchant, qty:1, unit:'式',
+    amount:amountEx, supplier_id:null, order_no:'', cost_type:costType||'諸経費', status:'received'
+  }).select().single();
+  if(error){showToast('原価登録に失敗しました：'+error.message);throw error;}
+  await dbUpdateCardStatement(row.id, {project:project||'', cost_type:costType||'', status:'registered', cost_entry_id:data.id});
+  return data.id;
 }
 
 // ── 免許・自動車保険 ──

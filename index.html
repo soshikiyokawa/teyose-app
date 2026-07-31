@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=213">
+<link rel="stylesheet" href="css/main.css?v=214">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -439,6 +439,7 @@
     <button class="sub-tab-btn staff-only" onclick="orderSubTab('supplier')">発注先マスタ</button>
     <button class="sub-tab-btn" id="subtab-master" onclick="orderSubTab('master')">品目マスタ</button>
     <button class="sub-tab-btn staff-only" onclick="orderSubTab('history')">発注履歴</button>
+    <button class="sub-tab-btn staff-only" onclick="orderSubTab('card')">カード明細</button>
   </div>
 
   <!-- ① 発注作成（発注先選択 → 品目選択 → カート） -->
@@ -558,6 +559,23 @@
   <div class="sub-page staff-only" id="ordersub-history">
     <div class="section-lbl">発注履歴</div>
     <div class="card" id="orders-list"><div class="empty">発注履歴はありません</div></div>
+  </div>
+
+  <!-- カード明細（JCB）の取り込みと照合 -->
+  <div class="sub-page staff-only" id="ordersub-card">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 8px">
+      <button class="btn primary" onclick="document.getElementById('card-csv-input').click()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="14" height="14" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        CSVを取り込む
+      </button>
+      <select id="card-month" onchange="cardMonthChanged()" style="width:auto;min-width:150px"></select>
+      <input type="file" id="card-csv-input" accept=".csv,text/csv" style="display:none" onchange="onCardCsvChange(this)">
+    </div>
+    <div id="card-busy" style="display:none;padding:10px 12px;margin-bottom:10px;border-radius:8px;background:var(--accent-bg);color:var(--accent-t);font-size:12px;font-weight:700"></div>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+      JCBの明細CSVをそのまま取り込めます。レシートから作った発注と金額・日付が一致する明細は自動で照合し、その現場の費用として記録します（原価は発注時に登録済みのため二重には計上しません）。
+    </div>
+    <div id="card-body"></div>
   </div>
 </div>
 
@@ -1088,6 +1106,31 @@
     <div class="modal-actions" style="display:flex;gap:6px">
       <button class="btn" style="flex:1;justify-content:center" onclick="closeHolidayGuide()">あとで</button>
       <button class="btn primary" style="flex:1.3;justify-content:center" onclick="goNippoFromGuide()">日報を書く</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ カード明細の割り当て ════ -->
+<div class="modal-overlay" id="card-assign-modal" style="z-index:330" onclick="if(event.target===this)closeCardAssign()">
+  <div class="modal-sheet" style="max-width:400px">
+    <h3>この利用はどの現場？</h3>
+    <div style="font-size:13px;font-weight:700" id="card-assign-title">—</div>
+    <div style="font-size:11px;color:var(--text-sub);margin-bottom:12px" id="card-assign-sub"></div>
+
+    <div class="fg" style="margin-bottom:10px"><label>案件（現場）</label>
+      <select id="card-assign-project"></select></div>
+    <div class="fg" style="margin-bottom:10px"><label>費目</label>
+      <select id="card-assign-cost"></select></div>
+    <div class="fg" style="margin-bottom:10px"><label>原価に残す名前</label>
+      <input id="card-assign-name" placeholder="利用先名"></div>
+
+    <div id="card-assign-note" style="font-size:11px;color:var(--text-sub);line-height:1.7;margin-bottom:12px"></div>
+
+    <div class="modal-actions" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn danger" onclick="ignoreCardRow()">対象外</button>
+      <button class="btn" style="margin-left:auto" onclick="closeCardAssign()">キャンセル</button>
+      <button class="btn" onclick="saveCardAssign()">記録だけ</button>
+      <button class="btn primary" id="card-assign-register" onclick="registerCardCost()">原価に登録</button>
     </div>
   </div>
 </div>
@@ -1776,10 +1819,10 @@
 <script src="js/utils.js?v=203"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=208"></script>
+<script src="js/state.js?v=214"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=208"></script>
+<script src="js/data/db.js?v=214"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=211"></script>
@@ -1812,9 +1855,10 @@
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=202"></script>
 <script src="js/order/item-master.js?v=202"></script>
-<script src="js/order/order-cart.js?v=197"></script>
+<script src="js/order/order-cart.js?v=214"></script>
 <script src="js/order/order-confirm.js?v=154"></script>
 <script src="js/order/order-history.js?v=155"></script>
+<script src="js/order/card-match.js?v=214"></script>
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
