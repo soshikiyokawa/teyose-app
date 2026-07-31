@@ -214,17 +214,36 @@ function closePdfViewer() {
   document.getElementById('pdf-viewer-frame').src = '';
 }
 
-// ════ やり取りパネル制御 ════
+// ════ チャットページ制御 ════
+// 他のタブと同じく、画面をチャットに切り替えて表示する
 
-function toggleTalkPanel(){
-  talkPanelOpen = !talkPanelOpen;
-  document.getElementById('ai-chat-panel').classList.toggle('open', talkPanelOpen);
-  document.getElementById('nav-talk').classList.toggle('active', talkPanelOpen);
-  if(talkPanelOpen){
-    closeTalkPanelThread(); // 一覧から開く
-    renderTalkPanelList();
-  }
+function toggleTalkPanel(){ mainTab('talk'); }   // 旧・パネル呼び出しの互換
+
+// チャットタブに切り替わったときに呼ばれる（nav.js の _mainTabGo から）
+function renderTalkPage(){
+  talkPanelOpen = true;
+  // 前に開いていたスレッドがあればそのまま開き直す（無ければ一覧）
+  if(activeTalkPanelSupplier) openTalkPanelThread(activeTalkPanelSupplier);
+  else closeTalkPanelThread();
+  fitTalkPage();
 }
+
+// 入力欄が画面下に収まるよう、チャット領域の高さを実際の位置から計算する
+function fitTalkPage(){
+  const wrap = document.getElementById('talk-page-wrap');
+  if(!wrap || !document.getElementById('page-talk')?.classList.contains('active')) return;
+  window.scrollTo(0,0);   // ページ先頭を基準に測る
+  const nav = document.getElementById('app-nav');
+  const navH = nav && nav.style.display!=='none' ? nav.offsetHeight : 0;
+  const top = wrap.getBoundingClientRect().top;   // 画面上端からの位置
+  const margin = parseFloat(getComputedStyle(wrap).marginBottom)||0;
+  let h = Math.max(320, window.innerHeight - top - navH - margin - 4);
+  wrap.style.height = h + 'px';
+  // 余白の分だけページがスクロールしてしまう場合は、その分だけ縮める
+  const excess = document.documentElement.scrollHeight - window.innerHeight;
+  if(excess > 0 && h - excess >= 320) wrap.style.height = (h - excess) + 'px';
+}
+window.addEventListener('resize', fitTalkPage);
 
 function renderTalkPanelList(){
   document.getElementById('talk-panel-list').style.display='flex';

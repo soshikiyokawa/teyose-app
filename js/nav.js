@@ -19,11 +19,13 @@ function mainTab(t){
   _mainTabGo(t);
 }
 function _mainTabGo(t){
-  ['estimate','cost','order','orderslist','schedule','genba'].forEach(n=>{
+  ['estimate','cost','order','orderslist','schedule','genba','talk'].forEach(n=>{
     document.getElementById('page-'+n)?.classList.toggle('active',n===t);
     document.getElementById('nav-'+n)?.classList.toggle('active',n===t);
   });
   document.body.classList.remove('sch-preview');
+  talkPanelOpen = (t==='talk');
+  if(t==='talk') renderTalkPage();
   if(t==='cost') renderCost();
   if(t==='order'&&document.getElementById('ordersub-master').classList.contains('active')) renderMaster();
   if(t==='orderslist') renderOrdersList();
