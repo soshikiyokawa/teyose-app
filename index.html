@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=216">
+<link rel="stylesheet" href="css/main.css?v=218">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -1123,6 +1123,37 @@
   </div>
 </div>
 
+<!-- ════ カード明細の取り込み（種別と列の確認） ════ -->
+<div class="modal-overlay" id="card-import-modal" style="z-index:330" onclick="if(event.target===this)closeCardImport()">
+  <div class="modal-sheet" style="max-width:420px">
+    <h3>カード明細の取り込み</h3>
+    <div style="font-size:11px;color:var(--text-sub);line-height:1.7;margin-bottom:12px">
+      読み取る列を自動で判別しました。違っていれば選び直してください（次回も同じ判別で読み込みます）。
+    </div>
+
+    <div class="fg" style="margin-bottom:10px"><label>カードの種別</label>
+      <select id="card-import-brand" onchange="renderCardImportPreview()">
+        <option value="JCB">JCB</option>
+        <option value="Visa">Visa</option>
+      </select>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:3px">発注の支払方法と一致するものだけを照合します</div>
+    </div>
+    <div class="fg" style="margin-bottom:8px"><label>ご利用日の列</label>
+      <select id="card-col-date" onchange="renderCardImportPreview()"></select></div>
+    <div class="fg" style="margin-bottom:8px"><label>ご利用先の列</label>
+      <select id="card-col-merchant" onchange="renderCardImportPreview()"></select></div>
+    <div class="fg" style="margin-bottom:10px"><label>ご利用金額の列</label>
+      <select id="card-col-amount" onchange="renderCardImportPreview()"></select></div>
+
+    <div id="card-import-preview" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11px;line-height:1.8;max-height:26vh;overflow-y:auto"></div>
+
+    <div class="modal-actions" style="display:flex;gap:6px">
+      <button class="btn" style="flex:1;justify-content:center" onclick="closeCardImport()">キャンセル</button>
+      <button class="btn primary" style="flex:1.4;justify-content:center" onclick="confirmCardImport()">この内容で取り込む</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════ カード明細の割り当て ════ -->
 <div class="modal-overlay" id="card-assign-modal" style="z-index:330" onclick="if(event.target===this)closeCardAssign()">
   <div class="modal-sheet" style="max-width:400px">
@@ -1835,7 +1866,7 @@
 <script src="js/state.js?v=214"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=216"></script>
+<script src="js/data/db.js?v=217"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=211"></script>
@@ -1871,7 +1902,7 @@
 <script src="js/order/order-cart.js?v=214"></script>
 <script src="js/order/order-confirm.js?v=216"></script>
 <script src="js/order/order-history.js?v=155"></script>
-<script src="js/order/card-match.js?v=216"></script>
+<script src="js/order/card-match.js?v=218"></script>
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->

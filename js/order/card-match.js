@@ -1,6 +1,6 @@
-// ════ カード明細（JCB）の取り込みと照合 ════
+// ════ カード明細（JCB／Visa）の取り込みと照合 ════
 //
-// JCBのCSV（Shift_JIS・6行目が見出し・摘要欄に改行が入ることがある）を読み込み、
+// カード会社のCSV（Shift_JIS・JIS・UTF-8。見出しの位置や列名が会社ごとに違う）を読み込み、
 // レシートから作った発注と「日付＋金額」で突き合わせて、どの現場（案件）の費用かを埋める。
 //   ・発注と一致した明細   → 原価は発注時に登録済みなので二重登録しない（照合済み）
 //   ・一致しなかった明細   → 過去に同じ利用先へ割り当てた案件・費目を候補として出し、原価に登録できる
@@ -63,58 +63,140 @@ function cardHolderOf(s){
   return {last4, holder:holder.replace(/[　\s]+/g,'')};
 }
 
-// CSV本文 → 明細の配列
-function cardParseCsv(text){
-  const rows=csvParse(text);
-  // 支払日（1〜5行目のヘッダ部にある）
-  let payDate='';
-  for(const r of rows.slice(0,6)){
-    const i=r.findIndex(c=>String(c).includes('お支払日'));
-    if(i>=0){ payDate=cardDate(r[i+1]); break; }
+// ── 列の自動判別 ──
+// JCBはもちろん、Visa（カード会社ごとに書式が違う）も読めるように、
+// 見出しの言い回しと中身の両方から「日付・利用先・金額」の列を推定する。
+const CARD_HEAD_WORDS = {
+  date:     ['ご利用日','利用日','利用年月日','ご利用年月日','使用日','日付','取引日'],
+  merchant: ['ご利用先','利用先','ご利用店名','利用店名','店名','ご利用店舗','利用加盟店','加盟店','摘要','内容','利用内容'],
+  amount:   ['ご利用金額','利用金額','ご利用額','利用額','金額','支払金額','お支払い金額','ご請求額','請求額'],
+  user:     ['ご利用者','利用者','カード会員','会員名','カード名義','利用者名'],
+  memo:     ['摘要','備考','メモ'],
+  category: ['カテゴリ','種別','区分'],
+  area:     ['国内','海外','国内／海外','国内/海外']
+};
+
+function cardNormHead(s){ return cardNorm(s).replace(/[()（）￥¥]/g,''); }
+
+// 見出し行を探す（無い場合は -1）
+function cardFindHeaderRow(rows){
+  const words=[...CARD_HEAD_WORDS.date, ...CARD_HEAD_WORDS.merchant, ...CARD_HEAD_WORDS.amount].map(cardNormHead);
+  let best=-1, bestScore=0;
+  rows.slice(0,25).forEach((r,i)=>{
+    const score=r.reduce((n,c)=>{
+      const h=cardNormHead(c);
+      return n + (h && words.some(w=>h.includes(w)) ? 1 : 0);
+    },0);
+    if(score>bestScore){ bestScore=score; best=i; }
+  });
+  return bestScore>=2 ? best : -1;
+}
+
+// 見出し名から列番号を決める
+// CARD_HEAD_WORDS の並び順＝優先順。前の語ほど強く、各語で「完全一致→部分一致」の順に探す。
+// （例：JCBの「ご利用先など」を、後ろの候補である「摘要」より先に拾う）
+function cardColByHead(head, kind){
+  const norm=head.map(cardNormHead);
+  for(const w of CARD_HEAD_WORDS[kind].map(cardNormHead)){
+    const exact=norm.findIndex(h=>h===w);
+    if(exact>=0) return exact;
+    const partial=norm.findIndex(h=>h && h.includes(w));
+    if(partial>=0) return partial;
   }
-  // 見出し行（「ご利用日」を含む行）を探す
-  const hi=rows.findIndex(r=>r.some(c=>String(c).trim()==='ご利用日'));
-  if(hi<0) throw new Error('見出し行（ご利用日）が見つかりません。JCBの明細CSVか確認してください');
-  const head=rows[hi].map(c=>String(c).trim());
-  const col=name=>head.findIndex(h=>h.replace(/\s/g,'').includes(name));
-  const idx={
-    user:col('ご利用者'), cat:col('カテゴリ'), date:col('ご利用日'), merchant:col('ご利用先'),
-    amount:col('ご利用金額'), pay:col('お支払い金額'), area:col('国内'), memo:col('摘要')
+  return -1;
+}
+
+// 中身から列番号を推定する（見出しが無い／見つからないCSV用）
+function cardColByContent(dataRows, kind){
+  const n=Math.max(...dataRows.map(r=>r.length), 0);
+  const score=[];
+  for(let c=0;c<n;c++){
+    const vals=dataRows.map(r=>String(r[c]??'').trim()).filter(Boolean);
+    if(!vals.length){ score.push(-1); continue; }
+    if(kind==='date')     score.push(vals.filter(v=>cardDate(v)).length / vals.length);
+    else if(kind==='amount') score.push(vals.filter(v=>/^[\-¥￥]?[\d,]+$/.test(v) && cardNum(v)>0).length / vals.length);
+    else /* merchant */   score.push(vals.filter(v=>!cardDate(v) && !/^[\-¥￥]?[\d,]+$/.test(v) && v.length>=2).length / vals.length);
+  }
+  const max=Math.max(...score);
+  return max>=0.6 ? score.indexOf(max) : -1;
+}
+
+// CSV本文を解析して、明細と「どの列を使ったか」を返す
+//   colOverride: {date, merchant, amount} を渡すと、その列を優先して使う（画面で選び直したとき）
+function cardParseCsv(text, opt){
+  opt=opt||{};
+  const rows=csvParse(text).filter(r=>r.length && !r.every(c=>!String(c).trim()));
+  if(!rows.length) throw new Error('中身が空のCSVです');
+
+  // 支払日（JCBは先頭に「今回のお支払日」がある。無ければ空）
+  let payDate='';
+  for(const r of rows.slice(0,8)){
+    const i=r.findIndex(c=>/お支払日|支払日|引落日|振替日/.test(String(c)));
+    if(i>=0 && cardDate(r[i+1])){ payDate=cardDate(r[i+1]); break; }
+  }
+
+  const hi=cardFindHeaderRow(rows);
+  const head=hi>=0 ? rows[hi].map(c=>String(c).trim()) : [];
+  const dataRows=rows.slice(hi>=0 ? hi+1 : 0);
+
+  // 列の決定：①画面で指定 ②見出し ③中身から推定
+  const pick=(kind)=>{
+    if(opt[kind]!=null && opt[kind]>=0) return opt[kind];
+    const byHead = head.length ? cardColByHead(head, kind) : -1;
+    if(byHead>=0) return byHead;
+    return cardColByContent(dataRows.slice(0,40), kind);
   };
+  const idx={ date:pick('date'), merchant:pick('merchant'), amount:pick('amount') };
+  // 補助の列（あれば使う。無くてもよい）
+  const sub={};
+  ['user','memo','category','area'].forEach(k=>{ sub[k]= head.length ? cardColByHead(head,k) : -1; });
+  // JCBの「お支払い金額」列（利用金額が空の行の保険）
+  const payCol = head.length ? head.findIndex(h=>/お支払い金額|支払金額/.test(String(h))) : -1;
+
+  if(idx.date<0 || idx.merchant<0 || idx.amount<0){
+    const missing=[idx.date<0?'日付':'', idx.merchant<0?'利用先':'', idx.amount<0?'金額':''].filter(Boolean).join('・');
+    const err=new Error(`${missing}の列を判別できませんでした`);
+    err.needMapping={head, rows:dataRows.slice(0,5), idx, payDate};
+    throw err;
+  }
 
   const seen={};
   const list=[];
-  rows.slice(hi+1).forEach(r=>{
-    if(!r.length || r.every(c=>!String(c).trim())) return;
+  dataRows.forEach(r=>{
     const useDate=cardDate(r[idx.date]);
     const merchant=String(r[idx.merchant]||'').trim();
     let amount=cardNum(r[idx.amount]);
-    if(!amount) amount=cardNum(r[idx.pay]);       // ETCまとめ行などは支払金額のみ
-    if(!merchant || !amount) return;              // 合計行・空行は取り込まない
-    const {last4, holder}=cardHolderOf(r[idx.user]);
+    if(!amount && payCol>=0) amount=cardNum(r[payCol]);   // ETCまとめ行などは支払金額のみ
+    if(!merchant || !amount) return;                      // 合計行・空行は取り込まない
+    if(/^合計|^総額|^ご請求/.test(merchant)) return;
+    const {last4, holder}= sub.user>=0 ? cardHolderOf(r[sub.user]) : {last4:'',holder:''};
     // 同じ日・同じ店・同じ金額が複数ある場合に備えて連番を付ける
-    const base=`${payDate}|${last4}|${useDate}|${merchant}|${amount}`;
+    const base=`${opt.brand||'JCB'}|${payDate}|${last4}|${useDate}|${merchant}|${amount}`;
     seen[base]=(seen[base]||0)+1;
     list.push({
+      brand:opt.brand||'JCB',
       payDate, cardLast4:last4, cardHolder:holder,
       useDate: useDate || payDate, merchant, amount,
-      category:String(r[idx.cat]||'').trim(), area:String(r[idx.area]||'').trim(),
-      memo:String(r[idx.memo]||'').replace(/\s*\n\s*/g,' ').trim(),
+      category: sub.category>=0 ? String(r[sub.category]||'').trim() : '',
+      area:     sub.area>=0     ? String(r[sub.area]||'').trim() : '',
+      memo:    (sub.memo>=0     ? String(r[sub.memo]||'') : '').replace(/\s*\n\s*/g,' ').trim(),
       rowKey:`${base}|${seen[base]}`
     });
   });
-  return {payDate, list};
+  return {payDate, list, head, idx, sample:dataRows.slice(0,5)};
 }
 
 // ── 自動割り当て ──
 
 // ① 発注（レシートから作ったもの）と突き合わせる：金額（税込）が一致し、日付が近いもの
-//    支払方法が「現金」「Visa」の発注はJCBの明細に出ないので除く（未記入の発注は対象に含める）
+//    支払方法が明細のカードと違う発注は除く（例：Visa明細に現金払い・JCB払いの発注は出ない）
+//    支払方法が未記入の古い発注は、どちらの明細とも照合できるようにしておく
 function cardFindOrder(row){
+  const brand = row.brand || 'JCB';
   const used = new Set(cardStatements.filter(c=>c.orderNo).map(c=>c.orderNo));
   const cands = orders.filter(o=>{
     if(used.has(o.no)) return false;                       // すでに他の明細と照合済み
-    if(o.paymentMethod && o.paymentMethod!=='JCB') return false;  // 現金・Visa払いは対象外
+    if(o.paymentMethod && o.paymentMethod!==brand) return false;  // 別の支払方法の発注は対象外
     if(Math.round(o.total)!==row.amount) return false;     // 合計（税込）が一致
     const d=Math.abs((new Date(o.date)-new Date(row.useDate))/86400000);
     return d<=CARD_MATCH_DAYS;
@@ -210,7 +292,7 @@ function cardRowHtml(c){
     <div class="cost-row-top">
       <div class="cost-row-name">
         <span style="font-weight:700">${esc(c.merchant)}</span>
-        <span style="font-size:11px;color:var(--text-muted)">　${(c.useDate||'').replace(/-/g,'/')}　${esc(c.cardHolder)}</span>
+        <span style="font-size:11px;color:var(--text-muted)">　${(c.useDate||'').replace(/-/g,'/')}　${esc(c.brand||'JCB')}${c.cardHolder?'　'+esc(c.cardHolder):''}</span>
       </div>
       <div class="cost-row-amt">¥${fmt(c.amount)}</div>
     </div>
@@ -223,7 +305,16 @@ function cardRowHtml(c){
   </div>`;
 }
 
-// ── CSVの取り込み ──
+// ── CSVの取り込み（JCB／Visa。列は自動判別し、外れたら選び直せる） ──
+let _cardCsvText='';     // 読み込んだCSV本文
+let _cardParsed=null;    // 判別結果
+
+function cardGuessBrand(filename, text){
+  const s=(filename||'')+' '+(text||'').slice(0,400);
+  if(/visa|VISA|ビザ|三井住友|ＶＩＳＡ/.test(s)) return 'Visa';
+  return 'JCB';
+}
+
 async function onCardCsvChange(input){
   const file=input.files?.[0];
   if(!file) return;
@@ -232,14 +323,98 @@ async function onCardCsvChange(input){
   const show=m=>{ if(busy){ busy.style.display=m?'':'none'; busy.textContent=m||''; } };
   show('CSVを読み込んでいます…');
   try{
-    const text=await cardReadText(file);
-    const {payDate, list}=cardParseCsv(text);
-    if(!list.length){ show(''); showToast('取り込める明細がありませんでした'); return; }
+    _cardCsvText=await cardReadText(file);
+    const brand=cardGuessBrand(file.name, _cardCsvText);
+    try{
+      _cardParsed=cardParseCsv(_cardCsvText, {brand});
+    }catch(e){
+      // 列を判別できなかった場合も、画面で選べるように情報を持って開く
+      if(!e.needMapping) throw e;
+      _cardParsed={...e.needMapping, list:[], brand};
+    }
+    show('');
+    openCardImport(brand);
+  }catch(e){
+    show('');
+    showToast('読み込みに失敗しました：'+e.message);
+  }
+}
 
+// 取り込み前の確認画面（カード種別と列の指定）
+function openCardImport(brand){
+  document.getElementById('card-import-brand').value=brand||_cardParsed?.brand||'JCB';
+  renderCardImportCols();
+  document.getElementById('card-import-modal').classList.add('open');
+}
+function closeCardImport(){
+  document.getElementById('card-import-modal').classList.remove('open');
+  _cardCsvText=''; _cardParsed=null;
+}
+
+// 列の選択肢を作る（見出し名＋先頭行の中身を見本として表示）
+function renderCardImportCols(){
+  if(!_cardParsed) return;
+  const head=_cardParsed.head||[];
+  const sample=_cardParsed.sample||[];
+  const n=Math.max(head.length, ...sample.map(r=>r.length), 0);
+  const label=i=>{
+    const h=(head[i]||'').trim();
+    const v=(sample.find(r=>String(r[i]||'').trim())||[])[i]||'';
+    const ex=String(v).replace(/\s+/g,' ').slice(0,14);
+    return `${i+1}列目${h?'：'+h:''}${ex?`（例：${ex}）`:''}`;
+  };
+  ['date','merchant','amount'].forEach(kind=>{
+    const sel=document.getElementById('card-col-'+kind);
+    sel.innerHTML='<option value="-1">選択してください</option>'+
+      Array.from({length:n},(_,i)=>`<option value="${i}">${esc(label(i))}</option>`).join('');
+    sel.value=String(_cardParsed.idx?.[kind] ?? -1);
+  });
+  renderCardImportPreview();
+}
+
+// 選んだ列でどう読めるかを試して見せる
+function renderCardImportPreview(){
+  const el=document.getElementById('card-import-preview');
+  if(!el || !_cardCsvText) return;
+  const opt={
+    brand:document.getElementById('card-import-brand').value,
+    date:Number(document.getElementById('card-col-date').value),
+    merchant:Number(document.getElementById('card-col-merchant').value),
+    amount:Number(document.getElementById('card-col-amount').value)
+  };
+  try{
+    const {list}=cardParseCsv(_cardCsvText, opt);
+    _cardParsed={..._cardParsed, list, brand:opt.brand};
+    if(!list.length){
+      el.innerHTML='<span style="color:var(--danger)">この指定では明細を読み取れませんでした。列を選び直してください。</span>';
+      return;
+    }
+    const total=list.reduce((s,r)=>s+r.amount,0);
+    el.innerHTML=
+      `<div style="font-weight:700;margin-bottom:4px">${list.length}件　合計 ¥${fmt(total)}（税込）</div>`+
+      list.slice(0,3).map(r=>`<div>${(r.useDate||'—').replace(/-/g,'/')}　${esc(r.merchant)}　¥${fmt(r.amount)}</div>`).join('')+
+      (list.length>3?`<div style="color:var(--text-muted)">…ほか${list.length-3}件</div>`:'');
+  }catch(e){
+    _cardParsed={..._cardParsed, list:[]};
+    el.innerHTML=`<span style="color:var(--danger)">${esc(e.message)}</span>`;
+  }
+}
+
+// 確認した内容で取り込む
+async function confirmCardImport(){
+  if(!_cardParsed?.list?.length){ showToast('取り込める明細がありません'); return; }
+  const brand=document.getElementById('card-import-brand').value;
+  const list=_cardParsed.list;
+  const payDate=_cardParsed.payDate||'';
+  closeCardImport();
+
+  const busy=document.getElementById('card-busy');
+  const show=m=>{ if(busy){ busy.style.display=m?'':'none'; busy.textContent=m||''; } };
+  try{
     // すでに取り込み済みの行は飛ばす
     const known=new Set(cardStatements.map(c=>c.rowKey));
     const fresh=list.filter(r=>!known.has(r.rowKey));
-    if(!fresh.length){ show(''); showToast(`この明細は取り込み済みです（${list.length}件）`); return; }
+    if(!fresh.length){ showToast(`この明細は取り込み済みです（${list.length}件）`); return; }
 
     // 発注（レシート由来）と自動照合してから保存する
     let matched=0;
@@ -256,15 +431,16 @@ async function onCardCsvChange(input){
     await dbAddCardStatements(fresh);
     await refreshCardData();
     show('');
-    cardMonth=(payDate||'').slice(0,7);
+    cardMonth=(payDate||fresh[0].useDate||'').slice(0,7);
     cardFilter='all';
     renderCardPage();
-    showToast(`${fresh.length}件を取り込みました（発注と照合：${matched}件）`);
+    showToast(`${brand}の明細を${fresh.length}件取り込みました（発注と照合：${matched}件）`);
   }catch(e){
     show('');
     showToast('取り込みに失敗しました：'+e.message);
   }
 }
+
 
 // ── 割り当て（1件ずつ） ──
 let _cardAssignId=null;
@@ -377,9 +553,10 @@ function exportCardCsv(){
   const rows=cardVisibleRows();
   if(!rows.length){ showToast('出力する明細がありません'); return; }
 
-  const head=['請求月','ご利用日','利用者','カード下4桁','ご利用先','ご利用金額(税込)','税抜金額',
+  const head=['カード','請求月','ご利用日','利用者','カード下4桁','ご利用先','ご利用金額(税込)','税抜金額',
               '案件（現場）','費目','状態','発注番号','国内/海外','摘要'];
   const body=rows.map(c=>[
+    c.brand||'JCB',
     (c.payDate||'').slice(0,7).replace('-','/'),
     (c.useDate||'').replace(/-/g,'/'),
     c.cardHolder||'', c.cardLast4||'', c.merchant||'',

@@ -541,13 +541,14 @@ async function fetchCardStatements(){
   if(currentUserRole!=='staff') return;
   const { data, error } = await sb.from('card_statements').select('*').order('use_date',{ascending:false});
   cardTableReady = !error;
-  cardStatements = (data||[]).map(r=>({id:r.id, payDate:r.pay_date||'', cardLast4:r.card_last4||'', cardHolder:r.card_holder||'',
+  cardStatements = (data||[]).map(r=>({id:r.id, brand:r.brand||'JCB', payDate:r.pay_date||'', cardLast4:r.card_last4||'', cardHolder:r.card_holder||'',
     useDate:r.use_date||'', merchant:r.merchant||'', amount:Number(r.amount)||0, category:r.category||'', area:r.area||'',
     memo:r.memo||'', project:r.project||'', costType:r.cost_type||'', orderNo:r.order_no||'',
     costEntryId:r.cost_entry_id||null, status:r.status||'unassigned', rowKey:r.row_key||''}));
 }
 async function dbAddCardStatements(rows){
   const payload = rows.map(r=>({
+    brand:r.brand||'JCB',
     pay_date:r.payDate||null, card_last4:r.cardLast4||'', card_holder:r.cardHolder||'',
     use_date:r.useDate||null, merchant:r.merchant||'', amount:r.amount||0,
     category:r.category||'', area:r.area||'', memo:r.memo||'',
