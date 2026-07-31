@@ -1,7 +1,7 @@
 // ════ 現場ページ：タブ切替・工事選択・共通ユーティリティ ════
 
 function genbaTab(t){
-  ['photos','drawings','nippo','leave','holiday'].forEach(n=>{
+  ['photos','drawings','nippo','leave','holiday','license'].forEach(n=>{
     document.getElementById('genbasub-'+n)?.classList.toggle('active',n===t);
     document.getElementById('genbatab-'+n)?.classList.toggle('active',n===t);
   });
@@ -21,6 +21,7 @@ function renderGenbaPage(){
   if(document.getElementById('genbasub-nippo')?.classList.contains('active')) renderNippo();
   if(document.getElementById('genbasub-leave')?.classList.contains('active')) renderLeave();
   if(document.getElementById('genbasub-holiday')?.classList.contains('active')) renderHoliday();
+  if(document.getElementById('genbasub-license')?.classList.contains('active')) renderLicense();
 }
 
 // 写真・図面・日報の工事選択プルダウンを最新の案件一覧で埋める

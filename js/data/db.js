@@ -517,6 +517,52 @@ async function fetchGenbaData(){
 
   const { data: holidayRows } = await sb.from('holiday_requests').select('*').order('created_at',{ascending:false});
   holidayRequests = (holidayRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',reason:r.reason||'',substituteDate:r.substitute_date||null,approverName:r.approver_name||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
+
+  // 免許・自動車保険（RLSで本人と管理者の分だけが返る）。migration-genba22.sql 未実行でも動くようにする
+  const { data: licRows, error: licErr } = await sb.from('licenses').select('*');
+  licenseTableReady = !licErr;
+  licenses = (licRows||[]).map(r=>({userId:r.user_id,userName:r.user_name||'',
+    licenseNo:r.license_no||'', licenseExpire:r.license_expire||'', licensePhoto:r.license_photo||'',
+    insurer:r.insurer||'', liabilityPerson:r.liability_person||'', liabilityObject:r.liability_object||'',
+    insuranceExpire:r.insurance_expire||'', insurancePhoto:r.insurance_photo||'',
+    note:r.note||'', updatedAt:r.updated_at, updatedBy:r.updated_by||''}));
+}
+
+// ── 免許・自動車保険 ──
+
+// 証拠写真を license-files（非公開バケット）へ保存し、保存先パスを返す
+async function dbUploadLicensePhoto(userId, blob, kind){
+  const path = `${userId}/${kind}_${Date.now()}.jpg`;
+  const { error } = await sb.storage.from('license-files').upload(path, blob, {contentType:'image/jpeg', upsert:false});
+  if(error){showToast('写真の保存に失敗しました：'+error.message);throw error;}
+  return path;
+}
+// 非公開バケットなので、表示のたびに期限付きURLを作る（1時間有効）
+async function dbLicensePhotoUrl(path){
+  if(!path) return '';
+  const { data, error } = await sb.storage.from('license-files').createSignedUrl(path, 3600);
+  if(error) return '';
+  return data?.signedUrl||'';
+}
+async function dbDeleteLicensePhoto(path){
+  if(!path) return;
+  await sb.storage.from('license-files').remove([path]);
+}
+async function dbSaveLicense(userId, userName, patch){
+  const row = {user_id:userId, user_name:userName||'', updated_at:new Date().toISOString(), updated_by:currentUserDisplayName||''};
+  const map = {licenseNo:'license_no', licenseExpire:'license_expire', licensePhoto:'license_photo',
+    insurer:'insurer', liabilityPerson:'liability_person', liabilityObject:'liability_object',
+    insuranceExpire:'insurance_expire', insurancePhoto:'insurance_photo', note:'note'};
+  Object.entries(patch).forEach(([k,v])=>{ if(map[k]!==undefined) row[map[k]] = (v===''&&/expire/i.test(k)) ? null : v; });
+  const { error } = await sb.from('licenses').upsert(row, {onConflict:'user_id'});
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+}
+// 撮影した画像から項目を読み取る（kind: 'license' / 'insurance'）
+async function dbReadLicenseImage(base64, mediaType, kind){
+  const { data, error } = await sb.functions.invoke('read-license', { body:{ image:base64, mediaType, kind } });
+  if(error) throw new Error(error.message);
+  if(data?.error) throw new Error(data.error);
+  return data?.result || {};
 }
 
 // 現場写真・図面のファイルをStorageにアップロードし、公開URLを返す
@@ -749,6 +795,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'leave_requests'}, ()=>refetchAndRerender('leave_requests'))
     .on('postgres_changes',{event:'*',schema:'public',table:'holiday_requests'}, ()=>refetchAndRerender('holiday_requests'))
     .on('postgres_changes',{event:'*',schema:'public',table:'work_holidays'}, ()=>refetchAndRerender('work_holidays'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'licenses'}, ()=>refetchAndRerender('licenses'))
     .subscribe();
 }
 
@@ -794,7 +841,7 @@ async function refetchAndRerender(table){
     if(document.getElementById('ordersub-history')?.classList.contains('active')) renderOrders();
     if(document.getElementById('page-cost')?.classList.contains('active')) renderCost();
   }
-  if(['site_photos','drawings','site_folders','drawing_views','daily_reports','leave_requests','holiday_requests'].includes(table)){
+  if(['site_photos','drawings','site_folders','drawing_views','daily_reports','leave_requests','holiday_requests','licenses'].includes(table)){
     if(document.getElementById('page-genba')?.classList.contains('active')) renderGenbaPage();
     renderInfoGenbaSections && renderInfoGenbaSections();
     refreshFB && refreshFB(); // 開いているファイルブラウザにも反映

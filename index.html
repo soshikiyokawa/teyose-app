@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=207">
+<link rel="stylesheet" href="css/main.css?v=208">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -683,6 +683,7 @@
     <button class="sub-tab-btn" id="genbatab-nippo" onclick="genbaTab('nippo')">日報</button>
     <button class="sub-tab-btn" id="genbatab-leave" onclick="genbaTab('leave')">有給</button>
     <button class="sub-tab-btn" id="genbatab-holiday" onclick="genbaTab('holiday')">休日出勤</button>
+    <button class="sub-tab-btn" id="genbatab-license" onclick="genbaTab('license')">免許・自保</button>
   </div>
 
   <!-- ① 現場写真（フォルダ表示） -->
@@ -887,6 +888,18 @@
       <div class="card" id="holiday-all-list" style="padding:0;overflow:hidden"></div>
     </div>
   </div>
+
+  <!-- ⑥ 免許・自保 -->
+  <div class="sub-page" id="genbasub-license">
+    <div id="license-busy" style="display:none;padding:10px 12px;margin-bottom:10px;border-radius:8px;background:var(--accent-bg);color:var(--accent-t);font-size:12px;font-weight:700"></div>
+    <div id="license-body"></div>
+    <input type="file" id="license-file-input" accept="image/*" capture="environment" style="display:none" onchange="onLicenseFileChange(this)">
+
+    <div id="license-admin-wrap" style="display:none">
+      <div class="section-lbl">社員の登録状況</div>
+      <div class="card" id="license-admin-list" style="padding:0;overflow:hidden"></div>
+    </div>
+  </div>
 </div>
 
   </div><!-- /main content -->
@@ -988,6 +1001,37 @@
       <button class="btn" style="flex:1;justify-content:center" onclick="closeSimpleEst()">キャンセル</button>
       <button class="btn" style="flex:1;justify-content:center" onclick="applySimpleEst(false)">明細に反映</button>
       <button class="btn primary" style="flex:1.2;justify-content:center" onclick="applySimpleEst(true)">反映して保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ 免許・自動車保険の入力／読み取り確認 ════ -->
+<div class="modal-overlay" id="license-edit-modal" style="z-index:330" onclick="if(event.target===this)closeLicenseEdit()">
+  <div class="modal-sheet" style="max-width:400px">
+    <h3 id="license-edit-title">運転免許証</h3>
+    <div id="license-edit-hint" style="font-size:11px;color:var(--text-sub);line-height:1.7;margin-bottom:12px"></div>
+
+    <div id="license-edit-lic">
+      <div class="fg" style="margin-bottom:10px"><label>免許証番号</label>
+        <input id="lc-no" inputmode="numeric" placeholder="123456789012"></div>
+      <div class="fg" style="margin-bottom:10px"><label>有効期限</label>
+        <input type="date" id="lc-expire"></div>
+    </div>
+
+    <div id="license-edit-ins" style="display:none">
+      <div class="fg" style="margin-bottom:10px"><label>保険会社</label>
+        <input id="lc-insurer" placeholder="〇〇損害保険"></div>
+      <div class="fg" style="margin-bottom:10px"><label>対人補償</label>
+        <input id="lc-person" placeholder="無制限"></div>
+      <div class="fg" style="margin-bottom:10px"><label>対物補償</label>
+        <input id="lc-object" placeholder="無制限"></div>
+      <div class="fg" style="margin-bottom:10px"><label>満了日</label>
+        <input type="date" id="lc-ins-expire"></div>
+    </div>
+
+    <div class="modal-actions" style="display:flex;gap:6px">
+      <button class="btn" style="flex:1;justify-content:center" onclick="closeLicenseEdit()">キャンセル</button>
+      <button class="btn primary" style="flex:1;justify-content:center" onclick="saveLicenseEdit()">保存</button>
     </div>
   </div>
 </div>
@@ -1715,10 +1759,10 @@
 <script src="js/utils.js?v=203"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=205"></script>
+<script src="js/state.js?v=208"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=206"></script>
+<script src="js/data/db.js?v=208"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=157"></script>
@@ -1757,7 +1801,7 @@
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=161"></script>
+<script src="js/genba/genba-tabs.js?v=208"></script>
 <script src="js/genba/genba-files.js?v=189"></script>
 <script src="js/genba/genba-photos.js?v=189"></script>
 <script src="js/genba/genba-drawings.js?v=186"></script>
@@ -1765,6 +1809,7 @@
 <script src="js/genba/leave-balance.js?v=207"></script>
 <script src="js/genba/genba-leave.js?v=207"></script>
 <script src="js/genba/genba-holiday.js?v=165"></script>
+<script src="js/genba/license.js?v=208"></script>
 <script src="js/genba/work-calendar.js?v=162"></script>
 <script src="js/genba/account-perms.js?v=190"></script>
 

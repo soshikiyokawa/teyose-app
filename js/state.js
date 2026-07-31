@@ -22,6 +22,8 @@ let fbMoving = null;        // 移動中のアイテム {kind:'photo'|'drawing',
 let dailyReports = [];      // 日報（carpenterは自分の分のみ・staffは全員分。RLSが自動で絞る）
 let leaveRequests = [];     // 有給申請（同上）
 let holidayRequests = [];   // 休日出勤申請（同上）
+let licenses = [];              // 免許・自動車保険（本人と管理者の分のみ。RLSが自動で絞る）
+let licenseTableReady = true;   // migration-genba22.sql が適用済みか
 
 // 勤務カレンダー（休日＝出勤しない日）。{regular:Set<'YYYY-MM-DD'>, trainee:Set<...>}
 let workHolidays = {regular:new Set(), trainee:new Set()};
