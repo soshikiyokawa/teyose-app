@@ -109,10 +109,12 @@ function cardParseCsv(text){
 // ── 自動割り当て ──
 
 // ① 発注（レシートから作ったもの）と突き合わせる：金額（税込）が一致し、日付が近いもの
+//    支払方法が「現金」「Visa」の発注はJCBの明細に出ないので除く（未記入の発注は対象に含める）
 function cardFindOrder(row){
   const used = new Set(cardStatements.filter(c=>c.orderNo).map(c=>c.orderNo));
   const cands = orders.filter(o=>{
     if(used.has(o.no)) return false;                       // すでに他の明細と照合済み
+    if(o.paymentMethod && o.paymentMethod!=='JCB') return false;  // 現金・Visa払いは対象外
     if(Math.round(o.total)!==row.amount) return false;     // 合計（税込）が一致
     const d=Math.abs((new Date(o.date)-new Date(row.useDate))/86400000);
     return d<=CARD_MATCH_DAYS;

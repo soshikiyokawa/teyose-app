@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=215">
+<link rel="stylesheet" href="css/main.css?v=216">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -501,7 +501,16 @@
             <option value="諸経費">諸経費</option>
           </select>
         </div>
-        <div class="fg" style="padding:0 12px 10px"><label>納品希望日<span style="color:var(--danger)">＊必須</span></label><input type="date" id="order-due-date" oninput="updateOrderPreviewBtnState()"></div>
+        <!-- レシート取り込みの発注は「支払済み」なので、納品希望日ではなく支払方法を選ぶ -->
+        <div class="fg" style="padding:0 12px 10px" id="order-due-wrap"><label>納品希望日<span style="color:var(--danger)">＊必須</span></label><input type="date" id="order-due-date" oninput="updateOrderPreviewBtnState()"></div>
+        <div class="fg" style="padding:0 12px 10px;display:none" id="order-pay-wrap"><label>支払方法<span style="color:var(--danger)">＊必須</span></label>
+          <select id="order-payment" onchange="updateOrderPreviewBtnState()">
+            <option value="">選択してください</option>
+            <option value="JCB">JCB</option>
+            <option value="Visa">Visa</option>
+            <option value="現金">現金</option>
+          </select>
+        </div>
         <div class="cart-foot">
           <div>
             <div style="font-size:11px;color:var(--text-sub)">合計（税抜）</div>
@@ -1826,7 +1835,7 @@
 <script src="js/state.js?v=214"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=214"></script>
+<script src="js/data/db.js?v=216"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=211"></script>
@@ -1860,9 +1869,9 @@
 <script src="js/order/supplier-master.js?v=202"></script>
 <script src="js/order/item-master.js?v=202"></script>
 <script src="js/order/order-cart.js?v=214"></script>
-<script src="js/order/order-confirm.js?v=154"></script>
+<script src="js/order/order-confirm.js?v=216"></script>
 <script src="js/order/order-history.js?v=155"></script>
-<script src="js/order/card-match.js?v=215"></script>
+<script src="js/order/card-match.js?v=216"></script>
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->

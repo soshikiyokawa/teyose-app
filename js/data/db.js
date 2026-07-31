@@ -89,7 +89,7 @@ async function fetchAllData(){
     estSeq = estimates.length+1;
 
     const { data: orderRows } = await sb.from('orders').select('*').order('created_at',{ascending:false});
-    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status}));
+    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status}));
 
     const { data: costRows } = await sb.from('cost_entries').select('*').order('created_at',{ascending:false});
     costEntries = (costRows||[]).map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status}));
@@ -302,10 +302,17 @@ async function dbGenerateOrderPdf(order){
 // ── 発注確定（発注書・原価・チャット投稿） ──
 async function dbConfirmOrder(order){
   const supplier_id = supplierIdByName(order.suppliers);
-  const { data: orderRow, error: orderErr } = await sb.from('orders').insert({
+  const base = {
     no:order.no,project:order.project,date:order.date,due_date:order.dueDate||null,cost_type:order.costType,supplier_id,
     items:order.items,subtotal:order.subtotal,tax:order.tax,total:order.total,status:'pending'
-  }).select().single();
+  };
+  let { data: orderRow, error: orderErr } =
+    await sb.from('orders').insert({...base, payment_method:order.paymentMethod||''}).select().single();
+  // 支払方法の列（migration-genba24.sql）が未適用でも発注は通す
+  if(orderErr && /payment_method/.test(orderErr.message||'')){
+    console.warn('payment_method列が未作成のため、支払方法を保存せずに続行します');
+    ({ data: orderRow, error: orderErr } = await sb.from('orders').insert(base).select().single());
+  }
   if(orderErr){showToast('発注確定に失敗しました：'+orderErr.message);throw orderErr;}
 
   const costRows = order.items.map(item=>({
