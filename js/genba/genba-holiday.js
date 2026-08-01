@@ -41,18 +41,33 @@ function holidaySubstituteChanged(){
   }
 }
 
+// 「その他」を選んだときだけ区分の入力欄を出す（日報と同じ扱い）
+function holidayProjectChanged(){
+  const wrap=document.getElementById('holiday-other-wrap');
+  const sel=document.getElementById('holiday-project');
+  if(wrap && sel) wrap.style.display = sel.value==='other' ? '' : 'none';
+}
+
 async function applyHoliday(){
   const workDate = document.getElementById('holiday-date').value;
-  const projectId = Number(document.getElementById('holiday-project').value)||null;
+  const projVal = document.getElementById('holiday-project').value;
+  const isOther = projVal==='other';
+  const projectId = isOther ? null : (Number(projVal)||null);
+  const otherName = document.getElementById('holiday-other')?.value.trim()||'';
   const reason = document.getElementById('holiday-reason').value.trim();
   const substituteDate = document.getElementById('holiday-substitute').value||null;
   const approverName = document.getElementById('holiday-approver').value;
   if(!workDate){ showToast('出勤日を入力してください'); return; }
-  if(!projectId){ showToast('工事を選択してください'); return; }
+  if(!projVal){ showToast('工事を選択してください'); return; }
+  if(isOther && !otherName){ showToast('区分（その他）を入力してください'); return; }
   if(!reason){ showToast('作業内容・理由を入力してください'); return; }
   if(!approverName){ showToast('承認者を選択してください'); return; }
   const project = projects.find(p=>p.id===projectId);
-  await dbAddHolidayRequest({workDate, projectId, projectName:project?.name||'', reason, substituteDate, approverName});
+  const projectName = isOther ? otherName : (project?.name||'');
+  await dbAddHolidayRequest({workDate, projectId, projectName, reason, substituteDate, approverName});
+  document.getElementById('holiday-other').value = '';
+  document.getElementById('holiday-project').value = '';
+  holidayProjectChanged();
   document.getElementById('holiday-date').value = '';
   document.getElementById('holiday-reason').value = '';
   document.getElementById('holiday-substitute').value = '';
