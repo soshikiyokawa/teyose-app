@@ -280,6 +280,7 @@ function newEstimate(){
   estDirty=false;
   updateEstBadge();renderSections();estSubTab('info');
   renderProjectSidebar();
+  updateProjDeleteBtn();
 }
 
 function cloneSections(list){
@@ -421,6 +422,7 @@ function _selectProjectSidebarGo(id){
   renderEstListBody();
   onProjectChanged && onProjectChanged();
   renderInfoGenbaSections && renderInfoGenbaSections();
+  updateProjDeleteBtn();
   // 原価管理ページを開いたまま案件を切り替えた場合も即反映（在庫分表示は解除）
   if(document.getElementById('page-cost')?.classList.contains('active')){
     costViewStock=false;
@@ -608,3 +610,27 @@ async function deleteEstimateFromList(id){
   showToast('見積を削除しました');
 }
 function closeEstList(){document.getElementById('est-list-overlay').classList.remove('open');}
+
+// ── 案件情報タブから、選択中の案件を削除する（一覧には削除ボタンを置かない） ──
+function updateProjDeleteBtn(){
+  const wrap=document.getElementById('proj-delete-wrap');
+  if(!wrap) return;
+  // 案件を選んでいて、管理者のときだけ出す
+  const show = !!selectedProject && currentUserRole==='staff';
+  wrap.style.display = show ? 'flex' : 'none';
+}
+async function deleteCurrentProject(){
+  const p=selectedProject;
+  if(!p){ showToast('案件が選択されていません'); return; }
+  if(!confirm(`「${p.name}」を削除しますか？\n（この案件の見積・発注書は残ります）\nこの操作は元に戻せません。`)) return;
+  try{
+    await dbDeleteProject(p.id);
+    projects=projects.filter(x=>x.id!==p.id);
+    selectedProject=null; selectedProjectName=null;
+    newEstimate();
+    renderProjectSidebar();
+    updateProjDeleteBtn();
+    estSubTab('list');
+    showToast('案件を削除しました');
+  }catch(e){}
+}

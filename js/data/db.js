@@ -49,7 +49,7 @@ async function fetchAllData(){
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
     const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
-    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],updatedAt:r.updated_at}));
+    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],coverPhotoId:r.cover_photo_id||null,updatedAt:r.updated_at}));
 
     await fetchGenbaData();
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
@@ -937,4 +937,12 @@ async function refetchAndRerender(table){
   if(table==='daily_reports' && (currentUserRole==='staff'||currentUserRole==='carpenter') && document.getElementById('page-cost')?.classList.contains('active')){
     renderCost();
   }
+}
+
+// 案件一覧のカードに出す表紙写真を選ぶ（管理者・社員）
+async function dbSetProjectCover(projectId, photoId){
+  const { error } = await sb.from('projects').update({cover_photo_id:photoId}).eq('id',projectId);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  const p=projects.find(x=>x.id===projectId);
+  if(p) p.coverPhotoId=photoId;
 }

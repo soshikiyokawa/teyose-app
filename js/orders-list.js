@@ -214,10 +214,6 @@ function renderOrdersList(){
       <td class="ol-r">${hasEst?apRate.toFixed(1)+'%':''}</td>
       <td class="ol-c ol-memo" ${hasEst?`contenteditable="true" spellcheck="false" data-est-id="${e.id}" data-field="ordersMemo"`:''}
         >${esc(e.ordersMemo||'')}</td>
-      <td class="ol-c ol-op" style="text-align:center;white-space:nowrap">
-        <button class="btn xs" onclick="olOpenProject(${p.id})">開く</button>
-        <button class="btn xs danger" onclick="olDeleteProject(${p.id},event)">削除</button>
-      </td>
     </tr>`;
   }).join('');
 
@@ -262,7 +258,6 @@ function renderOrdersTotals(list){
     <td class="ol-r">¥${fmt(totApAmt)}</td>
     <td class="ol-r">${totApRate}%</td>
     <td class="ol-memo"></td>
-    <td class="ol-op"></td>
   </tr>`;
 }
 
@@ -383,9 +378,16 @@ function olFilterLabel(){
 
 // ════ カード表示（案件名・ステータス・工事区分・写真が一目で分かる） ════
 
-// 案件の表紙写真（現場写真の最新の1枚）。無ければ null
+// 案件の表紙写真。写真ビューアで「表紙にする」を選んだ1枚を優先し、
+// 未設定なら現場写真の最新の1枚を使う。無ければ null
 function olCoverPhoto(projectId){
-  const list=(typeof sitePhotos!=='undefined'?sitePhotos:[]).filter(p=>p.projectId===projectId);
+  const all=(typeof sitePhotos!=='undefined'?sitePhotos:[]);
+  const proj=(projects||[]).find(p=>p.id===projectId);
+  if(proj?.coverPhotoId){
+    const fixed=all.find(p=>p.id===proj.coverPhotoId);
+    if(fixed) return fixed;
+  }
+  const list=all.filter(p=>p.projectId===projectId);
   if(!list.length) return null;
   // 撮影日 → 登録順で最新のもの
   return [...list].sort((a,b)=>(b.shotDate||'').localeCompare(a.shotDate||'') || (b.id-a.id))[0];
@@ -424,10 +426,7 @@ function olCardHtml(r){
       <div class="ol-card-name">${esc(p.name)}</div>
       ${p.clientName?`<div class="ol-card-sub">${esc(p.clientName)}</div>`:''}
       ${period?`<div class="ol-card-date">${period}</div>`:''}
-      <div class="ol-card-foot">
-        ${e.contractAmount?`<span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>`:'<span></span>'}
-        <button class="btn xs danger" onclick="olDeleteProject(${p.id},event)">削除</button>
-      </div>
+      ${e.contractAmount?`<div class="ol-card-foot"><span class="ol-card-amt">¥${fmt(e.contractAmount)}</span></div>`:''}
     </div>
   </div>`;
 }

@@ -166,6 +166,7 @@ function _showPhotoInViewer(id){
   document.getElementById('photo-viewer-caption').value = p.caption||'';
   const canDelete = currentUserRole==='staff' || p.uploadedBy===currentUserId;
   document.getElementById('photo-viewer-delete').style.display = canDelete ? '' : 'none';
+  updateCoverBtn();
   // 前後ボタンの表示（1枚だけなら隠す）
   const multi = _viewerList.length>1;
   const prev=document.getElementById('photo-viewer-prev'), next=document.getElementById('photo-viewer-next');
@@ -243,4 +244,38 @@ async function deleteViewingPhoto(){
   }
   showToast('写真を削除しました');
   await refreshGenba();
+}
+
+// ── 案件一覧のカードに出す「表紙写真」を選ぶ ──
+// 外観写真などを固定したいときに使う。解除すると最新の写真が表紙になる。
+function isCoverPhoto(photoId){
+  const p = sitePhotos.find(x=>x.id===photoId);
+  if(!p) return false;
+  const proj = projects.find(x=>x.id===p.projectId);
+  return !!proj && proj.coverPhotoId===photoId;
+}
+function updateCoverBtn(){
+  const btn=document.getElementById('photo-viewer-cover');
+  if(!btn) return;
+  const p=sitePhotos.find(x=>x.id===viewingPhotoId);
+  // 案件に紐づく写真のときだけ出す
+  if(!p || !p.projectId || !(currentUserRole==='staff'||currentUserRole==='carpenter')){
+    btn.style.display='none';
+    return;
+  }
+  btn.style.display='';
+  const on=isCoverPhoto(viewingPhotoId);
+  btn.textContent = on ? '★ 表紙' : '☆ 表紙にする';
+  btn.title = on ? 'この写真を表紙から外す' : 'この写真を案件一覧のカードに表示する';
+}
+async function toggleCoverPhoto(){
+  const p=sitePhotos.find(x=>x.id===viewingPhotoId);
+  if(!p || !p.projectId) return;
+  const on=isCoverPhoto(viewingPhotoId);
+  try{
+    await dbSetProjectCover(p.projectId, on ? null : p.id);
+  }catch(_){ return; }
+  updateCoverBtn();
+  if(typeof renderOrdersList==='function' && document.getElementById('estsub-list')?.classList.contains('active')) renderOrdersList();
+  showToast(on ? '表紙から外しました' : 'この写真を表紙にしました');
 }

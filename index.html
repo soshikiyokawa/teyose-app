@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=226">
+<link rel="stylesheet" href="css/main.css?v=227">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -160,7 +160,6 @@
         <col style="width:116px">
         <col style="width:64px">
         <col style="width:130px">
-        <col style="width:96px">
       </colgroup>
       <thead>
         <tr class="ol-head1">
@@ -179,7 +178,6 @@
           <th class="ol-th" colspan="2" style="background:#e8f0e8">見込み粗利</th>
           <th class="ol-th" colspan="2" style="background:#e0ebe0">完成粗利</th>
           <th class="ol-th" rowspan="2">備考</th>
-          <th class="ol-th ol-op" rowspan="2">操作</th>
         </tr>
         <tr class="ol-head2">
           <th class="ol-th">着工予定</th>
@@ -285,6 +283,15 @@
         案件を保存
       </button>
       <button class="btn" onclick="estSubTab('quote')">見積情報へ <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+    </div>
+
+    <!-- 案件の削除（選択中の案件のみ） -->
+    <div id="proj-delete-wrap" style="display:none;margin-top:18px;padding-top:12px;border-top:0.5px solid var(--border);
+         display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:0;font-size:11px;color:var(--text-muted);line-height:1.6">
+        この案件を削除します（見積・発注書は残ります）。元に戻せません。
+      </div>
+      <button class="btn danger" onclick="deleteCurrentProject()">この案件を削除</button>
     </div>
   </div>
 
@@ -1544,6 +1551,7 @@
   <div id="photo-viewer-foot">
     <div style="display:flex;gap:8px;align-items:center">
       <input id="photo-viewer-caption" placeholder="メモ（例：基礎配筋 全景）" onchange="savePhotoCaption()" style="flex:1;font-size:13px;padding:8px 10px;border-radius:7px;border:none;min-width:0">
+      <button class="btn sm" id="photo-viewer-cover" onclick="toggleCoverPhoto()" style="display:none;color:#fff;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);white-space:nowrap">☆ 表紙にする</button>
       <button class="btn sm" onclick="moveViewingPhoto()" style="color:#fff;background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3)">移動</button>
       <button class="btn sm danger" id="photo-viewer-delete" onclick="deleteViewingPhoto()">削除</button>
     </div>
@@ -1962,7 +1970,7 @@
 <script src="js/state.js?v=221"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=221"></script>
+<script src="js/data/db.js?v=227"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=225"></script>
@@ -1978,13 +1986,13 @@
 <script src="js/estimate/estimate-items.js?v=196"></script>
 <script src="js/estimate/estimate-master.js?v=202"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
-<script src="js/estimate/estimate-crud.js?v=191"></script>
+<script src="js/estimate/estimate-crud.js?v=227"></script>
 <script src="js/estimate/parking.js?v=193"></script>
 <script src="js/estimate/estimate-pdf.js?v=138"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=226"></script>
+<script src="js/orders-list.js?v=227"></script>
 
 <!-- 注文書・注文請書 -->
 <script src="js/chusho.js?v=138"></script>
@@ -2004,7 +2012,7 @@
 <!-- 現場（写真・図面・日報・有給） -->
 <script src="js/genba/genba-tabs.js?v=221"></script>
 <script src="js/genba/genba-files.js?v=189"></script>
-<script src="js/genba/genba-photos.js?v=189"></script>
+<script src="js/genba/genba-photos.js?v=227"></script>
 <script src="js/genba/genba-drawings.js?v=186"></script>
 <script src="js/genba/genba-nippo.js?v=210"></script>
 <script src="js/genba/leave-balance.js?v=207"></script>
