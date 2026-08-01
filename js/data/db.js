@@ -54,6 +54,7 @@ async function fetchAllData(){
     await fetchGenbaData();
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
     await fetchCardStatements();   // カード明細（管理者のみ。テーブルが無くても落とさない）
+    await fetchVehicles();         // 車両管理（テーブルが無くても落とさない）
   } else if(currentUserRole==='supplier'){
     // 業者：案件チャットのスレッド名表示のため、参加している案件だけ取得（RLSで自動的に絞られる）
     const { data: projectRows } = await sb.from('projects').select('id, name, members');
@@ -536,6 +537,42 @@ async function fetchGenbaData(){
     note:r.note||'', updatedAt:r.updated_at, updatedBy:r.updated_by||''}));
 }
 
+// ── 車両管理 ──
+async function fetchVehicles(){
+  const { data: vRows, error } = await sb.from('vehicles').select('*').order('sort_order').order('id');
+  vehicleTableReady = !error;
+  if(error){ vehicles=[]; vehicleRecords=[]; return; }
+  vehicles = (vRows||[]).map(r=>({id:r.id,name:r.name,plate:r.plate||'',managerName:r.manager_name||'',
+    inspectionDate:r.inspection_date||'',note:r.note||'',sortOrder:r.sort_order||0}));
+  const { data: rRows } = await sb.from('vehicle_records').select('*').order('done_date',{ascending:false});
+  vehicleRecords = (rRows||[]).map(r=>({id:r.id,vehicleId:r.vehicle_id,kind:r.kind,doneDate:r.done_date,
+    nextDate:r.next_date||'',odo:r.odo||null,note:r.note||'',userName:r.user_name||''}));
+}
+async function dbSaveVehicle(id, patch){
+  const map={name:'name',plate:'plate',managerName:'manager_name',inspectionDate:'inspection_date',note:'note'};
+  const row={updated_at:new Date().toISOString()};
+  Object.entries(patch).forEach(([k,v])=>{ if(map[k]!==undefined) row[map[k]]=v; });
+  const { error } = id
+    ? await sb.from('vehicles').update(row).eq('id',id)
+    : await sb.from('vehicles').insert(row);
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+}
+async function dbDeleteVehicle(id){
+  const { error } = await sb.from('vehicles').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+async function dbAddVehicleRecord(rec){
+  const { error } = await sb.from('vehicle_records').insert({
+    vehicle_id:rec.vehicleId, kind:rec.kind, done_date:rec.doneDate, next_date:rec.nextDate||null,
+    odo:rec.odo||null, note:rec.note||'', user_name:currentUserDisplayName||''
+  });
+  if(error){showToast('登録に失敗しました：'+error.message);throw error;}
+}
+async function dbDeleteVehicleRecord(id){
+  const { error } = await sb.from('vehicle_records').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
 // ── カード明細（JCB）──
 async function fetchCardStatements(){
   if(currentUserRole!=='staff') return;
@@ -843,6 +880,8 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'holiday_requests'}, ()=>refetchAndRerender('holiday_requests'))
     .on('postgres_changes',{event:'*',schema:'public',table:'work_holidays'}, ()=>refetchAndRerender('work_holidays'))
     .on('postgres_changes',{event:'*',schema:'public',table:'licenses'}, ()=>refetchAndRerender('licenses'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'vehicles'}, ()=>refetchAndRerender('vehicles'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'vehicle_records'}, ()=>refetchAndRerender('vehicles'))
     .subscribe();
 }
 
@@ -888,7 +927,7 @@ async function refetchAndRerender(table){
     if(document.getElementById('ordersub-history')?.classList.contains('active')) renderOrders();
     if(document.getElementById('page-cost')?.classList.contains('active')) renderCost();
   }
-  if(['site_photos','drawings','site_folders','drawing_views','daily_reports','leave_requests','holiday_requests','licenses'].includes(table)){
+  if(['site_photos','drawings','site_folders','drawing_views','daily_reports','leave_requests','holiday_requests','licenses','vehicles'].includes(table)){
     if(document.getElementById('page-genba')?.classList.contains('active')) renderGenbaPage();
     renderInfoGenbaSections && renderInfoGenbaSections();
     refreshFB && refreshFB(); // 開いているファイルブラウザにも反映
