@@ -1,20 +1,140 @@
-// ════ 受注一覧 ════
+// ════ 案件一覧（全案件の一覧・絞り込み・A3印刷） ════
+//
+// 案件（projects）を1行ずつ表示し、その案件の最新の見積から金額や入金の情報を出す。
+// 見積がまだ無い案件も「案件」として並ぶ（金額欄は空）。
+// 行をタップするとその案件を開き、案件タブで詳細を編集できる。
+
+// 絞り込みの状態
+let olFilterStatus = '';   // ''＝すべて / draft / sent / approved / completed
+let olFilterType   = '';   // ''＝すべて / 新築 / リフォーム …
+let olFilterFY     = '';   // ''＝すべて / '2026'（2026年度＝2026/3/1〜2027/2/末）
+
+// 完工年度（毎年3月1日が新年度）。'2026-04-10' → 2026年度
+function olFiscalYear(dateStr){
+  if(!dateStr) return null;
+  const [y,m] = dateStr.split('-').map(Number);
+  if(!y||!m) return null;
+  return m >= 3 ? y : y-1;
+}
+
+// 案件に紐づく代表の見積（いちばん新しく更新したもの）
+function olEstimateOf(project){
+  const list = (estimates||[]).filter(e=>e.projectName===project.name);
+  if(!list.length) return null;
+  return [...list].sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];
+}
+
+// 画面に出す1件分の情報にまとめる
+function olRowData(p){
+  const e = olEstimateOf(p) || {};
+  const endDate = e.endDate || p.endDate || '';
+  return {
+    project:p, est:e,
+    status: e.status || 'draft',
+    type: p.type || e.type || '',
+    endDate,
+    fy: olFiscalYear(endDate)
+  };
+}
+
+// 絞り込み後の一覧（契約日順）
+function olVisibleRows(){
+  return (projects||[]).map(olRowData)
+    .filter(r=>{
+      if(olFilterStatus && r.status!==olFilterStatus) return false;
+      if(olFilterType   && r.type!==olFilterType) return false;
+      if(olFilterFY     && String(r.fy)!==olFilterFY) return false;
+      return true;
+    })
+    .sort((a,b)=>{
+      const ka=(a.est.contractDate||a.est.date||a.project.startDate||'');
+      const kb=(b.est.contractDate||b.est.date||b.project.startDate||'');
+      return ka<kb ? -1 : ka>kb ? 1 : 0;
+    });
+}
+
+const OL_STATUS = {
+  draft:    {label:'下書き', cls:'draft'},
+  sent:     {label:'提出済', cls:'sent'},
+  approved: {label:'受注',   cls:'approved'},
+  completed:{label:'完工',   cls:'completed'}
+};
+
+// 絞り込みの選択肢を作る
+function renderOlFilters(){
+  const rows=(projects||[]).map(olRowData);
+  // 工事区分
+  const types=[...new Set(rows.map(r=>r.type).filter(Boolean))];
+  const tSel=document.getElementById('ol-filter-type');
+  if(tSel){
+    tSel.innerHTML='<option value="">工事区分：すべて</option>'+
+      types.map(t=>`<option value="${esc(t)}"${olFilterType===t?' selected':''}>${esc(t)}</option>`).join('');
+  }
+  // 完工年度
+  const fys=[...new Set(rows.map(r=>r.fy).filter(v=>v!=null))].sort((a,b)=>b-a);
+  const fSel=document.getElementById('ol-filter-fy');
+  if(fSel){
+    fSel.innerHTML='<option value="">完工年度：すべて</option>'+
+      fys.map(y=>`<option value="${y}"${olFilterFY===String(y)?' selected':''}>${y}年度（${y}/3〜${y+1}/2）</option>`).join('');
+  }
+  const sSel=document.getElementById('ol-filter-status');
+  if(sSel) sSel.value=olFilterStatus;
+}
+
+function olSetFilter(){
+  olFilterStatus=document.getElementById('ol-filter-status').value;
+  olFilterType  =document.getElementById('ol-filter-type').value;
+  olFilterFY    =document.getElementById('ol-filter-fy').value;
+  renderOrdersList();
+}
+function olClearFilter(){
+  olFilterStatus=''; olFilterType=''; olFilterFY='';
+  renderOrdersList();
+}
+
+// 一覧から案件を開く（案件タブへ移動して詳細を表示）
+function olOpenProject(id){
+  const p=projects.find(x=>x.id===id);
+  if(!p) return;
+  mainTab('estimate');
+  selectProjectSidebar(id);
+}
+
+// 一覧から案件を削除する
+async function olDeleteProject(id, ev){
+  if(ev) ev.stopPropagation();
+  const p=projects.find(x=>x.id===id);
+  if(!p) return;
+  const est=olEstimateOf(p);
+  if(!confirm(`「${p.name}」を削除しますか？\n${est?'この案件の見積・発注書は残ります。\n':''}この操作は元に戻せません。`)) return;
+  try{
+    await dbDeleteProject(id);
+    projects=projects.filter(x=>x.id!==id);
+    if(selectedProject?.id===id){ selectedProject=null; selectedProjectName=null; }
+    renderOrdersList();
+    renderProjectSidebar();
+    showToast('案件を削除しました');
+  }catch(_){}
+}
 
 function renderOrdersList(){
-  const list = (estimates||[])
-    .filter(e => e.status==='approved' || e.status==='sent' || e.status==='completed')
-    .sort((a,b)=>((a.contractDate||a.date||'') < (b.contractDate||b.date||'') ? -1 : 1));
+  renderOlFilters();
+  const list = olVisibleRows();
 
   const el = document.getElementById('orders-list-body');
   if(!el) return;
 
+  const cnt=document.getElementById('ol-count');
+  if(cnt) cnt.textContent = `${list.length}件${list.length!==(projects||[]).length?`（全${(projects||[]).length}件中）`:''}`;
+
   if(!list.length){
-    el.innerHTML='<tr><td colspan="26" style="padding:20px;text-align:center;color:var(--text-muted)">受注・提出済みの見積がありません</td></tr>';
+    el.innerHTML='<tr><td colspan="27" style="padding:20px;text-align:center;color:var(--text-muted)">該当する案件がありません</td></tr>';
     renderOrdersTotals([]);
     return;
   }
 
-  el.innerHTML = list.map((e,i)=>{
+  el.innerHTML = list.map((r,i)=>{
+    const e=r.est, p=r.project;
     const ca   = e.contractAmount||0;
     const comp = e.completion||0;
     const dekidaka = Math.round(ca * comp / 100);
@@ -24,7 +144,6 @@ function renderOrdersList(){
     const a3 = pays[2]?.actualAmount||0;
     const kaishuu = a1+a2+a3;
     const mishuu  = ca - kaishuu;
-    const zankin  = ca - a1 - a2 - a3;
     const secs = e.sections||[];
     const sectTotal = secs.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
     const sectCost  = secs.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.cost,0),0);
@@ -33,65 +152,67 @@ function renderOrdersList(){
     const apAmt= e.actualProfit||0;
     const apRate = ca ? (apAmt/ca*100) : 0;
     const extras = e.extras||[];
-    const totalCa = ca
-      + (extras[0]?.amount||0)
-      + (extras[1]?.amount||0)
-      + (extras[2]?.amount||0);
+    const totalCa = ca + (extras[0]?.amount||0) + (extras[1]?.amount||0) + (extras[2]?.amount||0);
 
-    const badge = e.status==='approved'
-      ? '<span class="badge approved" style="font-size:9px;padding:1px 5px">受注</span>'
-      : e.status==='completed'
-        ? '<span class="badge completed" style="font-size:9px;padding:1px 5px">完工</span>'
-        : '<span class="badge sent" style="font-size:9px;padding:1px 5px">提出済</span>';
+    const st=OL_STATUS[r.status]||OL_STATUS.draft;
+    const badge=`<span class="badge ${st.cls}" style="font-size:9px;padding:1px 5px">${st.label}</span>`;
+    // 見積の無い案件は、編集欄を出さずに空欄にする
+    const hasEst=!!e.id;
 
-    return `<tr class="ol-row status-${e.status}">
+    return `<tr class="ol-row status-${r.status}">
       <td class="ol-no">${i+1}</td>
       <td class="ol-c">${e.contractDate||''}</td>
-      <td class="ol-c" style="white-space:nowrap">${esc(e.clientName||'')}</td>
-      <td class="ol-c">${esc(e.projectName||'')} ${badge}</td>
-      <td class="ol-r">¥${fmt(totalCa)}</td>
-      <td class="ol-c">${e.startDate||''}</td>
+      <td class="ol-c" style="white-space:nowrap">${esc(e.clientName||p.clientName||'')}</td>
+      <td class="ol-c ol-name" onclick="olOpenProject(${p.id})" title="タップして案件を開く"
+          style="cursor:pointer;color:var(--accent-t);font-weight:600">${esc(p.name)} ${badge}</td>
+      <td class="ol-c" style="text-align:center">${esc(r.type||'')}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(totalCa):''}</td>
+      <td class="ol-c">${e.startDate||p.startDate||''}</td>
       <td class="ol-c" style="text-align:center;padding:2px 0;color:var(--text-muted)">〜</td>
-      <td class="ol-c">${e.endDate||''}</td>
+      <td class="ol-c">${r.endDate||''}</td>
       <td class="ol-c" style="padding:2px 4px">
-        <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
+        ${hasEst?`<div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
           <input type="text" inputmode="numeric" value="${comp||''}" placeholder="0"
             data-est-id="${e.id}" data-field="completion"
             style="width:38px;text-align:right;font-size:11px;padding:2px 3px"
             onfocus="this.value=this.value.replace(/,/g,'')"
           ><span style="font-size:10px;color:var(--text-muted)">%</span>
-        </div>
+        </div>`:''}
       </td>
-      <td class="ol-r">¥${fmt(dekidaka)}</td>
-      <td class="ol-r">¥${fmt(kaishuu)}</td>
-      <td class="ol-r" style="color:${mishuu>0?'var(--danger)':'inherit'}">¥${fmt(mishuu)}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(dekidaka):''}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(kaishuu):''}</td>
+      <td class="ol-r" style="color:${mishuu>0?'var(--danger)':'inherit'}">${hasEst?'¥'+fmt(mishuu):''}</td>
       <td class="ol-c" style="font-size:10px">${pays[0]?.actualDate||''}</td>
-      <td class="ol-r">¥${fmt(a1)}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(a1):''}</td>
       <td class="ol-c" style="font-size:10px">${pays[1]?.actualDate||''}</td>
-      <td class="ol-r">¥${fmt(a2)}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(a2):''}</td>
       <td class="ol-c" style="font-size:10px">${pays[2]?.actualDate||''}</td>
-      <td class="ol-r">¥${fmt(a3)}</td>
-      <td class="ol-r">¥${fmt(epAmt)}</td>
-      <td class="ol-r">${epr.toFixed(1)}%</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(a3):''}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(epAmt):''}</td>
+      <td class="ol-r">${hasEst?epr.toFixed(1)+'%':''}</td>
       <td class="ol-c" style="padding:2px 4px">
-        <div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
+        ${hasEst?`<div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
           <input type="text" inputmode="numeric" value="${apAmt ? apAmt.toLocaleString('ja-JP') : ''}" placeholder="0"
             data-est-id="${e.id}" data-field="actualProfit"
             style="width:80px;text-align:right;font-size:11px;padding:2px 3px"
             onfocus="this.value=this.value.replace(/,/g,'')"
             onblur="this.value=this.value?(parseFloat(this.value.replace(/,/g,''))||0).toLocaleString('ja-JP'):''"
           ><span style="font-size:10px;color:var(--text-muted)">円</span>
-        </div>
+        </div>`:''}
       </td>
-      <td class="ol-r">${apRate.toFixed(1)}%</td>
-      <td class="ol-c ol-memo" contenteditable="true" spellcheck="false"
-        data-est-id="${e.id}" data-field="ordersMemo"
+      <td class="ol-r">${hasEst?apRate.toFixed(1)+'%':''}</td>
+      <td class="ol-c ol-memo" ${hasEst?`contenteditable="true" spellcheck="false" data-est-id="${e.id}" data-field="ordersMemo"`:''}
         >${esc(e.ordersMemo||'')}</td>
+      <td class="ol-c ol-op" style="text-align:center;white-space:nowrap">
+        <button class="btn xs" onclick="olOpenProject(${p.id})">開く</button>
+        <button class="btn xs danger" onclick="olDeleteProject(${p.id},event)">削除</button>
+      </td>
     </tr>`;
   }).join('');
 
-  renderOrdersTotals(list);
+  renderOrdersTotals(list.map(r=>r.est).filter(e=>e && e.id));
 }
+
 
 function renderOrdersTotals(list){
   const el = document.getElementById('orders-list-totals');
@@ -118,7 +239,7 @@ function renderOrdersTotals(list){
   const totApRate = totCa ? (totApAmt/totCa*100).toFixed(1) : '—';
 
   el.innerHTML = `<tr style="font-weight:700;background:var(--surface2);border-top:2px solid var(--border)">
-    <td colspan="4" style="padding:5px 8px;text-align:center">合　　　計</td>
+    <td colspan="5" style="padding:5px 8px;text-align:center">合　　　計</td>
     <td class="ol-r">¥${fmt(totCa)}</td>
     <td colspan="4" style="padding:4px 6px"></td>
     <td class="ol-r">¥${fmt(totDeki)}</td>
@@ -130,6 +251,7 @@ function renderOrdersTotals(list){
     <td class="ol-r">¥${fmt(totApAmt)}</td>
     <td class="ol-r">${totApRate}%</td>
     <td class="ol-memo"></td>
+    <td class="ol-op"></td>
   </tr>`;
 }
 
@@ -148,8 +270,8 @@ function printOrdersList(){
   tbl.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
 
   // 備考列を削除（.ol-memo のtd と ヘッダーの「備考」th のみ）
-  tbl.querySelectorAll('.ol-memo').forEach(el => el.remove());
-  tbl.querySelectorAll('th').forEach(th => { if(th.textContent.trim()==='備考') th.remove(); });
+  tbl.querySelectorAll('.ol-memo, .ol-op').forEach(el => el.remove());
+  tbl.querySelectorAll('th').forEach(th => { const t=th.textContent.trim(); if(t==='備考'||t==='操作') th.remove(); });
 
   // バッジを小さいテキストに置換
   tbl.querySelectorAll('.badge').forEach(b => {
@@ -164,7 +286,7 @@ function printOrdersList(){
   });
 
   // colgroup: 22列分の幅を明示（合計 ≈ 1048pt、A3横1147ptに収まる）
-  const colWidths = [14,44,65,100,65,42,8,42,28,60,60,60,40,52,40,52,40,52,60,32,60,32];
+  const colWidths = [14,44,65,100,38,65,42,8,42,28,60,60,60,40,52,40,52,40,52,60,32,60,32];
   const cg = document.createElement('colgroup');
   colWidths.forEach(w => {
     const c = document.createElement('col');
@@ -176,7 +298,7 @@ function printOrdersList(){
 
   const date = new Date().toLocaleDateString('ja-JP');
   const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
-<title>受注一覧表</title>
+<title>案件一覧</title>
 <style>
 @page { size: A3 landscape; margin: 8mm; }
 * { box-sizing: border-box; }
@@ -192,7 +314,7 @@ tr:nth-child(even) td { background: #f5f5f5; -webkit-print-color-adjust: exact; 
 tfoot td { font-weight: 700; background: #e8e8e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 </style>
 </head><body>
-<h2>受注一覧表　${date}</h2>
+<h2>案件一覧　${date}${olFilterLabel()}</h2>
 ${tbl.outerHTML}
 <script>window.onload=function(){ window.print(); setTimeout(()=>window.close(),800); }<\/script>
 </body></html>`;
@@ -237,4 +359,13 @@ async function saveOlField(estId, field, value){
   est[field] = value;
   try{ await dbSaveEstimate(est); } catch(_){}
   renderOrdersList();
+}
+
+// 印刷の見出しに出す絞り込み条件
+function olFilterLabel(){
+  const parts=[];
+  if(olFilterStatus) parts.push(OL_STATUS[olFilterStatus]?.label||olFilterStatus);
+  if(olFilterType)   parts.push(olFilterType);
+  if(olFilterFY)     parts.push(`${olFilterFY}年度完工`);
+  return parts.length ? `　［${parts.join('／')}］` : '';
 }
