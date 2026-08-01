@@ -78,6 +78,7 @@ async function bootstrapApp(){
     newEstimate();
     renderSupplierSelectList();
     mainTab(currentUserRole==='staff' ? 'estimate' : 'genba');
+    if(currentUserRole==='staff') estSubTab('list');   // 管理者は案件一覧から始める
   } else {
     // 発注先ロール：品目マスタ（自社品目の単価編集）のみ表示
     mainTab('order');

@@ -92,11 +92,12 @@ function olClearFilter(){
   renderOrdersList();
 }
 
-// 一覧から案件を開く（案件タブへ移動して詳細を表示）
+// 一覧から案件を開く（同じ案件タブ内で「案件情報」に切り替えて詳細を表示）
 function olOpenProject(id){
   const p=projects.find(x=>x.id===id);
   if(!p) return;
   mainTab('estimate');
+  // 案件を読み込んでから案件情報タブへ（未保存の見積があれば確認が入る）
   selectProjectSidebar(id);
 }
 
