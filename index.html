@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=228">
+<link rel="stylesheet" href="css/main.css?v=229">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -791,11 +791,12 @@
         <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="nippo-project" onchange="nippoProjectChanged()"></select></div>
         <!-- 「その他」選択時のみ表示：区分を選択または入力 -->
         <div class="fg" id="nippo-other-wrap" style="display:none"><label>区分（その他） <span style="color:var(--danger)">*</span></label>
-          <input id="nippo-other" list="nippo-other-list" placeholder="設計／事務／空き家管理 など" autocomplete="off">
+          <input id="nippo-other" list="nippo-other-list" placeholder="設計／事務／空き家管理／研修 など" autocomplete="off">
           <datalist id="nippo-other-list">
             <option value="設計"></option>
             <option value="事務"></option>
             <option value="空き家管理"></option>
+            <option value="研修"></option>
           </datalist>
         </div>
         <!-- 工事区分が「新築」の案件のみ表示 -->
@@ -939,11 +940,12 @@
         <div class="fg"><label>工事 <span style="color:var(--danger)">*</span></label><select id="holiday-project" onchange="holidayProjectChanged()"></select></div>
         <!-- 「その他」選択時のみ表示：区分を選択または入力 -->
         <div class="fg" id="holiday-other-wrap" style="display:none"><label>区分（その他） <span style="color:var(--danger)">*</span></label>
-          <input id="holiday-other" list="holiday-other-list" placeholder="設計／事務／空き家管理 など" autocomplete="off">
+          <input id="holiday-other" list="holiday-other-list" placeholder="設計／事務／空き家管理／研修 など" autocomplete="off">
           <datalist id="holiday-other-list">
             <option value="設計"></option>
             <option value="事務"></option>
             <option value="空き家管理"></option>
+            <option value="研修"></option>
           </datalist>
         </div>
         <div class="fg full"><label>作業内容・理由 <span style="color:var(--danger)">*</span></label><input id="holiday-reason" placeholder="例：上棟前の準備のため"></div>
