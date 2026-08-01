@@ -8,6 +8,8 @@
 let olFilterStatus = '';   // ''＝すべて / draft / sent / approved / completed
 let olFilterType   = '';   // ''＝すべて / 新築 / リフォーム …
 let olFilterFY     = '';   // ''＝すべて / '2026'（2026年度＝2026/3/1〜2027/2/末）
+// 表示：カード（写真つき一覧）／表（金額・入金まで見る一覧。A3印刷もこちら）
+let olView = (()=>{ try{ return localStorage.getItem('teyose-ol-view')||'card'; }catch(_){ return 'card'; } })();
 
 // 完工年度（毎年3月1日が新年度）。'2026-04-10' → 2026年度
 function olFiscalYear(dateStr){
@@ -121,6 +123,14 @@ async function olDeleteProject(id, ev){
 function renderOrdersList(){
   renderOlFilters();
   const list = olVisibleRows();
+
+  // 表示の切り替え（表はA3印刷に使うので、カード表示中も中身は作っておく）
+  const cardWrap=document.getElementById('orders-card-wrap');
+  const tableWrap=document.getElementById('orders-table-wrap');
+  if(cardWrap)  cardWrap.style.display  = olView==='card'  ? '' : 'none';
+  if(tableWrap) tableWrap.style.display = olView==='table' ? '' : 'none';
+  document.querySelectorAll('.ol-view-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===olView));
+  renderOlCards(list);
 
   const el = document.getElementById('orders-list-body');
   if(!el) return;
@@ -369,4 +379,70 @@ function olFilterLabel(){
   if(olFilterType)   parts.push(olFilterType);
   if(olFilterFY)     parts.push(`${olFilterFY}年度完工`);
   return parts.length ? `　［${parts.join('／')}］` : '';
+}
+
+// ════ カード表示（案件名・ステータス・工事区分・写真が一目で分かる） ════
+
+// 案件の表紙写真（現場写真の最新の1枚）。無ければ null
+function olCoverPhoto(projectId){
+  const list=(typeof sitePhotos!=='undefined'?sitePhotos:[]).filter(p=>p.projectId===projectId);
+  if(!list.length) return null;
+  // 撮影日 → 登録順で最新のもの
+  return [...list].sort((a,b)=>(b.shotDate||'').localeCompare(a.shotDate||'') || (b.id-a.id))[0];
+}
+
+// 工事区分ごとのアイコン（写真が無いときの表紙）
+function olTypeIcon(type){
+  const mansion = /マンション|アパート|集合/.test(type||'');
+  return mansion
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" width="52" height="52">
+         <rect x="4" y="3" width="16" height="18" rx="1"/><line x1="8" y1="7" x2="8" y2="7.01"/><line x1="12" y1="7" x2="12" y2="7.01"/>
+         <line x1="16" y1="7" x2="16" y2="7.01"/><line x1="8" y1="11" x2="8" y2="11.01"/><line x1="12" y1="11" x2="12" y2="11.01"/>
+         <line x1="16" y1="11" x2="16" y2="11.01"/><line x1="8" y1="15" x2="8" y2="15.01"/><line x1="16" y1="15" x2="16" y2="15.01"/>
+         <path d="M10.5 21v-4h3v4"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" width="52" height="52">
+         <path d="M3 11l9-7 9 7"/><path d="M5 10v11h14V10"/><path d="M10 21v-6h4v6"/>
+         <line x1="8" y1="13" x2="8" y2="13.01"/><line x1="16" y1="13" x2="16" y2="13.01"/></svg>`;
+}
+
+function olCardHtml(r){
+  const p=r.project, e=r.est;
+  const st=OL_STATUS[r.status]||OL_STATUS.draft;
+  const photo=olCoverPhoto(p.id);
+  const start=(e.startDate||p.startDate||'').replace(/-/g,'/');
+  const end=(r.endDate||'').replace(/-/g,'/');
+  const period = start||end ? `${start||'—'}　〜　${end||''}` : '';
+  return `<div class="ol-card" onclick="olOpenProject(${p.id})" title="タップして案件を開く">
+    <div class="ol-card-img">
+      ${photo
+        ? `<img src="${photo.url}" alt="${esc(p.name)}" loading="lazy">`
+        : `<div class="ol-card-ph">${olTypeIcon(r.type)}<div class="ol-card-phtxt">${esc(r.type||'工事区分なし')}</div></div>`}
+      <span class="ol-card-status badge ${st.cls}">${st.label}</span>
+      ${r.type?`<span class="ol-card-type">${esc(r.type)}</span>`:''}
+    </div>
+    <div class="ol-card-body">
+      <div class="ol-card-name">${esc(p.name)}</div>
+      ${p.clientName?`<div class="ol-card-sub">${esc(p.clientName)}</div>`:''}
+      ${period?`<div class="ol-card-date">${period}</div>`:''}
+      <div class="ol-card-foot">
+        ${e.contractAmount?`<span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>`:'<span></span>'}
+        <button class="btn xs danger" onclick="olDeleteProject(${p.id},event)">削除</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderOlCards(list){
+  const el=document.getElementById('orders-card-grid');
+  if(!el) return;
+  el.innerHTML = list.length
+    ? list.map(olCardHtml).join('')
+    : '<div class="empty" style="padding:24px;grid-column:1/-1">該当する案件がありません</div>';
+}
+
+// カード／表の切り替え
+function olSetView(v){
+  olView=v;
+  try{ localStorage.setItem('teyose-ol-view', v); }catch(_){}
+  renderOrdersList();
 }

@@ -49,3 +49,35 @@
   background:var(--accent-bg);color:var(--accent-t);border:1px solid var(--accent);white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .member-tag.more{background:var(--surface2);color:var(--text-sub);border-color:var(--border-s);cursor:pointer;font-family:inherit}
+
+/* ── 案件一覧：カード表示 ── */
+.ol-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.ol-card{background:var(--surface);border:0.5px solid var(--border);border-radius:10px;overflow:hidden;
+  cursor:pointer;transition:box-shadow .15s,transform .1s;box-shadow:var(--sh)}
+.ol-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.ol-card:active{transform:scale(.99)}
+/* 表紙（写真 or 工事区分アイコン） */
+.ol-card-img{position:relative;aspect-ratio:4/3;background:var(--surface2);overflow:hidden}
+.ol-card-img img{width:100%;height:100%;object-fit:cover;display:block}
+.ol-card-ph{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;color:var(--border-s);background:#e6e2da}
+.ol-card-phtxt{font-size:11px;font-weight:700;color:#b3aca0}
+.ol-card-status{position:absolute;top:6px;right:6px;font-size:10px;padding:2px 7px;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.ol-card-type{position:absolute;top:6px;left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;
+  background:rgba(255,255,255,.92);color:var(--text-sub);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+/* 本文 */
+.ol-card-body{padding:8px 10px 9px}
+.ol-card-name{font-size:13px;font-weight:800;line-height:1.4;overflow:hidden;text-overflow:ellipsis;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.8em}
+.ol-card-sub{font-size:11px;color:var(--text-muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ol-card-date{font-size:11px;color:var(--text-sub);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ol-card-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px;
+  padding-top:6px;border-top:0.5px solid var(--border)}
+.ol-card-amt{font-size:12px;font-weight:700;color:var(--wood-t)}
+/* 表示切替ボタン */
+.ol-view-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.ol-view-btn.active svg{stroke:#fff}
+@media(max-width:599px){
+  .ol-card-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
+  .ol-card-name{font-size:12px}
+}
