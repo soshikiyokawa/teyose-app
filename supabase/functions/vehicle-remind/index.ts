@@ -1,7 +1,8 @@
 // 車両管理のリマインド用Edge Function。
 //
 // Supabaseのpg_cronから毎日9時（JST）に呼ばれ（migration-genba26.sql参照）、
-// 車両の点検責任者へプッシュ通知を送る。
+// 車両の点検責任者と管理者（staff）へプッシュ通知を送る。
+// 管理者あての本文には「（担当：〇〇）」を付けて、誰の担当かが分かるようにする。
 //
 //   車検        … 満了日の3か月前・1か月前
 //   オイル交換  … 4月1日／10月1日。実施が登録されるまで、以降は毎週金曜に催促
@@ -69,16 +70,24 @@ Deno.serve(async (req) => {
     if (!vehicles?.length) return json({ sent: 0 });
     const { data: records } = await admin.from("vehicle_records").select("vehicle_id, kind, done_date");
 
-    // 点検責任者の名前 → user_id
-    const { data: profiles } = await admin.from("profiles").select("id, display_name");
+    // 点検責任者の名前 → user_id ／ 管理者（staff）にも同じ内容を送る
+    const { data: profiles } = await admin.from("profiles").select("id, display_name, role");
     const idByName: Record<string, string> = {};
     (profiles || []).forEach((p: any) => { if (p.display_name) idByName[p.display_name] = p.id; });
+    const staffIds = (profiles || []).filter((p: any) => p.role === "staff").map((p: any) => p.id);
 
     type Msg = { userId: string; title: string; body: string };
     const msgs: Msg[] = [];
     const push = (v: any, title: string, body: string) => {
-      const uid = idByName[v.manager_name || ""];
-      if (uid) msgs.push({ userId: uid, title, body });
+      const managerId = idByName[v.manager_name || ""];
+      // 点検責任者＋管理者。同じ人が重ならないようにまとめる
+      const targets = new Set<string>(staffIds);
+      if (managerId) targets.add(managerId);
+      // 管理者へは、誰の担当かが分かるように車両名のあとへ責任者名を添える
+      const who = v.manager_name ? `（担当：${v.manager_name}）` : "（担当：未設定）";
+      targets.forEach((uid) => {
+        msgs.push({ userId: uid, title, body: uid === managerId ? body : body + who });
+      });
     };
 
     for (const v of vehicles) {
