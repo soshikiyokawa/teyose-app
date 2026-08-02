@@ -251,7 +251,7 @@ function newEstimateChecked(){confirmEstDiscard(()=>newEstimate());}
 
 function newEstimate(){
   editingEstId=null;
-  ['est-no','est-date','est-expire','est-start-date','est-end-date','est-client','est-client-address','est-client-tel','est-client-email','est-tantou','est-project','est-site','est-note',
+  ['est-no','est-date','est-expire','est-start-date','est-end-date','est-actual-start','est-handover','est-client','est-client-address','est-client-tel','est-client-email','est-tantou','est-project','est-site','est-note',
    'est-contract-date','est-extra1-date','est-extra2-date','est-extra3-date',
    'est-pay1-date','est-pay1-amount','est-pay2-date','est-pay2-amount','est-pay3-date','est-pay3-amount',
    'est-pay1-actual-date','est-pay1-actual-amount','est-pay2-actual-date','est-pay2-actual-amount','est-pay3-actual-date','est-pay3-actual-amount'
@@ -281,6 +281,7 @@ function newEstimate(){
   updateEstBadge();renderSections();estSubTab('info');
   renderProjectSidebar();
   updateProjDeleteBtn();
+  updateProjDateLabels();
 }
 
 function cloneSections(list){
@@ -438,6 +439,9 @@ function fillProjectInfoTab(p){
   sv('est-site', p?.address);
   sv('est-start-date', p?.startDate);
   sv('est-end-date', p?.endDate);
+  sv('est-actual-start', p?.actualStartDate);
+  sv('est-handover', p?.handoverDate);
+  updateProjDateLabels();
   window._currentMapLat = p?.mapLat||null;
   window._currentMapLng = p?.mapLng||null;
   updateMapPinIndicator && updateMapPinIndicator();
@@ -467,6 +471,8 @@ async function saveProjectInfo(){
     note: base.note||'',
     startDate: document.getElementById('est-start-date').value||'',
     endDate: document.getElementById('est-end-date').value||'',
+    actualStartDate: document.getElementById('est-actual-start')?.value||'',
+    handoverDate: document.getElementById('est-handover')?.value||'',
     mapLat: window._currentMapLat||null,
     mapLng: window._currentMapLng||null,
     parkingAddress: document.getElementById('est-parking')?.value.trim()||'',
@@ -633,4 +639,15 @@ async function deleteCurrentProject(){
     estSubTab('list');
     showToast('案件を削除しました');
   }catch(e){}
+}
+
+// ── 着工予定日／完工予定日の見出し ──
+// 実績（着工日・引渡日）を入れると、見出しが「着工日」「引渡日」に変わる
+function updateProjDateLabels(){
+  const sl=document.getElementById('est-start-label');
+  const el=document.getElementById('est-end-label');
+  const as=document.getElementById('est-actual-start')?.value||'';
+  const hd=document.getElementById('est-handover')?.value||'';
+  if(sl) sl.textContent = as ? '着工日' : '着工予定日';
+  if(el) el.textContent = hd ? '引渡日' : '完工予定日';
 }

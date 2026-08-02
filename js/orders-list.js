@@ -29,12 +29,16 @@ function olEstimateOf(project){
 // 画面に出す1件分の情報にまとめる
 function olRowData(p){
   const e = olEstimateOf(p) || {};
-  const endDate = e.endDate || p.endDate || '';
+  // 実績（着工日・引渡日）が入っていればそちらを使う
+  const startDate = p.actualStartDate || e.startDate || p.startDate || '';
+  const endDate   = p.handoverDate   || e.endDate   || p.endDate   || '';
   return {
     project:p, est:e,
     status: e.status || 'draft',
     type: p.type || e.type || '',
-    endDate,
+    startDate, endDate,
+    startIsActual: !!p.actualStartDate,
+    endIsActual:   !!p.handoverDate,
     fy: olFiscalYear(endDate)
   };
 }
@@ -178,9 +182,9 @@ function renderOrdersList(){
           style="cursor:pointer;color:var(--accent-t);font-weight:600">${esc(p.name)} ${badge}</td>
       <td class="ol-c" style="text-align:center">${esc(r.type||'')}</td>
       <td class="ol-r">${hasEst?'¥'+fmt(totalCa):''}</td>
-      <td class="ol-c">${e.startDate||p.startDate||''}</td>
+      <td class="ol-c">${r.startDate||''}${r.startIsActual?'<span style="font-size:9px;color:var(--ok-t)">（実績）</span>':''}</td>
       <td class="ol-c" style="text-align:center;padding:2px 0;color:var(--text-muted)">〜</td>
-      <td class="ol-c">${r.endDate||''}</td>
+      <td class="ol-c">${r.endDate||''}${r.endIsActual?'<span style="font-size:9px;color:var(--ok-t)">（引渡）</span>':''}</td>
       <td class="ol-c" style="padding:2px 4px">
         ${hasEst?`<div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
           <input type="text" inputmode="numeric" value="${comp||''}" placeholder="0"
@@ -411,7 +415,7 @@ function olCardHtml(r){
   const p=r.project, e=r.est;
   const st=OL_STATUS[r.status]||OL_STATUS.draft;
   const photo=olCoverPhoto(p.id);
-  const start=(e.startDate||p.startDate||'').replace(/-/g,'/');
+  const start=(r.startDate||'').replace(/-/g,'/');
   const end=(r.endDate||'').replace(/-/g,'/');
   const period = start||end ? `${start||'—'}　〜　${end||''}` : '';
   return `<div class="ol-card" onclick="olOpenProject(${p.id})" title="タップして案件を開く">

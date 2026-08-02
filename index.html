@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=230">
+<link rel="stylesheet" href="css/main.css?v=231">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -180,9 +180,9 @@
           <th class="ol-th" rowspan="2">備考</th>
         </tr>
         <tr class="ol-head2">
-          <th class="ol-th">着工予定</th>
+          <th class="ol-th">着工</th>
           <th class="ol-th" style="padding:2px 0;font-size:9px">〜</th>
-          <th class="ol-th">完工予定</th>
+          <th class="ol-th">完工・引渡</th>
           <th class="ol-th" style="background:var(--wood-lt,#f5ede0)">着工金<br>日付</th>
           <th class="ol-th" style="background:var(--wood-lt,#f5ede0)">金額</th>
           <th class="ol-th" style="background:var(--wood-lt,#f5ede0)">上棟時金<br>日付</th>
@@ -245,8 +245,31 @@
           </div>
           <div id="parking-doc-list" style="margin-top:4px"></div>
         </div>
-        <div class="fg"><label>着工予定日</label><input type="date" id="est-start-date"></div>
-        <div class="fg"><label>完工予定日</label><input type="date" id="est-end-date"></div>
+        <!-- 実績を入れると見出しが「着工日」「引渡日」に変わる -->
+        <div class="fg"><label id="est-start-label">着工予定日</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <div style="flex:1;min-width:0">
+              <input type="date" id="est-start-date" style="width:100%">
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">予定</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <input type="date" id="est-actual-start" onchange="updateProjDateLabels()" style="width:100%">
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">実績（着工日）</div>
+            </div>
+          </div>
+        </div>
+        <div class="fg"><label id="est-end-label">完工予定日</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <div style="flex:1;min-width:0">
+              <input type="date" id="est-end-date" style="width:100%">
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">予定</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <input type="date" id="est-handover" onchange="updateProjDateLabels()" style="width:100%">
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">実績（引渡日）</div>
+            </div>
+          </div>
+        </div>
         <div class="fg full"><label>参加メンバー（案件チャット）</label>
           <div style="display:flex;align-items:center;gap:8px">
             <div id="proj-members-summary" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;color:var(--text-sub)">未設定</div>
@@ -1981,7 +2004,7 @@
 <script src="js/state.js?v=221"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=227"></script>
+<script src="js/data/db.js?v=231"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=225"></script>
@@ -1997,13 +2020,13 @@
 <script src="js/estimate/estimate-items.js?v=196"></script>
 <script src="js/estimate/estimate-master.js?v=202"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
-<script src="js/estimate/estimate-crud.js?v=227"></script>
+<script src="js/estimate/estimate-crud.js?v=231"></script>
 <script src="js/estimate/parking.js?v=193"></script>
 <script src="js/estimate/estimate-pdf.js?v=138"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=227"></script>
+<script src="js/orders-list.js?v=231"></script>
 
 <!-- 注文書・注文請書 -->
 <script src="js/chusho.js?v=138"></script>

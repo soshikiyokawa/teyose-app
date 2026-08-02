@@ -49,7 +49,7 @@ async function fetchAllData(){
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
     const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
-    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],coverPhotoId:r.cover_photo_id||null,updatedAt:r.updated_at}));
+    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],coverPhotoId:r.cover_photo_id||null,actualStartDate:r.actual_start_date||'',handoverDate:r.handover_date||'',updatedAt:r.updated_at}));
 
     await fetchGenbaData();
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
@@ -110,15 +110,22 @@ function rowToEstimate(r){
 // ── 案件マスタ ──
 async function dbSaveProject(proj){
   const row={name:proj.name,client_name:proj.clientName,type:proj.type,address:proj.address,note:proj.note,
-    start_date:proj.startDate||null,end_date:proj.endDate||null,map_lat:proj.mapLat??null,map_lng:proj.mapLng??null,
+    start_date:proj.startDate||null,end_date:proj.endDate||null,
+    actual_start_date:proj.actualStartDate||null,handover_date:proj.handoverDate||null,map_lat:proj.mapLat??null,map_lng:proj.mapLng??null,
     parking_address:proj.parkingAddress||'',parking_lat:proj.parkingLat??null,parking_lng:proj.parkingLng??null,
     members:proj.members||[],
     updated_at:new Date().toISOString()};
+  // 実績日の列（migration-genba28.sql）が未適用でも保存できるようにする
+  const stripNewCols = r => { const {actual_start_date, handover_date, ...rest} = r; return rest; };
   if(proj.id){
     // 案件名が変わった場合、紐づく見積のproject_nameも一括更新する
     const oldProject=projects.find(p=>p.id===proj.id);
     const oldName=oldProject?.name;
-    const {error}=await sb.from('projects').update(row).eq('id',proj.id);
+    let {error}=await sb.from('projects').update(row).eq('id',proj.id);
+    if(error && /actual_start_date|handover_date/.test(error.message||'')){
+      console.warn('着工日・引渡日の列が未作成のため、その2つを除いて保存します');
+      ({error}=await sb.from('projects').update(stripNewCols(row)).eq('id',proj.id));
+    }
     if(error){showToast('保存に失敗しました：'+error.message);throw error;}
     if(oldName && oldName!==proj.name){
       const {error:estErr}=await sb.from('estimates').update({project_name:proj.name}).eq('project_name',oldName);
@@ -127,7 +134,10 @@ async function dbSaveProject(proj){
     }
     return proj.id;
   }
-  const {data,error}=await sb.from('projects').insert(row).select().single();
+  let {data,error}=await sb.from('projects').insert(row).select().single();
+  if(error && /actual_start_date|handover_date/.test(error.message||'')){
+    ({data,error}=await sb.from('projects').insert(stripNewCols(row)).select().single());
+  }
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   return data.id;
 }
