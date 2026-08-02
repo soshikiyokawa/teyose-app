@@ -964,15 +964,37 @@ async function fetchInspections(){
   const { data, error } = await sb.from('inspection_records').select('*').order('done_date',{ascending:false});
   inspectionTableReady = !error;
   inspectionRecords = (data||[]).map(r=>({id:r.id, projectId:r.project_id, kind:r.kind,
-    doneDate:r.done_date||'', note:r.note||'', userName:r.user_name||''}));
+    doneDate:r.done_date||'', guidedDate:r.guided_date||'', note:r.note||'', userName:r.user_name||''}));
+}
+// マイグレーション㉚が未実行だと guided_date が無い／実施日が必須のままなので、直し方を伝える
+function inspectionSaveError(error){
+  const m=String(error?.message||'');
+  if(/guided_date/.test(m) || /done_date/.test(m)){
+    showToast('データベースの準備が必要です。supabase/migration-genba30.sql を実行してください');
+  }else{
+    showToast('保存に失敗しました：'+m);
+  }
+  throw error;
 }
 async function dbSaveInspection(projectId, kind, doneDate, note){
+  const cur=(inspectionRecords||[]).find(r=>r.projectId===projectId && r.kind===kind);
   const { error } = await sb.from('inspection_records').upsert({
-    project_id:projectId, kind, done_date:doneDate, note:note||'', user_name:currentUserDisplayName||''
+    project_id:projectId, kind, done_date:doneDate, guided_date:cur?.guidedDate||null,
+    note:note||'', user_name:currentUserDisplayName||''
   }, {onConflict:'project_id,kind'});
-  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+  if(error) inspectionSaveError(error);
 }
 async function dbDeleteInspection(projectId, kind){
   const { error } = await sb.from('inspection_records').delete().eq('project_id',projectId).eq('kind',kind);
   if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+// 定期点検：お客様への案内が済んだ日を記録する（実施日はそのまま残す）
+async function dbSaveInspectionGuide(projectId, kind, guidedDate){
+  const cur=(inspectionRecords||[]).find(r=>r.projectId===projectId && r.kind===kind);
+  const { error } = await sb.from('inspection_records').upsert({
+    project_id:projectId, kind, guided_date:guidedDate||null,
+    done_date:cur?.doneDate||null, note:cur?.note||'', user_name:currentUserDisplayName||''
+  }, {onConflict:'project_id,kind'});
+  if(error) inspectionSaveError(error);
 }

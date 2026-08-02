@@ -47,6 +47,7 @@ function insAllSchedule(){
         project:p, kind:pl.kind, dueDate,
         fy: insFiscalYear(dueDate),
         doneDate: rec?.doneDate||'',
+        guidedDate: rec?.guidedDate||'',
         note: rec?.note||'',
         recordId: rec?.id||null
       });
@@ -93,15 +94,18 @@ function renderInspection(){
     sel.innerHTML=ordered.map(y=>`<option value="${y}"${y===insFilterFY?' selected':''}>${y}年度（${y}/3〜${y+1}/2）${y===now?'　今年度':''}</option>`).join('');
   }
 
-  let list=all.filter(r=>r.fy===insFilterFY);
-  const total=list.length;
+  const list0=all.filter(r=>r.fy===insFilterFY);
+  let list=list0;
+  const total=list0.length;
   const doneCnt=list.filter(r=>r.doneDate).length;
   const overCnt=list.filter(r=>!r.doneDate && r.dueDate<insToday()).length;
   if(insHideDone) list=list.filter(r=>!r.doneDate);
 
+  const guideLeft=list0.filter(r=>!r.guidedDate).length;
   document.getElementById('ins-summary').innerHTML=
     `<span style="font-weight:700">${total}件</span>　実施済み ${doneCnt}件　未実施 ${total-doneCnt}件`+
-    (overCnt?`　<span style="color:var(--danger);font-weight:700">期限超過 ${overCnt}件</span>`:'');
+    (overCnt?`　<span style="color:var(--danger);font-weight:700">期限超過 ${overCnt}件</span>`:'')+
+    (guideLeft?`　<span style="color:var(--warn-t);font-weight:700">案内まだ ${guideLeft}件</span>`:'　<span style="color:var(--ok-t);font-weight:700">案内すべて完了</span>');
 
   el.innerHTML = list.length
     ? `<div class="card" style="padding:0;overflow:hidden">${list.map(insRowHtml).join('')}</div>`
@@ -110,6 +114,18 @@ function renderInspection(){
 
 function insRowHtml(r){
   const st=insState(r);
+  const id=`${r.project.id}-${r.kind}`;
+  // お客様への案内：済んでいれば日付を表示、まだなら日付入力＋「案内完了」ボタン
+  const guide = r.guidedDate
+    ? `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ok-t);font-weight:700">
+         ✓ 案内済み（${insLabel(r.guidedDate)}）
+         <button class="btn xs" onclick="clearInspectionGuide(${r.project.id},'${r.kind}')">取り消し</button>
+       </div>`
+    : `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+         <span style="font-size:11px;color:var(--danger);font-weight:700">案内まだ</span>
+         <input type="date" id="ins-guide-${id}" value="${insToday()}" style="width:auto;font-size:11px;padding:3px 6px">
+         <button class="btn xs primary" onclick="saveInspectionGuide(${r.project.id},'${r.kind}')">案内完了</button>
+       </div>`;
   return `<div class="leave-row">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <div style="flex:1;min-width:0">
@@ -121,10 +137,28 @@ function insRowHtml(r){
           予定 ${insLabel(r.dueDate)}　<span style="color:var(--text-muted)">引渡 ${insLabel(r.project.handoverDate)}</span>
         </div>
         <div style="font-size:11px;color:${st.color};font-weight:700">${st.label}${r.note?`<span style="font-weight:400;color:var(--text-muted)">　${esc(r.note)}</span>`:''}</div>
+        <div style="margin-top:3px">${guide}</div>
       </div>
       <button class="btn xs${r.doneDate?'':' primary'}" onclick="openInspectionRecord(${r.project.id},'${r.kind}')">${r.doneDate?'変更':'実施登録'}</button>
     </div>
   </div>`;
+}
+
+// ── お客様への案内（案内完了） ──
+async function saveInspectionGuide(projectId, kind){
+  const el=document.getElementById(`ins-guide-${projectId}-${kind}`);
+  const d=el?.value||insToday();
+  await dbSaveInspectionGuide(projectId, kind, d);
+  await refreshInspections();
+  renderInspection();
+  showToast('案内完了として記録しました');
+}
+async function clearInspectionGuide(projectId, kind){
+  if(!confirm('案内完了を取り消しますか？（毎週の通知が再開します）')) return;
+  await dbSaveInspectionGuide(projectId, kind, '');
+  await refreshInspections();
+  renderInspection();
+  showToast('取り消しました');
 }
 
 function insFyChanged(){ insFilterFY=Number(document.getElementById('ins-fy').value); renderInspection(); }

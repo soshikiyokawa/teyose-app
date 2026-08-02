@@ -5,6 +5,13 @@ let _pendingOpenTab = null;
 function appOpenTab(spec){
   if(!spec) return;
   const [page, sub] = String(spec).split('/');
+  // 案件タブのサブタブ（定期点検など）
+  if(page === 'estimate'){
+    if(!currentUserRole || currentUserRole === 'supplier'){ _pendingOpenTab = spec; return; }
+    mainTab('estimate');
+    if(sub && document.getElementById('estsub-'+sub)) estSubTab(sub);
+    return;
+  }
   if(page !== 'genba') return;
   if(!currentUserRole || currentUserRole === 'supplier'){ _pendingOpenTab = spec; return; }
   mainTab('genba');
