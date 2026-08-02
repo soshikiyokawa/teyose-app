@@ -4,6 +4,9 @@
 
 const NIPPO_STANDARD_MINUTES = 480;
 
+// 工事の選択肢に入れる「職業訓練校」（訓練校生の通学日。案件には紐づかない）
+const NIPPO_SCHOOL = '職業訓練校';
+
 // 他人の日報を編集できる人（この人だけ。他は自分の日報のみ編集可）
 const NIPPO_EDITOR = '清川創史';
 function canEditOthersNippo(){ return currentUserDisplayName === NIPPO_EDITOR; }
@@ -100,9 +103,11 @@ async function saveNippo(){
   const endTime = document.getElementById('nippo-end').value;
   const breakMinutes = Number(document.getElementById('nippo-break').value)||0;
   if(!workDate){ showToast('日付を入力してください'); return; }
-  // 工事：案件を選択、または「その他」で区分を入力
+  // 工事：案件を選択、または「職業訓練校」「その他」（案件に紐づかない）
   let projectId = null, projectName = '';
-  if(projVal==='other'){
+  if(projVal==='school'){
+    projectName = NIPPO_SCHOOL;
+  } else if(projVal==='other'){
     projectName = document.getElementById('nippo-other').value.trim();
     if(!projectName){ showToast('区分を入力してください（設計・事務・空き家管理など）'); return; }
   } else {
@@ -192,9 +197,12 @@ function editNippo(id){
   editingNippoId = id;
   document.getElementById('nippo-date').value = n.workDate;
   renderGenbaProjectSelects();
-  // 案件に紐づかない日報（projectIdなし・projectNameあり）は「その他」として復元
+  // 案件に紐づかない日報（projectIdなし・projectNameあり）は「職業訓練校」「その他」として復元
   if(n.projectId){
     document.getElementById('nippo-project').value = String(n.projectId);
+    document.getElementById('nippo-other').value = '';
+  } else if(n.projectName===NIPPO_SCHOOL){
+    document.getElementById('nippo-project').value = 'school';
     document.getElementById('nippo-other').value = '';
   } else {
     document.getElementById('nippo-project').value = 'other';
