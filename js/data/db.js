@@ -55,6 +55,7 @@ async function fetchAllData(){
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
     await fetchCardStatements();   // カード明細（管理者のみ。テーブルが無くても落とさない）
     await fetchVehicles();         // 車両管理（テーブルが無くても落とさない）
+    await fetchInspections();      // 定期点検（同上）
   } else if(currentUserRole==='supplier'){
     // 業者：案件チャットのスレッド名表示のため、参加している案件だけ取得（RLSで自動的に絞られる）
     const { data: projectRows } = await sb.from('projects').select('id, name, members');
@@ -892,6 +893,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'licenses'}, ()=>refetchAndRerender('licenses'))
     .on('postgres_changes',{event:'*',schema:'public',table:'vehicles'}, ()=>refetchAndRerender('vehicles'))
     .on('postgres_changes',{event:'*',schema:'public',table:'vehicle_records'}, ()=>refetchAndRerender('vehicles'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'inspection_records'}, ()=>refetchAndRerender('inspections'))
     .subscribe();
 }
 
@@ -955,4 +957,22 @@ async function dbSetProjectCover(projectId, photoId){
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   const p=projects.find(x=>x.id===projectId);
   if(p) p.coverPhotoId=photoId;
+}
+
+// ── 定期点検（実施記録） ──
+async function fetchInspections(){
+  const { data, error } = await sb.from('inspection_records').select('*').order('done_date',{ascending:false});
+  inspectionTableReady = !error;
+  inspectionRecords = (data||[]).map(r=>({id:r.id, projectId:r.project_id, kind:r.kind,
+    doneDate:r.done_date||'', note:r.note||'', userName:r.user_name||''}));
+}
+async function dbSaveInspection(projectId, kind, doneDate, note){
+  const { error } = await sb.from('inspection_records').upsert({
+    project_id:projectId, kind, done_date:doneDate, note:note||'', user_name:currentUserDisplayName||''
+  }, {onConflict:'project_id,kind'});
+  if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+}
+async function dbDeleteInspection(projectId, kind){
+  const { error } = await sb.from('inspection_records').delete().eq('project_id',projectId).eq('kind',kind);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
 }

@@ -27,6 +27,8 @@ let cardStatements = [];        // カード明細（JCB。管理者のみ）
 let vehicles = [];              // 会社所有の車両
 let vehicleRecords = [];        // 車検・オイル交換・タイヤ交換の実施記録
 let vehicleTableReady = true;   // migration-genba26.sql が適用済みか
+let inspectionRecords = [];     // 定期点検の実施記録
+let inspectionTableReady = true; // migration-genba29.sql が適用済みか
 let cardTableReady = true;      // migration-genba23.sql が適用済みか
 let licenseTableReady = true;   // migration-genba22.sql が適用済みか
 

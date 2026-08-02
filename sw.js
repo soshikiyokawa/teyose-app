@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v231';
+const CACHE_NAME = 'teyose-v233';
 const ASSETS = [
   './',
   './index.html',
@@ -38,6 +38,7 @@ const ASSETS = [
   './js/order/order-history.js',
   './js/order/card-match.js',
   './js/orders-list.js',
+  './js/inspection.js',
   './js/chusho.js',
   './js/receipt.js',
   './js/schedule.js',
