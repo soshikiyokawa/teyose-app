@@ -112,3 +112,20 @@
   .ol-card-amt{font-size:11px}
   .ol-pay{font-size:9px;padding:1px 5px}
 }
+
+/* ── 入金予定スケジュール（年度＝3月度〜翌2月度／月度は25日締め） ── */
+.ps-table{width:100%;border-collapse:collapse;font-size:12px}
+.ps-table th{background:#f0ebe0;padding:6px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--text-sub);
+  border-bottom:0.5px solid var(--border);white-space:nowrap}
+.ps-table td{padding:7px 8px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+.ps-table .r{text-align:right;white-space:nowrap}
+.ps-table .c{text-align:center;color:var(--text-muted)}
+.ps-table tfoot td{background:var(--surface2);font-weight:800;border-top:1.5px solid var(--border);border-bottom:none}
+.ps-row{cursor:pointer}
+.ps-row:hover td{background:#faf7f0}
+.ps-row.now td{background:var(--accent-bg)}
+.ps-row.open td{background:var(--wood-bg)}
+.ps-detail td{background:var(--surface2);padding:2px 10px 8px}
+@media(max-width:599px){
+  .ps-table th,.ps-table td{padding:6px 5px;font-size:11px}
+}

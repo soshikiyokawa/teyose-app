@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=254">
+<link rel="stylesheet" href="css/main.css?v=255">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -89,6 +89,7 @@
     <button class="sub-tab-btn" onclick="estSubTab('quote')">見積情報</button>
     <button class="sub-tab-btn" onclick="estSubTab('items')">明細入力</button>
     <button class="sub-tab-btn" onclick="estSubTab('summary')">金額確認</button>
+    <button class="sub-tab-btn admin-only" onclick="estSubTab('payment')">入金予定</button>
     <button class="sub-tab-btn" onclick="estSubTab('inspection')">定期点検</button>
     <button class="sub-tab-btn" onclick="estSubTab('master')">工種・品目マスタ</button>
   </div>
@@ -507,6 +508,15 @@
         <button class="btn wood" onclick="openInvoicePdf()"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 御請求書PDF</button>
       </div>
     </div>
+  </div>
+
+  <!-- 入金予定スケジュール（年度＝3月度〜翌2月度／月度は25日締め） -->
+  <div class="sub-page" id="estsub-payment">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 8px">
+      <h2 style="margin:0;font-size:15px">入金予定</h2>
+      <select id="ps-fy" onchange="psFyChanged()" style="width:auto;font-size:12px;padding:4px 8px"></select>
+    </div>
+    <div id="ps-body"></div>
   </div>
 
   <!-- 定期点検（引渡日から3か月・1年・3年・5年・10年・15年・20年） -->
@@ -2111,7 +2121,7 @@
 <script src="js/push.js?v=199"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=232"></script>
+<script src="js/estimate/estimate-tabs.js?v=255"></script>
 <script src="js/estimate/estimate-items.js?v=249"></script>
 <script src="js/estimate/quote-import.js?v=249"></script>
 <script src="js/estimate/estimate-master.js?v=202"></script>
@@ -2123,6 +2133,7 @@
 
 <!-- 受注一覧 -->
 <script src="js/orders-list.js?v=253"></script>
+<script src="js/payment-schedule.js?v=256"></script>
 <script src="js/inspection.js?v=234"></script>
 
 <!-- 注文書・注文請書 -->

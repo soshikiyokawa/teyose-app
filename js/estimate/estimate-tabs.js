@@ -1,11 +1,12 @@
 // ════ 見積：サブタブ切り替え・ステータスバッジ ════
 
 function estSubTab(t){
-  document.querySelectorAll('#page-estimate .sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['list','info','quote','items','summary','inspection','master'][i]===t));
+  document.querySelectorAll('#page-estimate .sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['list','info','quote','items','summary','payment','inspection','master'][i]===t));
   document.querySelectorAll('#page-estimate .sub-page').forEach(p=>p.classList.remove('active'));
   document.getElementById('estsub-'+t).classList.add('active');
   if(t==='list') renderOrdersList();
   if(t==='inspection') renderInspection();
+  if(t==='payment') renderPaymentSchedule();
   if(t==='items') renderSections();
   if(t==='summary'){recalcSum();renderSumBreakdown();}
   if(t==='master'){renderEstCategoryMaster();renderEstPresetMaster();}
