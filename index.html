@@ -454,6 +454,7 @@
       <div class="card-head">
         <span class="card-head-title">明細</span>
         <button class="btn sm primary" onclick="openSimpleEst()" title="請負金額と原価合計だけで見積を登録する">かんたん入力</button>
+        <button class="btn sm" onclick="openQuoteImport()" title="業者からの見積（PDF・写真）を読み取って明細に入れる">業者見積を読み込む</button>
         <button class="btn sm" onclick="saveCurrentAsDefault()" title="現在の明細を、選択中の工事区分のデフォルトとして保存">この内容をデフォルトに保存</button>
         <span id="est-grand" style="font-size:13px;font-weight:700;color:var(--wood-t);white-space:nowrap;margin-left:auto">¥0</span>
       </div>
@@ -1975,6 +1976,23 @@
     </div>
   </div>
 </div>
+<!-- 業者の見積（PDF・写真）を読み取って明細に入れる -->
+<div class="modal-overlay" id="quote-import-modal" onclick="if(event.target.id==='quote-import-modal')closeQuoteImport()">
+  <div class="modal-sheet">
+    <h3>業者見積を読み込む</h3>
+    <div style="margin-bottom:10px">
+      <input type="file" id="qi-file" accept="application/pdf,image/*" onchange="qiFileChosen(this)"
+             style="font-size:12px;width:100%">
+    </div>
+    <div id="qi-body"></div>
+    <div class="modal-actions" id="qi-foot" style="margin-top:12px;display:none;align-items:center;gap:8px">
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeQuoteImport()">キャンセル</button>
+      <button class="btn primary" id="qi-apply" onclick="applyQuoteImport()">明細に追加</button>
+    </div>
+  </div>
+</div>
+
 <!-- エクレアパーツ：取ってきた単価と原価の差を確認して反映する -->
 <div class="modal-overlay" id="ekrea-diff-modal" onclick="if(event.target.id==='ekrea-diff-modal')closeEkreaDiff()">
   <div class="modal-sheet">
@@ -2094,7 +2112,8 @@
 
 <!-- 見積 -->
 <script src="js/estimate/estimate-tabs.js?v=232"></script>
-<script src="js/estimate/estimate-items.js?v=196"></script>
+<script src="js/estimate/estimate-items.js?v=249"></script>
+<script src="js/estimate/quote-import.js?v=249"></script>
 <script src="js/estimate/estimate-master.js?v=202"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
 <script src="js/estimate/estimate-crud.js?v=248"></script>
