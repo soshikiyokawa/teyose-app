@@ -73,6 +73,12 @@ function olVisibleRows(){
     });
 }
 
+// 施主名は案件（案件情報タブ）を優先し、入っていなければ見積のものを使う。
+// カードと表で違う名前が出ないよう、どちらもこれを使う
+function olClientName(r){
+  return r.project?.clientName || r.est?.clientName || '';
+}
+
 // 請負金額と入金の状況は管理者だけに見せる
 function olCanSeeMoney(){ return currentUserRole==='staff'; }
 
@@ -320,7 +326,7 @@ function renderOrdersList(){
     return `<tr class="ol-row status-${r.status}">
       <td class="ol-no">${i+1}</td>
       <td class="ol-c">${e.contractDate||''}</td>
-      <td class="ol-c" style="white-space:nowrap">${esc(e.clientName||p.clientName||'')}</td>
+      <td class="ol-c" style="white-space:nowrap">${esc(olClientName(r))}</td>
       <td class="ol-c ol-name" onclick="olOpenProject(${p.id})" title="タップして案件を開く"
           style="cursor:pointer;color:var(--accent-t);font-weight:600">${esc(p.name)} ${badge}</td>
       <td class="ol-c" style="text-align:center">${esc(r.type||'')}</td>
@@ -577,7 +583,7 @@ function olCardHtml(r){
     </div>
     <div class="ol-card-body">
       <div class="ol-card-name">${esc(p.name)}</div>
-      ${p.clientName?`<div class="ol-card-sub">${esc(p.clientName)}</div>`:''}
+      ${olClientName(r)?`<div class="ol-card-sub">${esc(olClientName(r))}</div>`:''}
       ${period?`<div class="ol-card-date">${period}</div>`:''}
       ${(e.contractAmount && olCanSeeMoney())?`<div class="ol-card-foot"><span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>${olPayBadge(e)}</div>`:''}
     </div>
