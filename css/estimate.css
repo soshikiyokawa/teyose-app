@@ -67,7 +67,8 @@
 }
 
 /* 入金の状態（カードの金額の横） */
-.ol-pay{font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;white-space:nowrap;margin-left:auto}
+.ol-pay{font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;white-space:nowrap;margin-left:auto;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .ol-pay.over{background:var(--danger-bg,#fdecea);color:var(--danger);border:0.5px solid var(--danger)}
 .ol-pay.wait{background:var(--surface2);color:var(--warn-t);border:0.5px solid var(--border-s)}
 .ol-pay.done{background:var(--ok-bg,#e8f5ec);color:var(--ok-t);border:0.5px solid var(--ok-t)}
@@ -93,13 +94,16 @@
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.8em}
 .ol-card-sub{font-size:11px;color:var(--text-muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ol-card-date{font-size:11px;color:var(--text-sub);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ol-card-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:6px;
+/* 金額と入金の状態。狭いカードでは入金の状態を下の行に折り返す */
+.ol-card-foot{display:flex;align-items:center;justify-content:space-between;gap:3px 6px;flex-wrap:wrap;margin-top:6px;
   padding-top:6px;border-top:0.5px solid var(--border)}
-.ol-card-amt{font-size:12px;font-weight:700;color:var(--wood-t)}
+.ol-card-amt{font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap}
 /* 表示切替ボタン */
 .ol-view-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
 .ol-view-btn.active svg{stroke:#fff}
 @media(max-width:599px){
   .ol-card-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
   .ol-card-name{font-size:12px}
+  .ol-card-amt{font-size:11px}
+  .ol-pay{font-size:9px;padding:1px 5px}
 }
