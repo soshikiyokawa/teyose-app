@@ -93,6 +93,10 @@ let dragSrcEstCatId=null, estCatDirty=false;
 let dragSrcEstPresetId=null, estPresetDirty=false;
 
 // 発注先マスタ
+// 会社共通の設定（app_settings）。migration-genba36.sql
+let appSettings = {};
+let appSettingsReady = false;
+
 let suppliers = [];
 let supplierIdSeq = 1, editingSupplierId=null;
 

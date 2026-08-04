@@ -571,6 +571,9 @@
   <!-- 新築案件：作業種別（木工事／上棟／墨付け刻み）ごとの人工内訳 -->
   <div id="c-ninku-breakdown" style="display:none;font-size:12px;color:var(--text-sub);margin-top:6px;padding:0 2px"></div>
 
+  <!-- 予実（見積の原価＝予算 と 実際にかかった原価） -->
+  <div id="cost-budget" style="margin-top:10px"></div>
+
   <!-- 在庫一覧（「在庫分を表示」のときだけ表示） -->
   <div id="stock-inventory-wrap" style="display:none">
     <div class="section-lbl">在庫一覧（現在庫）</div>
@@ -2065,10 +2068,10 @@
 <script src="js/utils.js?v=203"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=232"></script>
+<script src="js/state.js?v=245"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=244"></script>
+<script src="js/data/db.js?v=245"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=239"></script>
@@ -2105,7 +2108,8 @@
 <script src="js/order/ekrea-price.js?v=244"></script>
 <script src="js/order/order-cart.js?v=214"></script>
 <script src="js/order/order-confirm.js?v=216"></script>
-<script src="js/order/order-history.js?v=155"></script>
+<script src="js/order/order-history.js?v=245"></script>
+<script src="js/cost-budget.js?v=245"></script>
 <script src="js/order/card-match.js?v=220"></script>
 <script src="js/receipt.js?v=142"></script>
 

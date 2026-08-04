@@ -116,6 +116,7 @@ function renderCost(){
     document.getElementById('c-ninku-breakdown').style.display='none';
     const msg='<div class="empty">左の案件一覧から案件を選択してください</div>';
     ['cost-by-project','cost-by-supplier','cost-list'].forEach(id=>document.getElementById(id).innerHTML=msg);
+    renderCostBudget && renderCostBudget();
     return;
   }
 
@@ -140,6 +141,7 @@ function renderCost(){
   bd.innerHTML = parts.length ? '人工内訳：'+parts.join('　／　') : '';
   bd.style.display = parts.length ? '' : 'none';
 
+  renderCostBudget && renderCostBudget();
   renderCostByType(entries);
   renderCostBySupplier(entries);
 

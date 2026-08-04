@@ -57,6 +57,7 @@ async function fetchAllData(){
     await fetchCardStatements();   // カード明細（管理者のみ。テーブルが無くても落とさない）
     await fetchVehicles();         // 車両管理（テーブルが無くても落とさない）
     await fetchInspections();      // 定期点検（同上）
+    await fetchAppSettings();      // 会社共通の設定（同上）
   } else if(currentUserRole==='supplier'){
     // 業者：案件チャットのスレッド名表示のため、参加している案件だけ取得（RLSで自動的に絞られる）
     const { data: projectRows } = await sb.from('projects').select('id, name, members');
@@ -1011,6 +1012,25 @@ async function dbSetProjectCover(projectId, photoId){
   if(p) p.coverPhotoId=photoId;
 }
 
+
+// ── 会社共通の設定（1人工あたりの労務費など。migration-genba36.sql） ──
+async function fetchAppSettings(){
+  const { data, error } = await sb.from('app_settings').select('key, value');
+  appSettingsReady = !error;
+  appSettings = {};
+  (data||[]).forEach(r=>{ appSettings[r.key] = r.value||{}; });
+}
+async function dbSaveAppSetting(key, value){
+  const { error } = await sb.from('app_settings')
+    .upsert({key, value, updated_at:new Date().toISOString(), updated_by:currentUserDisplayName||''}, {onConflict:'key'});
+  if(error){
+    showToast(/app_settings/.test(error.message||'')
+      ? 'データベースの準備が必要です。supabase/migration-genba36.sql を実行してください'
+      : '保存に失敗しました：'+error.message);
+    throw error;
+  }
+  appSettings[key]=value;
+}
 // ── 定期点検（実施記録） ──
 async function fetchInspections(){
   const { data, error } = await sb.from('inspection_records').select('*').order('done_date',{ascending:false});
