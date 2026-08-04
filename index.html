@@ -102,9 +102,9 @@
     <div class="ol-filter" id="ol-filter-status"></div>
     <div class="ol-filter" id="ol-filter-type"></div>
     <div class="ol-filter" id="ol-filter-fy"></div>
-    <div class="ol-filter" id="ol-filter-pay"></div>
+    <div class="ol-filter admin-only" id="ol-filter-pay"></div>
     <button class="btn xs" id="ol-clear-filter" onclick="olClearFilter()">絞り込み解除</button>
-    <div style="display:flex;gap:2px;margin-left:auto">
+    <div class="admin-only" style="display:flex;gap:2px;margin-left:auto">
       <button class="btn xs ol-view-btn" data-view="card" onclick="olSetView('card')" title="カードで見る">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         カード
@@ -115,11 +115,11 @@
       </button>
     </div>
     <button class="btn xs" onclick="renderOrdersList()">更新</button>
-    <button class="btn xs" onclick="printOrdersList()">
+    <button class="btn xs admin-only" onclick="printOrdersList()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
       A3印刷
     </button>
-    <button class="btn xs primary" onclick="saveOrdersList()">
+    <button class="btn xs primary admin-only" onclick="saveOrdersList()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
       保存
     </button>
@@ -129,7 +129,7 @@
     <div id="orders-card-grid" class="ol-card-grid"></div>
   </div>
 
-  <!-- 表表示（金額・入金まで。A3印刷もこちら） -->
+  <!-- 表表示（金額・入金まで。A3印刷もこちら）。金額を含むので管理者のみ -->
   <div id="orders-table-wrap" style="overflow:auto;max-height:calc(100vh - 130px);display:none">
     <table id="orders-table" style="border-collapse:collapse;font-size:12px;width:max-content;min-width:100%">
       <colgroup>
@@ -349,7 +349,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card admin-only">
       <div class="card-head"><span class="card-head-title">契約情報</span></div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:480px">
@@ -386,7 +386,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card admin-only">
       <div class="card-head"><span class="card-head-title">入金予定・実績</span></div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px">
@@ -2094,7 +2094,7 @@
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=246"></script>
+<script src="js/orders-list.js?v=247"></script>
 <script src="js/inspection.js?v=234"></script>
 
 <!-- 注文書・注文請書 -->

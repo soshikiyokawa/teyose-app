@@ -63,7 +63,7 @@ function olVisibleRows(){
       if(olFilterStatus.length && !olFilterStatus.includes(r.status)) return false;
       if(olFilterType.length   && !olFilterType.includes(r.type)) return false;
       if(olFilterFY.length     && !olFilterFY.includes(String(r.fy))) return false;
-      if(olFilterPay.length    && !olFilterPay.includes(olPayKind(r.est))) return false;
+      if(olCanSeeMoney() && olFilterPay.length && !olFilterPay.includes(olPayKind(r.est))) return false;
       return true;
     })
     .sort((a,b)=>{
@@ -72,6 +72,9 @@ function olVisibleRows(){
       return ka<kb ? -1 : ka>kb ? 1 : 0;
     });
 }
+
+// 請負金額と入金の状況は管理者だけに見せる
+function olCanSeeMoney(){ return currentUserRole==='staff'; }
 
 // ── 入金の状況（着工金・上棟時金・最終金の予定と実際の入金から） ──
 // 予定日を過ぎているのに入金が予定額に届いていないものを「期日超過」とする
@@ -131,7 +134,7 @@ function renderOlFilters(){
     types.map(t=>({value:t, label:t})), olFilterType);
   olRenderFilterBox('fy','完工年度',
     fys.map(y=>({value:String(y), label:`${y}年度（${y}/3〜${y+1}/2）`, short:`${y}年度`})), olFilterFY);
-  olRenderFilterBox('pay','入金', [
+  if(olCanSeeMoney()) olRenderFilterBox('pay','入金', [
     {value:'overdue', label:'期日を過ぎた未入金'},
     {value:'unpaid',  label:'未入金あり'},
     {value:'done',    label:'入金済み'}
@@ -255,6 +258,8 @@ function renderOrdersList(){
   renderOlFilters();
   const list = olVisibleRows();
 
+  // 金額・入金を含む表は管理者だけ。一般社員は常にカード表示にする
+  if(!olCanSeeMoney()) olView='card';
   // 表示の切り替え（表はA3印刷に使うので、カード表示中も中身は作っておく）
   const cardWrap=document.getElementById('orders-card-wrap');
   const tableWrap=document.getElementById('orders-table-wrap');
@@ -393,6 +398,7 @@ function renderOrdersTotals(list){
 }
 
 function printOrdersList(){
+  if(!olCanSeeMoney()){ showToast('金額入りの一覧は管理者のみです'); return; }
   const src = document.getElementById('orders-table');
   if(!src) return;
 
@@ -463,6 +469,7 @@ ${tbl.outerHTML}
 }
 
 async function saveOrdersList(){
+  if(!olCanSeeMoney()){ showToast('金額入りの一覧は管理者のみです'); return; }
   const table = document.getElementById('orders-table');
   if(!table) return;
   const changes = {};
@@ -558,7 +565,7 @@ function olCardHtml(r){
       <div class="ol-card-name">${esc(p.name)}</div>
       ${p.clientName?`<div class="ol-card-sub">${esc(p.clientName)}</div>`:''}
       ${period?`<div class="ol-card-date">${period}</div>`:''}
-      ${e.contractAmount?`<div class="ol-card-foot"><span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>${olPayBadge(e)}</div>`:''}
+      ${(e.contractAmount && olCanSeeMoney())?`<div class="ol-card-foot"><span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>${olPayBadge(e)}</div>`:''}
     </div>
   </div>`;
 }
@@ -573,6 +580,7 @@ function renderOlCards(list){
 
 // カード／表の切り替え
 function olSetView(v){
+  if(v==='table' && !olCanSeeMoney()) return;   // 表は金額・入金を含むので管理者のみ
   olView=v;
   try{ localStorage.setItem('teyose-ol-view', v); }catch(_){}
   renderOrdersList();
