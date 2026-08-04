@@ -66,6 +66,12 @@
   .ol-filter-menu{min-width:170px}
 }
 
+/* 入金の状態（カードの金額の横） */
+.ol-pay{font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px;white-space:nowrap;margin-left:auto}
+.ol-pay.over{background:var(--danger-bg,#fdecea);color:var(--danger);border:0.5px solid var(--danger)}
+.ol-pay.wait{background:var(--surface2);color:var(--warn-t);border:0.5px solid var(--border-s)}
+.ol-pay.done{background:var(--ok-bg,#e8f5ec);color:var(--ok-t);border:0.5px solid var(--ok-t)}
+
 /* ── 案件一覧：カード表示 ── */
 .ol-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
 .ol-card{background:var(--surface);border:0.5px solid var(--border);border-radius:10px;overflow:hidden;

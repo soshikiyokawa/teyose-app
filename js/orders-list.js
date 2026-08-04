@@ -9,16 +9,17 @@
 let olFilterStatus = [];   // draft / sent / approved / completed
 let olFilterType   = [];   // 新築 / リフォーム …
 let olFilterFY     = [];   // '2026'（2026年度＝2026/3/1〜2027/2/末）
+let olFilterPay   = [];   // overdue（期日超過）／unpaid（未入金あり）／done（入金済み）
 const OL_FILTER_KEY = 'teyose-ol-filter';
 (()=>{
   try{
     const s=JSON.parse(localStorage.getItem(OL_FILTER_KEY)||'{}');
     const arr=v=>Array.isArray(v)?v.map(String):(v?[String(v)]:[]);
-    olFilterStatus=arr(s.status); olFilterType=arr(s.type); olFilterFY=arr(s.fy);
+    olFilterStatus=arr(s.status); olFilterType=arr(s.type); olFilterFY=arr(s.fy); olFilterPay=arr(s.pay);
   }catch(_){}
 })();
 function olSaveFilter(){
-  try{ localStorage.setItem(OL_FILTER_KEY, JSON.stringify({status:olFilterStatus, type:olFilterType, fy:olFilterFY})); }catch(_){}
+  try{ localStorage.setItem(OL_FILTER_KEY, JSON.stringify({status:olFilterStatus, type:olFilterType, fy:olFilterFY, pay:olFilterPay})); }catch(_){}
 }
 // 表示：カード（写真つき一覧）／表（金額・入金まで見る一覧。A3印刷もこちら）
 let olView = (()=>{ try{ return localStorage.getItem('teyose-ol-view')||'card'; }catch(_){ return 'card'; } })();
@@ -62,6 +63,7 @@ function olVisibleRows(){
       if(olFilterStatus.length && !olFilterStatus.includes(r.status)) return false;
       if(olFilterType.length   && !olFilterType.includes(r.type)) return false;
       if(olFilterFY.length     && !olFilterFY.includes(String(r.fy))) return false;
+      if(olFilterPay.length    && !olFilterPay.includes(olPayKind(r.est))) return false;
       return true;
     })
     .sort((a,b)=>{
@@ -69,6 +71,46 @@ function olVisibleRows(){
       const kb=(b.est.contractDate||b.est.date||b.project.startDate||'');
       return ka<kb ? -1 : ka>kb ? 1 : 0;
     });
+}
+
+// ── 入金の状況（着工金・上棟時金・最終金の予定と実際の入金から） ──
+// 予定日を過ぎているのに入金が予定額に届いていないものを「期日超過」とする
+function olPayState(est){
+  const pays=(est?.payments||[]).filter(p=>Number(p?.amount)>0);
+  const today=insToday ? insToday() : new Date().toISOString().slice(0,10);
+  let planned=0, received=0, overdue=0, nextDate='';
+  pays.forEach(p=>{
+    const amt=Number(p.amount)||0, act=Number(p.actualAmount)||0;
+    planned+=amt; received+=act;
+    const left=amt-act;
+    if(left<=0) return;
+    if(p.date && p.date<today) overdue+=left;
+    else if(p.date && (!nextDate || p.date<nextDate)) nextDate=p.date;
+  });
+  // 予定を入れていない案件は、契約金額と入金合計で見る
+  if(!pays.length){
+    const ca=Number(est?.contractAmount)||0;
+    const act=(est?.payments||[]).reduce((s,p)=>s+(Number(p?.actualAmount)||0),0);
+    return {planned:ca, received:act, unpaid:Math.max(0,ca-act), overdue:0, nextDate:'', hasPlan:false};
+  }
+  return {planned, received, unpaid:Math.max(0,planned-received), overdue, nextDate, hasPlan:true};
+}
+// 絞り込み用：この案件の入金の状態をひとことで
+function olPayKind(est){
+  const s=olPayState(est);
+  if(!s.planned) return 'none';       // 金額が入っていない（絞り込みの対象外）
+  if(s.overdue>0) return 'overdue';
+  if(s.unpaid>0) return 'unpaid';
+  return 'done';
+}
+function olPayBadge(est){
+  const s=olPayState(est);
+  if(!s.planned) return '';
+  if(s.overdue>0)
+    return `<span class="ol-pay over" title="入金予定日を過ぎています">未入金 ¥${fmt(s.overdue)}</span>`;
+  if(s.unpaid>0)
+    return `<span class="ol-pay wait" title="${s.nextDate?'入金予定 '+s.nextDate.replace(/-/g,'/'):'入金予定日は未設定'}">残 ¥${fmt(s.unpaid)}</span>`;
+  return `<span class="ol-pay done">入金済</span>`;
 }
 
 const OL_STATUS = {
@@ -89,9 +131,14 @@ function renderOlFilters(){
     types.map(t=>({value:t, label:t})), olFilterType);
   olRenderFilterBox('fy','完工年度',
     fys.map(y=>({value:String(y), label:`${y}年度（${y}/3〜${y+1}/2）`, short:`${y}年度`})), olFilterFY);
+  olRenderFilterBox('pay','入金', [
+    {value:'overdue', label:'期日を過ぎた未入金'},
+    {value:'unpaid',  label:'未入金あり'},
+    {value:'done',    label:'入金済み'}
+  ], olFilterPay);
   // 何も選ばれていなければ「絞り込み解除」は目立たせない
   const clr=document.getElementById('ol-clear-filter');
-  if(clr) clr.style.display = (olFilterStatus.length||olFilterType.length||olFilterFY.length) ? '' : 'none';
+  if(clr) clr.style.display = (olFilterStatus.length||olFilterType.length||olFilterFY.length||olFilterPay.length) ? '' : 'none';
 }
 
 // ひとつ分の絞り込み（ボタン＋チェックの一覧）
@@ -122,7 +169,7 @@ function olRenderFilterBox(key, title, options, selected){
 }
 
 function olFilterArr(key){
-  return key==='status' ? olFilterStatus : key==='type' ? olFilterType : olFilterFY;
+  return key==='status' ? olFilterStatus : key==='type' ? olFilterType : key==='fy' ? olFilterFY : olFilterPay;
 }
 function olToggleFilterBox(key){
   const box=document.getElementById('ol-filter-'+key);
@@ -158,13 +205,13 @@ function olClearFilterOne(key){
   renderOrdersList();
 }
 function olClearFilter(){
-  olFilterStatus.length=0; olFilterType.length=0; olFilterFY.length=0;
+  olFilterStatus.length=0; olFilterType.length=0; olFilterFY.length=0; olFilterPay.length=0;
   olSaveFilter();
   renderOrdersList();
 }
 // 開いているメニューをすべて閉じる
 function olCloseFilterMenus(){
-  ['status','type','fy'].forEach(k=>{
+  ['status','type','fy','pay'].forEach(k=>{
     const b=document.getElementById('ol-filter-'+k);
     if(!b) return;
     b.classList.remove('open');
@@ -174,7 +221,7 @@ function olCloseFilterMenus(){
 }
 // 絞り込みの外を触ったら閉じる
 document.addEventListener('click', e=>{
-  if(e.target.closest?.('#ol-filter-status,#ol-filter-type,#ol-filter-fy')) return;
+  if(e.target.closest?.('#ol-filter-status,#ol-filter-type,#ol-filter-fy,#ol-filter-pay')) return;
   olCloseFilterMenus();
 });
 
@@ -511,7 +558,7 @@ function olCardHtml(r){
       <div class="ol-card-name">${esc(p.name)}</div>
       ${p.clientName?`<div class="ol-card-sub">${esc(p.clientName)}</div>`:''}
       ${period?`<div class="ol-card-date">${period}</div>`:''}
-      ${e.contractAmount?`<div class="ol-card-foot"><span class="ol-card-amt">¥${fmt(e.contractAmount)}</span></div>`:''}
+      ${e.contractAmount?`<div class="ol-card-foot"><span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>${olPayBadge(e)}</div>`:''}
     </div>
   </div>`;
 }
