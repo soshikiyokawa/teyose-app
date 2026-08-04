@@ -50,6 +50,22 @@
   overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .member-tag.more{background:var(--surface2);color:var(--text-sub);border-color:var(--border-s);cursor:pointer;font-family:inherit}
 
+/* ── 案件一覧：絞り込み（複数えらべるチェックの一覧） ── */
+.ol-filter{position:relative}
+.ol-filter-btn{display:inline-flex;align-items:center;gap:4px;max-width:220px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ol-filter-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:60;min-width:180px;max-width:280px;
+  max-height:min(60vh,340px);overflow-y:auto;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.16);padding:4px 0}
+.ol-filter-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;cursor:pointer;line-height:1.4}
+.ol-filter-opt:hover{background:var(--surface2)}
+.ol-filter-opt input{width:auto;margin:0;flex:none}
+.ol-filter-opt span{flex:1;min-width:0}
+@media(max-width:600px){
+  .ol-filter-btn{max-width:150px}
+  .ol-filter-menu{min-width:170px}
+}
+
 /* ── 案件一覧：カード表示 ── */
 .ol-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
 .ol-card{background:var(--surface);border:0.5px solid var(--border);border-radius:10px;overflow:hidden;

@@ -4,10 +4,22 @@
 // 見積がまだ無い案件も「案件」として並ぶ（金額欄は空）。
 // 行をタップするとその案件を開き、案件タブで詳細を編集できる。
 
-// 絞り込みの状態
-let olFilterStatus = '';   // ''＝すべて / draft / sent / approved / completed
-let olFilterType   = '';   // ''＝すべて / 新築 / リフォーム …
-let olFilterFY     = '';   // ''＝すべて / '2026'（2026年度＝2026/3/1〜2027/2/末）
+// 絞り込みの状態。それぞれ複数えらべる（空の配列＝すべて）
+// 選んだ内容は端末に覚えさせるので、アプリを開き直しても元に戻らない
+let olFilterStatus = [];   // draft / sent / approved / completed
+let olFilterType   = [];   // 新築 / リフォーム …
+let olFilterFY     = [];   // '2026'（2026年度＝2026/3/1〜2027/2/末）
+const OL_FILTER_KEY = 'teyose-ol-filter';
+(()=>{
+  try{
+    const s=JSON.parse(localStorage.getItem(OL_FILTER_KEY)||'{}');
+    const arr=v=>Array.isArray(v)?v.map(String):(v?[String(v)]:[]);
+    olFilterStatus=arr(s.status); olFilterType=arr(s.type); olFilterFY=arr(s.fy);
+  }catch(_){}
+})();
+function olSaveFilter(){
+  try{ localStorage.setItem(OL_FILTER_KEY, JSON.stringify({status:olFilterStatus, type:olFilterType, fy:olFilterFY})); }catch(_){}
+}
 // 表示：カード（写真つき一覧）／表（金額・入金まで見る一覧。A3印刷もこちら）
 let olView = (()=>{ try{ return localStorage.getItem('teyose-ol-view')||'card'; }catch(_){ return 'card'; } })();
 
@@ -47,9 +59,9 @@ function olRowData(p){
 function olVisibleRows(){
   return (projects||[]).map(olRowData)
     .filter(r=>{
-      if(olFilterStatus && r.status!==olFilterStatus) return false;
-      if(olFilterType   && r.type!==olFilterType) return false;
-      if(olFilterFY     && String(r.fy)!==olFilterFY) return false;
+      if(olFilterStatus.length && !olFilterStatus.includes(r.status)) return false;
+      if(olFilterType.length   && !olFilterType.includes(r.type)) return false;
+      if(olFilterFY.length     && !olFilterFY.includes(String(r.fy))) return false;
       return true;
     })
     .sort((a,b)=>{
@@ -66,37 +78,105 @@ const OL_STATUS = {
   completed:{label:'完工',   cls:'completed'}
 };
 
-// 絞り込みの選択肢を作る
+// 絞り込みの選択肢を作る（チェックを入れた分だけ表示する形）
 function renderOlFilters(){
   const rows=(projects||[]).map(olRowData);
-  // 工事区分
   const types=[...new Set(rows.map(r=>r.type).filter(Boolean))];
-  const tSel=document.getElementById('ol-filter-type');
-  if(tSel){
-    tSel.innerHTML='<option value="">工事区分：すべて</option>'+
-      types.map(t=>`<option value="${esc(t)}"${olFilterType===t?' selected':''}>${esc(t)}</option>`).join('');
-  }
-  // 完工年度
   const fys=[...new Set(rows.map(r=>r.fy).filter(v=>v!=null))].sort((a,b)=>b-a);
-  const fSel=document.getElementById('ol-filter-fy');
-  if(fSel){
-    fSel.innerHTML='<option value="">完工年度：すべて</option>'+
-      fys.map(y=>`<option value="${y}"${olFilterFY===String(y)?' selected':''}>${y}年度（${y}/3〜${y+1}/2）</option>`).join('');
-  }
-  const sSel=document.getElementById('ol-filter-status');
-  if(sSel) sSel.value=olFilterStatus;
+  olRenderFilterBox('status','ステータス',
+    Object.keys(OL_STATUS).map(k=>({value:k, label:OL_STATUS[k].label})), olFilterStatus);
+  olRenderFilterBox('type','工事区分',
+    types.map(t=>({value:t, label:t})), olFilterType);
+  olRenderFilterBox('fy','完工年度',
+    fys.map(y=>({value:String(y), label:`${y}年度（${y}/3〜${y+1}/2）`, short:`${y}年度`})), olFilterFY);
+  // 何も選ばれていなければ「絞り込み解除」は目立たせない
+  const clr=document.getElementById('ol-clear-filter');
+  if(clr) clr.style.display = (olFilterStatus.length||olFilterType.length||olFilterFY.length) ? '' : 'none';
 }
 
-function olSetFilter(){
-  olFilterStatus=document.getElementById('ol-filter-status').value;
-  olFilterType  =document.getElementById('ol-filter-type').value;
-  olFilterFY    =document.getElementById('ol-filter-fy').value;
+// ひとつ分の絞り込み（ボタン＋チェックの一覧）
+function olRenderFilterBox(key, title, options, selected){
+  const box=document.getElementById('ol-filter-'+key);
+  if(!box) return;
+  const open = box.classList.contains('open');
+  const picked = options.filter(o=>selected.includes(o.value));
+  const label = !picked.length ? `${title}：すべて`
+    : picked.length<=2 ? `${title}：${picked.map(o=>o.short||o.label).join('・')}`
+    : `${title}：${picked.length}件`;
+  box.innerHTML =
+    `<button type="button" class="btn xs ol-filter-btn${picked.length?' primary':''}" onclick="olToggleFilterBox('${key}')">
+       ${esc(label)}
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="10" height="10" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+     </button>
+     <div class="ol-filter-menu"${open?' style="display:block"':''}>
+       ${options.length ? options.map(o=>`
+         <label class="ol-filter-opt">
+           <input type="checkbox" value="${esc(o.value)}"${selected.includes(o.value)?' checked':''}
+                  onchange="olToggleFilter('${key}', this.value, this.checked)">
+           <span>${esc(o.label)}</span>
+         </label>`).join('')
+        : '<div style="padding:8px 10px;font-size:11px;color:var(--text-muted)">選べるものがありません</div>'}
+       ${picked.length?`<button type="button" class="btn xs" style="margin:6px 8px 8px;width:calc(100% - 16px)" onclick="olClearFilterOne('${key}')">この絞り込みを外す</button>`:''}
+     </div>`;
+  if(open) olPlaceFilterMenu(box);
+}
+
+function olFilterArr(key){
+  return key==='status' ? olFilterStatus : key==='type' ? olFilterType : olFilterFY;
+}
+function olToggleFilterBox(key){
+  const box=document.getElementById('ol-filter-'+key);
+  const willOpen = !box.classList.contains('open');
+  olCloseFilterMenus();
+  if(willOpen){
+    box.classList.add('open');
+    olPlaceFilterMenu(box);
+  }
+}
+// 画面の右端からはみ出すときは右寄せにする
+function olPlaceFilterMenu(box){
+  const menu=box?.querySelector('.ol-filter-menu');
+  if(!menu) return;
+  menu.style.display='block';
+  menu.style.left=''; menu.style.right='';
+  if(menu.getBoundingClientRect().right > window.innerWidth-8){
+    menu.style.left='auto'; menu.style.right='0';
+  }
+}
+function olToggleFilter(key, value, on){
+  const arr=olFilterArr(key);
+  const i=arr.indexOf(value);
+  if(on && i<0) arr.push(value);
+  if(!on && i>=0) arr.splice(i,1);
+  olSaveFilter();
+  // openクラスは残るので、描き直しても開いたまま（続けてチェックを入れられる）
+  renderOrdersList();
+}
+function olClearFilterOne(key){
+  olFilterArr(key).length=0;
+  olSaveFilter();
   renderOrdersList();
 }
 function olClearFilter(){
-  olFilterStatus=''; olFilterType=''; olFilterFY='';
+  olFilterStatus.length=0; olFilterType.length=0; olFilterFY.length=0;
+  olSaveFilter();
   renderOrdersList();
 }
+// 開いているメニューをすべて閉じる
+function olCloseFilterMenus(){
+  ['status','type','fy'].forEach(k=>{
+    const b=document.getElementById('ol-filter-'+k);
+    if(!b) return;
+    b.classList.remove('open');
+    const m=b.querySelector('.ol-filter-menu');
+    if(m){ m.style.display=''; m.style.left=''; m.style.right=''; }
+  });
+}
+// 絞り込みの外を触ったら閉じる
+document.addEventListener('click', e=>{
+  if(e.target.closest?.('#ol-filter-status,#ol-filter-type,#ol-filter-fy')) return;
+  olCloseFilterMenus();
+});
 
 // 一覧から案件を開く（同じ案件タブ内で「案件情報」に切り替えて詳細を表示）
 function olOpenProject(id){
@@ -374,9 +454,10 @@ async function saveOlField(estId, field, value){
 // 印刷の見出しに出す絞り込み条件
 function olFilterLabel(){
   const parts=[];
-  if(olFilterStatus) parts.push(OL_STATUS[olFilterStatus]?.label||olFilterStatus);
-  if(olFilterType)   parts.push(olFilterType);
-  if(olFilterFY)     parts.push(`${olFilterFY}年度完工`);
+  // 選んだ順ではなく、いつもの並び（下書き→提出済→受注→完工／年度は新しい順）で書く
+  if(olFilterStatus.length) parts.push(Object.keys(OL_STATUS).filter(k=>olFilterStatus.includes(k)).map(k=>OL_STATUS[k].label).join('・'));
+  if(olFilterType.length)   parts.push([...olFilterType].join('・'));
+  if(olFilterFY.length)     parts.push([...olFilterFY].sort((a,b)=>b-a).join('・')+'年度完工');
   return parts.length ? `　［${parts.join('／')}］` : '';
 }
 

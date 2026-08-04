@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=234">
+<link rel="stylesheet" href="css/main.css?v=236">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -98,16 +98,11 @@
   <div style="padding:10px 12px 6px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-wrap:wrap">
     <h2 style="margin:0;font-size:15px">案件一覧</h2>
     <span style="font-size:11px;color:var(--text-muted)" id="ol-count"></span>
-    <select id="ol-filter-status" onchange="olSetFilter()" style="width:auto;font-size:12px;padding:4px 8px">
-      <option value="">ステータス：すべて</option>
-      <option value="draft">下書き</option>
-      <option value="sent">提出済</option>
-      <option value="approved">受注</option>
-      <option value="completed">完工</option>
-    </select>
-    <select id="ol-filter-type" onchange="olSetFilter()" style="width:auto;font-size:12px;padding:4px 8px"></select>
-    <select id="ol-filter-fy" onchange="olSetFilter()" style="width:auto;font-size:12px;padding:4px 8px"></select>
-    <button class="btn xs" onclick="olClearFilter()">絞り込み解除</button>
+    <!-- 絞り込み（それぞれ複数えらべる。選んだ内容は端末に残る） -->
+    <div class="ol-filter" id="ol-filter-status"></div>
+    <div class="ol-filter" id="ol-filter-type"></div>
+    <div class="ol-filter" id="ol-filter-fy"></div>
+    <button class="btn xs" id="ol-clear-filter" onclick="olClearFilter()">絞り込み解除</button>
     <div style="display:flex;gap:2px;margin-left:auto">
       <button class="btn xs ol-view-btn" data-view="card" onclick="olSetView('card')" title="カードで見る">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -2061,7 +2056,7 @@
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=231"></script>
+<script src="js/orders-list.js?v=236"></script>
 <script src="js/inspection.js?v=234"></script>
 
 <!-- 注文書・注文請書 -->
