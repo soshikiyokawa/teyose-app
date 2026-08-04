@@ -113,7 +113,13 @@ Deno.serve(async (req) => {
       if (found.has(code)) continue;                 // 別の品番のページで既に拾えた
       if (pages >= MAX_PAGES) { errors.push("1回に取得できる件数の上限に達しました。時間をおいてもう一度実行してください"); break; }
       try {
+        // 商品ページは「前回の記録 → カタログ索引 → サイト内検索」の順に探す
         let pageCode: string | null = m.web_page_code || null;
+        if (!pageCode) {
+          const { data: cat } = await admin.from("ekrea_catalog")
+            .select("page_code").eq("maker_code", code).maybeSingle();
+          pageCode = cat?.page_code || null;
+        }
         if (!pageCode) {
           pageCode = await findPageCode(code);
           await sleep(WAIT_MS);

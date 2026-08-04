@@ -262,6 +262,44 @@ async function dbUpdateMasterItem(id,item){
   }
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
 }
+// エクレアパーツのカタログ索引（品番→商品名・単価）。1000件ずつ全部取る
+async function dbFetchEkreaCatalog(){
+  const all=[];
+  for(let from=0; from<20000; from+=1000){
+    const { data, error } = await sb.from('ekrea_catalog')
+      .select('maker_code, name, price').order('maker_code').range(from, from+999);
+    if(error){
+      const msg = /ekrea_catalog|does not exist/.test(error.message||'')
+        ? 'データベースの準備が必要です。supabase/migration-genba33.sql を実行してください'
+        : 'カタログの取得に失敗しました：'+error.message;
+      showToast(msg); throw error;
+    }
+    all.push(...(data||[]));
+    if(!data || data.length<1000) break;
+  }
+  return all.map(r=>({makerCode:r.maker_code, name:r.name||'', price:(r.price==null?null:Number(r.price))}));
+}
+
+// カタログの取り込みを1回分進める（Edge Function：ekrea-catalog）
+async function dbBuildEkreaCatalog(){
+  const { data, error } = await sb.functions.invoke('ekrea-catalog', {body:{}});
+  if(error){
+    const m=error.message||'';
+    showToast(/Failed to send|NetworkError|Failed to fetch/i.test(m)
+      ? 'カタログ取り込みの機能がまだ入っていません。ekrea-catalog をデプロイしてください'
+      : /40[13]/.test(m) ? 'カタログの取り込みは管理者のみ実行できます'
+      : 'カタログの取り込みに失敗しました：'+m);
+    throw error;
+  }
+  if(data?.error){
+    showToast(/ekrea_pages|ekrea_catalog/.test(data.error)
+      ? 'データベースの準備が必要です。supabase/migration-genba33.sql を実行してください'
+      : 'カタログの取り込みに失敗しました：'+data.error);
+    throw new Error(data.error);
+  }
+  return data;
+}
+
 // エクレアパーツの単価を取りにいく（Edge Function：ekrea-price）
 async function dbCheckEkreaPrices(){
   const { data, error } = await sb.functions.invoke('ekrea-price', {body:{}});
