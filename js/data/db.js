@@ -477,6 +477,16 @@ async function fetchProfiles(){
   }
   allProfiles = (profs||[]).map(p=>({id:p.id,displayName:p.display_name||'',role:p.role,workGroup:p.work_group||'',supplierId:p.supplier_id||null,
     hireDate:p.hire_date||'', leaveAdjust:Number(p.leave_adjust)||0, leaveAdjustNote:p.leave_adjust_note||''}));
+  // 一般社員は自分の行しか取れないので、出面表の休日判定用に名前と区分だけ足す
+  // （有給の設定は含まれない名簿。migration-genba31.sql）
+  if(currentUserRole!=='staff'){
+    const { data: dir } = await sb.from('employee_directory').select('id, display_name, work_group');
+    (dir||[]).forEach(p=>{
+      if(allProfiles.some(x=>x.id===p.id)) return;
+      allProfiles.push({id:p.id, displayName:p.display_name||'', role:'', workGroup:p.work_group||'',
+        supplierId:null, hireDate:'', leaveAdjust:0, leaveAdjustNote:''});
+    });
+  }
 }
 
 // 有給の設定（雇用契約開始日・調整日数）を保存（管理者のみ）
