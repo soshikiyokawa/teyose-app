@@ -10,6 +10,9 @@
 const VEHICLE_KINDS = ['車検','オイル交換','夏タイヤ','冬タイヤ'];
 const VEHICLE_WARN_DAYS = 90;   // 車検がこの日数を切ったら注意表示
 
+// きよかわの社員（管理者・一般社員）か。発注先は含まない
+function appIsEmployee(){ return currentUserRole==='staff' || currentUserRole==='carpenter'; }
+
 function vhToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function vhDaysLeft(s){ return s ? Math.round((new Date(s+'T00:00:00')-new Date(vhToday()+'T00:00:00'))/86400000) : null; }
 function vhLabel(s){ return s ? s.replace(/-/g,'/') : '—'; }
@@ -79,11 +82,12 @@ function renderVehicle(){
     </div>`;
     return;
   }
-  document.getElementById('vehicle-add-btn').style.display = currentUserRole==='staff' ? '' : 'none';
+  // 車両の追加・編集は社員なら誰でもできる（削除だけ管理者）
+  document.getElementById('vehicle-add-btn').style.display = appIsEmployee() ? '' : 'none';
 
   if(!vehicles.length){
     el.innerHTML='<div class="card"><div class="empty" style="padding:18px">車両が登録されていません。'+
-      (currentUserRole==='staff'?'右上の「車両を追加」から登録してください。':'管理者に登録を依頼してください。')+'</div></div>';
+      (appIsEmployee()?'右上の「車両を追加」から登録してください。':'管理者に登録を依頼してください。')+'</div></div>';
     return;
   }
   el.innerHTML=vehicles.map(vehicleCardHtml).join('');
@@ -109,7 +113,7 @@ function vehicleCardHtml(v){
         <div style="font-size:11px;color:var(--text-sub)">点検責任者：${v.managerName?esc(v.managerName):'<span style="color:var(--danger)">未設定</span>'}</div>
       </div>
       ${insp.warn?`<span class="status-badge pending">要対応</span>`:''}
-      ${currentUserRole==='staff'?`<button class="btn xs" onclick="openVehicleEdit(${v.id})">編集</button>`:''}
+      ${appIsEmployee()?`<button class="btn xs" onclick="openVehicleEdit(${v.id})">編集</button>`:''}
       <button class="btn xs" onclick="openVehicleHistory(${v.id})">履歴</button>
     </div>
     ${VEHICLE_KINDS.map(row).join('')}
@@ -134,7 +138,8 @@ function openVehicleEdit(id){
     .sort((a,b)=>cmpEmployee(a.displayName,b.displayName));
   sel.innerHTML='<option value="">選択してください</option>'+emp.map(p=>`<option value="${esc(p.displayName)}">${esc(p.displayName)}</option>`).join('');
   sel.value=v?.managerName||'';
-  document.getElementById('vehicle-delete-btn').style.display=v?'':'none';
+  // 削除は管理者のみ（実施記録もまとめて消えるため）
+  document.getElementById('vehicle-delete-btn').style.display=(v && currentUserRole==='staff')?'':'none';
   document.getElementById('vehicle-edit-modal').classList.add('open');
 }
 function closeVehicleEdit(){ document.getElementById('vehicle-edit-modal').classList.remove('open'); _vehicleEditId=null; }

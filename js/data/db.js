@@ -558,10 +558,12 @@ async function fetchProfiles(){
   // 一般社員は自分の行しか取れないので、出面表の休日判定用に名前と区分だけ足す
   // （有給の設定は含まれない名簿。migration-genba31.sql）
   if(currentUserRole!=='staff'){
-    const { data: dir } = await sb.from('employee_directory').select('id, display_name, work_group');
+    // 区分（role）の列はmigration-genba34.sqlで足したもの。無くても動くようにしておく
+    let { data: dir } = await sb.from('employee_directory').select('id, display_name, role, work_group');
+    if(!dir) ({ data: dir } = await sb.from('employee_directory').select('id, display_name, work_group'));
     (dir||[]).forEach(p=>{
       if(allProfiles.some(x=>x.id===p.id)) return;
-      allProfiles.push({id:p.id, displayName:p.display_name||'', role:'', workGroup:p.work_group||'',
+      allProfiles.push({id:p.id, displayName:p.display_name||'', role:p.role||'carpenter', workGroup:p.work_group||'',
         supplierId:null, hireDate:'', leaveAdjust:0, leaveAdjustNote:''});
     });
   }
