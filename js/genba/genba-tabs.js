@@ -27,8 +27,11 @@ function renderGenbaPage(){
 
 // 写真・図面・日報の工事選択プルダウンを最新の案件一覧で埋める
 function renderGenbaProjectSelects(){
-  const opts = '<option value="">工事を選択...</option>' +
-    projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  const optHtml = list => '<option value="">工事を選択...</option>' +
+    list.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  const opts = optHtml(projects);
+  // 日報・休日出勤は、もう終わった工事を選ばないよう完工済みを外す
+  const optsActive = optHtml(projects.filter(p=>p.status!=='completed'));
   ['photo-project-select','drawing-project-select','nippo-project','holiday-project'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
@@ -37,17 +40,35 @@ function renderGenbaProjectSelects(){
     // 日報にはさらに「職業訓練校」（訓練校生の通学日）を「その他」の上に置く
     const withOther = (id==='nippo-project' || id==='holiday-project');
     el.innerHTML = withOther
-      ? opts + (id==='nippo-project' ? `<option value="school">${NIPPO_SCHOOL}</option>` : '')
+      ? optsActive + (id==='nippo-project' ? `<option value="school">${NIPPO_SCHOOL}</option>` : '')
              + '<option value="other">その他</option>'
       : opts;
     // 選択状態を維持（写真・図面は共通のgenbaProjectIdを優先）
     if(!withOther && genbaProjectId) el.value = String(genbaProjectId);
-    else if(prev) el.value = prev;
+    else if(prev) genbaSelectProject(el, prev);
     if(el.value==='') el.selectedIndex = 0;
   });
   // 「その他」欄の表示を同期
   if(typeof nippoProjectChanged==='function') nippoProjectChanged();
   if(typeof holidayProjectChanged==='function') holidayProjectChanged();
+}
+
+// 工事を選ぶ。一覧に無い案件（完工済みなど）は「（完工）」付きで足してから選ぶ。
+// 過去の日報を開き直したときに、当時の工事がそのまま出るようにするため。
+function genbaSelectProject(el, val){
+  if(!el) return;
+  const v = String(val||'');
+  if(v && !Array.from(el.options).some(o=>o.value===v)){
+    const p = (projects||[]).find(x=>String(x.id)===v);
+    if(p){
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = p.name + (p.status==='completed' ? '（完工）' : '');
+      const tail = Array.from(el.options).find(x=>x.value==='school'||x.value==='other');
+      el.insertBefore(o, tail || null);
+    }
+  }
+  el.value = v;
 }
 
 function setGenbaProject(val){

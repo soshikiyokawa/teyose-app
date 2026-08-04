@@ -104,7 +104,7 @@ function goNippoFromGuide(){
     const dEl=document.getElementById('nippo-date');
     if(dEl && date) dEl.value=date;
     const pEl=document.getElementById('nippo-project');
-    if(pEl && pid){ pEl.value=String(pid); if(typeof nippoProjectChanged==='function') nippoProjectChanged(); }
+    if(pEl && pid){ genbaSelectProject(pEl, pid); if(typeof nippoProjectChanged==='function') nippoProjectChanged(); }
     document.getElementById('nippo-content')?.focus();
   },50);
 }

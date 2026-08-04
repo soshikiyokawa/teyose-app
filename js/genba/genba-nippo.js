@@ -199,7 +199,8 @@ function editNippo(id){
   renderGenbaProjectSelects();
   // 案件に紐づかない日報（projectIdなし・projectNameあり）は「職業訓練校」「その他」として復元
   if(n.projectId){
-    document.getElementById('nippo-project').value = String(n.projectId);
+    // 完工済みの工事は一覧から外しているので、開き直したときだけ足して選ぶ
+    genbaSelectProject(document.getElementById('nippo-project'), n.projectId);
     document.getElementById('nippo-other').value = '';
   } else if(n.projectName===NIPPO_SCHOOL){
     document.getElementById('nippo-project').value = 'school';
