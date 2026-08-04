@@ -266,12 +266,24 @@ async function dbUpdateMasterItem(id,item){
 async function dbCheckEkreaPrices(){
   const { data, error } = await sb.functions.invoke('ekrea-price', {body:{}});
   if(error){
-    const msg = /Failed to send|not found|404/i.test(error.message||'')
-      ? '価格取得の準備ができていません（ekrea-price のデプロイが必要です）'
-      : '価格の取得に失敗しました：'+error.message;
+    // どこで止まっているのか分かるように、原因ごとに書き分ける
+    let msg;
+    const m = error.message||'';
+    if(/Failed to send|NetworkError|Failed to fetch/i.test(m)){
+      msg = '価格取得の機能がまだ入っていません。ekrea-price をデプロイしてください';
+    }else if(/40[13]/.test(m)){
+      msg = '価格取得を実行する権限がありません（管理者アカウントで実行してください）';
+    }else{
+      msg = '価格の取得に失敗しました：'+m;
+    }
     showToast(msg); throw error;
   }
-  if(data?.error){ showToast('価格の取得に失敗しました：'+data.error); throw new Error(data.error); }
+  if(data?.error){
+    const msg = /maker_code|web_price/.test(data.error)
+      ? 'データベースの準備が必要です。supabase/migration-genba32.sql を実行してください'
+      : '価格の取得に失敗しました：'+data.error;
+    showToast(msg); throw new Error(data.error);
+  }
   return data;
 }
 async function dbDeleteMasterItem(id){

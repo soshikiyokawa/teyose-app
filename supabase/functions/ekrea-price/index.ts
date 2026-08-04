@@ -90,10 +90,12 @@ Deno.serve(async (req) => {
       .map((s: any) => s.id);
     if (!supplierIds.length) return json({ checked: 0, note: "エクレアパーツの発注先が登録されていません" });
 
-    const { data: items } = await admin.from("master_items")
+    const { data: items, error: itemErr } = await admin.from("master_items")
       .select("id, name, cost, maker_code, web_page_code")
       .in("supplier_id", supplierIds)
       .neq("maker_code", "");
+    // 品番の列が無い＝マイグレーション未実行。画面で案内できるようそのまま返す
+    if (itemErr) return json({ error: itemErr.message }, 500);
     const targets = (items || []).filter((m: any) => m.maker_code);
     if (!targets.length) return json({ checked: 0, note: "品番が入っている品目がありません" });
 
