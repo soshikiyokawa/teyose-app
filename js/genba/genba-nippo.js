@@ -163,7 +163,7 @@ async function saveNippo(){
     showToast(editingNippoId ? '日報を更新しました' : '日報を登録しました');
   }
   resetNippoForm();
-  nippoMonth = workDate.slice(0,7); // 保存した月を表示
+  nippoMonth = nippoMonthOf(workDate); // 保存した日が入る「◯月度」を表示
   await refreshGenba();
 }
 
@@ -234,18 +234,39 @@ async function deleteNippo(){
 }
 
 function nippoMonthShift(delta){
-  const [y,m] = (nippoMonth||gbThisMonth()).split('-').map(Number);
+  const [y,m] = (nippoMonth||nippoMonthOf(gbToday())).split('-').map(Number);
   const d = new Date(y, m-1+delta, 1);
   nippoMonth = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
   renderNippo();
 }
 
+// その日が入る「◯月度」（21日以降は翌月度）
+function nippoMonthOf(dateStr){
+  const [y,m,d] = String(dateStr||gbToday()).split('-').map(Number);
+  const p = n => String(n).padStart(2,'0');
+  if(d < 21) return `${y}-${p(m)}`;
+  return m===12 ? `${y+1}-01` : `${y}-${p(m+1)}`;
+}
+
+// 「◯年◯月度」の期間（前月21日〜当月20日）。給与の締めと出面表に合わせる
+function nippoPeriod(month){
+  const [y,m] = (month||gbThisMonth()).split('-').map(Number);
+  const p = n => String(n).padStart(2,'0');
+  const py = m===1 ? y-1 : y;
+  const pm = m===1 ? 12 : m-1;
+  return {start:`${py}-${p(pm)}-21`, end:`${y}-${p(m)}-20`};
+}
+
 function renderNippo(){
-  if(!nippoMonth) nippoMonth = gbThisMonth();
+  if(!nippoMonth) nippoMonth = nippoMonthOf(gbToday());  // 今日が入る「◯月度」
   if(!document.getElementById('nippo-date').value) resetNippoForm();
 
+  // 「◯月度」は給与の締めに合わせて前月21日〜当月20日（出面表と同じ区切り）
+  const {start, end} = nippoPeriod(nippoMonth);
   const [y,m] = nippoMonth.split('-').map(Number);
-  document.getElementById('nippo-month-lbl').textContent = y+'年'+m+'月';
+  const md = s => { const [, mm, dd] = s.split('-'); return `${Number(mm)}/${Number(dd)}`; };
+  document.getElementById('nippo-month-lbl').innerHTML =
+    `${y}年${m}月度<span style="font-size:11px;font-weight:400;color:var(--text-sub)">（${md(start)}〜${md(end)}）</span>`;
 
   // ── 承認者のみ：自分宛の残業承認待ち一覧（月をまたいで全件表示） ──
   // 承認者が未指定の古い申請は5人全員に表示する
@@ -270,7 +291,7 @@ function renderNippo(){
     otWrap.style.display = 'none';
   }
 
-  let list = dailyReports.filter(n=>n.workDate.slice(0,7)===nippoMonth);
+  let list = dailyReports.filter(n=>n.workDate>=start && n.workDate<=end);
   // 承認者でも一般社員（staff以外）の月次一覧は自分の日報のみ
   if(currentUserRole!=='staff') list = list.filter(n=>n.userId===currentUserId);
 
@@ -297,7 +318,7 @@ function renderNippo(){
             </tr>`;
           }).join('')}
         </table>`
-      : '<div class="empty" style="padding:14px">この月の日報はありません</div>';
+      : '<div class="empty" style="padding:14px">この期間の日報はありません</div>';
 
     // 社員絞り込みプルダウン
     const sel = document.getElementById('nippo-user-filter');
@@ -319,7 +340,7 @@ function renderNippo(){
   // ── 日報一覧 ──
   const wrap = document.getElementById('nippo-list');
   if(!list.length){
-    wrap.innerHTML = '<div class="empty">この月の日報はありません</div>';
+    wrap.innerHTML = '<div class="empty">この期間の日報はありません</div>';
     return;
   }
   wrap.innerHTML = list.map(n=>`
