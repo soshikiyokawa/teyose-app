@@ -722,8 +722,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
         ホームページの単価を確認
       </button>
-      <button class="btn xs" id="ekrea-guess-btn" onclick="guessEkreaCodes()" style="display:none" title="品目名からエクレアの品番を探す">品番を自動で探す</button>
-      <button class="btn xs" id="ekrea-catalog-btn" onclick="buildEkreaCatalog()" title="エクレアの商品一覧を取り込む（品番を探すのに使う）">カタログを取り込む</button>
       <span id="ekrea-status" style="font-size:11px;color:var(--text-sub);flex:1;min-width:120px;line-height:1.6"></span>
     </div>
     <!-- 品目リスト本体 -->
@@ -1964,20 +1962,6 @@
     </div>
   </div>
 </div>
-<!-- エクレアパーツ：品目名から品番の候補を出して登録する -->
-<div class="modal-overlay" id="ekrea-guess-modal" onclick="if(event.target.id==='ekrea-guess-modal')closeEkreaGuess()">
-  <div class="modal-sheet">
-    <h3>品番の候補</h3>
-    <div id="ekrea-guess-sub" style="font-size:12px;color:var(--text-sub);margin-bottom:10px;line-height:1.7"></div>
-    <div id="ekrea-guess-body" style="max-height:52vh;overflow-y:auto"></div>
-    <div class="modal-actions" style="margin-top:12px;display:flex;align-items:center;gap:8px">
-      <div style="flex:1"></div>
-      <button class="btn" onclick="closeEkreaGuess()">閉じる</button>
-      <button class="btn primary" id="ekrea-guess-apply" onclick="applyEkreaGuess()">選んだ品番を登録</button>
-    </div>
-  </div>
-</div>
-
 <!-- エクレアパーツ：取ってきた単価と原価の差を確認して反映する -->
 <div class="modal-overlay" id="ekrea-diff-modal" onclick="if(event.target.id==='ekrea-diff-modal')closeEkreaDiff()">
   <div class="modal-sheet">
@@ -2084,7 +2068,7 @@
 <script src="js/state.js?v=232"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=242"></script>
+<script src="js/data/db.js?v=244"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=239"></script>
@@ -2118,7 +2102,7 @@
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=202"></script>
 <script src="js/order/item-master.js?v=239"></script>
-<script src="js/order/ekrea-price.js?v=241"></script>
+<script src="js/order/ekrea-price.js?v=244"></script>
 <script src="js/order/order-cart.js?v=214"></script>
 <script src="js/order/order-confirm.js?v=216"></script>
 <script src="js/order/order-history.js?v=155"></script>
