@@ -581,11 +581,14 @@ function olCardHtml(r){
       <span class="ol-card-status badge ${st.cls}">${st.label}</span>
       ${r.type?`<span class="ol-card-type">${esc(r.type)}</span>`:''}
     </div>
+    <!-- 中身が空でも欄は残す。カードごとに項目の位置がずれないようにするため -->
     <div class="ol-card-body">
       <div class="ol-card-name">${esc(p.name)}</div>
-      ${olClientName(r)?`<div class="ol-card-sub">${esc(olClientName(r))}</div>`:''}
-      ${period?`<div class="ol-card-date">${period}</div>`:''}
-      ${(e.contractAmount && olCanSeeMoney())?`<div class="ol-card-foot"><span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>${olPayBadge(e)}</div>`:''}
+      <div class="ol-card-sub">${esc(olClientName(r))||'&nbsp;'}</div>
+      <div class="ol-card-date">${period||'&nbsp;'}</div>
+      ${olCanSeeMoney()?`<div class="ol-card-foot">${e.contractAmount
+        ? `<span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>${olPayBadge(e)}`
+        : `<span class="ol-card-amt" style="color:var(--text-muted);font-weight:400">金額未入力</span>`}</div>`:''}
     </div>
   </div>`;
 }
