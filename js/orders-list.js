@@ -98,6 +98,19 @@ function olPayState(est){
   }
   return {planned, received, unpaid:Math.max(0,planned-received), overdue, nextDate, hasPlan:true};
 }
+// 入金をラベル（契約時金・着工金・上棟時金・最終金）で引けるようにする。
+// ラベルが入っていない古いデータは、着工金から順に並んでいるものとして扱う
+function olPaymentsByLabel(est){
+  const list=(est?.payments||[]);
+  const out={};
+  if(list.length && !list.some(p=>p?.label)){
+    ['着工金','上棟時金','最終金'].forEach((lb,i)=>{ if(list[i]) out[lb]=list[i]; });
+    return out;
+  }
+  list.forEach(p=>{ if(p?.label) out[p.label]=p; });
+  return out;
+}
+
 // 絞り込み用：この案件の入金の状態をひとことで
 function olPayKind(est){
   const s=olPayState(est);
@@ -275,7 +288,7 @@ function renderOrdersList(){
   if(cnt) cnt.textContent = `${list.length}件${list.length!==(projects||[]).length?`（全${(projects||[]).length}件中）`:''}`;
 
   if(!list.length){
-    el.innerHTML='<tr><td colspan="27" style="padding:20px;text-align:center;color:var(--text-muted)">該当する案件がありません</td></tr>';
+    el.innerHTML='<tr><td colspan="29" style="padding:20px;text-align:center;color:var(--text-muted)">該当する案件がありません</td></tr>';
     renderOrdersTotals([]);
     return;
   }
@@ -286,10 +299,8 @@ function renderOrdersList(){
     const comp = e.completion||0;
     const dekidaka = Math.round(ca * comp / 100);
     const pays = e.payments||[];
-    const a1 = pays[0]?.actualAmount||0;
-    const a2 = pays[1]?.actualAmount||0;
-    const a3 = pays[2]?.actualAmount||0;
-    const kaishuu = a1+a2+a3;
+    const pl = olPaymentsByLabel(e);
+    const kaishuu = pays.reduce((s2,p)=>s2+(Number(p?.actualAmount)||0),0);
     const mishuu  = ca - kaishuu;
     const secs = e.sections||[];
     const sectTotal = secs.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
@@ -329,12 +340,14 @@ function renderOrdersList(){
       <td class="ol-r">${hasEst?'¥'+fmt(dekidaka):''}</td>
       <td class="ol-r">${hasEst?'¥'+fmt(kaishuu):''}</td>
       <td class="ol-r" style="color:${mishuu>0?'var(--danger)':'inherit'}">${hasEst?'¥'+fmt(mishuu):''}</td>
-      <td class="ol-c" style="font-size:10px">${pays[0]?.actualDate||''}</td>
-      <td class="ol-r">${hasEst?'¥'+fmt(a1):''}</td>
-      <td class="ol-c" style="font-size:10px">${pays[1]?.actualDate||''}</td>
-      <td class="ol-r">${hasEst?'¥'+fmt(a2):''}</td>
-      <td class="ol-c" style="font-size:10px">${pays[2]?.actualDate||''}</td>
-      <td class="ol-r">${hasEst?'¥'+fmt(a3):''}</td>
+      <td class="ol-c" style="font-size:10px">${pl['契約時金']?.actualDate||''}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(pl['契約時金']?.actualAmount||0):''}</td>
+      <td class="ol-c" style="font-size:10px">${pl['着工金']?.actualDate||''}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(pl['着工金']?.actualAmount||0):''}</td>
+      <td class="ol-c" style="font-size:10px">${pl['上棟時金']?.actualDate||''}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(pl['上棟時金']?.actualAmount||0):''}</td>
+      <td class="ol-c" style="font-size:10px">${pl['最終金']?.actualDate||''}</td>
+      <td class="ol-r">${hasEst?'¥'+fmt(pl['最終金']?.actualAmount||0):''}</td>
       <td class="ol-r">${hasEst?'¥'+fmt(epAmt):''}</td>
       <td class="ol-r">${hasEst?epr.toFixed(1)+'%':''}</td>
       <td class="ol-c" style="padding:2px 4px">
@@ -388,7 +401,7 @@ function renderOrdersTotals(list){
     <td class="ol-r">¥${fmt(totDeki)}</td>
     <td class="ol-r">¥${fmt(totKai)}</td>
     <td class="ol-r" style="color:${totMi>0?'var(--danger)':'inherit'}">¥${fmt(totMi)}</td>
-    <td colspan="6" style="padding:4px 6px"></td>
+    <td colspan="8" style="padding:4px 6px"></td>
     <td class="ol-r">¥${fmt(totEpAmt)}</td>
     <td class="ol-r">${totEpRate}%</td>
     <td class="ol-r">¥${fmt(totApAmt)}</td>
@@ -428,8 +441,9 @@ function printOrdersList(){
       (_,y,m,d) => parseInt(m)+'/'+parseInt(d));
   });
 
-  // colgroup: 22列分の幅を明示（合計 ≈ 1048pt、A3横1147ptに収まる）
-  const colWidths = [14,44,65,100,38,65,42,8,42,28,60,60,60,40,52,40,52,40,52,60,32,60,32];
+  // colgroup: 各列の幅を明示（合計 ≈ 1138pt、A3横1147ptに収まる）
+  // 入金は契約時金・着工金・上棟時金・最終金の4回分（日付34pt＋金額48pt）
+  const colWidths = [14,44,65,100,38,65,42,8,42,28,60,60,60,34,48,34,48,34,48,34,48,60,32,60,32];
   const cg = document.createElement('colgroup');
   colWidths.forEach(w => {
     const c = document.createElement('col');

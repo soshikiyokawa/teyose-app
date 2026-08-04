@@ -162,12 +162,39 @@ function collectEstData(){
       {date:v('est-extra2-date'),amount:payAmtVal('est-extra2-amount')},
       {date:v('est-extra3-date'),amount:payAmtVal('est-extra3-amount')}
     ],
-    payments:[
-      {label:'着工金',date:v('est-pay1-date'),amount:payAmtVal('est-pay1-amount'),actualDate:v('est-pay1-actual-date'),actualAmount:payAmtVal('est-pay1-actual-amount')},
-      {label:'上棟時金',date:v('est-pay2-date'),amount:payAmtVal('est-pay2-amount'),actualDate:v('est-pay2-actual-date'),actualAmount:payAmtVal('est-pay2-actual-amount')},
-      {label:'最終金',date:v('est-pay3-date'),amount:payAmtVal('est-pay3-amount'),actualDate:v('est-pay3-actual-date'),actualAmount:payAmtVal('est-pay3-actual-amount')}
-    ],
+    payments:estPaymentsFromForm(),
     sections:sections.map(s=>({...s,items:[...s.items]})),discountAmount:parseFloat(v('discount-amount'))||0,taxRate:parseFloat(v('tax-rate'))||10};
+}
+
+// 入金の行（この順に並べる）。ラベルで保存するので、行が増えても既存データがずれない
+const EST_PAY_ROWS = [
+  {id:'est-pay0', label:'契約時金'},
+  {id:'est-pay1', label:'着工金'},
+  {id:'est-pay2', label:'上棟時金'},
+  {id:'est-pay3', label:'最終金'}
+];
+// 画面 → 保存する形
+function estPaymentsFromForm(){
+  const v=id=>document.getElementById(id)?.value||'';
+  return EST_PAY_ROWS.map(r=>({
+    label:r.label,
+    date:v(r.id+'-date'), amount:payAmtVal(r.id+'-amount'),
+    actualDate:v(r.id+'-actual-date'), actualAmount:payAmtVal(r.id+'-actual-amount')
+  }));
+}
+// 保存されている形 → 画面（ラベルで照合。ラベルの無い古いデータは並び順で拾う）
+function estPaymentsToForm(payments){
+  const list=payments||[];
+  const sv=(id,val)=>{const el=document.getElementById(id); if(el) el.value=val||'';};
+  // 古いデータ（契約時金が無い3行）は、着工金から順に入っているとみなす
+  const legacy = !list.some(p=>p?.label) ? true : false;
+  EST_PAY_ROWS.forEach((r,i)=>{
+    const p = legacy ? list[i-1] : list.find(x=>x?.label===r.label);
+    sv(r.id+'-date', p?.date);
+    payAmtLoad(r.id+'-amount', p?.amount);
+    sv(r.id+'-actual-date', p?.actualDate);
+    payAmtLoad(r.id+'-actual-amount', p?.actualAmount);
+  });
 }
 
 async function saveEstInfo(){
@@ -187,11 +214,7 @@ async function saveEstInfo(){
       {date:v('est-extra2-date'),amount:payAmtVal('est-extra2-amount')},
       {date:v('est-extra3-date'),amount:payAmtVal('est-extra3-amount')}
     ],
-    payments:[
-      {label:'着工金',date:v('est-pay1-date'),amount:payAmtVal('est-pay1-amount'),actualDate:v('est-pay1-actual-date'),actualAmount:payAmtVal('est-pay1-actual-amount')},
-      {label:'上棟時金',date:v('est-pay2-date'),amount:payAmtVal('est-pay2-amount'),actualDate:v('est-pay2-actual-date'),actualAmount:payAmtVal('est-pay2-actual-amount')},
-      {label:'最終金',date:v('est-pay3-date'),amount:payAmtVal('est-pay3-amount'),actualDate:v('est-pay3-actual-date'),actualAmount:payAmtVal('est-pay3-actual-amount')}
-    ]
+    payments:estPaymentsFromForm()
   };
   try{
     await dbSaveEstimate(updated);
@@ -335,9 +358,7 @@ function loadEstimate(est){
   sv('est-extra1-date',ex[0]?.date);payAmtLoad('est-extra1-amount',ex[0]?.amount);
   sv('est-extra2-date',ex[1]?.date);payAmtLoad('est-extra2-amount',ex[1]?.amount);
   sv('est-extra3-date',ex[2]?.date);payAmtLoad('est-extra3-amount',ex[2]?.amount);
-  sv('est-pay1-date',pays[0]?.date);payAmtLoad('est-pay1-amount',pays[0]?.amount);sv('est-pay1-actual-date',pays[0]?.actualDate);payAmtLoad('est-pay1-actual-amount',pays[0]?.actualAmount);
-  sv('est-pay2-date',pays[1]?.date);payAmtLoad('est-pay2-amount',pays[1]?.amount);sv('est-pay2-actual-date',pays[1]?.actualDate);payAmtLoad('est-pay2-actual-amount',pays[1]?.actualAmount);
-  sv('est-pay3-date',pays[2]?.date);payAmtLoad('est-pay3-amount',pays[2]?.amount);sv('est-pay3-actual-date',pays[2]?.actualDate);payAmtLoad('est-pay3-actual-amount',pays[2]?.actualAmount);
+  estPaymentsToForm(pays);
   sections=est.sections.map(s=>({...s,items:[...s.items]}));
   secSeq=Math.max(secSeq,...sections.map(s=>s.id))+1;
   itemSeq=Math.max(itemSeq,1,...sections.flatMap(s=>s.items.map(i=>i.id)))+1;

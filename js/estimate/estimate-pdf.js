@@ -69,7 +69,7 @@ function estPdfFootHtml(data){
     <div style="margin-top:14px;border-top:1px solid ${EST_PDF_BORDER};padding-top:10px">
       <div style="font-size:12px;font-weight:700;color:#222;margin-bottom:4px">入金予定</div>
       <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <tbody>${data.payments.map(p=>`<tr><td style="padding:3px 7px;color:#666;width:90px">${p.label}</td><td style="padding:3px 7px;color:#666">${p.date||'　'}</td><td style="padding:3px 7px;text-align:right;font-weight:600">¥${fmt(p.amount)}</td></tr>`).join('')}</tbody>
+        <tbody>${data.payments.filter(p=>p&&(p.date||p.amount)).map(p=>`<tr><td style="padding:3px 7px;color:#666;width:90px">${p.label}</td><td style="padding:3px 7px;color:#666">${p.date||'　'}</td><td style="padding:3px 7px;text-align:right;font-weight:600">¥${fmt(p.amount)}</td></tr>`).join('')}</tbody>
       </table>
     </div>`:''}
     <div style="margin-top:18px;font-size:11px;color:#888;text-align:center">上記の通り御見積申し上げます。</div>`;

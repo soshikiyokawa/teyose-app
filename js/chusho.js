@@ -73,13 +73,15 @@ function printChusho(estId){
   const fmtAmt = v => v ? '金　' + fmt(v) + '　円也' : '金　　　　　　　円也';
 
   const pays = est.payments||[];
-  const payRows = [0,1,2].map(i => {
-    const p = pays[i]||{};
+  // 金額か日付が入っている回だけを、上から順に第一回・第二回…として書く
+  const filled = pays.filter(p=>p && (p.date || p.amount));
+  const rows = filled.length ? filled.slice(0,4) : [{},{},{}];
+  const payRows = rows.map((p, i) => {
     const when = p.date ? fmtDate(p.date) : '　　　年　　月　　日';
     const how  = p.method || '';
     const amt  = p.amount ? '¥' + fmt(p.amount) : '';
     return `<tr>
-      <td class="label">第${['一','二','三'][i]}回</td>
+      <td class="label">第${['一','二','三','四'][i]}回</td>
       <td>${when}</td>
       <td>${how}</td>
       <td class="r">${amt}</td>

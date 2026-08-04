@@ -171,7 +171,7 @@
           <th class="ol-th" rowspan="2">出来高</th>
           <th class="ol-th" rowspan="2">回収済み金</th>
           <th class="ol-th" rowspan="2">未収金</th>
-          <th class="ol-th" colspan="6" style="background:var(--wood-lt,#f5ede0)">入金実績（備考・入金条件）</th>
+          <th class="ol-th" colspan="8" style="background:var(--wood-lt,#f5ede0)">入金実績（備考・入金条件）</th>
           <th class="ol-th" colspan="2" style="background:#e8f0e8">見込み粗利</th>
           <th class="ol-th" colspan="2" style="background:#e0ebe0">完成粗利</th>
           <th class="ol-th" rowspan="2">備考</th>
@@ -180,6 +180,8 @@
           <th class="ol-th">着工</th>
           <th class="ol-th" style="padding:2px 0;font-size:9px">〜</th>
           <th class="ol-th">完工・引渡</th>
+          <th class="ol-th" style="background:var(--wood-lt,#f5ede0)">契約時金<br>日付</th>
+          <th class="ol-th" style="background:var(--wood-lt,#f5ede0)">金額</th>
           <th class="ol-th" style="background:var(--wood-lt,#f5ede0)">着工金<br>日付</th>
           <th class="ol-th" style="background:var(--wood-lt,#f5ede0)">金額</th>
           <th class="ol-th" style="background:var(--wood-lt,#f5ede0)">上棟時金<br>日付</th>
@@ -398,6 +400,13 @@
             </tr>
           </thead>
           <tbody>
+            <tr>
+              <td style="padding:5px 8px;font-weight:600;color:var(--text-sub)">契約時金</td>
+              <td style="padding:4px 6px;border-left:1px solid var(--border)"><input type="date" id="est-pay0-date" style="width:100%"></td>
+              <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay0-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
+              <td style="padding:4px 6px;border-left:1px solid var(--border-s)"><input type="date" id="est-pay0-actual-date" style="width:100%"></td>
+              <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay0-actual-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
+            </tr>
             <tr>
               <td style="padding:5px 8px;font-weight:600;color:var(--text-sub)">着工金</td>
               <td style="padding:4px 6px;border-left:1px solid var(--border)"><input type="date" id="est-pay1-date" style="width:100%"></td>
@@ -2088,17 +2097,17 @@
 <script src="js/estimate/estimate-items.js?v=196"></script>
 <script src="js/estimate/estimate-master.js?v=202"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
-<script src="js/estimate/estimate-crud.js?v=231"></script>
+<script src="js/estimate/estimate-crud.js?v=248"></script>
 <script src="js/estimate/parking.js?v=193"></script>
-<script src="js/estimate/estimate-pdf.js?v=138"></script>
+<script src="js/estimate/estimate-pdf.js?v=248"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=247"></script>
+<script src="js/orders-list.js?v=248"></script>
 <script src="js/inspection.js?v=234"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=138"></script>
+<script src="js/chusho.js?v=248"></script>
 
 <!-- 工程表 -->
 <script src="js/schedule.js?v=183"></script>
