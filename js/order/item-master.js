@@ -23,6 +23,9 @@ function renderMaster(){
     ? master.filter(m=>m.supplier===activeMasterSupplier)
     : master;
 
+  // エクレアパーツのときだけ「ホームページの単価を確認」を出す
+  if(typeof renderEkreaBar==='function') renderEkreaBar();
+
   const el = document.getElementById('master-list');
   el.innerHTML = '';
   if(!items.length){el.innerHTML='<div class="empty">品目がありません</div>';return;}
@@ -48,6 +51,9 @@ function renderMaster(){
           </div>
           <div class="mi-meta">
             <span>原価 ¥${fmt(m.cost)}/${m.unit}</span>
+            ${m.makerCode?`<span style="color:var(--text-muted)">品番 ${esc(m.makerCode)}</span>`:''}
+            ${(m.webPrice!=null && m.webPrice!==m.cost)
+              ? `<span style="color:var(--danger);font-weight:700">HP ¥${fmt(m.webPrice)}</span>` : ''}
           </div>
         </div>
         <button class="mi-edit-btn-sm staff-only" onclick="duplicateMasterItem(${m.id})" title="この品目を複製して次の品目を追加">複製</button>
@@ -91,7 +97,7 @@ function openMasterEdit(id){
   document.getElementById('m-supplier-sel').innerHTML=buildSupplierOptions();
   document.getElementById('master-modal-title').textContent=editingMasterId===-1?'品目を追加':'品目を編集';
   if(editingMasterId===-1){
-    ['m-name','m-unit'].forEach(i=>document.getElementById(i).value='');
+    ['m-name','m-unit','m-maker-code'].forEach(i=>document.getElementById(i).value='');
     ['m-price','m-cost'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('m-cat').value='木材';
     document.getElementById('m-supplier-sel').value=suppliers[0]?.name||'';
@@ -103,12 +109,35 @@ function openMasterEdit(id){
     document.getElementById('m-unit').value=m.unit;
     document.getElementById('m-cost').value=m.cost;
     document.getElementById('m-supplier-sel').value=m.supplier;
+    document.getElementById('m-maker-code').value=m.makerCode||'';
   }
+  masterMakerCodeSync();
   // 発注先ロールは原価のみ編集可（管理者・一般社員は全項目編集可）
   const supplierOnly = currentUserRole==='supplier';
-  ['m-cat','m-name','m-unit','m-supplier-sel'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
+  ['m-cat','m-name','m-unit','m-supplier-sel','m-maker-code'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
   document.getElementById('master-delete-btn').style.display = (supplierOnly||editingMasterId===-1) ? 'none' : 'inline-flex';
   document.getElementById('master-modal').classList.add('open');
+}
+
+// 品番欄はエクレアパーツのときだけ出す。空なら品目名から品番らしき文字を拾って案内する
+function masterMakerCodeSync(){
+  const wrap=document.getElementById('m-maker-code-wrap');
+  if(!wrap) return;
+  const sup=document.getElementById('m-supplier-sel').value;
+  const show=(typeof isEkreaSupplier==='function') ? isEkreaSupplier(sup) : false;
+  wrap.style.display = show ? '' : 'none';
+  if(!show) return;
+  const codeEl=document.getElementById('m-maker-code');
+  const hint=document.getElementById('m-maker-code-hint');
+  if(codeEl.value.trim()){ hint.textContent='この品番でホームページの単価を取りにいきます'; return; }
+  const guess=(document.getElementById('m-name').value.match(/\d{2}-\d{3,5}/)||[])[0];
+  hint.innerHTML = guess
+    ? `品目名に「${esc(guess)}」が入っています。<button type="button" class="btn xs" onclick="masterUseGuessedCode('${esc(guess)}')">品番に入れる</button>`
+    : '空のままだと、この品目は価格の自動取得の対象になりません';
+}
+function masterUseGuessedCode(code){
+  document.getElementById('m-maker-code').value=code;
+  masterMakerCodeSync();
 }
 
 function duplicateMasterItem(id){
@@ -123,6 +152,9 @@ function duplicateMasterItem(id){
   document.getElementById('m-unit').value=m.unit;
   document.getElementById('m-cost').value=m.cost;
   document.getElementById('m-supplier-sel').value=m.supplier;
+  // 品番は品目ごとに違うので、複製では引き継がない
+  document.getElementById('m-maker-code').value='';
+  masterMakerCodeSync();
   document.getElementById('master-modal').classList.add('open');
   setTimeout(()=>{
     const nameInput=document.getElementById('m-name');
@@ -155,7 +187,8 @@ async function saveMasterItem(){
     unit: document.getElementById('m-unit').value.trim()||'式',
     cost: parseInt(document.getElementById('m-cost').value)||0,
     price: parseInt(document.getElementById('m-cost').value)||0,
-    supplier: document.getElementById('m-supplier-sel').value
+    supplier: document.getElementById('m-supplier-sel').value,
+    makerCode: document.getElementById('m-maker-code').value.trim()
   };
   if(!item.name){alert('品目名を入力してください');return;}
 

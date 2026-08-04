@@ -27,7 +27,8 @@ async function fetchAllData(){
 
   const { data: itemRows, error: itemErr } = await sb.from('master_items').select('*').order('sort_order').order('id');
   if(itemErr) throw itemErr;
-  master = itemRows.map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,price:Number(r.price),cost:Number(r.cost),supplier:supplierNameById(r.supplier_id),sortOrder:r.sort_order}));
+  master = itemRows.map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,price:Number(r.price),cost:Number(r.cost),supplier:supplierNameById(r.supplier_id),sortOrder:r.sort_order,
+    makerCode:r.maker_code||'', webPrice:(r.web_price==null?null:Number(r.web_price)), webPriceAt:r.web_price_at||''}));
   masterIdSeq = Math.max(0,...master.map(m=>m.id))+1;
 
   // チャットは社内＝全件／発注先＝自社分のみ／大工＝社内チャットのみ（RLSが自動で絞る）
@@ -232,19 +233,46 @@ async function dbReorderSuppliers(orderedSuppliers){
 }
 
 // ── 品目マスタ ──
+// 品番の列（migration-genba32.sql）が未適用でも動くよう、失敗したら品番なしで保存し直す
+let makerCodeColumnReady = true;
+function stripMakerCode(payload){
+  const {maker_code, ...rest} = payload;
+  return rest;
+}
 async function dbAddMasterItem(item){
   const supplier_id = supplierIdByName(item.supplier);
-  const { data, error } = await sb.from('master_items').insert({cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id}).select().single();
+  const row = {cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id,maker_code:item.makerCode||''};
+  let { data, error } = await sb.from('master_items').insert(row).select().single();
+  if(error && /maker_code/.test(error.message||'')){
+    makerCodeColumnReady = false;
+    ({ data, error } = await sb.from('master_items').insert(stripMakerCode(row)).select().single());
+  }
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
-  master.push({id:data.id,...item,sortOrder:data.sort_order});
+  master.push({id:data.id,...item,sortOrder:data.sort_order,webPrice:null,webPriceAt:''});
 }
 async function dbUpdateMasterItem(id,item){
   const supplier_id = supplierIdByName(item.supplier);
   const payload = currentUserRole!=='supplier'
-    ? {cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id}
+    ? {cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id,maker_code:item.makerCode||''}
     : {price:item.price,cost:item.cost}; // 発注先は価格・原価のみ更新（DB側のトリガーでも強制）
-  const { error } = await sb.from('master_items').update(payload).eq('id',id);
+  let { error } = await sb.from('master_items').update(payload).eq('id',id);
+  if(error && /maker_code/.test(error.message||'')){
+    makerCodeColumnReady = false;
+    ({ error } = await sb.from('master_items').update(stripMakerCode(payload)).eq('id',id));
+  }
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
+}
+// エクレアパーツの単価を取りにいく（Edge Function：ekrea-price）
+async function dbCheckEkreaPrices(){
+  const { data, error } = await sb.functions.invoke('ekrea-price', {body:{}});
+  if(error){
+    const msg = /Failed to send|not found|404/i.test(error.message||'')
+      ? '価格取得の準備ができていません（ekrea-price のデプロイが必要です）'
+      : '価格の取得に失敗しました：'+error.message;
+    showToast(msg); throw error;
+  }
+  if(data?.error){ showToast('価格の取得に失敗しました：'+data.error); throw new Error(data.error); }
+  return data;
 }
 async function dbDeleteMasterItem(id){
   const { error } = await sb.from('master_items').delete().eq('id',id);

@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=236">
+<link rel="stylesheet" href="css/main.css?v=239">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -715,6 +715,15 @@
     </div>
     <!-- 発注先タブ -->
     <div id="master-supplier-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <!-- エクレアパーツ：ホームページから単価を取ってくる -->
+    <div id="ekrea-bar" class="staff-only" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;
+         background:var(--accent-bg);border:0.5px solid var(--accent);border-radius:8px;padding:8px 10px">
+      <button class="btn xs primary" id="ekrea-check-btn" onclick="checkEkreaPrices()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+        ホームページの単価を確認
+      </button>
+      <span id="ekrea-status" style="font-size:11px;color:var(--text-sub);flex:1;min-width:120px;line-height:1.6"></span>
+    </div>
     <!-- 品目リスト本体 -->
     <div class="card" id="master-list" style="padding:0;overflow:hidden"></div>
   </div>
@@ -1953,6 +1962,22 @@
     </div>
   </div>
 </div>
+<!-- エクレアパーツ：取ってきた単価と原価の差を確認して反映する -->
+<div class="modal-overlay" id="ekrea-diff-modal" onclick="if(event.target.id==='ekrea-diff-modal')closeEkreaDiff()">
+  <div class="modal-sheet">
+    <h3>ホームページの単価</h3>
+    <div id="ekrea-diff-sub" style="font-size:12px;color:var(--text-sub);margin-bottom:10px;line-height:1.7"></div>
+    <div id="ekrea-diff-body" style="max-height:52vh;overflow-y:auto"></div>
+    <div class="modal-actions" style="margin-top:12px;display:flex;align-items:center;gap:8px">
+      <button class="btn xs" onclick="ekreaDiffCheckAll(true)">すべて選ぶ</button>
+      <button class="btn xs" onclick="ekreaDiffCheckAll(false)">すべて外す</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeEkreaDiff()">閉じる</button>
+      <button class="btn primary" id="ekrea-apply-btn" onclick="applyEkreaPrices()">選んだ分を原価に反映</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="master-modal" onclick="if(event.target.id==='master-modal')closeMasterModal()">
   <div class="modal-sheet">
     <h3 id="master-modal-title">品目を追加</h3>
@@ -1962,9 +1987,15 @@
       </div>
       <div class="fg"><label>単位</label><input id="m-unit" placeholder="本・枚・袋"></div>
     </div>
-    <div class="fg" style="margin-top:10px"><label>品目名</label><input id="m-name" placeholder="例：杉 KD材 105×105×3000"></div>
+    <div class="fg" style="margin-top:10px"><label>品目名</label><input id="m-name" placeholder="例：杉 KD材 105×105×3000" oninput="masterMakerCodeSync()"></div>
     <div class="fg" style="margin-top:10px"><label>原価（円）</label><input type="number" id="m-cost" placeholder="0"><input type="hidden" id="m-price" value="0"></div>
-    <div class="fg" style="margin-top:10px"><label>発注先</label><select id="m-supplier-sel"></select></div>
+    <div class="fg" style="margin-top:10px"><label>発注先</label><select id="m-supplier-sel" onchange="masterMakerCodeSync()"></select></div>
+    <!-- 品番：エクレアパーツの単価を自動で取ってくるのに使う -->
+    <div class="fg" id="m-maker-code-wrap" style="margin-top:10px">
+      <label>品番<span style="font-weight:400;color:var(--text-muted)">（エクレアパーツの価格取得に使用）</span></label>
+      <input id="m-maker-code" placeholder="例：30-8582" oninput="masterMakerCodeSync()">
+      <div id="m-maker-code-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.6"></div>
+    </div>
     <!-- 保存ボタン -->
     <div style="background:var(--accent-bg);border:0.5px solid var(--accent);border-radius:8px;padding:10px 12px;margin-top:14px;display:flex;align-items:center;gap:10px">
       <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-t)" width="16" height="16" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -2037,10 +2068,10 @@
 <script src="js/state.js?v=232"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=237"></script>
+<script src="js/data/db.js?v=239"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=234"></script>
+<script src="js/nav.js?v=239"></script>
 
 <!-- やり取り（LINE風チャット） -->
 <script src="js/talk.js?v=212"></script>
@@ -2070,7 +2101,8 @@
 
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=202"></script>
-<script src="js/order/item-master.js?v=202"></script>
+<script src="js/order/item-master.js?v=239"></script>
+<script src="js/order/ekrea-price.js?v=239"></script>
 <script src="js/order/order-cart.js?v=214"></script>
 <script src="js/order/order-confirm.js?v=216"></script>
 <script src="js/order/order-history.js?v=155"></script>

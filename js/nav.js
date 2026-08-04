@@ -12,6 +12,13 @@ function appOpenTab(spec){
     if(sub && document.getElementById('estsub-'+sub)) estSubTab(sub);
     return;
   }
+  // 受発注タブのサブタブ（品目マスタなど）
+  if(page === 'order'){
+    if(!currentUserRole || currentUserRole === 'supplier'){ _pendingOpenTab = spec; return; }
+    mainTab('order');
+    if(sub && document.getElementById('ordersub-'+sub)) orderSubTab(sub);
+    return;
+  }
   if(page !== 'genba') return;
   if(!currentUserRole || currentUserRole === 'supplier'){ _pendingOpenTab = spec; return; }
   mainTab('genba');
