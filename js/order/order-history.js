@@ -166,11 +166,12 @@ function renderCostByType(entries){
   });
   const types=[...COST_TYPES.filter(t=>byType[t]), ...Object.keys(byType).filter(t=>!COST_TYPES.includes(t))];
   const total=entries.reduce((s,e)=>s+e.amount,0);
-  el.innerHTML=`<table class="items-table" style="width:100%">
+  // 3列だけなので、スマホでも横スクロールなしで収める（items-tableは幅800px固定のため使わない）
+  el.innerHTML=`<table class="cost-type-table">
     <thead><tr><th>費目区分</th><th class="r">金額</th><th class="r">構成比</th></tr></thead>
     <tbody>
-      ${types.map(t=>`<tr><td>${t}</td><td class="num">¥${fmt(byType[t])}</td><td class="num">${total?Math.round(byType[t]/total*100):0}%</td></tr>`).join('')}
-      <tr style="background:var(--surface2)"><td style="font-weight:700">合計</td><td class="num" style="font-weight:800;color:var(--wood-t)">¥${fmt(total)}</td><td class="num">100%</td></tr>
+      ${types.map(t=>`<tr><td>${t}</td><td class="r">¥${fmt(byType[t])}</td><td class="r">${total?Math.round(byType[t]/total*100):0}%</td></tr>`).join('')}
+      <tr class="total"><td>合計</td><td class="r">¥${fmt(total)}</td><td class="r">100%</td></tr>
     </tbody>
   </table>`;
 }

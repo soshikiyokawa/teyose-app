@@ -46,6 +46,23 @@
 .cost-row-amt{font-size:13px;font-weight:700;color:var(--wood-t)}
 .cost-row-meta{font-size:11px;color:var(--text-sub);display:flex;gap:8px;flex-wrap:wrap}
 
+/* ── 費目別 原価集計（3列。スマホでも横スクロールなしで収める） ── */
+.cost-type-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+.cost-type-table th{background:#f0ebe0;padding:6px 10px;text-align:left;font-size:11px;font-weight:700;
+  color:var(--text-sub);border-bottom:0.5px solid var(--border);white-space:nowrap}
+.cost-type-table td{padding:8px 10px;border-bottom:0.5px solid var(--border);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cost-type-table tr:last-child td{border-bottom:none}
+.cost-type-table .r{text-align:right}
+.cost-type-table th:nth-child(2),.cost-type-table td:nth-child(2){width:42%}
+.cost-type-table th:nth-child(3),.cost-type-table td:nth-child(3){width:20%}
+.cost-type-table tr.total td{background:var(--surface2);font-weight:800;color:var(--wood-t)}
+.cost-type-table tr.total td:first-child{color:var(--text)}
+@media(max-width:599px){
+  .cost-type-table{font-size:12px}
+  .cost-type-table th,.cost-type-table td{padding:7px 7px}
+}
+
 /* ── 品目マスタ ── */
 .cat-head{padding:6px 14px 3px;font-size:10px;font-weight:800;color:var(--wood-t);letter-spacing:.08em;text-transform:uppercase;background:var(--wood-bg);border-bottom:0.5px solid var(--border)}
 .master-item{display:flex;align-items:flex-start;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--border)}

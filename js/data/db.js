@@ -560,8 +560,13 @@ async function dbUploadChatFile(file){
   const extMatch = file.name.match(/\.[a-zA-Z0-9]+$/);
   const ext = extMatch ? extMatch[0] : '';
   const path = `${Date.now()}_${Math.random().toString(36).slice(2,8)}${ext}`;
-  const { error } = await sb.storage.from('chat-files').upload(path, file, { contentType: file.type || 'application/octet-stream' });
-  if(error){showToast('ファイルのアップロードに失敗しました：'+error.message);throw error;}
+  const put = () => sb.storage.from('chat-files').upload(path, file, { contentType: file.type || 'application/octet-stream' });
+  let { error } = await put();
+  if(error){   // ログインの期限切れなら入れ直して1回だけやり直す
+    try{ await sb.auth.refreshSession(); }catch(_){}
+    ({ error } = await put());
+  }
+  if(error){showToast('ファイルのアップロードに失敗しました：'+uploadErrorMessage(error));throw error;}
   const { data } = sb.storage.from('chat-files').getPublicUrl(path);
   return data.publicUrl;
 }
@@ -795,11 +800,42 @@ async function dbReadLicenseImage(base64, mediaType, kind){
 }
 
 // 現場写真・図面のファイルをStorageにアップロードし、公開URLを返す
+// 失敗の原因を見分けて、次にどうすればよいかを伝える
+function uploadErrorMessage(err){
+  const m = String(err?.message || err || '');
+  const st = Number(err?.statusCode || err?.status || 0);
+  if(/row-level security|Unauthorized|not authorized|JWT|401|403/i.test(m) || st===401 || st===403)
+    return 'ログインの期限が切れている可能性があります。一度ログアウトして入り直してください';
+  if(/maximum allowed size|Payload too large|413|too large/i.test(m) || st===413)
+    return 'ファイルが大きすぎます。小さくしてからお試しください';
+  if(/Failed to fetch|NetworkError|network/i.test(m))
+    return '通信が不安定です。電波の良い場所でもう一度お試しください';
+  if(/Duplicate|already exists/i.test(m))
+    return '同じ名前のファイルがすでにあります。もう一度お試しください';
+  return m || '原因不明のエラーです';
+}
+
 async function dbUploadSiteFile(folder, projectId, blob, ext){
-  const path = `${folder}/${projectId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}${ext}`;
-  const { error } = await sb.storage.from('site-files').upload(path, blob, { contentType: blob.type || 'application/octet-stream' });
-  if(error){showToast('アップロードに失敗しました：'+error.message);throw error;}
-  const { data } = sb.storage.from('site-files').getPublicUrl(path);
+  if(blob.size > 40*1024*1024){
+    showToast('ファイルが大きすぎます（40MBまで）');
+    throw new Error('file too large');
+  }
+  const put = () => {
+    const path = `${folder}/${projectId}/${Date.now()}_${Math.random().toString(36).slice(2,8)}${ext}`;
+    return sb.storage.from('site-files').upload(path, blob, { contentType: blob.type || 'application/octet-stream' })
+      .then(r=>({...r, path}));
+  };
+  let res = await put();
+  // ログインの期限切れで弾かれることがあるので、入れ直してから1回だけやり直す
+  if(res.error){
+    try{ await sb.auth.refreshSession(); }catch(_){}
+    res = await put();
+  }
+  if(res.error){
+    showToast('アップロードに失敗しました：'+uploadErrorMessage(res.error));
+    throw res.error;
+  }
+  const { data } = sb.storage.from('site-files').getPublicUrl(res.path);
   return data.publicUrl;
 }
 
