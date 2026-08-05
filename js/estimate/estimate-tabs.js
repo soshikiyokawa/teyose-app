@@ -16,6 +16,7 @@ function estSubTab(t){
   } else {
     document.body.classList.remove('sch-preview');
   }
+  resetScheduleEdit && resetScheduleEdit();
   if(t==='info'){
     renderInfoGenbaSections && renderInfoGenbaSections();
     applySupplierProjectView && applySupplierProjectView();

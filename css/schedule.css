@@ -10,13 +10,19 @@ body.sch-preview .gantt-body-left { overflow: visible; height: auto; }
 body.sch-preview .gantt-body-right { overflow-x: auto; overflow-y: visible; height: auto; }
 body.sch-preview .gantt-left-panel { height: auto; }
 body.sch-preview .gantt-right-panel { height: auto; }
-body.sch-preview #task-edit-sheet { display: none; }
-/* プレビューモード：編集ボタン類・ドラッグ・クリック操作を無効化 */
-body.sch-preview .sch-toolbar button { display: none; }
-body.sch-preview .gantt-bar { pointer-events: none; cursor: default; }
-body.sch-preview .gantt-bar-hdl { display: none; }
-body.sch-preview .gantt-row-left { cursor: default; pointer-events: none; }
-body.sch-preview .gantt-drag-hdl { display: none; }
+body.sch-preview:not(.sch-edit) #task-edit-sheet { display: none; }
+/* プレビューモード：編集ボタン類・ドラッグ・クリック操作を無効化
+   （案件情報の「編集」を押すと body.sch-edit が付き、通常どおり編集できる） */
+body.sch-preview:not(.sch-edit) .sch-toolbar button { display: none; }
+body.sch-preview:not(.sch-edit) .gantt-bar { pointer-events: none; cursor: default; }
+body.sch-preview:not(.sch-edit) .gantt-bar-hdl { display: none; }
+body.sch-preview:not(.sch-edit) .gantt-row-left { cursor: default; pointer-events: none; }
+body.sch-preview:not(.sch-edit) .gantt-drag-hdl { display: none; }
+/* 工程が無いときの「＋ 大工程を追加」も、編集中だけ出す */
+body.sch-preview:not(.sch-edit) .sch-empty button { display: none; }
+/* 「編集」ボタンだけは表示のみの状態でも出す */
+body.sch-preview .sch-toolbar button.sch-edit-btn { display: inline-flex; }
+body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border-color: var(--wood); color: #fff; }
 
 .sch-toolbar {
   display: flex;

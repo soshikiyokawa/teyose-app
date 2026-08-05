@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=255">
+<link rel="stylesheet" href="css/main.css?v=266">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -800,6 +800,8 @@
     <h2>工程表</h2>
     <span class="sch-proj-badge" id="sch-proj-name">（案件未選択）</span>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">
+      <!-- 案件情報の中では表示のみ。この「編集」を押すと編集できるようになる -->
+      <button class="btn xs sch-edit-btn employee-only" id="sch-edit-btn" onclick="toggleScheduleEdit()">編集</button>
       <button class="btn xs" onclick="ganttScrollToToday()">今日</button>
       <button class="btn xs" onclick="schAddTask(0,null)">＋ 大工程</button>
       <button class="btn xs" onclick="openScheduleCopy()" title="他の案件の工程表をコピーして作成">
@@ -1688,10 +1690,7 @@
 
 <!-- bottom nav -->
 <nav class="main-nav" id="app-nav" style="display:none">
-  <button class="main-nav-btn staff-only" id="nav-schedule" onclick="mainTab('schedule')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
-    工程表
-  </button>
+  <!-- 工程表は案件情報タブの中に出す（下のメニューからは外した） -->
   <button class="main-nav-btn active" id="nav-estimate" onclick="mainTab('estimate')">
     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     案件
@@ -2133,12 +2132,12 @@
 <script src="js/push.js?v=199"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=262"></script>
+<script src="js/estimate/estimate-tabs.js?v=264"></script>
 <script src="js/estimate/estimate-items.js?v=249"></script>
 <script src="js/estimate/quote-import.js?v=257"></script>
 <script src="js/estimate/estimate-master.js?v=202"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
-<script src="js/estimate/estimate-crud.js?v=262"></script>
+<script src="js/estimate/estimate-crud.js?v=264"></script>
 <script src="js/estimate/parking.js?v=193"></script>
 <script src="js/estimate/estimate-pdf.js?v=248"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
@@ -2168,7 +2167,7 @@
 
 <!-- 現場（写真・図面・日報・有給） -->
 <script src="js/genba/genba-tabs.js?v=262"></script>
-<script src="js/genba/supplier-view.js?v=263"></script>
+<script src="js/genba/supplier-view.js?v=265"></script>
 <script src="js/genba/genba-files.js?v=260"></script>
 <script src="js/genba/genba-photos.js?v=260"></script>
 <script src="js/genba/genba-drawings.js?v=261"></script>

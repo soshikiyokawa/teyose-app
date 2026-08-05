@@ -48,22 +48,33 @@ function applySupplierProjectView(){
   applySupplierScheduleView();
 }
 
-// 工程表：発注先には編集の操作を出さない
+// ── 案件情報の中の工程表：ふだんは表示のみ。「編集」を押すと編集できる ──
+function toggleScheduleEdit(){
+  if(isSupplierView()) return;                  // 発注先は編集できない
+  const on = !document.body.classList.contains('sch-edit');
+  document.body.classList.toggle('sch-edit', on);
+  const btn=document.getElementById('sch-edit-btn');
+  if(btn) btn.textContent = on ? '編集をやめる' : '編集';
+  if(on) showToast('工程表を編集できます。変更したら「保存」を押してください');
+}
+// 案件やタブを切り替えたら、表示のみの状態に戻す（保存し忘れた編集を持ち越さない）
+function resetScheduleEdit(){
+  document.body.classList.remove('sch-edit');
+  const btn=document.getElementById('sch-edit-btn');
+  if(btn) btn.textContent='編集';
+}
+
+// 工程表：発注先には「表示のみ」と出す
+// （編集ボタンは employee-only、他のボタンは表示のみの状態ではCSSで隠れている）
 function applySupplierScheduleView(){
   const bar=document.querySelector('#page-schedule .sch-toolbar');
   if(!bar) return;
   const readOnly=isSupplierView();
-  bar.querySelectorAll('button').forEach(b=>{
-    const t=(b.textContent||'').replace(/\s+/g,'');
-    // 「今日」へ移動と Excel出力だけ残す
-    const keep = t.includes('今日') || t.includes('Excel');
-    b.style.display = (readOnly && !keep) ? 'none' : '';
-  });
   let note=document.getElementById('sch-readonly-note');
   if(readOnly && !note){
     note=document.createElement('span');
     note.id='sch-readonly-note';
-    note.style.cssText='font-size:11px;color:var(--text-muted)';
+    note.style.cssText='font-size:11px;color:var(--text-muted);margin-left:auto';
     note.textContent='表示のみ';
     bar.appendChild(note);
   }
