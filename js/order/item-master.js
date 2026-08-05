@@ -112,11 +112,29 @@ function openMasterEdit(id){
     document.getElementById('m-maker-code').value=m.makerCode||'';
   }
   masterMakerCodeSync();
+  const askBox=document.getElementById('m-ask-price');
+  if(askBox) delete askBox.dataset.touched;   // 開くたびに自動判定に戻す
+  masterAskSync();
   // 発注先ロールは原価のみ編集可（管理者・一般社員は全項目編集可）
   const supplierOnly = currentUserRole==='supplier';
   ['m-cat','m-name','m-unit','m-supplier-sel','m-maker-code'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
   document.getElementById('master-delete-btn').style.display = (supplierOnly||editingMasterId===-1) ? 'none' : 'inline-flex';
   document.getElementById('master-modal').classList.add('open');
+}
+
+// 「単価の入力をお願いする」欄は新規追加のときだけ。
+// 原価をこちらで入れた場合は、お願いする必要がないので既定で外す
+function masterAskSync(){
+  const wrap=document.getElementById('m-ask-wrap');
+  if(!wrap) return;
+  const isNew = editingMasterId===-1;
+  const sup=document.getElementById('m-supplier-sel').value;
+  const show = isNew && currentUserRole!=='supplier' && sup && sup!=='在庫分';
+  wrap.style.display = show ? 'flex' : 'none';
+  if(!show) return;
+  const cost=parseInt(document.getElementById('m-cost').value)||0;
+  const box=document.getElementById('m-ask-price');
+  if(box && !box.dataset.touched) box.checked = cost===0;
 }
 
 // 品番欄はエクレアパーツのときだけ出す。空なら品目名から品番らしき文字を拾って案内する
@@ -155,6 +173,9 @@ function duplicateMasterItem(id){
   // 品番は品目ごとに違うので、複製では引き継がない
   document.getElementById('m-maker-code').value='';
   masterMakerCodeSync();
+  const dupAskBox=document.getElementById('m-ask-price');
+  if(dupAskBox) delete dupAskBox.dataset.touched;
+  masterAskSync();
   document.getElementById('master-modal').classList.add('open');
   setTimeout(()=>{
     const nameInput=document.getElementById('m-name');
@@ -180,6 +201,24 @@ async function deleteMasterItem(){
   showToast('品目を削除しました');
 }
 function closeMasterModal(){document.getElementById('master-modal').classList.remove('open');}
+
+// 品目を追加したとき、発注先に単価の入力をお願いする（チャット＋通知）
+// 在庫分は社内用の枠なので送らない
+async function askSupplierForPrice(item){
+  if(!item.supplier || item.supplier==='在庫分') return;
+  const spec = item.makerCode ? `　品番 ${item.makerCode}` : '';
+  const text =
+    `【単価入力のお願い】\n`+
+    `下記の品目を登録しました。単価のご入力をお願いします。\n`+
+    `・${item.cat}　${item.name}（${item.unit}）${spec}\n`+
+    `アプリの「受発注 → 品目マスタ」の「単価編集」からご入力ください。`;
+  try{
+    await dbAddChatMessage(item.supplier, {role:'me', type:'text', text});
+    showToast(`${item.supplier}に単価の入力をお願いしました`);
+  }catch(_){
+    showToast('品目は追加しましたが、依頼の送信に失敗しました');
+  }
+}
 async function saveMasterItem(){
   const item={
     cat: document.getElementById('m-cat').value,
@@ -196,10 +235,14 @@ async function saveMasterItem(){
   btn.disabled = true;
   btn.innerHTML = '保存中…';
 
+  const isNew = editingMasterId===-1;
+  const askPrice = isNew && document.getElementById('m-ask-price')?.checked;
+
   try{
     if(editingMasterId===-1){
       await dbAddMasterItem(item);
       activeMasterSupplier = item.supplier; // 追加した発注先タブに移動
+      if(askPrice) await askSupplierForPrice(item);
     } else {
       await dbUpdateMasterItem(editingMasterId,item);
       const m=master.find(x=>x.id===editingMasterId);

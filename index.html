@@ -2040,14 +2040,19 @@
       <div class="fg"><label>単位</label><input id="m-unit" placeholder="本・枚・袋"></div>
     </div>
     <div class="fg" style="margin-top:10px"><label>品目名</label><input id="m-name" placeholder="例：杉 KD材 105×105×3000" oninput="masterMakerCodeSync()"></div>
-    <div class="fg" style="margin-top:10px"><label>原価（円）</label><input type="number" id="m-cost" placeholder="0"><input type="hidden" id="m-price" value="0"></div>
-    <div class="fg" style="margin-top:10px"><label>発注先</label><select id="m-supplier-sel" onchange="masterMakerCodeSync()"></select></div>
+    <div class="fg" style="margin-top:10px"><label>原価（円）</label><input type="number" id="m-cost" placeholder="0" oninput="masterAskSync()"><input type="hidden" id="m-price" value="0"></div>
+    <div class="fg" style="margin-top:10px"><label>発注先</label><select id="m-supplier-sel" onchange="masterMakerCodeSync();masterAskSync()"></select></div>
     <!-- 品番：エクレアパーツの単価を自動で取ってくるのに使う -->
     <div class="fg" id="m-maker-code-wrap" style="margin-top:10px">
       <label>品番<span style="font-weight:400;color:var(--text-muted)">（エクレアパーツの価格取得に使用）</span></label>
       <input id="m-maker-code" placeholder="例：30-8582" oninput="masterMakerCodeSync()">
       <div id="m-maker-code-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.6"></div>
     </div>
+    <!-- 新規追加のとき：発注先へ単価の入力をお願いする -->
+    <label class="fg staff-only" id="m-ask-wrap" style="display:none;margin-top:10px;flex-direction:row;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="m-ask-price" checked onchange="this.dataset.touched=1" style="width:auto;margin:0;flex:none">
+      <span style="font-size:12px">発注先に単価の入力をお願いする（チャットと通知を送ります）</span>
+    </label>
     <!-- 保存ボタン -->
     <div style="background:var(--accent-bg);border:0.5px solid var(--accent);border-radius:8px;padding:10px 12px;margin-top:14px;display:flex;align-items:center;gap:10px">
       <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-t)" width="16" height="16" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -2155,7 +2160,7 @@
 
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=202"></script>
-<script src="js/order/item-master.js?v=239"></script>
+<script src="js/order/item-master.js?v=269"></script>
 <script src="js/order/invoice.js?v=259"></script>
 <script src="js/order/ekrea-price.js?v=244"></script>
 <script src="js/order/order-cart.js?v=258"></script>
