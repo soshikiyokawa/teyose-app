@@ -27,20 +27,49 @@ function closeQuoteImport(){
   _qiItems = []; _qiSupplier = '';
 }
 
+// 写真は大きいまま送ると失敗しやすいので、長辺2200pxくらいに縮めてから送る
+// （明細の文字が読める程度は保ちつつ、通信量を減らす）
+function qiShrinkImage(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      const max=2200;
+      const scale=Math.min(1, max/Math.max(img.width,img.height));
+      if(scale>=1 && file.size<=3*1024*1024){ resolve(null); return; }  // そのままで十分小さい
+      const cv=document.createElement('canvas');
+      cv.width=Math.round(img.width*scale); cv.height=Math.round(img.height*scale);
+      cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+      const dataUrl=cv.toDataURL('image/jpeg',0.85);
+      resolve({base64:dataUrl.split(',')[1], mediaType:'image/jpeg'});
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); reject(new Error('画像を開けませんでした')); };
+    img.src=url;
+  });
+}
+
 // ファイルを選んだら読み取りに出す
 async function qiFileChosen(input){
   const file = input.files?.[0];
   if(!file) return;
-  if(file.size > 12 * 1024 * 1024){ showToast('ファイルが大きすぎます（12MBまで）'); return; }
+  const isPdf = /pdf/i.test(file.type) || /\.pdf$/i.test(file.name||'');
+  if(isPdf && file.size > 25 * 1024 * 1024){ showToast('PDFが大きすぎます（25MBまで）。ページを分けてください'); return; }
 
   document.getElementById('qi-body').innerHTML =
     `<div style="padding:20px;text-align:center;font-size:12px;color:var(--text-sub)">
        読み取っています…（10〜30秒ほどかかります）
      </div>`;
   try{
-    const base64 = await fileToBase64(file);
+    let base64, mediaType = file.type || '';
+    if(!isPdf){
+      const small = await qiShrinkImage(file).catch(()=>null);
+      if(small){ base64 = small.base64; mediaType = small.mediaType; }
+    }
+    if(!base64) base64 = await fileToBase64(file);
     const { data, error } = await sb.functions.invoke('read-quote', {
-      body: { file: base64, mediaType: file.type || 'application/pdf' }
+      // スマホから選ぶと種類が空のことがあるので、ファイル名も送って判断してもらう
+      body: { file: base64, mediaType, fileName: file.name || '' }
     });
     if(error){
       const m = error.message||'';
@@ -49,10 +78,17 @@ async function qiFileChosen(input){
     }
     if(data?.error) throw new Error(data.error);
     if(!data?.items?.length){
+      // 何が起きたのかを出す（読み取り側から理由が返ってくる）
       document.getElementById('qi-body').innerHTML =
-        `<div style="padding:16px;font-size:12px;color:var(--text-sub);line-height:1.8">
-           明細を読み取れませんでした。<br>
-           写真の場合は、明細の表が全部入るように撮り直すと読み取れることがあります。
+        `<div style="padding:12px;font-size:12px;color:var(--text-sub);line-height:1.8">
+           <b style="color:var(--danger)">明細を読み取れませんでした。</b>
+           ${data?.reason?`<br><span style="color:var(--text)">${esc(data.reason)}</span>`:''}
+           <div style="margin-top:8px;font-size:11px;color:var(--text-muted)">
+             うまくいかないときは：<br>
+             ・写真なら、明細の表が全部入るように、明るいところで正面から撮り直す<br>
+             ・PDFが複数ページなら、明細のページだけに分けて読み込む<br>
+             ・それでも読めない場合は、この見積を清川まで共有してください（読み取り方を調整します）
+           </div>
          </div>`;
       return;
     }
@@ -67,7 +103,7 @@ async function qiFileChosen(input){
       cost: (it.cost==null ? null : Number(it.cost)),
       amount: (it.amount==null ? null : Number(it.amount))
     }));
-    renderQuoteImport(data.total);
+    renderQuoteImport(data.total, data.reason);
   }catch(e){
     showToast('読み取りに失敗しました：'+(e?.message||e));
     closeQuoteImport();
@@ -76,7 +112,7 @@ async function qiFileChosen(input){
   }
 }
 
-function renderQuoteImport(total){
+function renderQuoteImport(total, note){
   const missing = _qiItems.filter(i=>i.cost==null).length;
   const sum = _qiItems.filter(i=>i.pick).reduce((s,i)=>s+(i.cost||0)*i.qty, 0);
 
@@ -89,6 +125,7 @@ function renderQuoteImport(total){
       ${_qiSupplier?`<b>${esc(_qiSupplier)}</b>の見積から `:''}${_qiItems.length}行を読み取りました。
       ${total?`<span style="color:var(--text-muted)">（見積書の合計 ¥${fmt(total)}）</span>`:''}
       ${missing?`<br><span style="color:var(--danger)">単価を読み取れなかった行が${missing}件あります。金額を入れてください</span>`:''}
+      ${note?`<br><span style="color:var(--warn-t)">${esc(note)}</span>`:''}
       <br><span style="color:var(--warn-t)">読み取りは間違えることがあります。金額をご確認のうえ取り込んでください。</span>
     </div>
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
