@@ -147,12 +147,15 @@ function renderOlFilters(){
   const rows=(projects||[]).map(olRowData);
   const types=[...new Set(rows.map(r=>r.type).filter(Boolean))];
   const fys=[...new Set(rows.map(r=>r.fy).filter(v=>v!=null))].sort((a,b)=>b-a);
-  olRenderFilterBox('status','ステータス',
-    Object.keys(OL_STATUS).map(k=>({value:k, label:OL_STATUS[k].label})), olFilterStatus);
+  // ステータス・完工年度は見積の情報。発注先には出さない
+  if(olCanSeeMoney()){
+    olRenderFilterBox('status','ステータス',
+      Object.keys(OL_STATUS).map(k=>({value:k, label:OL_STATUS[k].label})), olFilterStatus);
+    olRenderFilterBox('fy','完工年度',
+      fys.map(y=>({value:String(y), label:`${y}年度（${y}/3〜${y+1}/2）`, short:`${y}年度`})), olFilterFY);
+  }
   olRenderFilterBox('type','工事区分',
     types.map(t=>({value:t, label:t})), olFilterType);
-  olRenderFilterBox('fy','完工年度',
-    fys.map(y=>({value:String(y), label:`${y}年度（${y}/3〜${y+1}/2）`, short:`${y}年度`})), olFilterFY);
   if(olCanSeeMoney()) olRenderFilterBox('pay','入金', [
     {value:'overdue', label:'期日を過ぎた未入金'},
     {value:'unpaid',  label:'未入金あり'},
@@ -578,7 +581,7 @@ function olCardHtml(r){
       ${photo
         ? `<img src="${photo.url}" alt="${esc(p.name)}" loading="lazy">`
         : `<div class="ol-card-ph">${olTypeIcon(r.type)}<div class="ol-card-phtxt">${esc(r.type||'工事区分なし')}</div></div>`}
-      <span class="ol-card-status badge ${st.cls}">${st.label}</span>
+      ${olCanSeeMoney()?`<span class="ol-card-status badge ${st.cls}">${st.label}</span>`:''}
       ${r.type?`<span class="ol-card-type">${esc(r.type)}</span>`:''}
     </div>
     <!-- 中身が空でも欄は残す。カードごとに項目の位置がずれないようにするため -->

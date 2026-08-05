@@ -1,50 +1,51 @@
-// ════ 発注先が見る案件の情報（見るだけ） ════
+// ════ 発注先が見る案件タブ（見るだけ。写真の追加だけできる） ════
 //
-// 発注先には、参加している案件の「案件情報・現場写真・図面・工程表」だけを見せる。
-// 施主の個人情報（氏名・連絡先）と、金額にかかわるものは出さない。
-// 現場写真は追加できる。消せるのは自分が上げた写真だけ（データベース側でも制限）。
+// 社員と同じ「案件」タブを使う。ただし発注先には
+//   ・一覧（カード）と案件情報だけを出し、見積・金額・原価は出さない
+//   ・案件情報は書き換えできない（地図は開ける）
+//   ・現場写真は追加できる。削除・移動は自分が上げた写真だけ
+//   ・工程表は案件情報の下に出る（見るだけ）
+// が適用される。参加している案件しか出ない（データベース側で制限）。
 
 function isSupplierView(){ return currentUserRole==='supplier'; }
 
-// 発注先には「勤怠日報」ではなく「現場」と出す
-function applySupplierNavLabel(){
-  const el=document.getElementById('nav-genba-label');
-  if(el) el.textContent = isSupplierView() ? '現場' : '勤怠日報';
-}
+// 案件情報タブを見るだけの状態にする（社員のときは元に戻す）
+function applySupplierProjectView(){
+  const readOnly = isSupplierView();
+  // 書き換えできないようにする（地図・写真・図面のボタンは残す）
+  ['est-project','est-site','est-parking','est-start-date','est-actual-start','est-end-date','est-handover']
+    .forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el) return;
+      el.readOnly = readOnly;
+      el.style.background = readOnly ? 'var(--surface2)' : '';
+    });
+  // 保存・新規・見積へ・削除・メンバー編集・区画図の追加は出さない
+  [...document.querySelectorAll('#estsub-info button')].forEach(b=>{
+    const t=(b.textContent||'').replace(/\s+/g,'');
+    const on=(b.getAttribute('onclick')||'');
+    const isEdit = t.includes('案件を保存')||t.includes('見積情報へ')||t.includes('新規')||t==='一覧'
+        || t.includes('この案件を削除')||on.includes('openMemberPicker')||b.id==='parking-doc-add-btn';
+    if(isEdit) b.style.display = readOnly ? 'none' : '';
+  });
+  // 案件の削除欄は社員側の出し分け（updateProjDeleteBtn）に任せる。発注先のときだけ隠す
+  const del=document.getElementById('proj-delete-wrap');
+  if(del && readOnly) del.style.display='none';
+  const badge=document.getElementById('est-badge');
+  if(badge) badge.style.display = readOnly ? 'none' : '';
 
-// 現場写真タブの上に出す、案件のあらまし
-function renderSupplierProjectInfo(){
-  const el=document.getElementById('supplier-project-info');
-  if(!el) return;
-  if(!isSupplierView()){ el.style.display='none'; return; }
-  el.style.display='';
-  const p=(projects||[]).find(x=>x.id===genbaProjectId);
-  if(!p){
-    el.innerHTML='<div class="card" style="padding:12px;font-size:12px;color:var(--text-sub)">工事を選ぶと、その案件の情報が出ます</div>';
-    return;
+  // 見るだけであることを書いておく
+  const head=document.querySelector('#estsub-info .card-head');
+  let note=document.getElementById('sup-info-note');
+  if(readOnly && head && !note){
+    note=document.createElement('span');
+    note.id='sup-info-note';
+    note.style.cssText='font-size:11px;color:var(--text-muted);margin-left:auto';
+    note.textContent='表示のみ（変更は担当者へご連絡ください）';
+    head.appendChild(note);
   }
-  const row=(label,val)=>val
-    ? `<div style="display:flex;gap:8px;padding:3px 0"><span style="width:76px;flex:none;color:var(--text-muted);font-size:11px">${label}</span>
-         <span style="flex:1;min-width:0;font-size:12px">${esc(val)}</span></div>`
-    : '';
-  const period=[p.actualStartDate||p.startDate, p.handoverDate||p.endDate]
-    .map(d=>d?String(d).replace(/-/g,'/'):'').filter(Boolean).join('　〜　');
-  const map = (p.mapLat&&p.mapLng)
-    ? `<a href="https://www.google.com/maps?q=${p.mapLat},${p.mapLng}" target="_blank" rel="noopener"
-         style="font-size:11px;color:var(--accent-t)">地図を開く</a>` : '';
-  el.innerHTML=`<div class="card" style="padding:12px">
-    <div style="font-size:13px;font-weight:800;margin-bottom:6px">${esc(p.name)}</div>
-    ${row('工事区分', p.type)}
-    ${row('工事場所', p.address)}
-    ${row('工期', period)}
-    ${row('駐車場', p.parkingAddress)}
-    ${row('連絡事項', p.note)}
-    ${map?`<div style="padding:4px 0 0 84px">${map}</div>`:''}
-    <div style="margin-top:8px;font-size:11px;color:var(--text-muted);line-height:1.7">
-      写真は追加できます。ご自分が上げた写真だけ削除できます。<br>
-      内容の変更が必要なときは、きよかわの担当者にご連絡ください。
-    </div>
-  </div>`;
+  if(note) note.style.display = readOnly ? '' : 'none';
+  applySupplierScheduleView();
 }
 
 // 工程表：発注先には編集の操作を出さない
