@@ -617,6 +617,7 @@
     <button class="sub-tab-btn active staff-only" onclick="orderSubTab('new')">発注作成</button>
     <button class="sub-tab-btn staff-only" onclick="orderSubTab('supplier')">発注先マスタ</button>
     <button class="sub-tab-btn" id="subtab-master" onclick="orderSubTab('master')">品目マスタ</button>
+    <button class="sub-tab-btn" id="subtab-invoice" onclick="orderSubTab('invoice')">請求書</button>
     <button class="sub-tab-btn staff-only" onclick="orderSubTab('history')">発注履歴</button>
     <button class="sub-tab-btn staff-only" onclick="orderSubTab('card')">カード明細</button>
   </div>
@@ -750,6 +751,17 @@
     </div>
     <!-- 品目リスト本体 -->
     <div class="card" id="master-list" style="padding:0;overflow:hidden"></div>
+  </div>
+
+  <!-- 請求書（発注先が月ごとに送る／社内は全社分を一覧で見る） -->
+  <div class="sub-page" id="ordersub-invoice">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 8px">
+      <h2 style="margin:0;font-size:15px">請求書</h2>
+      <span style="font-size:11px;color:var(--text-muted)">「業者名＋請求月」の名前で保存されます</span>
+    </div>
+    <div id="invoice-form" style="margin-bottom:10px"></div>
+    <div id="invoice-filter" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <div id="invoice-body"></div>
   </div>
 
   <!-- 発注履歴 -->
@@ -2109,13 +2121,13 @@
 <script src="js/state.js?v=245"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=245"></script>
+<script src="js/data/db.js?v=258"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=239"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=212"></script>
+<script src="js/talk.js?v=258"></script>
 
 <!-- プッシュ通知 -->
 <script src="js/push.js?v=199"></script>
@@ -2145,8 +2157,9 @@
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=202"></script>
 <script src="js/order/item-master.js?v=239"></script>
+<script src="js/order/invoice.js?v=259"></script>
 <script src="js/order/ekrea-price.js?v=244"></script>
-<script src="js/order/order-cart.js?v=214"></script>
+<script src="js/order/order-cart.js?v=258"></script>
 <script src="js/order/order-confirm.js?v=216"></script>
 <script src="js/order/order-history.js?v=245"></script>
 <script src="js/cost-budget.js?v=245"></script>

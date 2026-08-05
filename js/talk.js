@@ -51,6 +51,40 @@ const REACTION_PALETTE = ['👍','👏','🙏','ありがとうございます',
 let reactingMsgId = null;
 
 // メッセージ下のリアクション表示（他人の投稿には追加ボタンも出す）
+// 発注書の吹き出しに出す「受領しました」。押せるのは発注先だけ。
+// 社内から見たときは、受領済みかどうかの表示だけ出す
+function orderReceiveHtml(o){
+  const ord=(orders||[]).find(x=>x.no===o.no);
+  const received = ord ? ord.status==='received' : false;
+  if(received){
+    return `<div style="padding:6px 10px 8px;font-size:11px;color:var(--ok-t);font-weight:700;text-align:center">
+      ✓ 受領済み${ord?.receivedAt?`（${String(ord.receivedAt).slice(0,10).replace(/-/g,'/')}）`:''}</div>`;
+  }
+  if(currentUserRole!=='supplier') return '';
+  return `<div style="padding:4px 10px 10px">
+    <button class="btn sm primary" style="width:100%;justify-content:center" onclick="receiveOrderFromChat('${esc(o.no)}')">
+      受領しました
+    </button>
+  </div>`;
+}
+
+// 発注先が発注書を受領する
+async function receiveOrderFromChat(orderNo){
+  const ord=(orders||[]).find(x=>x.no===orderNo);
+  if(!confirm(`発注書 ${orderNo} を受領しましたと伝えます。よろしいですか？`)) return;
+  try{
+    await dbMarkOrderReceived(orderNo, ord?.suppliers || currentUserDisplayName);
+    if(ord){ ord.status='received'; ord.receivedAt=new Date().toISOString(); }
+    renderTalkPanelMessages();
+    showToast('受領しました。きよかわに伝わります');
+    // 社内へ通知＋チャットにも残す
+    dbSendPushToRole('staff', '発注書が受領されました',
+      `${currentUserDisplayName||''} ${orderNo}`, 'order/history').catch(()=>{});
+    dbAddChatMessage(activeTalkPanelSupplier, {role:'them', type:'text',
+      text:`発注書 ${orderNo} を受領しました`}).catch(()=>{});
+  }catch(_){}
+}
+
 function reactionsHtml(m, isMe){
   const reactions = m.reactions||{};
   const keys = Object.keys(reactions).filter(k=>(reactions[k]||[]).length);
@@ -416,11 +450,14 @@ function renderTalkPanelMessages(){
               PDF出力
             </button>`}
           </div>
+          ${orderReceiveHtml(o)}
         </div>
         <div class="ts">${time}${msgMarks(m)}</div>
         ${reactionsHtml(m,true)}
       </div>`;
     }
+    // ここまで発注書の吹き出し
+
     // 社内チャットは送信者名で自分／他人を判定（全員が社員のためroleでは区別できない）
     const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';
     if(m.type==='file'){

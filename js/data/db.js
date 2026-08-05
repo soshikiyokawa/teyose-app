@@ -64,7 +64,14 @@ async function fetchAllData(){
     projects = (projectRows||[])
       .filter(r=>(r.members||[]).includes(currentUserDisplayName))
       .map(r=>({id:r.id,name:r.name,members:r.members||[]}));
+    // 自社宛の発注（受領ボタンの状態に使う）
+    const { data: myOrders } = await sb.from('orders').select('*').order('date',{ascending:false});
+    orders = (myOrders||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,
+      paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,
+      subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||''}));
   }
+  // 請求書は社内も発注先も見る（RLSで自社分に絞られる。テーブルが無くても落とさない）
+  try{ await fetchInvoices(); }catch(_){ invoicesReady=false; }
 
   // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
@@ -93,7 +100,7 @@ async function fetchAllData(){
     estSeq = estimates.length+1;
 
     const { data: orderRows } = await sb.from('orders').select('*').order('created_at',{ascending:false});
-    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status}));
+    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||''}));
 
     const { data: costRows } = await sb.from('cost_entries').select('*').order('created_at',{ascending:false});
     costEntries = (costRows||[]).map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status}));
@@ -380,8 +387,65 @@ async function dbConfirmOrder(order){
 }
 async function dbMarkOrderReceived(orderNo, supplierName){
   const supplier_id = supplierIdByName(supplierName);
-  await sb.from('orders').update({status:'received'}).eq('no',orderNo).eq('supplier_id',supplier_id);
-  await sb.from('cost_entries').update({status:'received'}).eq('order_no',orderNo).eq('supplier_id',supplier_id);
+  const row = {status:'received'};
+  // 誰がいつ受領したか（列が無い環境でも動くよう、失敗したら status だけで更新し直す）
+  let { error } = await sb.from('orders')
+    .update({...row, received_at:new Date().toISOString(), received_by:currentUserDisplayName||''})
+    .eq('no',orderNo).eq('supplier_id',supplier_id);
+  if(error) ({ error } = await sb.from('orders').update(row).eq('no',orderNo).eq('supplier_id',supplier_id));
+  if(error){ showToast('受領の記録に失敗しました：'+error.message); throw error; }
+  await sb.from('cost_entries').update(row).eq('order_no',orderNo).eq('supplier_id',supplier_id);
+}
+
+// ── 請求書（発注先が月ごとに送る。migration-genba38.sql） ──
+let invoices = [];
+let invoicesReady = true;
+
+async function fetchInvoices(){
+  const { data, error } = await sb.from('invoices').select('*').order('month',{ascending:false}).order('id',{ascending:false});
+  invoicesReady = !error;
+  invoices = (data||[]).map(r=>({id:r.id, supplierId:r.supplier_id, supplierName:r.supplier_name||'', month:r.month||'',
+    title:r.title||'', filePath:r.file_path, fileName:r.file_name||'', fileMime:r.file_mime||'',
+    amount:(r.amount==null?null:Number(r.amount)), note:r.note||'', uploadedBy:r.uploaded_by||'', createdAt:r.created_at}));
+}
+
+// 請求書を送る（ファイルを保管して、一覧に1件足す）
+async function dbAddInvoice({supplierId, supplierName, month, file, amount, note}){
+  const ext=(file.name.match(/\.[a-zA-Z0-9]+$/)||[''])[0];
+  const [y,m]=month.split('-');
+  const title=`${supplierName}_${y}年${m}月`;
+  // 保管場所は「発注先ID/請求月/日時.拡張子」。日本語はキーに使えないため
+  const path=`${supplierId}/${month}/${Date.now()}${ext}`;
+  const { error: upErr } = await sb.storage.from('invoices')
+    .upload(path, file, { contentType:file.type || 'application/octet-stream' });
+  if(upErr){ showToast('請求書の保存に失敗しました：'+upErr.message); throw upErr; }
+
+  const { data, error } = await sb.from('invoices').insert({
+    supplier_id:supplierId, supplier_name:supplierName, month, title,
+    file_path:path, file_name:file.name||'', file_mime:file.type||'',
+    amount:amount||null, note:note||'', uploaded_by:currentUserDisplayName||''
+  }).select().single();
+  if(error){
+    await sb.storage.from('invoices').remove([path]);   // 一覧に載らないファイルを残さない
+    showToast(/invoices/.test(error.message||'')
+      ? 'データベースの準備が必要です。supabase/migration-genba38.sql を実行してください'
+      : '請求書の登録に失敗しました：'+error.message);
+    throw error;
+  }
+  return data;
+}
+
+// 請求書を開く（1時間だけ有効なリンクを作る）
+async function dbInvoiceUrl(filePath){
+  const { data, error } = await sb.storage.from('invoices').createSignedUrl(filePath, 3600);
+  if(error){ showToast('請求書を開けませんでした：'+error.message); throw error; }
+  return data.signedUrl;
+}
+
+async function dbDeleteInvoice(inv){
+  const { error } = await sb.from('invoices').delete().eq('id',inv.id);
+  if(error){ showToast('削除に失敗しました：'+error.message); throw error; }
+  await sb.storage.from('invoices').remove([inv.filePath]);
 }
 
 // メッセージへのリアクション（スタンプ）をトグル。自分の名前を付ける／外す
@@ -924,6 +988,11 @@ async function dbSendPushToUser(targetUserId, title, body, tab){
 async function dbSendPushToNames(targetNames, title, body, tab){
   if(isQuietHoursJST()) return;
   await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body, tab } });
+}
+// 役割（staff など）でまとめて通知する
+async function dbSendPushToRole(targetRole, title, body, tab){
+  if(isQuietHoursJST()) return;
+  await sb.functions.invoke('send-push', { body: { targetRole, title, body, tab } });
 }
 
 // ── リアルタイム同期（他端末の変更を反映） ──
