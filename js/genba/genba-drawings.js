@@ -40,7 +40,9 @@ function drawingViewsLabel(id){
 // 表示中フォルダ直下の図面一覧
 function fbDrawingListHtml(){
   const list = drawings.filter(d=>d.projectId===fbProjectId && (d.kind||'drawing')==='drawing' && (d.folderId||null)===(fbFolderId||null));
-  if(!list.length) return '<div class="empty">このフォルダに図面はありません。「＋ 図面」から登録できます（PDF・画像）</div>';
+  if(!list.length) return currentUserRole==='supplier'
+    ? '<div class="empty">このフォルダに図面はありません</div>'
+    : '<div class="empty">このフォルダに図面はありません。「＋ 図面」から登録できます（PDF・画像）</div>';
   return `<div class="card" style="padding:0;overflow:hidden">` + list.map(d=>{
     const isPdf = /pdf/i.test(d.fileMime) || /\.pdf$/i.test(d.fileName);
     const canDelete = currentUserRole==='staff' || d.uploadedBy===currentUserId;
@@ -54,10 +56,10 @@ function fbDrawingListHtml(){
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
         <button class="btn xs primary" onclick="viewDrawing(${d.id})">開く</button>
-        <div style="display:flex;gap:4px">
+        ${currentUserRole==='supplier' ? '' : `<div style="display:flex;gap:4px">
           <button class="btn xs" onclick="openFbMove('drawing',${d.id})" title="フォルダへ移動">移動</button>
           ${canDelete?`<button class="btn xs danger" onclick="deleteDrawing(${d.id})">削除</button>`:''}
-        </div>
+        </div>`}
       </div>
     </div>`;
   }).join('') + `</div>`;

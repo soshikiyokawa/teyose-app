@@ -55,6 +55,9 @@ function renderFB(){
   if(!wrap) return;
   if(!fbProjectId){ wrap.innerHTML = '<div class="empty">工事を選択してください</div>'; return; }
 
+  // 発注先はフォルダ作成・図面追加はできない（写真の追加だけできる）
+  const supplierReadOnly = currentUserRole==='supplier';
+  const canAdd = !supplierReadOnly || fbKind==='photo';
   const crumbs = fbCrumbs();
   const folders = siteFolders.filter(f=>f.projectId===fbProjectId && f.kind===fbKind && (f.parentId||null)===(fbFolderId||null));
   const addLabel = fbKind==='photo' ? '＋ 写真' : '＋ 図面';
@@ -67,8 +70,8 @@ function renderFB(){
         ${crumbs.map((c,i)=>`<span class="sep">›</span><a onclick="fbEnter(${c.id})" class="${i===crumbs.length-1?'current':''}">${esc(c.name)}</a>`).join('')}
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn xs" onclick="fbNewFolder()">＋ フォルダ</button>
-        <button class="btn xs primary" id="fb-add-btn" onclick="document.getElementById('${inputId}').click()">${addLabel}</button>
+        ${supplierReadOnly ? '' : `<button class="btn xs" onclick="fbNewFolder()">＋ フォルダ</button>`}
+        ${canAdd ? `<button class="btn xs primary" id="fb-add-btn" onclick="document.getElementById('${inputId}').click()">${addLabel}</button>` : ''}
       </div>
     </div>`;
 

@@ -59,11 +59,16 @@ async function fetchAllData(){
     await fetchInspections();      // 定期点検（同上）
     await fetchAppSettings();      // 会社共通の設定（同上）
   } else if(currentUserRole==='supplier'){
-    // 業者：案件チャットのスレッド名表示のため、参加している案件だけ取得（RLSで自動的に絞られる）
-    const { data: projectRows } = await sb.from('projects').select('id, name, members');
+    // 業者：参加している案件だけ取得（RLSで自動的に絞られる）。案件情報の表示にも使う
+    const { data: projectRows } = await sb.from('projects').select('*');
     projects = (projectRows||[])
       .filter(r=>(r.members||[]).includes(currentUserDisplayName))
-      .map(r=>({id:r.id,name:r.name,members:r.members||[]}));
+      .map(r=>({id:r.id,name:r.name,type:r.type||'',address:r.address||'',note:r.note||'',
+        startDate:r.start_date||'',endDate:r.end_date||'',actualStartDate:r.actual_start_date||'',handoverDate:r.handover_date||'',
+        mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',
+        members:r.members||[]}));
+    // 現場写真・図面・フォルダ（参加している案件の分だけRLSが返す）
+    await fetchSupplierGenbaData();
     // 自社宛の発注（受領ボタンの状態に使う）
     const { data: myOrders } = await sb.from('orders').select('*').order('date',{ascending:false});
     orders = (myOrders||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,
@@ -632,6 +637,18 @@ async function dbSetWorkGroup(userId, group){
 }
 
 // ── 現場管理（写真・図面・日報・有給） ──
+// 発注先向け：現場写真・図面・フォルダだけ取得する（日報などは対象外）
+async function fetchSupplierGenbaData(){
+  const { data: photoRows } = await sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false});
+  sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
+
+  const { data: drawingRows } = await sb.from('drawings').select('*').order('created_at',{ascending:false});
+  drawings = (drawingRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,kind:r.kind||'drawing',fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime||'',note:r.note||'',uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
+
+  const { data: folderRows } = await sb.from('site_folders').select('*').order('name');
+  siteFolders = (folderRows||[]).map(r=>({id:r.id,projectId:r.project_id,kind:r.kind,parentId:r.parent_id||null,name:r.name,createdBy:r.created_by}));
+}
+
 async function fetchGenbaData(){
   const { data: photoRows } = await sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false});
   sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));

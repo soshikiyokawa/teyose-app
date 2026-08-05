@@ -60,6 +60,7 @@ async function bootstrapApp(){
 
   document.body.classList.remove('role-staff','role-supplier','role-carpenter');
   document.body.classList.add('role-'+currentUserRole);
+  applySupplierNavLabel && applySupplierNavLabel();
 
   try{
     await fetchAllData();

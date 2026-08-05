@@ -115,7 +115,7 @@ function fbPhotoGridHtml(){
         <button class="btn xs" onclick="togglePhotoSelectMode()">終了</button>
       </div>`
     : `<div class="photo-sel-bar"><span style="flex:1;font-size:11px;color:var(--text-muted)">タップで拡大表示</span>
-        <button class="btn xs" onclick="togglePhotoSelectMode()">選択</button></div>`;
+        ${currentUserRole==='supplier' ? '' : `<button class="btn xs" onclick="togglePhotoSelectMode()">選択</button>`}</div>`;
 
   const byDate = {};
   list.forEach(p=>{ (byDate[p.shotDate] = byDate[p.shotDate]||[]).push(p); });
@@ -166,6 +166,14 @@ function _showPhotoInViewer(id){
   document.getElementById('photo-viewer-caption').value = p.caption||'';
   const canDelete = currentUserRole==='staff' || p.uploadedBy===currentUserId;
   document.getElementById('photo-viewer-delete').style.display = canDelete ? '' : 'none';
+  // 発注先は、自分が上げた写真以外は動かせない（移動・説明の書き換えもできない）
+  if(currentUserRole==='supplier'){
+    const mine = p.uploadedBy===currentUserId;
+    const moveBtn=[...document.querySelectorAll('#photo-viewer button')].find(b=>b.textContent.trim()==='移動');
+    if(moveBtn) moveBtn.style.display = mine ? '' : 'none';
+    const cap=document.getElementById('photo-viewer-caption');
+    if(cap){ cap.readOnly = !mine; cap.style.opacity = mine ? '' : '.6'; }
+  }
   updateCoverBtn();
   // 前後ボタンの表示（1枚だけなら隠す）
   const multi = _viewerList.length>1;

@@ -42,7 +42,7 @@ function _mainTabGo(t){
   if(t==='talk') renderTalkPage();
   if(t==='cost') renderCost();
   if(t==='order'&&document.getElementById('ordersub-master').classList.contains('active')) renderMaster();
-  if(t==='schedule') loadScheduleForProject();
+  if(t==='schedule'){ loadScheduleForProject(); applySupplierScheduleView && applySupplierScheduleView(); }
   if(t==='genba') renderGenbaPage();
   window.scrollTo(0,0);
 }

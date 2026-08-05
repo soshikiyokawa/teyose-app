@@ -15,6 +15,12 @@ function renderGenbaPage(){
     const act = document.querySelector('#page-genba .sub-page.active');
     if(act && (act.id==='genbasub-photos'||act.id==='genbasub-drawings')){ genbaTab('nippo'); return; }
   }
+  // 発注先は写真・図面だけ（日報などのタブは出さない）
+  if(currentUserRole==='supplier'){
+    const act = document.querySelector('#page-genba .sub-page.active');
+    if(!act || !(act.id==='genbasub-photos'||act.id==='genbasub-drawings')){ genbaTab('photos'); return; }
+    renderSupplierProjectInfo();
+  }
   renderGenbaProjectSelects();
   if(document.getElementById('genbasub-photos')?.classList.contains('active')) mountGenbaFB('photo');
   if(document.getElementById('genbasub-drawings')?.classList.contains('active')) mountGenbaFB('drawing');
@@ -85,6 +91,7 @@ function genbaSelectProject(el, val){
 function setGenbaProject(val){
   genbaProjectId = val ? Number(val) : null;
   renderGenbaProjectSelects();
+  if(typeof renderSupplierProjectInfo==='function') renderSupplierProjectInfo();
   if(document.getElementById('genbasub-photos')?.classList.contains('active')) mountGenbaFB('photo');
   if(document.getElementById('genbasub-drawings')?.classList.contains('active')) mountGenbaFB('drawing');
 }

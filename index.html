@@ -795,7 +795,7 @@
 <!-- ════ 受注一覧ページ ════ -->
 
 <!-- ════ 工程表ページ ════ -->
-<div class="page staff-only" id="page-schedule">
+<div class="page" id="page-schedule">
   <div class="sch-toolbar">
     <h2>工程表</h2>
     <span class="sch-proj-badge" id="sch-proj-name">（案件未選択）</span>
@@ -828,20 +828,22 @@
 </div>
 
 <!-- ════ 現場ページ（写真・図面・日報・有給） ════ -->
-<div class="page employee-only" id="page-genba">
+<div class="page" id="page-genba">
   <div class="sub-tab-bar">
     <button class="sub-tab-btn active carpenter-only" id="genbatab-photos" onclick="genbaTab('photos')">現場写真</button>
     <button class="sub-tab-btn carpenter-only" id="genbatab-drawings" onclick="genbaTab('drawings')">図面</button>
-    <button class="sub-tab-btn" id="genbatab-nippo" onclick="genbaTab('nippo')">日報</button>
-    <button class="sub-tab-btn" id="genbatab-leave" onclick="genbaTab('leave')">有給</button>
-    <button class="sub-tab-btn" id="genbatab-holiday" onclick="genbaTab('holiday')">休日出勤</button>
-    <button class="sub-tab-btn" id="genbatab-license" onclick="genbaTab('license')">免許・自保</button>
-    <button class="sub-tab-btn" id="genbatab-vehicle" onclick="genbaTab('vehicle')">車両管理</button>
+    <button class="sub-tab-btn employee-only" id="genbatab-nippo" onclick="genbaTab('nippo')">日報</button>
+    <button class="sub-tab-btn employee-only" id="genbatab-leave" onclick="genbaTab('leave')">有給</button>
+    <button class="sub-tab-btn employee-only" id="genbatab-holiday" onclick="genbaTab('holiday')">休日出勤</button>
+    <button class="sub-tab-btn employee-only" id="genbatab-license" onclick="genbaTab('license')">免許・自保</button>
+    <button class="sub-tab-btn employee-only" id="genbatab-vehicle" onclick="genbaTab('vehicle')">車両管理</button>
   </div>
 
   <!-- ① 現場写真（フォルダ表示） -->
   <div class="sub-page active carpenter-only" id="genbasub-photos">
     <div class="fg" style="margin-bottom:10px"><label>工事</label><select id="photo-project-select" onchange="setGenbaProject(this.value)"></select></div>
+    <!-- 発注先向けの案件情報（見るだけ） -->
+    <div id="supplier-project-info" style="display:none;margin-bottom:10px"></div>
     <div id="genba-fb-photos"></div>
   </div>
 
@@ -852,7 +854,7 @@
   </div>
 
   <!-- ③ 日報 -->
-  <div class="sub-page" id="genbasub-nippo">
+  <div class="sub-page employee-only" id="genbasub-nippo">
     <!-- 承認者のみ：残業の承認待ち一覧 -->
     <div id="ot-approve-wrap" style="display:none;margin-bottom:14px">
       <div class="section-lbl" style="margin-top:0">残業の承認待ち</div>
@@ -957,7 +959,7 @@
   </div>
 
   <!-- ④ 有給 -->
-  <div class="sub-page" id="genbasub-leave">
+  <div class="sub-page employee-only" id="genbasub-leave">
     <!-- staff：承認待ち -->
     <div id="leave-review-wrap" style="display:none">
       <div class="section-lbl" style="margin-top:0">承認待ちの申請</div>
@@ -1007,7 +1009,7 @@
   </div>
 
   <!-- ⑤ 休日出勤 -->
-  <div class="sub-page" id="genbasub-holiday">
+  <div class="sub-page employee-only" id="genbasub-holiday">
     <!-- 承認者のみ：自分宛の承認待ち -->
     <div id="holiday-review-wrap" style="display:none">
       <div class="section-lbl" style="margin-top:0">休日出勤の承認待ち</div>
@@ -1062,7 +1064,7 @@
   </div>
 
   <!-- ⑥ 免許・自保 -->
-  <div class="sub-page" id="genbasub-license">
+  <div class="sub-page employee-only" id="genbasub-license">
     <div id="license-busy" style="display:none;padding:10px 12px;margin-bottom:10px;border-radius:8px;background:var(--accent-bg);color:var(--accent-t);font-size:12px;font-weight:700"></div>
     <div id="license-body"></div>
     <!-- 撮影用（カメラが直接開く）と、画像フォルダから選ぶ用を分ける -->
@@ -1076,7 +1078,7 @@
   </div>
 
   <!-- ⑦ 車両管理 -->
-  <div class="sub-page" id="genbasub-vehicle">
+  <div class="sub-page employee-only" id="genbasub-vehicle">
     <div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px">
       <div style="flex:1;font-size:11px;color:var(--text-muted);line-height:1.7">
         車検・オイル交換・タイヤ交換の記録です。時期が来ると点検責任者と管理者に通知が届きます。
@@ -1688,7 +1690,7 @@
 
 <!-- bottom nav -->
 <nav class="main-nav" id="app-nav" style="display:none">
-  <button class="main-nav-btn staff-only" id="nav-schedule" onclick="mainTab('schedule')">
+  <button class="main-nav-btn" id="nav-schedule" onclick="mainTab('schedule')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/></svg>
     工程表
   </button>
@@ -1704,9 +1706,9 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
     受発注
   </button>
-  <button class="main-nav-btn employee-only" id="nav-genba" onclick="mainTab('genba')">
+  <button class="main-nav-btn" id="nav-genba" onclick="mainTab('genba')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/></svg>
-    勤怠日報
+    <span id="nav-genba-label">勤怠日報</span>
   </button>
   <button class="main-nav-btn" id="nav-talk" onclick="mainTab('talk')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -2121,10 +2123,10 @@
 <script src="js/state.js?v=245"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=258"></script>
+<script src="js/data/db.js?v=260"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=239"></script>
+<script src="js/nav.js?v=260"></script>
 
 <!-- やり取り（LINE風チャット） -->
 <script src="js/talk.js?v=258"></script>
@@ -2167,10 +2169,11 @@
 <script src="js/receipt.js?v=142"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=238"></script>
-<script src="js/genba/genba-files.js?v=189"></script>
-<script src="js/genba/genba-photos.js?v=227"></script>
-<script src="js/genba/genba-drawings.js?v=186"></script>
+<script src="js/genba/genba-tabs.js?v=261"></script>
+<script src="js/genba/supplier-view.js?v=261"></script>
+<script src="js/genba/genba-files.js?v=260"></script>
+<script src="js/genba/genba-photos.js?v=260"></script>
+<script src="js/genba/genba-drawings.js?v=261"></script>
 <script src="js/genba/genba-nippo.js?v=243"></script>
 <script src="js/genba/leave-balance.js?v=207"></script>
 <script src="js/genba/genba-leave.js?v=207"></script>
@@ -2184,6 +2187,6 @@
 <script src="js/init.js?v=169"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=225"></script>
+<script src="js/auth.js?v=260"></script>
 </body>
 </html>
