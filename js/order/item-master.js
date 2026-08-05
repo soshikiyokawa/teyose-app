@@ -50,10 +50,12 @@ function renderMaster(){
             <span class="mi-spec">${s}</span>
           </div>
           <div class="mi-meta">
-            <span>原価 ¥${fmt(m.cost)}/${m.unit}</span>
+            <span>原価 ¥${fmt(itemCurrentCost(m))}/${m.unit}</span>
             ${m.makerCode?`<span style="color:var(--text-muted)">品番 ${esc(m.makerCode)}</span>`:''}
-            ${(m.webPrice!=null && m.webPrice!==m.cost)
+            ${(m.webPrice!=null && m.webPrice!==itemCurrentCost(m))
               ? `<span style="color:var(--danger);font-weight:700">HP ¥${fmt(m.webPrice)}</span>` : ''}
+            ${(()=>{const n=itemNextPriceChange(m);
+              return n?`<span style="color:var(--warn-t);font-weight:700">${ipLabel(n.effectiveFrom)}から ¥${fmt(n.cost)}</span>`:'';})()}
           </div>
         </div>
         <button class="mi-edit-btn-sm staff-only" onclick="duplicateMasterItem(${m.id})" title="この品目を複製して次の品目を追加">複製</button>
@@ -115,11 +117,33 @@ function openMasterEdit(id){
   const askBox=document.getElementById('m-ask-price');
   if(askBox) delete askBox.dataset.touched;   // 開くたびに自動判定に戻す
   masterAskSync();
+  const fromEl=document.getElementById('m-price-from');
+  if(fromEl) fromEl.value='';
+  masterPriceFromSync();
   // 発注先ロールは原価のみ編集可（管理者・一般社員は全項目編集可）
   const supplierOnly = currentUserRole==='supplier';
   ['m-cat','m-name','m-unit','m-supplier-sel','m-maker-code'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
   document.getElementById('master-delete-btn').style.display = (supplierOnly||editingMasterId===-1) ? 'none' : 'inline-flex';
   document.getElementById('master-modal').classList.add('open');
+}
+
+// 「いつからの単価か」の欄は、既存の品目で単価を変えたときだけ出す
+function masterPriceFromSync(){
+  const wrap=document.getElementById('m-price-from-wrap');
+  if(!wrap) return;
+  const prev = editingMasterId!==-1 ? master.find(x=>x.id===editingMasterId) : null;
+  const cost = parseInt(document.getElementById('m-cost').value)||0;
+  const changed = !!prev && Number(prev.cost)!==cost;
+  wrap.style.display = changed ? '' : 'none';
+  if(!changed) return;
+  const el=document.getElementById('m-price-from');
+  if(!el.value) el.value = ipToday();
+  const hint=document.getElementById('m-price-from-hint');
+  if(hint){
+    hint.innerHTML = el.value > ipToday()
+      ? `${ipLabel(el.value)}から ¥${fmt(cost)} になります。<br>それより前の発注は、これまでの ¥${fmt(prev.cost)} で発注書を作ります`
+      : `本日から ¥${fmt(cost)} になります（これまで ¥${fmt(prev.cost)}）`;
+  }
 }
 
 // 「単価の入力をお願いする」欄は新規追加のときだけ。
@@ -237,6 +261,7 @@ async function saveMasterItem(){
 
   const isNew = editingMasterId===-1;
   const askPrice = isNew && document.getElementById('m-ask-price')?.checked;
+  let _priceChangedTo = null;   // 単価を変えたときの控え（保存後の案内に使う）
 
   try{
     if(editingMasterId===-1){
@@ -244,14 +269,29 @@ async function saveMasterItem(){
       activeMasterSupplier = item.supplier; // 追加した発注先タブに移動
       if(askPrice) await askSupplierForPrice(item);
     } else {
-      await dbUpdateMasterItem(editingMasterId,item);
-      const m=master.find(x=>x.id===editingMasterId);
-      if(m) Object.assign(m,item);
+      const prev=master.find(x=>x.id===editingMasterId);
+      const eff=document.getElementById('m-price-from')?.value || ipToday();
+      const costChanged = prev && Number(prev.cost)!==Number(item.cost);
+      if(costChanged){
+        // 単価は履歴として登録する。適用日が先なら、その日まで今までの単価のまま
+        await dbUpdateMasterItem(editingMasterId,{...item, cost:prev.cost, price:prev.cost});
+        await dbSaveItemPrice(prev, item.cost, eff);
+        if(prev) Object.assign(prev, {...item, cost: eff<=ipToday()? item.cost : prev.cost,
+                                              price: eff<=ipToday()? item.cost : prev.cost});
+        _priceChangedTo = {cost:item.cost, from: eff<=ipToday()? '本日から' : ipLabel(eff)+'から'};
+        // 発注先が変えたときは、きよかわにお知らせする
+        if(currentUserRole==='supplier') await notifyPriceChange({...prev, ...item}, item.cost, eff, Number(prev.cost));
+      } else {
+        await dbUpdateMasterItem(editingMasterId,item);
+        if(prev) Object.assign(prev,item);
+      }
       activeMasterSupplier = item.supplier;
     }
     closeMasterModal();
     renderMaster();
-    showToast(editingMasterId===-1?'品目を追加しました':'品目を保存しました');
+    showToast(isNew ? '品目を追加しました'
+      : _priceChangedTo ? `単価を ¥${fmt(_priceChangedTo.cost)}（${_priceChangedTo.from}）で登録しました`
+      : '品目を保存しました');
   }catch(e){
     // dbAdd/dbUpdate内でトースト表示済み
   }finally{

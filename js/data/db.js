@@ -77,6 +77,8 @@ async function fetchAllData(){
   }
   // 請求書は社内も発注先も見る（RLSで自社分に絞られる。テーブルが無くても落とさない）
   try{ await fetchInvoices(); }catch(_){ invoicesReady=false; }
+  // 単価の変更履歴（表がまだ無くても落とさない）
+  try{ await fetchItemPriceChanges(); }catch(_){ priceHistoryReady=false; }
 
   // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
@@ -400,6 +402,39 @@ async function dbMarkOrderReceived(orderNo, supplierName){
   if(error) ({ error } = await sb.from('orders').update(row).eq('no',orderNo).eq('supplier_id',supplier_id));
   if(error){ showToast('受領の記録に失敗しました：'+error.message); throw error; }
   await sb.from('cost_entries').update(row).eq('order_no',orderNo).eq('supplier_id',supplier_id);
+}
+
+// ── 単価の変更履歴（いつからの単価か。migration-genba40.sql） ──
+let itemPriceChanges = [];
+let priceHistoryReady = true;
+
+async function fetchItemPriceChanges(){
+  const { data, error } = await sb.from('item_price_changes')
+    .select('*').order('effective_from',{ascending:false}).order('id',{ascending:false});
+  priceHistoryReady = !error;
+  itemPriceChanges = (data||[]).map(r=>({id:r.id, itemId:r.item_id, cost:Number(r.cost),
+    prevCost:(r.prev_cost==null?null:Number(r.prev_cost)), effectiveFrom:r.effective_from,
+    changedBy:r.changed_by||'', createdAt:r.created_at}));
+}
+
+// 単価の変更を登録する。適用日が今日以前なら、いまの単価も入れ替える
+async function dbSaveItemPrice(item, cost, effectiveFrom){
+  const today = gbToday ? gbToday() : new Date().toISOString().slice(0,10);
+  const { error } = await sb.from('item_price_changes').insert({
+    item_id:item.id, cost, prev_cost:item.cost, effective_from:effectiveFrom,
+    changed_by:currentUserDisplayName||''
+  });
+  if(error){
+    showToast(/item_price_changes/.test(error.message||'')
+      ? 'データベースの準備が必要です。supabase/migration-genba40.sql を実行してください'
+      : '単価の登録に失敗しました：'+error.message);
+    throw error;
+  }
+  if(effectiveFrom <= today){
+    const { error: e2 } = await sb.from('master_items').update({price:cost, cost}).eq('id',item.id);
+    if(e2){ showToast('単価の反映に失敗しました：'+e2.message); throw e2; }
+  }
+  await fetchItemPriceChanges();
 }
 
 // ── 請求書（発注先が月ごとに送る。migration-genba38.sql） ──

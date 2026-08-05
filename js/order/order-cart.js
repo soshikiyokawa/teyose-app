@@ -121,15 +121,17 @@ function renderItemSelectList(){
         </div>
         <div class="ipc-meta">${m.cat}${inCart?` · カート: ${inCart.qty}${m.unit}`:'　／　タップして追加'}</div>
       </div>
-      <div class="ipc-price">原価 ¥${fmt(m.cost)}/${m.unit}</div>
+      <div class="ipc-price">原価 ¥${fmt(itemCurrentCost(m))}/${m.unit}</div>
     </div>`;
   }).join('');
 }
 
 // ── 数量モーダル ──
 function openQtyModal(itemId){
-  pendingItem=master.find(m=>m.id===itemId);
-  if(!pendingItem) return;
+  const _m=master.find(m=>m.id===itemId);
+  if(!_m) return;
+  // 発注は「今日の時点で有効な単価」で行う（先の日付で予約された値上げはまだ使わない）
+  pendingItem={..._m, cost:itemCurrentCost(_m), price:itemCurrentCost(_m)};
   const inCart=cart.find(c=>c.id===itemId);
   document.getElementById('qty-modal-title').textContent=inCart?'数量を変更':'数量を入力';
   document.getElementById('qty-item-name').textContent=pendingItem.name;

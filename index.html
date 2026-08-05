@@ -2040,7 +2040,13 @@
       <div class="fg"><label>単位</label><input id="m-unit" placeholder="本・枚・袋"></div>
     </div>
     <div class="fg" style="margin-top:10px"><label>品目名</label><input id="m-name" placeholder="例：杉 KD材 105×105×3000" oninput="masterMakerCodeSync()"></div>
-    <div class="fg" style="margin-top:10px"><label>原価（円）</label><input type="number" id="m-cost" placeholder="0" oninput="masterAskSync()"><input type="hidden" id="m-price" value="0"></div>
+    <div class="fg" style="margin-top:10px"><label>原価（円）</label><input type="number" id="m-cost" placeholder="0" oninput="masterAskSync();masterPriceFromSync()"><input type="hidden" id="m-price" value="0"></div>
+    <!-- 単価を変えるとき：いつからの単価か -->
+    <div class="fg" id="m-price-from-wrap" style="display:none;margin-top:10px">
+      <label>この単価はいつから</label>
+      <input type="date" id="m-price-from" onchange="masterPriceFromSync()">
+      <div id="m-price-from-hint" style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.6"></div>
+    </div>
     <div class="fg" style="margin-top:10px"><label>発注先</label><select id="m-supplier-sel" onchange="masterMakerCodeSync();masterAskSync()"></select></div>
     <!-- 品番：エクレアパーツの単価を自動で取ってくるのに使う -->
     <div class="fg" id="m-maker-code-wrap" style="margin-top:10px">
@@ -2125,7 +2131,7 @@
 <script src="js/state.js?v=245"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=267"></script>
+<script src="js/data/db.js?v=270"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=260"></script>
@@ -2160,10 +2166,11 @@
 
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=202"></script>
-<script src="js/order/item-master.js?v=269"></script>
+<script src="js/order/item-price.js?v=270"></script>
+<script src="js/order/item-master.js?v=271"></script>
 <script src="js/order/invoice.js?v=259"></script>
 <script src="js/order/ekrea-price.js?v=244"></script>
-<script src="js/order/order-cart.js?v=258"></script>
+<script src="js/order/order-cart.js?v=270"></script>
 <script src="js/order/order-confirm.js?v=216"></script>
 <script src="js/order/order-history.js?v=268"></script>
 <script src="js/cost-budget.js?v=245"></script>
