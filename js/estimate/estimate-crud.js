@@ -389,20 +389,38 @@ function setSidebarStatusFilter(s){
   renderProjectSidebar();
 }
 
+// 案件の並び：受注 → 提出済み → 下書き → 完工。同じステータスの中は新しい順
+const PROJ_STATUS_ORDER = ['approved','sent','draft','completed'];
+function projStatusOf(p){
+  const list=(estimates||[]).filter(e=>e.projectName===p.name);
+  if(!list.length) return 'draft';   // 見積がまだ無い案件は下書き扱い
+  const newest=[...list].sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];
+  return newest.status||'draft';
+}
+function sortProjectsForList(list){
+  return [...list].sort((a,b)=>{
+    const ra=PROJ_STATUS_ORDER.indexOf(projStatusOf(a));
+    const rb=PROJ_STATUS_ORDER.indexOf(projStatusOf(b));
+    if(ra!==rb) return (ra<0?99:ra)-(rb<0?99:rb);
+    return new Date(b.updatedAt||0)-new Date(a.updatedAt||0);
+  });
+}
+
 function renderProjectSidebar(){
   const kw=(document.getElementById('est-sidebar-search')?.value||'').trim().toLowerCase();
+  const sorted=sortProjectsForList(projects);
 
   // モバイル用セレクト（全件）
   const msel=document.getElementById('est-sidebar-mobile-select');
   if(msel){
     msel.innerHTML='<option value="">案件を選択...</option>'+
-      projects.map(p=>`<option value="${p.id}"${selectedProject?.id===p.id?' selected':''}>${esc(p.name)}${p.clientName?'（'+esc(p.clientName)+'）':''}</option>`).join('');
+      sorted.map(p=>`<option value="${p.id}"${selectedProject?.id===p.id?' selected':''}>${esc(p.name)}${p.clientName?'（'+esc(p.clientName)+'）':''}</option>`).join('');
   }
 
   // デスクトップ用サイドバーリスト
   const el=document.getElementById('est-project-sidebar-list');
   if(!el) return;
-  let list=projects;
+  let list=sorted;
   if(kw) list=list.filter(p=>p.name.toLowerCase().includes(kw)||(p.clientName||'').toLowerCase().includes(kw));
   if(_sidebarStatusFilter){
     const pids=new Set(estimates.filter(e=>e.status===_sidebarStatusFilter).map(e=>e.projectName));
