@@ -516,7 +516,21 @@ function printDezura(){
     const r = Math.round(v*100)/100;
     return Number.isInteger(r) ? r.toFixed(1) : String(r);
   };
-  const siteNames = Object.keys(sites).sort((a,b)=>sites[a].no-sites[b].no);
+  // 並び順：「工事」が付くものを人工の多い順に上へ。そのあと訓練校・研修・設計・事務
+  const SITE_TAIL_ORDER = ['訓練校','研修','設計','事務'];
+  const siteRank = name => {
+    const s = String(name||'');
+    if(s.includes('工事')) return 0;
+    const i = SITE_TAIL_ORDER.findIndex(k=>s.includes(k));
+    if(i>=0) return 2+i;          // 訓練校=2／研修=3／設計=4／事務=5
+    return 1;                      // どちらでもないもの（工事名など）は工事の次
+  };
+  const siteNames = Object.keys(sites).sort((a,b)=>{
+    const ra=siteRank(a), rb=siteRank(b);
+    if(ra!==rb) return ra-rb;
+    // 同じ区分の中は人工の多い順。同数なら番号順
+    return (sites[b].total-sites[a].total) || (sites[a].no-sites[b].no);
+  });
   const siteTotal = siteNames.reduce((s,n)=>s+sites[n].total,0);
   // 社員名を列に（上の表と同じ並び）。各セルはその現場でのその社員の人工数
   const empNames = userIds.map(uid=>users[uid].name);
