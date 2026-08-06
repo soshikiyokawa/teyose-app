@@ -18,6 +18,8 @@ const corsHeaders = {
 const PROMPT = `これは建築工事の見積書です。明細の行をすべて読み取って、save_quote_items の道具で返してください。
 
 読み取り方:
+- 金額の列が2つある表（原価と売価、仕入と見積など）は、
+  cost に「原価・仕入」側、price に「売価・見積」側を入れる。列が1つなら cost だけ入れる
 - 単価(cost)は「税抜」を使う。税抜が無ければ税込のままでよい
 - 金額(amount)は数量×単価。書かれていなければ計算する
 - 工種(section)は見積書の見出し・分類をそのまま使う。分類が無ければ空文字
@@ -46,7 +48,8 @@ const TOOL = {
             spec: { type: "string", description: "規格・仕様" },
             qty: { type: "number", description: "数量" },
             unit: { type: "string", description: "単位" },
-            cost: { type: "number", description: "単価（税抜）。読めなければ省く" },
+            cost: { type: "number", description: "原価・仕入の単価（税抜）。読めなければ省く" },
+            price: { type: "number", description: "売価・見積の単価。売価の列が無ければ省く" },
             amount: { type: "number", description: "金額" },
           },
           required: ["name"],
@@ -115,6 +118,7 @@ Deno.serve(async (req) => {
         qty: num(it.qty) ?? 1,
         unit: String(it.unit || "式").trim() || "式",
         cost: num(it.cost),
+        price: num(it.price),
         amount: num(it.amount),
       }))
       .filter((it: any) => it.name);
