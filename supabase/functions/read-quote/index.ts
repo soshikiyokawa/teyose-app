@@ -72,9 +72,11 @@ Deno.serve(async (req) => {
       (!mt.startsWith("image/") && String(file).startsWith("JVBER"));   // PDFの先頭は %PDF
     const imageType = ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mt) ? mt : "image/jpeg";
 
-    const message = await client.messages.create({
+    // 原価明細のように300行近い表でも切れないよう、多めに受け取る。
+    // 長い返答は時間がかかるため、ストリーミングで受け取って最後にまとめる
+    const message = await client.messages.stream({
       model: "claude-sonnet-5",
-      max_tokens: 16000,
+      max_tokens: 32000,
       tools: [TOOL],
       tool_choice: { type: "tool", name: "save_quote_items" },
       messages: [{
@@ -86,7 +88,7 @@ Deno.serve(async (req) => {
           { type: "text", text: PROMPT },
         ],
       }],
-    });
+    }).finalMessage();
 
     const use: any = message.content.find((c: any) => c.type === "tool_use");
     if (!use) {
