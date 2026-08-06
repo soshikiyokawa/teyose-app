@@ -7,6 +7,12 @@ const NIPPO_STANDARD_MINUTES = 480;
 // 工事の選択肢に入れる「職業訓練校」（訓練校生の通学日。案件には紐づかない）
 const NIPPO_SCHOOL = '職業訓練校';
 
+// 役員だけが選べる「休み」。出面表では日曜日と同じ「－」で表す（実働・人工には数えない）
+const NIPPO_REST = '休み';
+function isNippoRestUser(){
+  return typeof isLeaveExempt==='function' && isLeaveExempt(currentUserDisplayName);
+}
+
 // 他人の日報を編集できる人（この人だけ。他は自分の日報のみ編集可）
 const NIPPO_EDITOR = '清川創史';
 function canEditOthersNippo(){ return currentUserDisplayName === NIPPO_EDITOR; }
@@ -47,8 +53,19 @@ function nippoWorkKindToggle(){
 
 // 工事選択の変更：「その他」なら区分入力欄を表示、作業種別の出し分けも更新
 function nippoProjectChanged(){
+  const val = document.getElementById('nippo-project').value;
   const otherWrap = document.getElementById('nippo-other-wrap');
-  if(otherWrap) otherWrap.style.display = (document.getElementById('nippo-project').value==='other') ? '' : 'none';
+  if(otherWrap) otherWrap.style.display = (val==='other') ? '' : 'none';
+  // 「休み」は作業内容も時刻も要らないので隠す
+  const rest = (val===NIPPO_REST);
+  ['nippo-content-wrap','nippo-time-wrap','nippo-calc-wrap'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = rest ? 'none' : '';
+  });
+  if(rest){
+    const ot = document.getElementById('nippo-ot-approver-wrap');
+    if(ot) ot.style.display = 'none';
+  }
   nippoWorkKindToggle();
 }
 
@@ -105,6 +122,20 @@ async function saveNippo(){
   if(!workDate){ showToast('日付を入力してください'); return; }
   // 工事：案件を選択、または「職業訓練校」「その他」（案件に紐づかない）
   let projectId = null, projectName = '';
+  if(projVal===NIPPO_REST){
+    // 休み：作業内容も時間も要らない。実働0で登録する
+    projectName = NIPPO_REST;
+    await dbSaveNippo({
+      id: editingNippoId, workDate, projectId:null, projectName, workKind:'',
+      content: NIPPO_REST, startTime:'00:00', endTime:'00:00', breakMinutes:0,
+      workMinutes:0, overtimeMinutes:0, otStatus:'none', otApproverName:''
+    });
+    showToast(editingNippoId ? '休みに変更しました' : '休みとして登録しました');
+    resetNippoForm();
+    nippoMonth = nippoMonthOf(workDate);
+    await refreshGenba();
+    return;
+  }
   if(projVal==='school'){
     projectName = NIPPO_SCHOOL;
   } else if(projVal==='other'){
@@ -201,6 +232,9 @@ function editNippo(id){
   if(n.projectId){
     // 完工済みの工事は一覧から外しているので、開き直したときだけ足して選ぶ
     genbaSelectProject(document.getElementById('nippo-project'), n.projectId);
+    document.getElementById('nippo-other').value = '';
+  } else if(n.projectName===NIPPO_REST){
+    document.getElementById('nippo-project').value = NIPPO_REST;
     document.getElementById('nippo-other').value = '';
   } else if(n.projectName===NIPPO_SCHOOL){
     document.getElementById('nippo-project').value = 'school';
@@ -302,6 +336,7 @@ function renderNippo(){
     const byUser = {};
     list.forEach(n=>{
       const u = byUser[n.userId] = byUser[n.userId]||{name:n.userName||'（名前未設定）',dates:new Set(),work:0,overtime:0};
+      if(n.projectName===NIPPO_REST) return;   // 「休み」は出勤日数・実働に数えない
       u.dates.add(n.workDate); u.work += n.workMinutes; u.overtime += n.overtimeMinutes;
     });
     const userIds = Object.keys(byUser).sort((a,b)=>cmpEmployee(byUser[a].name, byUser[b].name));
@@ -330,9 +365,10 @@ function renderNippo(){
   } else {
     sumWrap.style.display = 'none';
     // carpenter：自分の月間合計
-    const work = list.reduce((s,n)=>s+n.workMinutes,0);
-    const overtime = list.reduce((s,n)=>s+n.overtimeMinutes,0);
-    const days = new Set(list.map(n=>n.workDate)).size;
+    const worked = list.filter(n=>n.projectName!==NIPPO_REST);   // 「休み」は除く
+    const work = worked.reduce((s,n)=>s+n.workMinutes,0);
+    const overtime = worked.reduce((s,n)=>s+n.overtimeMinutes,0);
+    const days = new Set(worked.map(n=>n.workDate)).size;
     document.getElementById('nippo-my-total').innerHTML =
       `出勤 <b>${days}日</b>　実働 <b>${gbMinLabel(work)}</b>　残業 <b style="${overtime>0?'color:var(--danger)':''}">${overtime>0?gbMinLabel(overtime):'なし'}</b>`;
   }
@@ -343,22 +379,26 @@ function renderNippo(){
     wrap.innerHTML = '<div class="empty">この期間の日報はありません</div>';
     return;
   }
-  wrap.innerHTML = list.map(n=>`
+  wrap.innerHTML = list.map(n=>{
+    const rest = n.projectName===NIPPO_REST;   // 休み：作業内容も時刻も出さない
+    return `
     <div class="nippo-row" onclick="editNippo(${n.id})" style="${(n.userId===currentUserId||canEditOthersNippo())?'':'cursor:default'}">
       <div style="flex-shrink:0;width:64px">
         <div style="font-size:12px;font-weight:700">${gbDateLabel(n.workDate)}</div>
         ${currentUserRole==='staff'?`<div style="font-size:10px;color:var(--text-muted)">${esc(n.userName)}</div>`:''}
       </div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.projectName||'（工事未設定）')}${n.workKind?`<span style="font-weight:400;color:var(--accent-t)">｜${esc(n.workKind)}</span>`:''}</div>
-        <div style="font-size:11px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.content)||'　'}</div>
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${rest?'color:var(--text-muted)':''}">${esc(n.projectName||'（工事未設定）')}${n.workKind?`<span style="font-weight:400;color:var(--accent-t)">｜${esc(n.workKind)}</span>`:''}</div>
+        ${rest?'':`<div style="font-size:11px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.content)||'　'}</div>`}
       </div>
       <div style="flex-shrink:0;text-align:right">
+        ${rest ? '<div style="font-size:11px;color:var(--text-muted)">－</div>' : `
         <div style="font-size:11px">${n.startTime}〜${n.endTime}</div>
         <div style="font-size:10px;${n.overtimeMinutes>0?'color:var(--danger);font-weight:700':'color:var(--text-muted)'}">${n.overtimeMinutes>0?'残業 '+gbMinLabel(n.overtimeMinutes):gbMinLabel(n.workMinutes)}</div>
-        ${n.overtimeMinutes>0 && OT_STATUS[n.otStatus] ? `<span class="status-badge ${OT_STATUS[n.otStatus].cls}" style="margin-top:2px">${OT_STATUS[n.otStatus].label}：${esc(n.otStatus==='pending' ? (n.otApproverName||'承認者未設定') : n.otReviewerName)}</span>` : ''}
+        ${n.overtimeMinutes>0 && OT_STATUS[n.otStatus] ? `<span class="status-badge ${OT_STATUS[n.otStatus].cls}" style="margin-top:2px">${OT_STATUS[n.otStatus].label}：${esc(n.otStatus==='pending' ? (n.otApproverName||'承認者未設定') : n.otReviewerName)}</span>` : ''}`}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function nippoSetUserFilter(v){
@@ -394,7 +434,8 @@ function printDezura(){
     minByDate:{},              // 日ごとの実働（分）＝日報から。休日出勤の時間数に使う
     holidayDates:new Set(),    // 承認済みの休日出勤日（全部）
     premiumDates:new Set(),    // うち休日労働（割増あり）
-    furikaeDates:new Set()};   // うち事前の振替出勤（労働日の振替＝割増なし）
+    furikaeDates:new Set(),    // うち事前の振替出勤（労働日の振替＝割増なし）
+    restDates:new Set()};      // 役員が日報で「休み」とした日（日曜日と同じ表記にする）
 
   // 現場（工事）ごとに番号を振り、人工（実働8時間＝1.0人工）を集計する
   const sites = {}; // siteName -> {no, total, byUser:{userName:ninku}}
@@ -406,6 +447,8 @@ function printDezura(){
 
   dailyReports.filter(n=>inPeriod(n.workDate)).forEach(n=>{
     const u = getU(n.userId, n.userName);
+    // 「休み」は働いていないので、出勤日数・実働・人工には数えない
+    if(n.projectName===NIPPO_REST){ u.restDates.add(n.workDate); return; }
     u.work += n.workMinutes; u.overtime += n.overtimeMinutes; u.days.add(n.workDate);
     u.minByDate[n.workDate] = (u.minByDate[n.workDate]||0) + n.workMinutes;
     const site = getSite(n.projectName);
@@ -469,6 +512,8 @@ function printDezura(){
       const siteTxt = siteCell ? [...siteCell.nos].sort((a,b)=>a-b).join('·') + (siteCell.ot?'＊':'') : '';
       const wd = d.getDay();
       let mk = special + siteTxt;                // 例：「1」「1·2＊」「休1」「有」
+      // 日報で「休み」とした日は、日曜日と同じ「－」で表す
+      if(!mk && u.restDates.has(s)) mk = '－';
       // 休日（勤務カレンダー基準）で活動が無ければ「－」。残る空欄＝出勤日なのに未入力
       if(!mk && isHolidayForUser(uid, s, wd)) mk = '－';
       const missing = !mk;                       // 出勤日で記入なし

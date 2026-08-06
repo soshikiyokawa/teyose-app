@@ -50,9 +50,12 @@ function renderGenbaProjectSelects(){
     // 日報・休日出勤は「その他」（案件に紐づかない：設計・事務・空き家管理など）を追加
     // 日報にはさらに「職業訓練校」（訓練校生の通学日）を「その他」の上に置く
     const withOther = (id==='nippo-project' || id==='holiday-project');
+    // 役員は日報に「休み」を出す（いちばん下）。出面表では日曜日と同じ扱いになる
+    const restOpt = (id==='nippo-project' && typeof isNippoRestUser==='function' && isNippoRestUser())
+      ? `<option value="${NIPPO_REST}">${NIPPO_REST}</option>` : '';
     el.innerHTML = withOther
       ? optsActive + (id==='nippo-project' ? `<option value="school">${NIPPO_SCHOOL}</option>` : '')
-             + '<option value="other">その他</option>'
+             + '<option value="other">その他</option>' + restOpt
       : opts;
     // 選択状態を維持（写真・図面は共通のgenbaProjectIdを優先）
     if(!withOther && genbaProjectId) el.value = String(genbaProjectId);
