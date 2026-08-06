@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=268">
+<link rel="stylesheet" href="css/main.css?v=274">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -25,8 +25,9 @@
     <div class="fg" style="margin-bottom:10px"><label>メールアドレス</label><input type="email" id="login-email" placeholder="you@example.com"></div>
     <div class="fg" style="margin-bottom:10px"><label>パスワード</label><input type="password" id="login-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
     <div id="login-error" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
-    <div class="modal-actions">
+    <div class="modal-actions" style="flex-direction:column;gap:8px">
       <button class="btn primary" id="login-btn" style="width:100%;justify-content:center" onclick="doLogin()">ログイン</button>
+      <button class="btn" style="width:100%;justify-content:center;font-size:12px" onclick="openPasswordReset()">パスワードをお忘れの方</button>
     </div>
   </div>
 </div>
@@ -43,8 +44,8 @@
 <button class="btn sm" onclick="hardUpdate()" title="強制更新" style="padding:5px 8px">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
   </button>
-  <button class="btn sm" onclick="doLogout()" title="ログアウト" style="padding:5px 8px">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+  <button class="btn sm" onclick="openAccountSettings()" title="アカウント設定" style="padding:5px 8px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
   </button>
 </div>
 
@@ -2014,6 +2015,61 @@
   </div>
 </div>
 
+<!-- アカウント設定（本人がパスワードを変える） -->
+<div class="modal-overlay" id="account-modal" onclick="if(event.target.id==='account-modal')closeAccountSettings()">
+  <div class="modal-sheet">
+    <h3>アカウント設定</h3>
+    <div id="acct-info" style="font-size:12px;color:var(--text-sub);line-height:1.9;margin-bottom:12px"></div>
+
+    <div class="section-lbl" style="margin-top:0">パスワードの変更</div>
+    <div class="fg" style="margin-bottom:8px"><label>いまのパスワード</label>
+      <input type="password" id="acct-pass-now" autocomplete="current-password"></div>
+    <div class="fg" style="margin-bottom:8px"><label>新しいパスワード（8文字以上）</label>
+      <input type="password" id="acct-pass1" autocomplete="new-password"></div>
+    <div class="fg" style="margin-bottom:8px"><label>新しいパスワード（確認）</label>
+      <input type="password" id="acct-pass2" autocomplete="new-password"
+             onkeydown="if(event.key==='Enter')changeMyPassword()"></div>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:10px">
+      変更すると、他の端末でのログインは切れます。新しいパスワードで入り直してください。
+    </div>
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeAccountSettings()">閉じる</button>
+      <button class="btn primary" id="acct-pass-btn" onclick="changeMyPassword()">パスワードを変更</button>
+    </div>
+
+    <!-- ログアウト -->
+    <div style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:0;font-size:11px;color:var(--text-muted);line-height:1.6">
+        この端末からログアウトします。次に使うときはメールアドレスとパスワードが必要です。
+      </div>
+      <button class="btn" onclick="logoutFromSettings()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        ログアウト
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- パスワードの再設定（ログイン前） -->
+<div class="modal-overlay" id="pwreset-modal" onclick="if(event.target.id==='pwreset-modal')closePasswordReset()">
+  <div class="modal-sheet" style="max-width:360px">
+    <h3>パスワードの再設定</h3>
+    <div style="font-size:12px;color:var(--text-sub);line-height:1.8;margin-bottom:10px">
+      ご登録のメールアドレスに、パスワードを設定し直すためのリンクをお送りします。
+    </div>
+    <div class="fg" style="margin-bottom:10px"><label>メールアドレス</label>
+      <input type="email" id="pwreset-email" placeholder="you@example.com" autocomplete="email"
+             onkeydown="if(event.key==='Enter')sendPasswordReset()"></div>
+    <div id="pwreset-msg" style="font-size:12px;line-height:1.7;margin-bottom:8px;display:none"></div>
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closePasswordReset()">閉じる</button>
+      <button class="btn primary" id="pwreset-btn" onclick="sendPasswordReset()">リンクを送る</button>
+    </div>
+  </div>
+</div>
+
 <!-- エクレアパーツ：取ってきた単価と原価の差を確認して反映する -->
 <div class="modal-overlay" id="ekrea-diff-modal" onclick="if(event.target.id==='ekrea-diff-modal')closeEkreaDiff()">
   <div class="modal-sheet">
@@ -2197,5 +2253,6 @@
 
 <!-- 認証（ログイン・ログアウト・権限） -->
 <script src="js/auth.js?v=262"></script>
+<script src="js/account.js?v=275"></script>
 </body>
 </html>
