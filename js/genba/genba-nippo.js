@@ -542,6 +542,11 @@ function printDezura(){
     const prem = sumMin(u.premiumDates);
     const furi = sumMin(u.furikaeDates);
     const hCell = (v, warnLabel) => `<td class="sum" style="text-align:right;${v.miss?'background:#ffcdd2;':''}${v.min?'font-weight:700':''}">${v.min?fmtH(v.min):''}${v.miss?`<div style="font-size:8px;font-weight:700">日報${v.miss}件</div>`:''}</td>`;
+    // 役員は休日労働割増の対象外。時間が入っていると紛らわしいので「—」にする
+    const noPremium = typeof isLeaveExempt==='function' && isLeaveExempt(u.name);
+    const premCell = noPremium
+      ? '<td class="sum" style="text-align:right;color:#bbb">—</td>'
+      : hCell(prem);
     return `<tr>
       <td style="white-space:nowrap;font-weight:700">${esc(u.name)}</td>
       ${cells}
@@ -549,7 +554,7 @@ function printDezura(){
       <td class="sum" style="text-align:right">${fmtH(u.work)}</td>
       <td class="sum" style="text-align:right;${u.overtime>0?'font-weight:700':''}">${u.overtime>0?fmtH(u.overtime):''}</td>
       <td class="sum" style="text-align:right">${u.holidayDays||''}</td>
-      ${hCell(prem)}
+      ${premCell}
       ${hCell(furi)}
       <td class="sum" style="text-align:right">${u.leaveDays||''}</td>
       <td class="sum" style="text-align:right">${u.subDays||''}</td>
@@ -632,7 +637,7 @@ function printDezura(){
   <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
     <h2 style="font-size:16px;margin:0">出面表　${y}年${m}月度</h2>
     <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
-    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　<span style="color:#b5302a;font-weight:700">休</span>=休日労働（割増対象）　<span style="color:#1f6f8b;font-weight:700">替</span>=振替出勤（事前に振替休日を指定＝労働日の振替のため割増なし）　休・替の下段は日報の実働時間　有=有給　半=半休　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　<span style="background:#ffcdd2;padding:0 4px">■</span>＝休日出勤の日報が未提出（時間数を計算できません）　※休日出勤・有給・振替は承認済みのみ</span>
+    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　<span style="color:#b5302a;font-weight:700">休</span>=休日労働（割増対象）　<span style="color:#1f6f8b;font-weight:700">替</span>=振替出勤（事前に振替休日を指定＝労働日の振替のため割増なし）　休・替の下段は日報の実働時間　有=有給　半=半休　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　<span style="background:#ffcdd2;padding:0 4px">■</span>＝休日出勤の日報が未提出（時間数を計算できません）　※休日出勤・有給・振替は承認済みのみ　※役員は休日労働割増の対象外のため「休日労働(h)割増」は—</span>
   </div>
   <div style="font-size:10px;color:#888;margin-bottom:4px">← 横スクロールで日付が見られます（氏名は固定）</div>
   <div class="dz-scroll">
