@@ -195,6 +195,7 @@ function estPaymentsToForm(payments){
     sv(r.id+'-actual-date', p?.actualDate);
     payAmtLoad(r.id+'-actual-amount', p?.actualAmount);
   });
+  estUpdateInfoTotals();
 }
 
 async function saveEstInfo(){
@@ -276,8 +277,8 @@ function newEstimate(){
   editingEstId=null;
   ['est-no','est-date','est-expire','est-start-date','est-end-date','est-actual-start','est-handover','est-client','est-client-address','est-client-tel','est-client-email','est-tantou','est-project','est-site','est-note',
    'est-contract-date','est-extra1-date','est-extra2-date','est-extra3-date',
-   'est-pay1-date','est-pay1-amount','est-pay2-date','est-pay2-amount','est-pay3-date','est-pay3-amount',
-   'est-pay1-actual-date','est-pay1-actual-amount','est-pay2-actual-date','est-pay2-actual-amount','est-pay3-actual-date','est-pay3-actual-amount'
+   'est-pay0-date','est-pay0-amount','est-pay1-date','est-pay1-amount','est-pay2-date','est-pay2-amount','est-pay3-date','est-pay3-amount',
+   'est-pay0-actual-date','est-pay0-actual-amount','est-pay1-actual-date','est-pay1-actual-amount','est-pay2-actual-date','est-pay2-actual-amount','est-pay3-actual-date','est-pay3-actual-amount'
   ].forEach(id=>document.getElementById(id).value='');
   ['est-contract-amount','est-extra1-amount','est-extra2-amount','est-extra3-amount'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('est-status').value='draft';
@@ -305,6 +306,7 @@ function newEstimate(){
   renderProjectSidebar();
   updateProjDeleteBtn();
   updateProjDateLabels();
+  estUpdateInfoTotals();
 }
 
 function cloneSections(list){
@@ -692,3 +694,30 @@ function updateProjDateLabels(){
   if(sl) sl.textContent = as ? '着工日' : '着工予定日';
   if(el) el.textContent = hd ? '引渡日' : '完工予定日';
 }
+
+// ── 契約情報・入金予定・実績の合計 ──
+// 入力しながら合計が分かるように、打つたびに書き換える。
+// 契約情報の合計（請負契約＋追加契約①②③）は、案件一覧のカードに出る請負金額と同じ数字。
+const EST_CONTRACT_AMOUNT_IDS = ['est-contract-amount','est-extra1-amount','est-extra2-amount','est-extra3-amount'];
+
+function estContractTotalFromForm(){
+  return EST_CONTRACT_AMOUNT_IDS.reduce((s,id)=>s+payAmtVal(id),0);
+}
+function estUpdateInfoTotals(){
+  const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent='¥'+fmt(v);};
+  set('est-contract-total', estContractTotalFromForm());
+  set('est-pay-plan-total',   EST_PAY_ROWS.reduce((s,r)=>s+payAmtVal(r.id+'-amount'),0));
+  set('est-pay-actual-total', EST_PAY_ROWS.reduce((s,r)=>s+payAmtVal(r.id+'-actual-amount'),0));
+}
+
+// 金額欄を打っている間も合計を追いかける
+document.addEventListener('DOMContentLoaded', ()=>{
+  const ids = EST_CONTRACT_AMOUNT_IDS
+    .concat(EST_PAY_ROWS.map(r=>r.id+'-amount'))
+    .concat(EST_PAY_ROWS.map(r=>r.id+'-actual-amount'));
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('input', estUpdateInfoTotals);
+  });
+  estUpdateInfoTotals();
+});

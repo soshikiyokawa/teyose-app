@@ -79,6 +79,14 @@ function olClientName(r){
   return r.project?.clientName || r.est?.clientName || '';
 }
 
+// 請負金額＝契約情報の合計（請負契約＋追加契約①②③）。
+// 見積情報の「契約情報」に出る合計と同じ数字を、カードにも表にも出す
+function olContractTotal(est){
+  const ex = est?.extras||[];
+  return (Number(est?.contractAmount)||0)
+    + (Number(ex[0]?.amount)||0) + (Number(ex[1]?.amount)||0) + (Number(ex[2]?.amount)||0);
+}
+
 // 請負金額と入金の状況は管理者だけに見せる
 function olCanSeeMoney(){ return currentUserRole==='staff'; }
 
@@ -318,8 +326,7 @@ function renderOrdersList(){
     const epr  = sectTotal > 0 ? epAmt/sectTotal*100 : 0;
     const apAmt= e.actualProfit||0;
     const apRate = ca ? (apAmt/ca*100) : 0;
-    const extras = e.extras||[];
-    const totalCa = ca + (extras[0]?.amount||0) + (extras[1]?.amount||0) + (extras[2]?.amount||0);
+    const totalCa = olContractTotal(e);
 
     const st=OL_STATUS[r.status]||OL_STATUS.draft;
     const badge=`<span class="badge ${st.cls}" style="font-size:9px;padding:1px 5px">${st.label}</span>`;
@@ -382,10 +389,7 @@ function renderOrdersList(){
 function renderOrdersTotals(list){
   const el = document.getElementById('orders-list-totals');
   if(!el) return;
-  const totCa     = list.reduce((s,e)=>{
-    const ex=e.extras||[];
-    return s+(e.contractAmount||0)+(ex[0]?.amount||0)+(ex[1]?.amount||0)+(ex[2]?.amount||0);
-  },0);
+  const totCa     = list.reduce((s,e)=>s+olContractTotal(e),0);
   const totDeki   = list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.completion||0)/100),0);
   const totKai    = list.reduce((s,e)=>(s+(e.payments||[]).reduce((s2,p)=>s2+(p.actualAmount||0),0)),0);
   const totMi     = totCa - totKai;
@@ -589,8 +593,8 @@ function olCardHtml(r){
       <div class="ol-card-name">${esc(p.name)}</div>
       <div class="ol-card-sub">${esc(olClientName(r))||'&nbsp;'}</div>
       <div class="ol-card-date">${period||'&nbsp;'}</div>
-      ${olCanSeeMoney()?`<div class="ol-card-foot">${e.contractAmount
-        ? `<span class="ol-card-amt">¥${fmt(e.contractAmount)}</span>${olPayBadge(e)}`
+      ${olCanSeeMoney()?`<div class="ol-card-foot">${olContractTotal(e)
+        ? `<span class="ol-card-amt">¥${fmt(olContractTotal(e))}</span>${olPayBadge(e)}`
         : `<span class="ol-card-amt" style="color:var(--text-muted);font-weight:400">金額未入力</span>`}</div>`:''}
     </div>
   </div>`;

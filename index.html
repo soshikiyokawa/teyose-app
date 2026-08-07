@@ -390,6 +390,13 @@
               <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-extra3-amount" placeholder="0" style="width:100%;min-width:100px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
             </tr>
           </tbody>
+          <tfoot>
+            <tr style="background:var(--surface2)">
+              <td style="padding:6px 8px;font-weight:700;border-top:1px solid var(--border)">合計</td>
+              <td style="border-left:1px solid var(--border);border-top:1px solid var(--border)"></td>
+              <td style="padding:6px 10px;text-align:right;font-weight:700;border-top:1px solid var(--border);white-space:nowrap" id="est-contract-total">¥0</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -435,6 +442,15 @@
               <td style="padding:4px 6px"><div style="display:flex;align-items:center;gap:3px"><input type="text" inputmode="numeric" id="est-pay3-actual-amount" placeholder="0" style="width:100%;min-width:80px;text-align:right" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this)"><span style="flex-shrink:0;color:var(--text-muted);font-size:11px">円</span></div></td>
             </tr>
           </tbody>
+          <tfoot>
+            <tr style="background:var(--surface2)">
+              <td style="padding:6px 8px;font-weight:700;border-top:1px solid var(--border)">合計</td>
+              <td style="border-left:1px solid var(--border);border-top:1px solid var(--border)"></td>
+              <td style="padding:6px 10px;text-align:right;font-weight:700;border-top:1px solid var(--border);white-space:nowrap" id="est-pay-plan-total">¥0</td>
+              <td style="border-left:1px solid var(--border-s);border-top:1px solid var(--border)"></td>
+              <td style="padding:6px 10px;text-align:right;font-weight:700;border-top:1px solid var(--border);white-space:nowrap" id="est-pay-actual-total">¥0</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -2222,13 +2238,13 @@
 <script src="js/estimate/quote-import.js?v=257"></script>
 <script src="js/estimate/estimate-master.js?v=202"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
-<script src="js/estimate/estimate-crud.js?v=273"></script>
+<script src="js/estimate/estimate-crud.js?v=280"></script>
 <script src="js/estimate/parking.js?v=193"></script>
 <script src="js/estimate/estimate-pdf.js?v=248"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=262"></script>
+<script src="js/orders-list.js?v=280"></script>
 <script src="js/payment-schedule.js?v=256"></script>
 <script src="js/inspection.js?v=234"></script>
 
