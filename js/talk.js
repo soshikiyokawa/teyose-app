@@ -383,7 +383,7 @@ function updateChatBadge(){
     el.textContent = n>99 ? '99+' : (n||'');
     el.style.display = n ? 'flex' : 'none';
   }
-  setAppBadgeCount(n);
+  setAppBadgeCount(typeof appBadgeTotal==='function' ? appBadgeTotal() : n);
   return n;
 }
 

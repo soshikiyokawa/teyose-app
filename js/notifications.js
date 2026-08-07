@@ -25,6 +25,12 @@ function unreadNotificationCount(){
   return myNotifications.filter(n=>!n.readAt).length;
 }
 
+// ホーム画面のアプリアイコンに出す数（チャットの未読＋未読の通知）
+function appBadgeTotal(){
+  const chat = (typeof chatUnreadTotal==='function') ? chatUnreadTotal() : 0;
+  return chat + unreadNotificationCount();
+}
+
 // 上のバーのベルに未読件数を出す
 function updateNotificationBadge(){
   const b = document.getElementById('notif-badge');
@@ -32,6 +38,7 @@ function updateNotificationBadge(){
   const n = unreadNotificationCount();
   b.textContent = n>99 ? '99+' : String(n);
   b.style.display = n ? 'flex' : 'none';
+  setAppBadgeCount(appBadgeTotal());   // ホーム画面のアイコンにも出す
 }
 
 // 通知が来た日時。今日なら時刻だけ、今年なら月日、それ以外は年から
