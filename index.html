@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=274">
+<link rel="stylesheet" href="css/main.css?v=278">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -43,6 +43,10 @@
   </button>
 <button class="btn sm" onclick="hardUpdate()" title="強制更新" style="padding:5px 8px">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+  </button>
+  <button class="btn sm" onclick="openNotifications()" title="通知履歴" style="padding:5px 8px;position:relative">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    <span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;align-items:center;justify-content:center;background:var(--danger);color:#fff;border-radius:99px;font-size:9px;font-weight:800;line-height:1">0</span>
   </button>
   <button class="btn sm" onclick="openAccountSettings()" title="アカウント設定" style="padding:5px 8px">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -2016,6 +2020,20 @@
 </div>
 
 <!-- アカウント設定（本人がパスワードを変える） -->
+<!-- 通知履歴：届いた通知をあとから読み返す -->
+<div class="modal-overlay" id="notif-modal" onclick="if(event.target.id==='notif-modal')closeNotifications()">
+  <div class="modal-sheet">
+    <h3>通知</h3>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">お使いの端末に届いた通知を、新しい順に表示します（90日ぶん）。</div>
+    <div id="notif-list" style="max-height:60vh;overflow-y:auto;margin:0 -4px"></div>
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+      <button class="btn" onclick="clearMyNotifications()">すべて消す</button>
+      <div style="flex:1"></div>
+      <button class="btn primary" onclick="closeNotifications()">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="account-modal" onclick="if(event.target.id==='account-modal')closeAccountSettings()">
   <div class="modal-sheet">
     <h3>アカウント設定</h3>
@@ -2187,7 +2205,7 @@
 <script src="js/state.js?v=245"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=270"></script>
+<script src="js/data/db.js?v=278"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=260"></script>
@@ -2252,7 +2270,8 @@
 <script src="js/init.js?v=169"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=262"></script>
+<script src="js/auth.js?v=278"></script>
 <script src="js/account.js?v=275"></script>
+<script src="js/notifications.js?v=278"></script>
 </body>
 </html>

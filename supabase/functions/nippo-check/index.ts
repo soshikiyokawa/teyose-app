@@ -8,6 +8,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { logNotifications } from "../_shared/notify-log.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -91,6 +92,7 @@ Deno.serve(async (req) => {
 
     const pushTo = async (userIds: string[], title: string, body: string) => {
       if (!userIds.length) return 0;
+      await logNotifications(admin, userIds, { title, body, tab: "genba/nippo" }, "nippo-check");
       const { data: subsPush } = await admin.from("push_subscriptions").select("*").in("user_id", userIds);
       let sent = 0;
       await Promise.all((subsPush || []).map(async (s: any) => {

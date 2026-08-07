@@ -15,6 +15,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { logNotifications } from "../_shared/notify-log.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -79,6 +80,11 @@ Deno.serve(async (req) => {
     if (!targets.length) return json({ sent: 0, targets: 0 });
 
     const label = `${jstNow.getUTCMonth() + 1}/${jstNow.getUTCDate()}`;
+    await logNotifications(admin, targets.map((p: any) => p.id), {
+      title: "日報リマインド",
+      body: `本日（${label}）の日報がまだ提出されていません。手寄の勤怠日報から提出してください。`,
+      tab: "genba/nippo",
+    }, "nippo-remind");
     let sent = 0;
     await Promise.all(
       targets.map(async (p: any) => {

@@ -14,6 +14,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { logNotifications } from "../_shared/notify-log.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -165,6 +166,8 @@ Deno.serve(async (req) => {
         .map((c) => `${c.name}（¥${c.cost.toLocaleString()}→¥${c.webPrice.toLocaleString()}）`).join("／");
       const body = `エクレアパーツの単価が${changed.length}件変わっています。${head}` +
         (changed.length > 3 ? ` ほか${changed.length - 3}件` : "") + "。品目マスタで確認してください。";
+      await logNotifications(admin, staffIds,
+        { title: "エクレアパーツの価格が変わりました", body, tab: "order/master" }, "ekrea-price");
       await Promise.all((subs || []).map(async (sub: any) => {
         try {
           await webpush.sendNotification(

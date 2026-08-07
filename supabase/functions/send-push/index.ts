@@ -5,6 +5,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { logNotifications } from "../_shared/notify-log.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -49,6 +50,9 @@ Deno.serve(async (req) => {
       .map((p: any) => p.id);
 
     if (!targetUserIds.length) return json({ sent: 0 });
+
+    // 後から読み返せるように、送る相手ぶんの通知履歴を残す
+    await logNotifications(admin, targetUserIds, { title, body, tab }, String(targetRole || ""));
 
     const { data: subs } = await admin.from("push_subscriptions").select("*").in("user_id", targetUserIds);
 

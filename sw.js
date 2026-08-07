@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v277';
+const CACHE_NAME = 'teyose-v278';
 const ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,7 @@ const ASSETS = [
   './js/data/db.js',
   './js/nav.js',
   './js/talk.js',
+  './js/notifications.js',
   './js/init.js',
   './js/auth.js',
   './js/estimate/estimate-tabs.js',

@@ -13,6 +13,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { logNotifications } from "../_shared/notify-log.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -120,6 +121,10 @@ Deno.serve(async (req) => {
     }
 
     if (!msgs.length) return json({ sent: 0 });
+
+    for (const m of msgs) {
+      await logNotifications(admin, [m.userId], { title: m.title, body: m.body, tab: "genba/vehicle" }, "vehicle-remind");
+    }
 
     const { data: subs } = await admin.from("push_subscriptions").select("*")
       .in("user_id", [...new Set(msgs.map((m) => m.userId))]);

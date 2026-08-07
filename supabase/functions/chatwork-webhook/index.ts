@@ -10,6 +10,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
+import { logNotifications } from "../_shared/notify-log.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -87,6 +88,8 @@ Deno.serve(async (req) => {
       const { data: staff } = await admin.from("profiles").select("id").eq("role", "staff");
       const ids = (staff || []).map((p: any) => p.id);
       if (ids.length) {
+        await logNotifications(admin, ids,
+          { title: sup.name, body: cleanBody(body).slice(0, 80), tab: null }, "chatwork");
         const { data: subs } = await admin.from("push_subscriptions").select("*").in("user_id", ids);
         await Promise.all((subs || []).map(async (s: any) => {
           try {

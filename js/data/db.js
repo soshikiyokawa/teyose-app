@@ -79,6 +79,8 @@ async function fetchAllData(){
   try{ await fetchInvoices(); }catch(_){ invoicesReady=false; }
   // 単価の変更履歴（表がまだ無くても落とさない）
   try{ await fetchItemPriceChanges(); }catch(_){ priceHistoryReady=false; }
+  // 通知履歴（表がまだ無くても落とさない）
+  try{ await fetchMyNotifications(); }catch(_){ notificationsReady=false; }
 
   // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
@@ -1104,6 +1106,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'vehicles'}, ()=>refetchAndRerender('vehicles'))
     .on('postgres_changes',{event:'*',schema:'public',table:'vehicle_records'}, ()=>refetchAndRerender('vehicles'))
     .on('postgres_changes',{event:'*',schema:'public',table:'inspection_records'}, ()=>refetchAndRerender('inspections'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'notifications'}, ()=>refreshNotifications())
     .subscribe();
 }
 
