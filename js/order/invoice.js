@@ -134,7 +134,9 @@ async function sendInvoice(){
     if(!supplierId){ showToast('発注先を選んでください'); return; }
   }else{
     supplierId=currentUserSupplierId;
-    supplierName=currentUserDisplayName||'';
+    // 「業者名＋請求月」の名前にするので、担当者の名前ではなく会社の名前を使う
+    // （1つの発注先に複数のアカウントがあっても同じ名前で並ぶようにするため）
+    supplierName=(suppliers||[]).find(s=>s.id===currentUserSupplierId)?.name||currentUserDisplayName||'';
     if(!supplierId){ showToast('発注先の情報が取得できませんでした'); return; }
   }
   // 同じ月に送っていないか確認（差し替えの送り直しは止めない）

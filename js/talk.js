@@ -5,7 +5,7 @@ let notifyTargets = [];   // 空＝ALL（全員）。表示名の配列
 function _employeeNames(){
   if(isProjectThread(activeTalkPanelSupplier)){
     const p = projects.find(x=>x.id===projectThreadIds[activeTalkPanelSupplier]);
-    return (p?.members||[]).filter(n=>n!==currentUserDisplayName);
+    return otherMemberNames(p?.members);
   }
   return (typeof allProfiles!=='undefined' ? allProfiles : [])
     .filter(p=>p.role!=='supplier' && p.displayName && p.displayName!==currentUserDisplayName)
@@ -364,7 +364,7 @@ function chatUnreadFor(threadName){
 function visibleThreadNames(){
   const isEmployee = currentUserRole==='staff' || currentUserRole==='carpenter';
   const projNames = projects
-    .filter(p=>currentUserRole==='staff' || (p.members||[]).includes(currentUserDisplayName))
+    .filter(p=>currentUserRole==='staff' || isMyProjectMember(p.members))
     .map(p=>projectThreadName(p.id));
   const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])]
     .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n));

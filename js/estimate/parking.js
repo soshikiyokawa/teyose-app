@@ -7,9 +7,25 @@ function _memberCandidates(){
   const emp = profs.filter(p=>p.role!=='supplier')
     .map(p=>({name:p.displayName, kind:'社員'}))
     .sort((a,b)=> (typeof cmpEmployee==='function' ? cmpEmployee(a.name,b.name) : a.name.localeCompare(b.name,'ja')));
-  const sup = profs.filter(p=>p.role==='supplier')
-    .map(p=>({name:p.displayName, kind:'業者', supplierName:(suppliers.find(s=>s.id===p.supplierId)?.name)||''}))
+  const supProfs = profs.filter(p=>p.role==='supplier');
+  // アカウントが2つ以上ある発注先は「会社ぜんぶ」も選べるようにする。
+  // 会社名で入れておけば、その会社のアカウント全員が案件を見られるので、
+  // あとから担当者が増えても設定し直さなくてよい。
+  // （アカウントが1つだけの発注先は、これまでどおりその1件だけを出す）
+  const countBySupplier = {};
+  supProfs.forEach(p=>{ if(p.supplierId) countBySupplier[p.supplierId]=(countBySupplier[p.supplierId]||0)+1; });
+  const supCompanies = Object.keys(countBySupplier)
+    .filter(id=>countBySupplier[id]>=2)
+    .map(id=>(suppliers.find(s=>String(s.id)===String(id))?.name)||'')
+    .filter(Boolean)
+    .sort((a,b)=>a.localeCompare(b,'ja'))
+    .map(name=>({name, kind:'発注先（会社ぜんぶ）', note:'この会社のアカウント全員'}));
+  // 担当者を1人だけ入れたいときのために、個人のアカウントも選べるようにしておく
+  const supPeople = supProfs
+    .map(p=>({name:p.displayName, kind:'発注先の担当者', supplierName:(suppliers.find(s=>s.id===p.supplierId)?.name)||''}))
+    .filter(m=>!supCompanies.some(c=>c.name===m.name))   // 会社名と同じ表示名は重ねて出さない
     .sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  const sup = [...supCompanies, ...supPeople];
   // 参加者に居るが候補に無い名前（退職者など）も末尾に出して削除できるようにする
   const known = new Set([...emp,...sup].map(m=>m.name));
   const extra = projectMembers.filter(n=>!known.has(n)).map(n=>({name:n, kind:'その他'}));
@@ -38,7 +54,7 @@ function renderMemberPicker(){
     const on = projectMembers.includes(m.name);
     html += `<button type="button" class="member-row${on?' on':''}" onclick="toggleProjectMember('${m.name.replace(/'/g,"\\'")}')">
       <span class="member-check">${on?'✓':''}</span>
-      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}${m.supplierName?`<span style="font-size:11px;color:var(--text-muted)">（${esc(m.supplierName)}）</span>`:''}</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}${m.supplierName?`<span style="font-size:11px;color:var(--text-muted)">（${esc(m.supplierName)}）</span>`:''}${m.note?`<span style="font-size:11px;color:var(--text-muted)">　${esc(m.note)}</span>`:''}</span>
     </button>`;
   });
   el.innerHTML = html;

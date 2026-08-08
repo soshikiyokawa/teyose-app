@@ -62,7 +62,7 @@ async function fetchAllData(){
     // 業者：参加している案件だけ取得（RLSで自動的に絞られる）。案件情報の表示にも使う
     const { data: projectRows } = await sb.from('projects').select('*');
     projects = (projectRows||[])
-      .filter(r=>(r.members||[]).includes(currentUserDisplayName))
+      .filter(r=>isMyProjectMember(r.members))
       .map(r=>({id:r.id,name:r.name,type:r.type||'',address:r.address||'',note:r.note||'',
         startDate:r.start_date||'',endDate:r.end_date||'',actualStartDate:r.actual_start_date||'',handoverDate:r.handover_date||'',
         mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',
@@ -561,7 +561,7 @@ async function dbAddChatMessage(supplierName, msg){
   if(isProject){
     // 案件チャット：参加メンバー（自分以外）へ通知
     const proj = projects.find(p=>p.id===project_id);
-    const names = (proj?.members||[]).filter(n=>n!==currentUserDisplayName);
+    const names = otherMemberNames(proj?.members);
     if(names.length) dbSendPushToNames(names, `${supplierName} ${currentUserDisplayName||''}`, preview, null).catch(()=>{});
   } else if(isInternal){
     const title = `${INTERNAL_THREAD} ${currentUserDisplayName||''}`;

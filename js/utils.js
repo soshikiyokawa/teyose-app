@@ -11,6 +11,29 @@ function payAmtLoad(id, val){
   el.value = val ? Number(val).toLocaleString('ja-JP') : '';
 }
 function payAmtVal(id){ return parseFloat((document.getElementById(id)?.value||'').replace(/,/g,''))||0; }
+
+// ════ 案件の参加メンバー（1つの発注先に複数のアカウントがある場合に使う） ════
+// 案件のメンバーには、社員は表示名、発注先は「会社名」または担当者の表示名が入る。
+// 発注先は会社名でも自分の表示名でも通るようにして、会社名だけ入れておけば
+// その会社のアカウント全員が見られるようにする（SQL側の app_is_project_member と同じ考え方）。
+function myMemberNames(){
+  const names = [currentUserDisplayName].filter(Boolean);
+  if(currentUserRole==='supplier'){
+    const sup = (typeof suppliers!=='undefined' ? suppliers : [])
+      .find(s=>s.id===currentUserSupplierId);
+    if(sup?.name) names.push(sup.name);
+  }
+  return names;
+}
+function isMyProjectMember(members){
+  const mine = myMemberNames();
+  return (members||[]).some(n=>mine.includes(n));
+}
+// 案件チャットの通知先（参加メンバーから自分＝表示名も会社名も除く）
+function otherMemberNames(members){
+  const mine = myMemberNames();
+  return (members||[]).filter(n=>!mine.includes(n));
+}
 const COMPANY = {name:'株式会社きよかわ',zip:'〒731-0221',address:'広島県広島市安佐北区可部2-13-31-1',tel:'082-815-6080',fax:'082-815-6081',regNo:'T9-2400-0101-8389',url:'kiyokawanoie.com'};
 
 function showToast(msg, duration=2000){

@@ -37,6 +37,14 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     const { data: profiles } = await admin.from("profiles").select("id, role, supplier_id, display_name");
+
+    // 表示名で宛先を指定するとき（案件チャットなど）は、発注先の「会社名」でも届くようにする。
+    // 1つの発注先に担当者が何人かいる場合、会社名で指定すればその会社の全員に届く。
+    let supplierNameById: Record<string, string> = {};
+    if (targetRole === "names") {
+      const { data: sups } = await admin.from("suppliers").select("id, name");
+      for (const sp of sups || []) supplierNameById[String(sp.id)] = sp.name || "";
+    }
     const targetUserIds = (profiles || [])
       .filter((p: any) => {
         if (excludeUserId && p.id === excludeUserId) return false; // 送信者自身は除外（社内チャットなど）
@@ -44,7 +52,13 @@ Deno.serve(async (req) => {
         if (targetRole === "employee") return p.role === "staff" || p.role === "carpenter"; // 社員全員（社内チャット）
         if (targetRole === "supplier") return p.role === "supplier" && p.supplier_id === targetSupplierId;
         if (targetRole === "user") return p.id === targetUserId; // 特定ユーザー宛（有給承認結果など）
-        if (targetRole === "names") return Array.isArray(targetNames) && targetNames.includes(p.display_name); // 表示名指定（残業承認者など）
+        if (targetRole === "names") {
+          // 表示名指定（残業承認者など）。発注先は所属している会社名でも一致させる
+          if (!Array.isArray(targetNames)) return false;
+          if (targetNames.includes(p.display_name)) return true;
+          return p.role === "supplier" && p.supplier_id != null
+            && targetNames.includes(supplierNameById[String(p.supplier_id)]);
+        }
         return false;
       })
       .map((p: any) => p.id);
