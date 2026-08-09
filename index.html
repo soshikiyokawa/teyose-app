@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=290">
+<link rel="stylesheet" href="css/main.css?v=291">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -2072,8 +2072,10 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
       <select id="tt-type" onchange="setTtWorkType(this.value)" style="flex:1;font-size:12px"></select>
+      <button class="btn xs" id="tt-sort-btn" onclick="ttSortByTimeline()" style="flex-shrink:0" title="節目と工程の日付の順に並べ直す">時系列に並べ直す</button>
       <button class="btn xs primary" onclick="openTemplateNew()" style="flex-shrink:0">＋ 追加</button>
     </div>
+    <div style="font-size:10px;color:var(--text-muted);margin-bottom:6px">▲▼で手直しできます。並べ直したあとも、直した順はそのまま残ります。</div>
     <div id="tt-list" style="max-height:52vh;overflow-y:auto"></div>
     <div class="modal-actions"><button class="btn primary" onclick="closeTaskTemplates()">閉じる</button></div>
   </div>
@@ -2507,7 +2509,7 @@
 <!-- 認証（ログイン・ログアウト・権限） -->
 <script src="js/notifications.js?v=279"></script>
 <script src="js/tasks.js?v=287"></script>
-<script src="js/task-templates.js?v=289"></script>
+<script src="js/task-templates.js?v=291"></script>
 <script src="js/auth.js?v=282"></script>
 <script src="js/account.js?v=275"></script>
 </body>

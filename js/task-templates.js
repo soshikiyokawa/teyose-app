@@ -72,6 +72,97 @@ function ttAnchorLabel(a){
   return n===0 ? `${where}` : n<0 ? `${where}の${-n}日前` : `${where}の${n}日後`;
 }
 
+// ════ 並び順 ════
+//
+// 基本は時系列（マイルストーン順・工程順）。
+// 「時系列に並べ直す」を押すと、見本の工程表を使って基準日を出し、
+// そこにずらし日数を足した日付の順に並べ直して、その順を保存する。
+// そのあと ↑↓ で手直しでき、直した順はそのまま残る。
+//
+// 見本の工程表 … その工事区分の案件のうち、いちばん新しく更新された工程表。
+//                 これが無ければ節目の並び順（契約日→…→引渡日）で代用する。
+
+// その工事区分の定型タスクを、並び順どおりに取り出す
+function ttOrdered(workType){
+  return taskTemplates.filter(t=>t.workType===workType)
+    .sort((a,b)=>a.sortOrder-b.sortOrder || a.id-b.id);
+}
+
+// 節目の並びでの位置（無いものは末尾）
+function ttMilestoneIndex(name){
+  const i = ttMilestoneLabels().indexOf(name);
+  return i<0 ? 900 : i;
+}
+
+// 並べ替えに使う値。見本の工程表があれば実際の日付、無ければ節目の並び順
+function ttSortKey(t, sched){
+  const due = sched ? ttDueDate(t, sched) : '';
+  if(due) return ['A', due, 0];
+  if(t.anchorKind==='milestone') return ['B', String(ttMilestoneIndex(t.anchorName)).padStart(3,'0'), Number(t.offsetDays)||0];
+  if(t.anchorKind==='schedule')  return ['C', t.anchorName||'', Number(t.offsetDays)||0];
+  return ['D', '', 0];   // 基準なしは最後
+}
+function ttCompare(a, b, sched){
+  const ka=ttSortKey(a,sched), kb=ttSortKey(b,sched);
+  if(ka[0]!==kb[0]) return ka[0]<kb[0] ? -1 : 1;
+  if(ka[1]!==kb[1]) return String(ka[1]).localeCompare(String(kb[1]),'ja');
+  if(ka[2]!==kb[2]) return ka[2]-kb[2];
+  return String(a.title).localeCompare(String(b.title),'ja');
+}
+
+// 見本にする工程表を1つ取ってくる（その工事区分の案件のうち、いちばん新しいもの）
+async function ttReferenceSchedule(workType){
+  const names=(projects||[]).filter(p=>(p.type||'')===workType).map(p=>p.name).filter(Boolean);
+  if(!names.length) return null;
+  const { data } = await sb.from('schedules').select('tasks, milestones, updated_at')
+    .in('project_name', names).order('updated_at',{ascending:false}).limit(1);
+  const row=(data||[])[0];
+  return row ? {tasks:row.tasks||[], milestones:row.milestones||{}} : null;
+}
+
+// 時系列に並べ直して、その順を保存する
+async function ttSortByTimeline(){
+  const list=ttOrdered(ttWorkType);
+  if(list.length<2){ showToast('並べ替えるものがありません'); return; }
+  const btn=document.getElementById('tt-sort-btn');
+  if(btn){ btn.disabled=true; btn.textContent='並べ替え中…'; }
+  let sched=null;
+  try{ sched=await ttReferenceSchedule(ttWorkType); }catch(_){}
+  const sorted=[...list].sort((a,b)=>ttCompare(a,b,sched));
+  for(let i=0;i<sorted.length;i++){
+    const order=(i+1)*10;
+    if(sorted[i].sortOrder===order) continue;
+    const { error } = await sb.from('task_templates').update({sort_order:order}).eq('id',sorted[i].id);
+    if(error){ showToast('並べ替えに失敗しました：'+error.message); break; }
+    sorted[i].sortOrder=order;
+  }
+  if(btn){ btn.disabled=false; btn.textContent='時系列に並べ直す'; }
+  renderTaskTemplates();
+  showToast(sched ? '工程表に合わせて並べ直しました' : '節目の順に並べ直しました');
+}
+
+// ↑↓ で手直しする（隣と入れ替える）
+async function moveTemplate(id, dir){
+  const list=ttOrdered(ttWorkType);
+  const i=list.findIndex(t=>t.id===id);
+  const j=i+dir;
+  if(i<0 || j<0 || j>=list.length) return;
+  const a=list[i], b=list[j];
+  // 同じ値だと入れ替わらないので、並びに沿って番号を振り直してから交換する
+  if(a.sortOrder===b.sortOrder){
+    for(let k=0;k<list.length;k++) list[k].sortOrder=(k+1)*10;
+  }
+  const av=a.sortOrder, bv=b.sortOrder;
+  a.sortOrder=bv; b.sortOrder=av;
+  const r1=await sb.from('task_templates').update({sort_order:a.sortOrder}).eq('id',a.id);
+  const r2=await sb.from('task_templates').update({sort_order:b.sortOrder}).eq('id',b.id);
+  if(r1.error||r2.error){
+    showToast('並べ替えに失敗しました：'+((r1.error||r2.error).message));
+    a.sortOrder=av; b.sortOrder=bv;
+  }
+  renderTaskTemplates();
+}
+
 // ── 定型タスクの一覧（管理者のみ） ──
 function openTaskTemplates(){
   if(currentUserRole!=='staff'){ showToast('定型タスクを触れるのは管理者だけです'); return; }
@@ -96,20 +187,24 @@ function renderTaskTemplates(){
     wrap.innerHTML='<div class="empty">定型タスクの準備ができていません。管理者にお問い合わせください</div>';
     return;
   }
-  const list=taskTemplates.filter(t=>t.workType===ttWorkType);
+  const list=ttOrdered(ttWorkType);
   if(!list.length){
     wrap.innerHTML='<div class="empty">この工事区分の定型タスクはまだありません</div>';
     return;
   }
-  wrap.innerHTML=list.map(t=>`
-    <div class="task-row" style="cursor:pointer" onclick="openTemplateEdit(${t.id})">
-      <div class="task-main">
-        <div class="task-title">${esc(t.title)}</div>
+  wrap.innerHTML=list.map((t,i)=>`
+    <div class="task-row">
+      <div class="task-main" onclick="openTemplateEdit(${t.id})">
+        <div class="task-title"><span class="tt-no">${i+1}</span>${esc(t.title)}</div>
         <div class="task-meta">
           <span class="task-due ${t.anchorKind==='none'?'none':''}">${esc(ttAnchorLabel(t))}</span>
           ${t.checklist.length?`<span class="task-cl">${t.checklist.length}項目</span>`:''}
           ${t.assignees.length?`<span class="task-asg">${t.assignees.map(esc).join('、')}</span>`:''}
         </div>
+      </div>
+      <div class="tt-move">
+        <button type="button" class="tt-move-btn" onclick="moveTemplate(${t.id},-1)" ${i===0?'disabled':''} title="上へ">▲</button>
+        <button type="button" class="tt-move-btn" onclick="moveTemplate(${t.id},1)" ${i===list.length-1?'disabled':''} title="下へ">▼</button>
       </div>
     </div>`).join('');
 }
@@ -246,7 +341,7 @@ async function saveTemplate(){
     offset_days: Number(document.getElementById('tte-offset').value)||0,
     sort_order: editingTemplateId
       ? (taskTemplates.find(t=>t.id===editingTemplateId)?.sortOrder||0)
-      : (taskTemplates.filter(t=>t.workType===ttWorkType).length+1)*10
+      : Math.max(0, ...taskTemplates.filter(t=>t.workType===ttWorkType).map(t=>t.sortOrder)) + 10
   };
   const q = editingTemplateId
     ? sb.from('task_templates').update(row).eq('id',editingTemplateId)
@@ -321,7 +416,7 @@ async function taApplyProjectChanged(v){
 
 function renderTaskApplyList(){
   const wrap=document.getElementById('ta-list');
-  const list=taskTemplates.filter(t=>t.workType===ttWorkType);
+  const list=ttOrdered(ttWorkType);
   if(!list.length){
     wrap.innerHTML=`<div class="empty">工事区分「${esc(ttWorkType)}」の定型タスクがありません</div>`;
     return;
@@ -349,7 +444,7 @@ function toggleTaskApply(id){
 
 async function doTaskApply(){
   if(!ttApplyProjectId){ showToast('案件を選んでください'); return; }
-  const list=taskTemplates.filter(t=>t.workType===ttWorkType && ttApplyPick.includes(t.id));
+  const list=ttOrdered(ttWorkType).filter(t=>ttApplyPick.includes(t.id));
   if(!list.length){ showToast('取り込むタスクを選んでください'); return; }
 
   const rows=list.map(t=>{
