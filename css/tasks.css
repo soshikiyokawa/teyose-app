@@ -54,3 +54,9 @@
 .task-ho-note{ font-size:11px; color:var(--text); line-height:1.6; margin-top:2px; }
 /* チェックリストの「誰がいつ済にしたか」 */
 .task-cl-by{ font-size:10px; color:var(--text-muted); margin-left:6px; font-weight:400; }
+/* 引き継ぎ元へ返したぶん */
+.task-ho-row.back{ border-left-color:#1f6f8b; }
+.task-ho-back{
+  font-size:9px; font-weight:700; padding:0 5px; border-radius:99px;
+  background:#e8f2f6; color:#1f6f8b; margin-left:5px;
+}

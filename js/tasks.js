@@ -16,6 +16,7 @@ let taskAssignees = [];           // 編集中のタスクの担当者
 let taskChecklist = [];           // 編集中のチェックリスト [{id,text,done,by,at}]
 let taskHandoffs = [];            // 編集中のタスクの引き継ぎ履歴（読むだけ）
 let handoffTo = [];               // 引き継ぎ先に選んだ人
+let handoffMode = 'handoff';      // handoff＝引き継ぐ（社員） / return＝引き継ぎ元へ返す（発注先）
 
 async function fetchTasks(){
   const { data, error } = await sb.from('tasks').select('*')
@@ -187,6 +188,7 @@ function openTaskNew(){
   document.getElementById('task-assignee-add').style.display='';
   document.getElementById('task-delete-btn').style.display='none';
   document.getElementById('task-handoff-btn').style.display='none';   // 新しく作るときは引き継げない
+  document.getElementById('task-return-btn').style.display='none';
   renderTaskHandoffs();
   document.getElementById('task-modal').classList.add('open');
   setTimeout(()=>document.getElementById('task-title').focus(),100);
@@ -212,8 +214,16 @@ function openTaskEdit(id){
     const el=document.getElementById(i); if(el) el.disabled=ro;
   });
   document.getElementById('task-assignee-add').style.display = ro ? 'none' : '';
-  // 引き継げるのはきよかわの社員だけ（発注先は担当者を変えられない）
-  document.getElementById('task-handoff-btn').style.display = (taskCanEdit() && t.status!=='done') ? '' : 'none';
+  // 社員は「引き継ぐ」。発注先は「引き継ぎ元へ返す」だけできる
+  const hoBtn=document.getElementById('task-handoff-btn');
+  const retBtn=document.getElementById('task-return-btn');
+  hoBtn.style.display = (taskCanEdit() && t.status!=='done') ? '' : 'none';
+  if(canReturnTask(t)){
+    retBtn.style.display='';
+    retBtn.textContent=`${taskReturnTarget(t)}さんに返す`;
+  } else {
+    retBtn.style.display='none';
+  }
   renderTaskHandoffs();
   document.getElementById('task-modal').classList.add('open');
 }
@@ -324,23 +334,64 @@ function renderTaskHandoffs(){
   wrap.innerHTML = '<div class="section-lbl" style="margin:2px 0 4px">引き継ぎの記録</div>' +
     taskHandoffs.map(h=>{
       const when=(d=>isNaN(d)?'':`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`)(new Date(h.at));
-      return `<div class="task-ho-row">
-        <div class="task-ho-line"><b>${esc(h.from||'—')}</b> → <b>${esc((h.to||[]).join('、')||'—')}</b>
+      return `<div class="task-ho-row${h.kind==='return'?' back':''}">
+        <div class="task-ho-line"><b>${esc(h.from||'—')}</b> ${h.kind==='return'?'↩':'→'} <b>${esc((h.to||[]).join('、')||'—')}</b>${h.kind==='return'?'<span class="task-ho-back">返却</span>':''}
           <span class="task-ho-when">${when}${h.total?`　${h.done}/${h.total} まで`:''}</span></div>
         ${h.note?`<div class="task-ho-note">${esc(h.note)}</div>`:''}
       </div>`;
     }).join('');
 }
 
+// 発注先が「返す」相手。自分に引き継いだ人のうちいちばん新しいもの、
+// 引き継ぎがまだ無ければタスクを作った人。ほかの人には回せない
+// （SQL側の task_return_target と同じ決まりにしてある）
+function taskReturnTarget(t){
+  const mine = myMemberNames();
+  const hs = t?.handoffs || [];
+  for(let i=hs.length-1; i>=0; i--){
+    const h = hs[i];
+    if((h.to||[]).some(n=>mine.includes(n)) && h.from) return h.from;
+  }
+  return t?.createdBy || '';
+}
+// 発注先が返せる状態か（自分が担当で、返す相手がいて、まだ済んでいない）
+function canReturnTask(t){
+  return !taskCanEdit() && !!t && t.status!=='done' && isMyTask(t) && !!taskReturnTarget(t);
+}
+
 function openTaskHandoff(){
   if(!editingTodoId || !taskCanEdit()) return;
+  handoffMode='handoff';
   handoffTo=[];
+  showHandoffModal('タスクを引き継ぐ',
+    'いまの進み具合とひとことを添えて、その先を別の人に渡します。渡した記録はタスクに残ります。');
+}
+
+// 発注先：自分に渡してきた人へ返す（相手は決まっているので選ばせない）
+function openTaskReturn(){
+  const t=tasks.find(x=>x.id===editingTodoId);
+  if(!canReturnTask(t)) return;
+  handoffMode='return';
+  handoffTo=[taskReturnTarget(t)];
+  showHandoffModal(`${handoffTo[0]}さんに返す`,
+    'こちらの分が終わったことを、引き継いでくれた方に伝えて返します。ほかの方には回せません。');
+}
+
+function showHandoffModal(title, lead){
+  const ret = handoffMode==='return';
+  document.getElementById('ho-title').textContent=title;
+  document.getElementById('ho-lead').textContent=lead;
   const done=taskChecklist.filter(c=>c.done).length;
   document.getElementById('ho-progress').textContent =
     taskChecklist.length ? `いまの進み具合：${done}/${taskChecklist.length} 完了` : 'チェックリストはありません';
   document.getElementById('ho-note').value='';
   document.getElementById('ho-due').value=document.getElementById('task-due').value||'';
   document.getElementById('ho-keep-me').checked=false;
+  // 返す場合は、相手も期限も変えられない（発注先が変えられるのは担当者を返すことだけ）
+  document.getElementById('ho-picker').style.display = ret ? 'none' : '';
+  document.getElementById('ho-to-label').textContent = ret ? '返す先' : '引き継ぎ先 *';
+  document.getElementById('ho-options').style.display = ret ? 'none' : '';
+  document.getElementById('ho-go').textContent = ret ? '返す' : '引き継ぐ';
   renderHandoffTo();
   document.getElementById('task-handoff-modal').classList.add('open');
 }
@@ -352,7 +403,7 @@ function renderHandoffTo(){
     ? handoffTo.map(n=>`<span class="member-tag">${esc(n)}</span>`).join('')
     : '<span style="color:var(--text-muted);font-size:11px">選んでください</span>';
   const el=document.getElementById('ho-picker');
-  if(!el) return;
+  if(!el || handoffMode==='return') return;   // 返す先は決まっているので候補は出さない
   const cands=(typeof _memberCandidates==='function') ? _memberCandidates() : [];
   let html='', lastKind='';
   cands.forEach(m=>{
@@ -373,19 +424,20 @@ function toggleHandoffTo(name){
 
 async function doTaskHandoff(){
   if(!editingTodoId) return;
-  if(!handoffTo.length){ showToast('引き継ぎ先を選んでください'); return; }
+  const ret = handoffMode==='return';
+  if(!handoffTo.length){ showToast(ret?'返す相手が分かりません':'引き継ぎ先を選んでください'); return; }
   const t=tasks.find(x=>x.id===editingTodoId);
   if(!t) return;
 
   const note=document.getElementById('ho-note').value.trim();
   const due=document.getElementById('ho-due').value||null;
-  const keepMe=document.getElementById('ho-keep-me').checked;
+  const keepMe=!ret && document.getElementById('ho-keep-me').checked;
   const done=taskChecklist.filter(c=>c.done).length;
 
   // 自分を担当に残すかどうか。残さない場合は引き継ぎ先だけが担当になる
   const mine=myMemberNames();
   const keep = keepMe ? taskAssignees.filter(n=>mine.includes(n)) : [];
-  const next = [...new Set([...keep, ...handoffTo])];
+  const next = ret ? [...handoffTo] : [...new Set([...keep, ...handoffTo])];
 
   const entry={
     at:new Date().toISOString(),
@@ -395,19 +447,29 @@ async function doTaskHandoff(){
     done,
     total:taskChecklist.length
   };
+  if(ret) entry.kind='return';
   const handoffs=[...taskHandoffs, entry];
 
-  const { error } = await sb.from('tasks').update({
-    assignees:next, due_date:due, checklist:taskChecklist, handoffs
-  }).eq('id',editingTodoId);
-  if(error){ showToast('引き継ぎに失敗しました：'+error.message); return; }
+  // 返す場合は task_return を呼ぶ。返すと自分から見えなくなる行になるので、
+  // ふつうの更新では書けない。返す相手と履歴の中身はSupabase側で決まる
+  let error;
+  if(ret){
+    ({ error } = await sb.rpc('task_return', {
+      p_id: editingTodoId, p_note: note, p_checklist: taskChecklist
+    }));
+  } else {
+    ({ error } = await sb.from('tasks')
+      .update({assignees:next, due_date:due, checklist:taskChecklist, handoffs})
+      .eq('id',editingTodoId));
+  }
+  if(error){ showToast((ret?'返すのに失敗しました：':'引き継ぎに失敗しました：')+error.message); return; }
 
-  // 引き継ぎ先に知らせる（自分あてには送らない）
+  // 引き継ぎ先（返す先）に知らせる（自分あてには送らない）
   const notify=handoffTo.filter(n=>!mine.includes(n));
   if(notify.length){
-    const dueTxt = due ? `期限 ${due.replace(/-/g,'/')}` : '期限なし';
+    const dueTxt = (ret ? t.dueDate : due) ? `期限 ${String(ret?t.dueDate:due).replace(/-/g,'/')}` : '期限なし';
     const prog = taskChecklist.length ? `${done}/${taskChecklist.length}まで完了` : '';
-    dbSendPushToNames(notify, 'タスクを引き継ぎました',
+    dbSendPushToNames(notify, ret?'タスクが返ってきました':'タスクを引き継ぎました',
       `${t.title}（${[dueTxt, prog].filter(Boolean).join('・')}）${currentUserDisplayName?' — '+currentUserDisplayName:''}${note?'：'+note:''}`,
       'task').catch(()=>{});
   }
@@ -415,7 +477,7 @@ async function doTaskHandoff(){
   closeTaskHandoff();
   closeTaskModal();
   await refreshTasks();
-  showToast(`${handoffTo.join('、')}さんに引き継ぎました`);
+  showToast(ret ? `${handoffTo.join('、')}さんに返しました` : `${handoffTo.join('、')}さんに引き継ぎました`);
 }
 
 // ── 保存・削除 ──
