@@ -17,7 +17,7 @@ let editingTemplateId = null;
 // 工程表の節目（js/schedule.js の MILESTONE_LABELS と同じもの）
 function ttMilestoneLabels(){
   return (typeof MILESTONE_LABELS!=='undefined') ? MILESTONE_LABELS
-    : ['確認済証発行日','着工日','配筋検査日','上棟日','中間検査日','木完日','完了検査日','社内検査日','見学会','引渡日'];
+    : ['契約日','確認済証発行日','着工日','配筋検査日','上棟日','中間検査日','木完日','完了検査日','社内検査日','見学会','引渡日'];
 }
 // 工事区分の一覧（見積の区分をそのまま使う）
 function ttWorkTypes(){

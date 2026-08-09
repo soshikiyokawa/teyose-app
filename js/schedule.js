@@ -11,7 +11,7 @@ const GANTT_COLORS = [
 let scheduleTasks     = [];
 
 // ─ マイルストーン（工程表の節目。この順で表示・入力する） ─
-const MILESTONE_LABELS = ['確認済証発行日','着工日','配筋検査日','上棟日','中間検査日','木完日','完了検査日','社内検査日','見学会','引渡日'];
+const MILESTONE_LABELS = ['契約日','確認済証発行日','着工日','配筋検査日','上棟日','中間検査日','木完日','完了検査日','社内検査日','見学会','引渡日'];
 let scheduleMilestones = {};   // {ラベル: 'YYYY-MM-DD'}
 let scheduleTaskSeq   = 1;
 let editingScheduleId = null;
