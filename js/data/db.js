@@ -83,6 +83,10 @@ async function fetchAllData(){
   try{ await fetchMyNotifications(); }catch(_){ notificationsReady=false; }
   // タスク（表がまだ無くても落とさない）
   try{ await fetchTasks(); }catch(_){ tasksReady=false; }
+  // 定型タスク（社員のみ。表がまだ無くても落とさない）
+  if(currentUserRole==='staff'||currentUserRole==='carpenter'){
+    try{ await fetchTaskTemplates(); }catch(_){ taskTemplatesReady=false; }
+  }
 
   // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
@@ -1110,6 +1114,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'inspection_records'}, ()=>refetchAndRerender('inspections'))
     .on('postgres_changes',{event:'*',schema:'public',table:'notifications'}, ()=>refreshNotifications())
     .on('postgres_changes',{event:'*',schema:'public',table:'tasks'}, ()=>refreshTasks())
+    .on('postgres_changes',{event:'*',schema:'public',table:'task_templates'}, ()=>refreshTaskTemplates())
     .subscribe();
 }
 

@@ -102,6 +102,11 @@ async function saveSchedule() {
   scheduleDirty = false;
   showToast('工程表を保存しました');
   _notifySchedulePersons(pName);
+  // 定型から取り込んだタスクの期限を、いまの工程表に合わせて直す
+  if(typeof syncTaskDuesForProject === 'function'){
+    syncTaskDuesForProject(pName, {tasks: scheduleTasks, milestones: scheduleMilestones})
+      .catch(e=>console.warn('タスクの期限の更新に失敗しました', e));
+  }
 }
 
 function _notifySchedulePersons(pName) {

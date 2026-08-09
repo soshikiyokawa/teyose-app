@@ -27,6 +27,8 @@ async function fetchTasks(){
     id:r.id, title:r.title||'', detail:r.detail||'', projectId:r.project_id||null,
     assignees:r.assignees||[], dueDate:r.due_date||'', status:r.status||'open',
     checklist:r.checklist||[], handoffs:r.handoffs||[], createdBy:r.created_by||'',
+    templateId:r.template_id||null, anchorKind:r.anchor_kind||'none', anchorName:r.anchor_name||'',
+    anchorPoint:r.anchor_point||'start', offsetDays:Number(r.offset_days)||0, autoDue:!!r.auto_due,
     doneAt:r.done_at||null, doneBy:r.done_by||'', createdAt:r.created_at, updatedAt:r.updated_at
   }));
 }

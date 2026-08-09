@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=286">
+<link rel="stylesheet" href="css/main.css?v=287">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -1118,6 +1118,8 @@
       <span class="card-head-title">タスク</span>
       <span id="task-count" style="font-size:11px;color:var(--text-muted)"></span>
       <div style="flex:1"></div>
+      <button class="btn sm employee-only" onclick="openTaskApply()" title="定型タスクを案件に取り込む">取り込む</button>
+      <button class="btn sm staff-only" onclick="openTaskTemplates()" title="工事区分ごとの定型タスク">定型</button>
       <button class="btn sm primary employee-only" onclick="openTaskNew()">＋ 追加</button>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px">
@@ -2060,6 +2062,102 @@
 </div>
 
 <!-- アカウント設定（本人がパスワードを変える） -->
+<!-- 定型タスク：工事区分ごとの決まったやること（管理者のみ） -->
+<div class="modal-overlay" id="tt-modal" onclick="if(event.target.id==='tt-modal')closeTaskTemplates()">
+  <div class="modal-sheet">
+    <h3>定型タスク</h3>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+      工事区分ごとに「いつも決まってやること」を登録しておきます。期限は工程表の節目や工程の日付から決まり、工程表を直すと付いて動きます。
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <select id="tt-type" onchange="setTtWorkType(this.value)" style="flex:1;font-size:12px"></select>
+      <button class="btn xs primary" onclick="openTemplateNew()" style="flex-shrink:0">＋ 追加</button>
+    </div>
+    <div id="tt-list" style="max-height:52vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeTaskTemplates()">閉じる</button></div>
+  </div>
+</div>
+
+<!-- 定型タスクの追加・編集 -->
+<div class="modal-overlay" id="tt-edit-modal" onclick="if(event.target.id==='tt-edit-modal')closeTemplateEdit()">
+  <div class="modal-sheet">
+    <h3 id="tt-edit-title">定型タスクを追加</h3>
+    <div class="fg" style="margin-bottom:8px"><label>やること <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="tte-title" placeholder="例：確認申請の提出書類をそろえる" maxlength="120"></div>
+    <div class="fg" style="margin-bottom:8px"><label>メモ</label>
+      <textarea id="tte-detail" rows="2" placeholder="補足があれば" style="resize:vertical;width:100%;box-sizing:border-box"></textarea></div>
+
+    <div class="section-lbl" style="margin:10px 0 4px">期限の決め方</div>
+    <div class="fg" style="margin-bottom:8px"><label>何を基準にするか</label>
+      <select id="tte-anchor-kind" onchange="ttAnchorKindChanged()">
+        <option value="milestone">工程表の節目（着工日・上棟日など）</option>
+        <option value="schedule">工程表の工程（名前で指定）</option>
+        <option value="none">基準なし（期限は空のまま）</option>
+      </select></div>
+    <div class="fg" id="tte-milestone-wrap" style="margin-bottom:8px"><label>節目</label>
+      <select id="tte-milestone"></select></div>
+    <div id="tte-schedule-wrap" style="display:none">
+      <div class="fg" style="margin-bottom:8px"><label>工程の名前（工程表と同じ言葉で）</label>
+        <input type="text" id="tte-schedule-name" placeholder="例：基礎工事" maxlength="60"></div>
+      <div class="fg" style="margin-bottom:8px"><label>その工程の</label>
+        <select id="tte-point"><option value="start">開始日</option><option value="end">完了日</option></select></div>
+    </div>
+    <div class="fg" id="tte-offset-wrap" style="margin-bottom:8px"><label>そこから何日ずらすか（マイナスで◯日前）</label>
+      <input type="number" id="tte-offset" value="0" step="1" style="width:100px"></div>
+
+    <div class="fg" style="margin-bottom:8px">
+      <label>担当者（決めておくなら）</label>
+      <div style="display:flex;align-items:flex-start;gap:6px">
+        <div id="tte-assignees" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center"></div>
+        <button class="btn xs" onclick="openTtAssigneePicker()" style="flex-shrink:0">選ぶ</button>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:8px">
+      <label>チェックリスト</label>
+      <div id="tte-checklist" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px"></div>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="tte-cl-input" placeholder="項目を足す" maxlength="80"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addTtClItem();}" style="flex:1;min-width:0">
+        <button class="btn xs" onclick="addTtClItem()" style="flex-shrink:0">追加</button>
+      </div>
+    </div>
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+      <button class="btn" id="tt-delete-btn" onclick="deleteTemplate()" style="display:none;color:var(--danger)">削除</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeTemplateEdit()">閉じる</button>
+      <button class="btn primary" onclick="saveTemplate()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 定型タスクの担当者を選ぶ -->
+<div class="modal-overlay" id="tt-assignee-modal" onclick="if(event.target.id==='tt-assignee-modal')closeTtAssigneePicker()">
+  <div class="modal-sheet">
+    <h3>担当者を選ぶ</h3>
+    <div id="tt-assignee-picker" style="max-height:55vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeTtAssigneePicker()">決定</button></div>
+  </div>
+</div>
+
+<!-- 定型タスクを案件に取り込む -->
+<div class="modal-overlay" id="tt-apply-modal" onclick="if(event.target.id==='tt-apply-modal')closeTaskApply()">
+  <div class="modal-sheet">
+    <h3>定型タスクを取り込む</h3>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+      案件の工事区分に合う定型タスクを、まとめてタスクに足します。期限はその案件の工程表から決まります。
+    </div>
+    <div class="fg" style="margin-bottom:8px"><label>案件</label>
+      <select id="ta-project" onchange="taApplyProjectChanged(this.value)"></select></div>
+    <div id="ta-note" style="font-size:11px;color:var(--text-sub);margin-bottom:6px"></div>
+    <div id="ta-list" style="max-height:46vh;overflow-y:auto"></div>
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeTaskApply()">やめる</button>
+      <button class="btn primary" onclick="doTaskApply()">取り込む</button>
+    </div>
+  </div>
+</div>
+
 <!-- タスクの追加・編集 -->
 <div class="modal-overlay" id="task-modal" onclick="if(event.target.id==='task-modal')closeTaskModal()">
   <div class="modal-sheet">
@@ -2341,7 +2439,7 @@
 <script src="js/state.js?v=245"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=282"></script>
+<script src="js/data/db.js?v=287"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=282"></script>
@@ -2372,7 +2470,7 @@
 <script src="js/chusho.js?v=248"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=183"></script>
+<script src="js/schedule.js?v=287"></script>
 
 <!-- 受発注 -->
 <script src="js/order/supplier-master.js?v=202"></script>
@@ -2407,7 +2505,8 @@
 
 <!-- 認証（ログイン・ログアウト・権限） -->
 <script src="js/notifications.js?v=279"></script>
-<script src="js/tasks.js?v=286"></script>
+<script src="js/tasks.js?v=287"></script>
+<script src="js/task-templates.js?v=287"></script>
 <script src="js/auth.js?v=282"></script>
 <script src="js/account.js?v=275"></script>
 </body>
