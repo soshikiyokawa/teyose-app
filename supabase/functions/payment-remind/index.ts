@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const lates: Late[] = [];
     for (const e of newest.values()) {
       // 受注前（下書き・提出済み）の見積は督促の対象にしない
-      if (e.status !== "approved" && e.status !== "completed") continue;
+      if (!["approved", "construction", "completed"].includes(e.status)) continue;
       for (const p of (e.payments || [])) {
         const amount = Number(p?.amount) || 0;
         const actual = Number(p?.actualAmount) || 0;

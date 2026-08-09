@@ -27,5 +27,5 @@ function updateEstBadge(){
   const s=document.getElementById('est-status').value;
   const b=document.getElementById('est-badge');
   b.className='badge '+s;
-  b.textContent=s==='draft'?'下書き':s==='sent'?'提出済み':s==='approved'?'受注':'完工';
+  b.textContent=(typeof estStatusLabel==='function') ? estStatusLabel(s) : s;
 }

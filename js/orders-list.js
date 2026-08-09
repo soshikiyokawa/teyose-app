@@ -144,10 +144,11 @@ function olPayBadge(est){
 }
 
 const OL_STATUS = {
-  draft:    {label:'下書き', cls:'draft'},
-  sent:     {label:'提出済', cls:'sent'},
-  approved: {label:'受注',   cls:'approved'},
-  completed:{label:'完工',   cls:'completed'}
+  draft:       {label:'下書き', cls:'draft'},
+  sent:        {label:'提出済', cls:'sent'},
+  approved:    {label:'受注',   cls:'approved'},
+  construction:{label:'工事中', cls:'construction'},
+  completed:   {label:'完工',   cls:'completed'}
 };
 
 // 絞り込みの選択肢を作る（チェックを入れた分だけ表示する形）
@@ -535,7 +536,7 @@ async function saveOlField(estId, field, value){
 // 印刷の見出しに出す絞り込み条件
 function olFilterLabel(){
   const parts=[];
-  // 選んだ順ではなく、いつもの並び（下書き→提出済→受注→完工／年度は新しい順）で書く
+  // 選んだ順ではなく、いつもの並び（下書き→提出済→受注→工事中→完工／年度は新しい順）で書く
   if(olFilterStatus.length) parts.push(Object.keys(OL_STATUS).filter(k=>olFilterStatus.includes(k)).map(k=>OL_STATUS[k].label).join('・'));
   if(olFilterType.length)   parts.push([...olFilterType].join('・'));
   if(olFilterFY.length)     parts.push([...olFilterFY].sort((a,b)=>b-a).join('・')+'年度完工');

@@ -386,13 +386,17 @@ function calcEstTotal(e){
 let _sidebarStatusFilter='';
 function setSidebarStatusFilter(s){
   _sidebarStatusFilter=s;
-  const label={'':'全て','draft':'下書き','sent':'提出済み','approved':'受注','completed':'完工'}[s]||'全て';
+  const label={'':'全て','draft':'下書き','sent':'提出済み','approved':'受注','construction':'工事中','completed':'完工'}[s]||'全て';
   document.querySelectorAll('.sf-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===label));
   renderProjectSidebar();
 }
 
-// 案件の並び：受注 → 提出済み → 下書き → 完工。同じステータスの中は新しい順
-const PROJ_STATUS_ORDER = ['approved','sent','draft','completed'];
+// 案件の並び：工事中 → 受注 → 提出済み → 下書き → 完工。同じステータスの中は新しい順
+const PROJ_STATUS_ORDER = ['construction','approved','sent','draft','completed'];
+
+// ステータスの表示名（下書き・提出済み・受注・工事中・完工）
+const EST_STATUS_LABEL = {draft:'下書き', sent:'提出済み', approved:'受注', construction:'工事中', completed:'完工'};
+function estStatusLabel(s){ return EST_STATUS_LABEL[s] || '完工'; }
 function projStatusOf(p){
   const list=(estimates||[]).filter(e=>e.projectName===p.name);
   if(!list.length) return 'draft';   // 見積がまだ無い案件は下書き扱い
@@ -638,7 +642,7 @@ function renderEstListBody(){
     <div class="list-item" onclick="confirmEstDiscard(()=>{loadEstimate(estimates.find(x=>x.id===${e.id}));closeEstList();})">
       <div class="li-info">
         <div class="li-name">${e.title||e.projectName||e.siteName||e.no||'無題の見積'}</div>
-        <div class="li-meta">${e.no} · ${e.type} · ${e.date||'日付未設定'} <span class="badge ${e.status}" style="margin-left:4px">${e.status==='draft'?'下書き':e.status==='sent'?'提出済み':e.status==='approved'?'受注':'完工'}</span></div>
+        <div class="li-meta">${e.no} · ${e.type} · ${e.date||'日付未設定'} <span class="badge ${e.status}" style="margin-left:4px">${estStatusLabel(e.status)}</span></div>
       </div>
       <div class="li-amt">¥${fmt(calcEstTotal(e))}</div>
       <button class="btn danger xs" onclick="event.stopPropagation();deleteEstimateFromList(${e.id})" style="margin-left:8px">削除</button>

@@ -5,7 +5,7 @@
 //   例）2026年4月度 ＝ 2026/3/26 〜 2026/4/25
 //
 // もとになるのは見積の「入金予定・実績」（契約時金・着工金・上棟時金・最終金）。
-// 受注・完工の案件だけを数える（下書き・提出済みは予定に入れない）。
+// 受注・工事中・完工の案件だけを数える（下書き・提出済みは予定に入れない）。
 
 const PS_MONTHS = [3,4,5,6,7,8,9,10,11,12,1,2];   // 年度の並び（3月度はじまり）
 
@@ -40,11 +40,11 @@ function psThisFiscalYear(){
   return k ? psFyOfMonthKey(k) : new Date().getFullYear();
 }
 
-// 入金予定を1件ずつ取り出す（受注・完工の案件のみ）
+// 入金予定を1件ずつ取り出す（受注・工事中・完工の案件のみ）
 function psAllPayments(){
   const out=[];
   (estimates||[]).forEach(e=>{
-    if(e.status!=='approved' && e.status!=='completed') return;
+    if(!['approved','construction','completed'].includes(e.status)) return;
     // 同じ案件に見積が複数あるときは、いちばん新しく更新したものだけ
     const same=(estimates||[]).filter(x=>x.projectName===e.projectName);
     const newest=[...same].sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];
@@ -133,7 +133,7 @@ function renderPaymentSchedule(){
     </div>
     <div style="font-size:11px;color:var(--text-muted);line-height:1.8;margin-top:8px">
       月度は25日締めです（◯月度 ＝ 前月26日〜当月25日）。年度は3月度から翌年2月度まで。<br>
-      受注・完工の案件の入金予定だけを数えます。行をタップすると内訳が出ます。
+      受注・工事中・完工の案件の入金予定だけを数えます。行をタップすると内訳が出ます。
       ${tot.overdue?`<br><span style="color:var(--danger);font-weight:700">予定日を過ぎた未入金が ¥${fmt(tot.overdue)} あります</span>`:''}
     </div>`;
 }

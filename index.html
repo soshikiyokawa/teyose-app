@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=287">
+<link rel="stylesheet" href="css/main.css?v=290">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -78,6 +78,7 @@
         <button class="sf-btn" onclick="setSidebarStatusFilter('draft')">下書き</button>
         <button class="sf-btn" onclick="setSidebarStatusFilter('sent')">提出済み</button>
         <button class="sf-btn" onclick="setSidebarStatusFilter('approved')">受注</button>
+        <button class="sf-btn" onclick="setSidebarStatusFilter('construction')">工事中</button>
         <button class="sf-btn" onclick="setSidebarStatusFilter('completed')">完工</button>
       </div>
     </div>
@@ -337,7 +338,7 @@
         </div>
         <div class="fg"><label>ステータス</label>
           <select id="est-status" onchange="updateEstBadge()">
-            <option value="draft">下書き</option><option value="sent">提出済み</option><option value="approved">受注</option><option value="completed">完工</option>
+            <option value="draft">下書き</option><option value="sent">提出済み</option><option value="approved">受注</option><option value="construction">工事中</option><option value="completed">完工</option>
           </select>
         </div>
         <div class="fg"><label>施主名</label><input id="est-client" placeholder="山田 太郎 様"></div>
@@ -2451,19 +2452,19 @@
 <script src="js/push.js?v=199"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=264"></script>
+<script src="js/estimate/estimate-tabs.js?v=290"></script>
 <script src="js/estimate/estimate-items.js?v=249"></script>
 <script src="js/estimate/quote-import.js?v=257"></script>
 <script src="js/estimate/estimate-master.js?v=202"></script>
 <script src="js/estimate/estimate-summary.js?v=138"></script>
-<script src="js/estimate/estimate-crud.js?v=280"></script>
+<script src="js/estimate/estimate-crud.js?v=290"></script>
 <script src="js/estimate/parking.js?v=281"></script>
 <script src="js/estimate/estimate-pdf.js?v=248"></script>
 <script src="js/estimate/estimate-invoice.js?v=138"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=280"></script>
-<script src="js/payment-schedule.js?v=256"></script>
+<script src="js/orders-list.js?v=290"></script>
+<script src="js/payment-schedule.js?v=290"></script>
 <script src="js/inspection.js?v=234"></script>
 
 <!-- 注文書・注文請書 -->

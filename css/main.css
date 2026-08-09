@@ -87,9 +87,11 @@
 /* 受注一覧 行色分け */
 .ol-row.status-approved { background: #f0faf3; }
 .ol-row.status-sent     { background: #f0f5ff; }
+.ol-row.status-construction{ background: #eaf6fa; }
 .ol-row.status-completed{ background: #f5f0ff; }
 .ol-row.status-approved:hover  { background: #d8f5e0; }
 .ol-row.status-sent:hover      { background: #dceaff; }
+.ol-row.status-construction:hover { background: #d3ecf5; }
 .ol-row.status-completed:hover { background: #ead8ff; }
 
 #orders-table input[type="text"] {
