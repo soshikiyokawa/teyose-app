@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v282';
+const CACHE_NAME = 'teyose-v283';
 const ASSETS = [
   './',
   './index.html',

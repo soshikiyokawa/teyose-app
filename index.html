@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=282">
+<link rel="stylesheet" href="css/main.css?v=283">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -2082,7 +2082,7 @@
       </div>
     </div>
     <div class="fg" style="margin-bottom:8px">
-      <label>チェックリスト</label>
+      <label>チェックリスト <span id="task-cl-progress" style="font-weight:400;color:var(--text-muted)"></span></label>
       <div id="task-checklist" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px"></div>
       <div style="display:flex;gap:6px">
         <input type="text" id="task-cl-input" placeholder="項目を足す" maxlength="80"
@@ -2090,11 +2090,47 @@
         <button class="btn xs" onclick="addTaskClItem()" style="flex-shrink:0">追加</button>
       </div>
     </div>
-    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+    <div id="task-handoff-history" style="display:none;margin:10px 0 4px"></div>
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <button class="btn" id="task-delete-btn" onclick="deleteTask()" style="display:none;color:var(--danger)">削除</button>
+      <button class="btn" id="task-handoff-btn" onclick="openTaskHandoff()" style="display:none">引き継ぐ</button>
       <div style="flex:1"></div>
       <button class="btn" onclick="closeTaskModal()">閉じる</button>
       <button class="btn primary" onclick="saveTask()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- タスクを引き継ぐ（途中まで進めて、その先を別の人に渡す） -->
+<div class="modal-overlay" id="task-handoff-modal" onclick="if(event.target.id==='task-handoff-modal')closeTaskHandoff()">
+  <div class="modal-sheet">
+    <h3>タスクを引き継ぐ</h3>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+      いまの進み具合とひとことを添えて、その先を別の人に渡します。渡した記録はタスクに残ります。
+    </div>
+    <div id="ho-progress" style="font-size:12px;font-weight:700;margin-bottom:10px"></div>
+
+    <div class="fg" style="margin-bottom:8px">
+      <label>引き継ぎ先 <span style="color:var(--danger)">*</span></label>
+      <div id="ho-to-tags" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-bottom:6px"></div>
+      <div id="ho-picker" style="max-height:34vh;overflow-y:auto;border:0.5px solid var(--border);border-radius:8px;padding:4px 6px"></div>
+    </div>
+
+    <div class="fg" style="margin-bottom:8px"><label>ひとこと（引き継ぎ先に伝えること）</label>
+      <textarea id="ho-note" rows="2" placeholder="例：求積図まで終わりました。仕様書からお願いします" style="resize:vertical;width:100%;box-sizing:border-box"></textarea></div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="fg" style="flex:1;min-width:130px;margin-bottom:8px"><label>期限（変えるなら）</label>
+        <input type="date" id="ho-due"></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:14px">
+        <input type="checkbox" id="ho-keep-me" style="width:auto">自分も担当に残る
+      </label>
+    </div>
+
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeTaskHandoff()">やめる</button>
+      <button class="btn primary" onclick="doTaskHandoff()">引き継ぐ</button>
     </div>
   </div>
 </div>
@@ -2359,7 +2395,7 @@
 
 <!-- 認証（ログイン・ログアウト・権限） -->
 <script src="js/notifications.js?v=279"></script>
-<script src="js/tasks.js?v=282"></script>
+<script src="js/tasks.js?v=283"></script>
 <script src="js/auth.js?v=282"></script>
 <script src="js/account.js?v=275"></script>
 </body>
