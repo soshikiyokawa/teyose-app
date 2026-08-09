@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=284">
+<link rel="stylesheet" href="css/main.css?v=285">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -2120,6 +2120,17 @@
     <div class="fg" style="margin-bottom:8px"><label>ひとこと（引き継ぎ先に伝えること）</label>
       <textarea id="ho-note" rows="2" placeholder="例：こちらの分は終わりました。あとはお願いします" style="resize:vertical;width:100%;box-sizing:border-box"></textarea></div>
 
+    <div class="fg" style="margin-bottom:8px">
+      <label>資料を添える（任意）</label>
+      <div id="ho-files" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px"></div>
+      <label class="btn xs" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        ファイルを選ぶ
+        <input type="file" multiple onchange="handoffFilesPicked(this)" style="display:none">
+      </label>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:4px">図面・写真・PDFなど。1つあたり20MBまで</div>
+    </div>
+
     <div id="ho-options" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div class="fg" style="flex:1;min-width:130px;margin-bottom:8px"><label>期限（変えるなら）</label>
         <input type="date" id="ho-due"></div>
@@ -2396,7 +2407,7 @@
 
 <!-- 認証（ログイン・ログアウト・権限） -->
 <script src="js/notifications.js?v=279"></script>
-<script src="js/tasks.js?v=284"></script>
+<script src="js/tasks.js?v=285"></script>
 <script src="js/auth.js?v=282"></script>
 <script src="js/account.js?v=275"></script>
 </body>

@@ -17,6 +17,7 @@ let taskChecklist = [];           // 編集中のチェックリスト [{id,text
 let taskHandoffs = [];            // 編集中のタスクの引き継ぎ履歴（読むだけ）
 let handoffTo = [];               // 引き継ぎ先に選んだ人
 let handoffMode = 'handoff';      // handoff＝引き継ぐ（社員） / return＝引き継ぎ元へ返す（発注先）
+let handoffFiles = [];            // 引き継ぎに添える資料（送信前のファイル）
 
 async function fetchTasks(){
   const { data, error } = await sb.from('tasks').select('*')
@@ -125,6 +126,8 @@ function renderTaskPage(){
           <span class="task-due ${due.cls}">${due.text}</span>
           ${pn?`<span class="task-proj">${esc(pn)}</span>`:''}
           ${cl.length?`<span class="task-cl">${clDone}/${cl.length}</span>`:''}
+          ${(t.handoffs||[]).reduce((n,h)=>n+((h.files||[]).length),0)
+            ? `<span class="task-file-cnt">資料${(t.handoffs||[]).reduce((n,h)=>n+((h.files||[]).length),0)}</span>` : ''}
           ${(t.handoffs||[]).length?`<span class="task-ho" title="${esc((t.handoffs||[]).map(h=>(h.from||'')+'→'+((h.to||[]).join('、'))).join(' / '))}">引継${t.handoffs.length>1?t.handoffs.length:''}</span>`:''}
           ${t.assignees.length
             ? `<span class="task-asg${mine?' mine':''}">${t.assignees.map(esc).join('、')}</span>`
@@ -338,6 +341,10 @@ function renderTaskHandoffs(){
         <div class="task-ho-line"><b>${esc(h.from||'—')}</b> ${h.kind==='return'?'↩':'→'} <b>${esc((h.to||[]).join('、')||'—')}</b>${h.kind==='return'?'<span class="task-ho-back">返却</span>':''}
           <span class="task-ho-when">${when}${h.total?`　${h.done}/${h.total} まで`:''}</span></div>
         ${h.note?`<div class="task-ho-note">${esc(h.note)}</div>`:''}
+        ${(h.files||[]).length?`<div class="task-ho-files">${h.files.map(f=>
+          `<button type="button" class="task-file-link" onclick="openTaskFile('${String(f.path).replace(/'/g,"\\'")}')" title="${esc(f.name)}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="11" height="11" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            ${esc(f.name)}</button>`).join('')}</div>`:''}
       </div>`;
     }).join('');
 }
@@ -379,6 +386,8 @@ function openTaskReturn(){
 
 function showHandoffModal(title, lead){
   const ret = handoffMode==='return';
+  handoffFiles=[];
+  renderHandoffFiles();
   document.getElementById('ho-title').textContent=title;
   document.getElementById('ho-lead').textContent=lead;
   const done=taskChecklist.filter(c=>c.done).length;
@@ -416,6 +425,60 @@ function renderHandoffTo(){
   });
   el.innerHTML = html || '<div style="font-size:12px;color:var(--text-muted);padding:10px">候補がありません</div>';
 }
+// ── 引き継ぎに添える資料 ──
+// 選んだファイルは送信のときにまとめて保管する（途中でやめれば何も残らない）
+const HANDOFF_FILE_MAX = 20 * 1024 * 1024;   // 1つあたり20MBまで
+
+function handoffFilesPicked(input){
+  const list=[...(input.files||[])];
+  input.value='';
+  for(const f of list){
+    if(f.size > HANDOFF_FILE_MAX){ showToast(`${f.name} は大きすぎます（20MBまで）`); continue; }
+    if(handoffFiles.some(x=>x.name===f.name && x.size===f.size)) continue;   // 同じものは足さない
+    handoffFiles.push(f);
+  }
+  renderHandoffFiles();
+}
+function removeHandoffFile(i){ handoffFiles.splice(i,1); renderHandoffFiles(); }
+function fileSizeLabel(n){
+  if(n<1024) return n+'B';
+  if(n<1024*1024) return Math.round(n/1024)+'KB';
+  return (n/1024/1024).toFixed(1)+'MB';
+}
+function renderHandoffFiles(){
+  const el=document.getElementById('ho-files');
+  if(!el) return;
+  el.innerHTML = handoffFiles.length
+    ? handoffFiles.map((f,i)=>`<div class="task-file-row">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
+        <span style="color:var(--text-muted);font-size:10px;flex-shrink:0">${fileSizeLabel(f.size)}</span>
+        <button type="button" class="btn xs" onclick="removeHandoffFile(${i})" style="flex-shrink:0">外す</button>
+      </div>`).join('')
+    : '<div style="font-size:11px;color:var(--text-muted)">添えていません</div>';
+}
+
+// 保管する。場所は「タスクID/日時_連番.拡張子」（日本語はキーに使えないため）
+async function uploadHandoffFiles(taskId){
+  const out=[];
+  for(let i=0;i<handoffFiles.length;i++){
+    const f=handoffFiles[i];
+    const ext=(f.name.match(/\.[a-zA-Z0-9]+$/)||[''])[0];
+    const path=`${taskId}/${Date.now()}_${i}${ext}`;
+    const { error } = await sb.storage.from('task-files')
+      .upload(path, f, { contentType: f.type || 'application/octet-stream' });
+    if(error){ showToast(`${f.name} の保存に失敗しました：${error.message}`); throw error; }
+    out.push({path, name:f.name||'', size:f.size||0, mime:f.type||''});
+  }
+  return out;
+}
+
+// 添えた資料を開く（1時間だけ有効なリンクを作る）
+async function openTaskFile(path){
+  const { data, error } = await sb.storage.from('task-files').createSignedUrl(path, 3600);
+  if(error){ showToast('資料を開けませんでした：'+error.message); return; }
+  window.open(data.signedUrl, '_blank', 'noopener');
+}
+
 function toggleHandoffTo(name){
   const i=handoffTo.indexOf(name);
   if(i>=0) handoffTo.splice(i,1); else handoffTo.push(name);
@@ -439,13 +502,24 @@ async function doTaskHandoff(){
   const keep = keepMe ? taskAssignees.filter(n=>mine.includes(n)) : [];
   const next = ret ? [...handoffTo] : [...new Set([...keep, ...handoffTo])];
 
+  // 先に資料を保管する（ここで失敗したら引き継ぎ自体を止める）
+  const goBtn=document.getElementById('ho-go');
+  let files=[];
+  if(handoffFiles.length){
+    goBtn.disabled=true; goBtn.textContent='送信中…';
+    try{ files = await uploadHandoffFiles(editingTodoId); }
+    catch(_){ goBtn.disabled=false; goBtn.textContent = ret?'返す':'引き継ぐ'; return; }
+    goBtn.disabled=false; goBtn.textContent = ret?'返す':'引き継ぐ';
+  }
+
   const entry={
     at:new Date().toISOString(),
     from:currentUserDisplayName||'',
     to:[...handoffTo],
     note,
     done,
-    total:taskChecklist.length
+    total:taskChecklist.length,
+    files
   };
   if(ret) entry.kind='return';
   const handoffs=[...taskHandoffs, entry];
@@ -455,7 +529,7 @@ async function doTaskHandoff(){
   let error;
   if(ret){
     ({ error } = await sb.rpc('task_return', {
-      p_id: editingTodoId, p_note: note, p_checklist: taskChecklist
+      p_id: editingTodoId, p_note: note, p_checklist: taskChecklist, p_files: files
     }));
   } else {
     ({ error } = await sb.from('tasks')
@@ -469,8 +543,9 @@ async function doTaskHandoff(){
   if(notify.length){
     const dueTxt = (ret ? t.dueDate : due) ? `期限 ${String(ret?t.dueDate:due).replace(/-/g,'/')}` : '期限なし';
     const prog = taskChecklist.length ? `${done}/${taskChecklist.length}まで完了` : '';
+    const fileTxt = files.length ? `　資料${files.length}件` : '';
     dbSendPushToNames(notify, ret?'タスクが返ってきました':'タスクを引き継ぎました',
-      `${t.title}（${[dueTxt, prog].filter(Boolean).join('・')}）${currentUserDisplayName?' — '+currentUserDisplayName:''}${note?'：'+note:''}`,
+      `${t.title}（${[dueTxt, prog].filter(Boolean).join('・')}）${fileTxt}${currentUserDisplayName?' — '+currentUserDisplayName:''}${note?'：'+note:''}`,
       'task').catch(()=>{});
   }
 
