@@ -19,6 +19,11 @@ function appOpenTab(spec){
     if(sub && document.getElementById('ordersub-'+sub)) orderSubTab(sub);
     return;
   }
+  if(page === 'task'){
+    if(!currentUserRole){ _pendingOpenTab = spec; return; }
+    mainTab('task');
+    return;
+  }
   if(page !== 'genba') return;
   if(!currentUserRole || currentUserRole === 'supplier'){ _pendingOpenTab = spec; return; }
   mainTab('genba');
@@ -33,7 +38,7 @@ function mainTab(t){
   _mainTabGo(t);
 }
 function _mainTabGo(t){
-  ['estimate','cost','order','schedule','genba','talk'].forEach(n=>{
+  ['estimate','cost','order','schedule','genba','task','talk'].forEach(n=>{
     document.getElementById('page-'+n)?.classList.toggle('active',n===t);
     document.getElementById('nav-'+n)?.classList.toggle('active',n===t);
   });
@@ -44,5 +49,6 @@ function _mainTabGo(t){
   if(t==='order'&&document.getElementById('ordersub-master').classList.contains('active')) renderMaster();
   if(t==='schedule'){ loadScheduleForProject(); applySupplierScheduleView && applySupplierScheduleView(); }
   if(t==='genba') renderGenbaPage();
+  if(t==='task') renderTaskPage();
   window.scrollTo(0,0);
 }

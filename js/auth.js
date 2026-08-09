@@ -89,6 +89,7 @@ async function bootstrapApp(){
   appTouchLastSeen();
   notifyNewChatMessages();   // 未読件数の初期表示（着信音は鳴らさない）
   updateNotificationBadge();  // 通知履歴の未読件数
+  updateTaskBadge();          // 自分あての未済タスクの件数
   pushNotifyPrefToSW();      // 通知の設定（バナー・サウンド）をService Workerへ
 
   // 招待メール・パスワード再設定のリンクから来た場合：パスワード設定を求める

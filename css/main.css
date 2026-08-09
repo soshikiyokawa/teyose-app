@@ -10,6 +10,7 @@
 @import url('talk.css');
 @import url('overlay.css');
 @import url('genba.css');
+@import url('tasks.css');
 
 /* ── 受注一覧 A3印刷 ── */
 @media print {

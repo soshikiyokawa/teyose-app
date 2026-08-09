@@ -1,0 +1,41 @@
+/* ── タスク（やること・担当者・期限・チェックリスト） ── */
+.task-row{
+  display:flex; align-items:flex-start; gap:9px;
+  padding:9px 4px; border-bottom:0.5px solid var(--border);
+}
+.task-row:last-child{ border-bottom:0; }
+.task-row.done .task-title{ text-decoration:line-through; color:var(--text-muted); }
+
+.task-main{ flex:1; min-width:0; cursor:pointer; }
+.task-title{ font-size:13px; font-weight:600; color:var(--text); line-height:1.5; word-break:break-word; }
+.task-meta{ display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-top:3px; }
+
+/* 済／未済のまるいボタン */
+.task-check{
+  flex-shrink:0; width:21px; height:21px; margin-top:1px;
+  border-radius:50%; border:1.5px solid var(--border-s); background:var(--surface);
+  color:#fff; font-size:12px; font-weight:800; line-height:1;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; font-family:inherit;
+}
+.task-check.on{ background:var(--ok, #4a7c59); border-color:var(--ok, #4a7c59); }
+.task-check.sm{ width:18px; height:18px; font-size:11px; margin-top:0; }
+
+/* 期限。近いもの・過ぎたものは目立たせる */
+.task-due{
+  font-size:10px; font-weight:700; padding:1px 6px; border-radius:99px;
+  background:var(--surface2); color:var(--text-sub); white-space:nowrap;
+}
+.task-due.over{ background:#ffcdd2; color:#b5302a; }
+.task-due.today{ background:#ffe0b2; color:#8a4b00; }
+.task-due.soon{ background:#fff6d6; color:#7a5c00; }
+.task-due.none{ color:var(--text-muted); font-weight:400; }
+
+.task-proj, .task-cl, .task-asg{
+  font-size:10px; padding:1px 6px; border-radius:99px;
+  background:var(--surface2); color:var(--text-sub);
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.task-asg.mine{ background:var(--accent-bg); color:var(--accent-t); font-weight:700; }
+.task-asg.none{ color:var(--text-muted); background:transparent; padding-left:0; }
+
+.task-cl-row{ display:flex; align-items:center; gap:7px; font-size:12px; }

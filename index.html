@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=278">
+<link rel="stylesheet" href="css/main.css?v=282">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -1111,6 +1111,25 @@
 </div>
 
 <!-- ════ やり取りパネル ════ -->
+<!-- ════ タスク（やること・担当者・期限・チェックリスト） ════ -->
+<div class="page" id="page-task">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-head-title">タスク</span>
+      <span id="task-count" style="font-size:11px;color:var(--text-muted)"></span>
+      <div style="flex:1"></div>
+      <button class="btn sm primary employee-only" onclick="openTaskNew()">＋ 追加</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px">
+      <div id="task-filters" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+      <div style="flex:1;min-width:120px">
+        <select id="task-project-filter" onchange="setTaskProjectFilter(this.value)" style="width:100%;font-size:12px"></select>
+      </div>
+    </div>
+    <div id="task-list"></div>
+  </div>
+</div>
+
 <div class="page" id="page-talk">
   <div id="talk-page-wrap">
 
@@ -1728,6 +1747,11 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 21v-6h6v6"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/></svg>
     勤怠日報
   </button>
+  <button class="main-nav-btn" id="nav-task" onclick="mainTab('task')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    タスク
+    <span id="nav-task-dot" style="display:none;position:absolute;top:4px;left:calc(50% + 6px);min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;align-items:center;justify-content:center;background:var(--danger);color:#fff;border-radius:99px;font-size:10px;font-weight:800;line-height:1">0</span>
+  </button>
   <button class="main-nav-btn" id="nav-talk" onclick="mainTab('talk')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     チャット
@@ -2036,6 +2060,54 @@
 </div>
 
 <!-- アカウント設定（本人がパスワードを変える） -->
+<!-- タスクの追加・編集 -->
+<div class="modal-overlay" id="task-modal" onclick="if(event.target.id==='task-modal')closeTaskModal()">
+  <div class="modal-sheet">
+    <h3 id="task-modal-title">タスクを追加</h3>
+    <div class="fg" style="margin-bottom:8px"><label>やること <span style="color:var(--danger)">*</span></label>
+      <input type="text" id="task-title" placeholder="例：確認申請の提出書類をそろえる" maxlength="120"></div>
+    <div class="fg" style="margin-bottom:8px"><label>メモ</label>
+      <textarea id="task-detail" rows="2" placeholder="補足があれば" style="resize:vertical;width:100%;box-sizing:border-box"></textarea></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="fg" style="flex:1;min-width:130px;margin-bottom:8px"><label>期限</label>
+        <input type="date" id="task-due"></div>
+      <div class="fg" style="flex:1;min-width:150px;margin-bottom:8px"><label>案件</label>
+        <select id="task-project"></select></div>
+    </div>
+    <div class="fg" style="margin-bottom:8px">
+      <label>担当者</label>
+      <div style="display:flex;align-items:flex-start;gap:6px">
+        <div id="task-assignees" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px;align-items:center"></div>
+        <button class="btn xs" id="task-assignee-add" onclick="openTaskAssigneePicker()" style="flex-shrink:0">選ぶ</button>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:8px">
+      <label>チェックリスト</label>
+      <div id="task-checklist" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px"></div>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="task-cl-input" placeholder="項目を足す" maxlength="80"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addTaskClItem();}" style="flex:1;min-width:0">
+        <button class="btn xs" onclick="addTaskClItem()" style="flex-shrink:0">追加</button>
+      </div>
+    </div>
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+      <button class="btn" id="task-delete-btn" onclick="deleteTask()" style="display:none;color:var(--danger)">削除</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeTaskModal()">閉じる</button>
+      <button class="btn primary" onclick="saveTask()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- タスクの担当者を選ぶ -->
+<div class="modal-overlay" id="task-assignee-modal" onclick="if(event.target.id==='task-assignee-modal')closeTaskAssigneePicker()">
+  <div class="modal-sheet">
+    <h3>担当者を選ぶ</h3>
+    <div id="task-assignee-picker" style="max-height:55vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeTaskAssigneePicker()">決定</button></div>
+  </div>
+</div>
+
 <!-- 通知履歴：届いた通知をあとから読み返す -->
 <div class="modal-overlay" id="notif-modal" onclick="if(event.target.id==='notif-modal')closeNotifications()">
   <div class="modal-sheet">
@@ -2221,10 +2293,10 @@
 <script src="js/state.js?v=245"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=281"></script>
+<script src="js/data/db.js?v=282"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=260"></script>
+<script src="js/nav.js?v=282"></script>
 
 <!-- やり取り（LINE風チャット） -->
 <script src="js/talk.js?v=281"></script>
@@ -2286,8 +2358,9 @@
 <script src="js/init.js?v=169"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/auth.js?v=278"></script>
-<script src="js/account.js?v=275"></script>
 <script src="js/notifications.js?v=279"></script>
+<script src="js/tasks.js?v=282"></script>
+<script src="js/auth.js?v=282"></script>
+<script src="js/account.js?v=275"></script>
 </body>
 </html>

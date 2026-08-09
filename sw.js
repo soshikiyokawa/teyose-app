@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v281';
+const CACHE_NAME = 'teyose-v282';
 const ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const ASSETS = [
   './css/order.css',
   './css/talk.css',
   './css/overlay.css',
+  './css/tasks.css',
   './css/schedule.css',
   './css/genba.css',
   './js/supabase-client.js',
@@ -22,6 +23,7 @@ const ASSETS = [
   './js/nav.js',
   './js/talk.js',
   './js/notifications.js',
+  './js/tasks.js',
   './js/init.js',
   './js/auth.js',
   './js/estimate/estimate-tabs.js',
