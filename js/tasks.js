@@ -329,6 +329,13 @@ function addTaskClItem(){
 // 担当者が引き継ぎ先に入れ替わり、渡した時点の進み具合とひとことが履歴に残る。
 // 受け取った人には通知が届き、どこから続ければよいかが分かる。
 
+// onclick の中に値を埋めるとき、引用符やバックスラッシュで壊れないようにする
+function jsArg(v){
+  return "'" + String(v==null?'':v)
+    .replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+    .replace(/</g,'\\x3c').replace(/&/g,'\\x26') + "'";
+}
+
 function renderTaskHandoffs(){
   const wrap=document.getElementById('task-handoff-history');
   if(!wrap) return;
@@ -341,10 +348,17 @@ function renderTaskHandoffs(){
         <div class="task-ho-line"><b>${esc(h.from||'—')}</b> ${h.kind==='return'?'↩':'→'} <b>${esc((h.to||[]).join('、')||'—')}</b>${h.kind==='return'?'<span class="task-ho-back">返却</span>':''}
           <span class="task-ho-when">${when}${h.total?`　${h.done}/${h.total} まで`:''}</span></div>
         ${h.note?`<div class="task-ho-note">${esc(h.note)}</div>`:''}
-        ${(h.files||[]).length?`<div class="task-ho-files">${h.files.map(f=>
-          `<button type="button" class="task-file-link" onclick="openTaskFile('${String(f.path).replace(/'/g,"\\'")}')" title="${esc(f.name)}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="11" height="11" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-            ${esc(f.name)}</button>`).join('')}</div>`:''}
+        ${(h.files||[]).length?`<div class="task-ho-files">${h.files.map(f=>{
+          const a1=jsArg(f.path), a2=jsArg(f.name);
+          return `<span class="task-file-chip">
+            <button type="button" class="task-file-link" onclick="openTaskFile(${a1})" title="開く：${esc(f.name)}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="11" height="11" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              ${esc(f.name)}</button>
+            <button type="button" class="task-file-save" onclick="saveTaskFile(${a1},${a2})" title="端末に保存">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="11" height="11" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
+          </span>`;
+        }).join('')}</div>`:''}
       </div>`;
     }).join('');
 }
@@ -477,6 +491,22 @@ async function openTaskFile(path){
   const { data, error } = await sb.storage.from('task-files').createSignedUrl(path, 3600);
   if(error){ showToast('資料を開けませんでした：'+error.message); return; }
   window.open(data.signedUrl, '_blank', 'noopener');
+}
+
+// 添えた資料を端末に保存する。
+// 開いてから保存する手間をなくすため、元のファイル名のまま落とせるリンクを作る
+// （download を付けると、画面で開かずに保存になる）
+async function saveTaskFile(path, name){
+  const { data, error } = await sb.storage.from('task-files')
+    .createSignedUrl(path, 3600, { download: name || true });
+  if(error){ showToast('保存できませんでした：'+error.message); return; }
+  const a=document.createElement('a');
+  a.href=data.signedUrl;
+  a.download=name||'';
+  a.rel='noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 function toggleHandoffTo(name){
