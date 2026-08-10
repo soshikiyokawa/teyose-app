@@ -104,3 +104,16 @@
 .photo-check{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.9);
   border:1.5px solid var(--accent);color:var(--accent-t);font-size:13px;font-weight:800;line-height:17px;text-align:center}
 .photo-cell.photo-selected .photo-check{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* 保存書類：まだ作っていない定型フォルダのお知らせ */
+.fb-doc-hint{
+  display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  padding:8px 10px; border-radius:8px;
+  background:var(--surface2); border:0.5px solid var(--border-s);
+  font-size:11px; color:var(--text-sub); line-height:1.6;
+}
+/* 中身がまだ入っていない定型フォルダ */
+.fb-nodoc{
+  font-size:10px; font-weight:700; padding:1px 6px; border-radius:99px;
+  background:var(--warn-bg); color:var(--warn-t); margin-left:4px; white-space:nowrap;
+}

@@ -2,11 +2,40 @@
 // staff：案件情報のボタンからモーダルで開く／carpenter：現場ページのタブ内に直接表示
 
 // ── 開閉・マウント ──
+// 現場資料の種類。photo＝現場写真 / drawing＝図面 / document＝保存書類
+const FB_LABEL = {photo:'現場写真', drawing:'図面', document:'保存書類'};
+const FB_UNIT  = {photo:'枚', drawing:'件', document:'件'};
+
+// 工事区分ごとの、はじめに用意しておく保存書類のフォルダ。
+// ここに足せば、その工事区分の案件で「まとめて作る」ボタンから作れる
+const DOC_DEFAULT_FOLDERS = {
+  '新築': ['確認済証', '検査済証', '瑕疵保険証書']
+};
+function docDefaultFolders(projectId){
+  const p = (projects||[]).find(x=>x.id===projectId);
+  return DOC_DEFAULT_FOLDERS[p?.type||''] || [];
+}
+// まだ作られていない定型フォルダ（いちばん上の階層だけを見る）
+function docMissingFolders(projectId){
+  const have = new Set(siteFolders
+    .filter(f=>f.projectId===projectId && f.kind==='document' && !f.parentId)
+    .map(f=>f.name));
+  return docDefaultFolders(projectId).filter(n=>!have.has(n));
+}
+// 定型フォルダをまとめて作る
+async function fbCreateDefaultDocFolders(){
+  const missing = docMissingFolders(fbProjectId);
+  if(!missing.length) return;
+  for(const name of missing) await dbAddFolder(fbProjectId, 'document', null, name);
+  showToast(missing.length + '件のフォルダを作りました');
+  await refreshGenba();
+}
+
 function openFileBrowser(kind, projectId){
   if(!projectId){ showToast('先に案件を選択してください'); return; }
   fbKind = kind; fbProjectId = projectId; fbFolderId = null; fbContainerId = 'fb-modal-body';
   const p = projects.find(x=>x.id===projectId);
-  document.getElementById('fb-modal-title').textContent = kind==='photo' ? '現場写真' : '図面';
+  document.getElementById('fb-modal-title').textContent = FB_LABEL[kind] || '図面';
   document.getElementById('fb-modal-proj').textContent = p ? p.name : '';
   document.getElementById('fb-modal').classList.add('open');
   renderFB();
@@ -43,7 +72,8 @@ function fbCrumbs(){
 }
 // フォルダ内（下層含む）のファイル数
 function fbCountItems(folderId){
-  const items = fbKind==='photo' ? sitePhotos : drawings;
+  const items = fbKind==='photo' ? sitePhotos
+    : drawings.filter(d=>(d.kind||'drawing')===fbKind);
   let n = items.filter(i=>i.folderId===folderId).length;
   siteFolders.filter(f=>f.parentId===folderId).forEach(f=>{ n += fbCountItems(f.id); });
   return n;
@@ -60,8 +90,11 @@ function renderFB(){
   const canAdd = !supplierReadOnly || fbKind==='photo';
   const crumbs = fbCrumbs();
   const folders = siteFolders.filter(f=>f.projectId===fbProjectId && f.kind===fbKind && (f.parentId||null)===(fbFolderId||null));
-  const addLabel = fbKind==='photo' ? '＋ 写真' : '＋ 図面';
+  const addLabel = fbKind==='photo' ? '＋ 写真' : fbKind==='document' ? '＋ 書類' : '＋ 図面';
   const inputId = fbKind==='photo' ? 'fb-photo-input' : 'fb-drawing-input';
+  // 保存書類：まだ無い定型フォルダがあれば、まとめて作れるようにする
+  const missingDocs = (fbKind==='document' && !fbFolderId && !supplierReadOnly)
+    ? docMissingFolders(fbProjectId) : [];
 
   let html = `
     <div class="fb-toolbar">
@@ -75,6 +108,13 @@ function renderFB(){
       </div>
     </div>`;
 
+  if(missingDocs.length){
+    html += `<div class="fb-doc-hint">
+      <div style="flex:1;min-width:0">この案件（${esc((projects||[]).find(p=>p.id===fbProjectId)?.type||'')}）で残しておく書類：${missingDocs.map(esc).join('・')}</div>
+      <button class="btn xs primary" onclick="fbCreateDefaultDocFolders()" style="flex-shrink:0">まとめて作る</button>
+    </div>`;
+  }
+
   // フォルダ一覧
   if(folders.length){
     html += `<div class="card" style="padding:0;overflow:hidden;margin-bottom:10px">` + folders.map(f=>{
@@ -84,7 +124,8 @@ function renderFB(){
         <div style="flex:1;min-width:0;display:flex;align-items:center;gap:9px;cursor:pointer" onclick="fbEnter(${f.id})">
           <span style="font-size:17px">📁</span>
           <span style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
-          <span style="font-size:11px;color:var(--text-muted)">${n?n+(fbKind==='photo'?'枚':'件'):''}</span>
+          <span style="font-size:11px;color:var(--text-muted)">${n?n+(FB_UNIT[fbKind]||'件'):''}</span>
+          ${(!n && fbKind==='document' && docDefaultFolders(fbProjectId).includes(f.name))?'<span class="fb-nodoc">未登録</span>':''}
         </div>
         ${canEdit?`
         <button class="btn xs" onclick="fbRenameFolder(${f.id})" title="名前を変更">✏</button>
@@ -118,7 +159,7 @@ async function fbDeleteFolder(id){
   const f = siteFolders.find(x=>x.id===id);
   if(!f) return;
   const n = fbCountItems(id);
-  if(!confirm(`フォルダ「${f.name}」を削除しますか？\n${n?`中の${fbKind==='photo'?'写真':'図面'}${n}${fbKind==='photo'?'枚':'件'}は削除されず「すべて」に戻ります。`:''}`)) return;
+  if(!confirm(`フォルダ「${f.name}」を削除しますか？\n${n?`中の${FB_LABEL[fbKind]||'図面'}${n}${FB_UNIT[fbKind]||'件'}は削除されず「すべて」に戻ります。`:''}`)) return;
   await dbDeleteFolder(id);
   showToast('フォルダを削除しました');
   await refreshGenba();
@@ -168,6 +209,8 @@ function renderInfoGenbaSections(){
   const pid = selectedProject?.id || null;
   pc.textContent = pid ? sitePhotos.filter(p=>p.projectId===pid).length+'枚' : '—';
   document.getElementById('info-drawing-count').textContent = pid ? drawings.filter(d=>d.projectId===pid && (d.kind||'drawing')==='drawing').length+'件' : '—';
+  const dc = document.getElementById('info-document-count');
+  if(dc) dc.textContent = pid ? drawings.filter(d=>d.projectId===pid && (d.kind||'drawing')==='document').length+'件' : '—';
   renderParkingDocs();
 }
 function openInfoFileBrowser(kind){

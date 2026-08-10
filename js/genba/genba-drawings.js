@@ -15,9 +15,9 @@ async function onFbDrawingInput(input){
       showToast(`アップロード中…（${i+1}/${files.length}）`, 30000);
       const extMatch = f.name.match(/\.[a-zA-Z0-9]+$/);
       const url = await dbUploadSiteFile('drawings', projectId, f, extMatch?extMatch[0]:'');
-      await dbAddDrawing({projectId, folderId, fileUrl:url, fileName:f.name, fileMime:f.type||''});
+      await dbAddDrawing({projectId, folderId, kind:fbKind, fileUrl:url, fileName:f.name, fileMime:f.type||''});
     }
-    showToast(files.length+'件の図面を登録しました');
+    showToast(files.length+'件の'+(FB_LABEL[fbKind]||'図面')+'を登録しました');
   }finally{
     if(btn) btn.disabled = false;
   }
@@ -39,10 +39,11 @@ function drawingViewsLabel(id){
 
 // 表示中フォルダ直下の図面一覧
 function fbDrawingListHtml(){
-  const list = drawings.filter(d=>d.projectId===fbProjectId && (d.kind||'drawing')==='drawing' && (d.folderId||null)===(fbFolderId||null));
+  const list = drawings.filter(d=>d.projectId===fbProjectId && (d.kind||'drawing')===fbKind && (d.folderId||null)===(fbFolderId||null));
+  const label = FB_LABEL[fbKind] || '図面';
   if(!list.length) return currentUserRole==='supplier'
-    ? '<div class="empty">このフォルダに図面はありません</div>'
-    : '<div class="empty">このフォルダに図面はありません。「＋ 図面」から登録できます（PDF・画像）</div>';
+    ? `<div class="empty">このフォルダに${label}はありません</div>`
+    : `<div class="empty">このフォルダに${label}はありません。「＋ ${fbKind==='document'?'書類':'図面'}」から登録できます（PDF・画像）</div>`;
   return `<div class="card" style="padding:0;overflow:hidden">` + list.map(d=>{
     const isPdf = /pdf/i.test(d.fileMime) || /\.pdf$/i.test(d.fileName);
     const canDelete = currentUserRole==='staff' || d.uploadedBy===currentUserId;
@@ -57,7 +58,7 @@ function fbDrawingListHtml(){
       <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
         <button class="btn xs primary" onclick="viewDrawing(${d.id})">開く</button>
         ${currentUserRole==='supplier' ? '' : `<div style="display:flex;gap:4px">
-          <button class="btn xs" onclick="openFbMove('drawing',${d.id})" title="フォルダへ移動">移動</button>
+          <button class="btn xs" onclick="openFbMove('${fbKind}',${d.id})" title="フォルダへ移動">移動</button>
           ${canDelete?`<button class="btn xs danger" onclick="deleteDrawing(${d.id})">削除</button>`:''}
         </div>`}
       </div>
