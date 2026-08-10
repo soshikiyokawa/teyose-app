@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=291">
+<link rel="stylesheet" href="css/main.css?v=292">
 <link rel="stylesheet" href="css/schedule.css?v=183">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -1165,7 +1165,11 @@
         </div>
         <button id="talk-bm-filter" onclick="chatBookmarkFilter=!chatBookmarkFilter;renderTalkPanelMessages()" title="ブックマークしたメッセージのみ表示" style="border:none;background:none;cursor:pointer;font-size:16px;line-height:1;padding:2px;opacity:.5">🔖</button>
       </div>
-      <div id="talk-panel-messages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px"></div>
+      <!-- メッセージ一覧。上に戻して読んでいる間は、描き直しても位置を保つ -->
+      <div style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column">
+        <div id="talk-panel-messages" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px"></div>
+        <button type="button" id="talk-new-msg" onclick="chatScrollToBottom()" style="display:none">新しいメッセージ ↓</button>
+      </div>
       <!-- 通知先バー（社内チャットのみ） -->
       <div id="talk-notify-bar" style="display:none;align-items:center;gap:8px;padding:6px 12px;border-top:0.5px solid var(--border);background:var(--surface)">
         <span style="font-size:11px;color:var(--text-muted);flex-shrink:0">🔔 通知先</span>
@@ -2448,7 +2452,7 @@
 <script src="js/nav.js?v=282"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=281"></script>
+<script src="js/talk.js?v=292"></script>
 
 <!-- プッシュ通知 -->
 <script src="js/push.js?v=199"></script>

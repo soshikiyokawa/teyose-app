@@ -79,3 +79,11 @@
 .notify-opt{display:block;width:100%;text-align:left;border:1px solid var(--border-s);background:var(--surface2);
   font-family:inherit;font-size:13px;color:var(--text);padding:9px 12px;border-radius:8px;cursor:pointer}
 .notify-opt.mine{background:var(--accent-bg);border-color:var(--accent);color:var(--accent-t);font-weight:700}
+
+/* 上に戻して読んでいる間に新しいメッセージが来たときの案内 */
+#talk-new-msg{
+  position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+  padding:5px 14px; border-radius:99px; border:none; cursor:pointer;
+  background:var(--accent); color:#fff; font-size:11px; font-weight:700; font-family:inherit;
+  box-shadow:0 2px 8px rgba(0,0,0,.18); z-index:2;
+}

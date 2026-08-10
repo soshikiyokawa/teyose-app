@@ -333,7 +333,8 @@ function openTalkPanelThread(supName){
   notifyTargets = [];        // スレッドを開くたび通知先はALLに戻す
   updateNotifyLabel();
   setupMsgMenuHandlers();
-  renderTalkPanelMessages();
+  updateChatNewMark(false);
+  renderTalkPanelMessages(true);
   // 開いた時刻を既読として記録し、未読バッジを更新する
   dbMarkThreadRead(threadKeyOf(supName)).then(updateChatBadge).catch(()=>{});
   updateChatBadge();
@@ -405,12 +406,36 @@ function msgMarks(m){
   return edited+bm;
 }
 
-function renderTalkPanelMessages(){
+// いちばん下まで見ているか（少しの余裕をみて判定する）
+const CHAT_BOTTOM_SLACK = 80;   // px
+function chatAtBottom(el){
+  if(!el) return true;
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= CHAT_BOTTOM_SLACK;
+}
+// 上に戻して読んでいる間に新しいメッセージが来たときに出す案内
+function updateChatNewMark(show){
+  const b=document.getElementById('talk-new-msg');
+  if(b) b.style.display = show ? '' : 'none';
+}
+function chatScrollToBottom(){
+  const el=document.getElementById('talk-panel-messages');
+  if(!el) return;
+  el.scrollTop=el.scrollHeight;
+  updateChatNewMark(false);
+}
+
+// 上に戻して読んでいる途中に描き直しが入っても、勝手に下へ飛ばさない。
+// forceBottom＝true のときだけ、いちばん下まで送る（スレッドを開いたとき・自分が送ったとき）
+function renderTalkPanelMessages(forceBottom){
   const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD || isProjectThread(activeTalkPanelSupplier);
   let msgs=talkThreads[activeTalkPanelSupplier]||[];
   if(chatBookmarkFilter) msgs=msgs.filter(m=>Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName));
   document.getElementById('talk-bm-filter')?.classList.toggle('active',chatBookmarkFilter);
   const el=document.getElementById('talk-panel-messages');
+  // 描き直す前の位置と、いちばん下を見ていたかどうかを覚えておく
+  const wasAtBottom = chatAtBottom(el);
+  const prevTop = el ? el.scrollTop : 0;
+  const prevCount = el ? el.querySelectorAll('.talk-bubble').length : 0;
   if(!msgs.length){
     el.innerHTML = chatBookmarkFilter
       ? '<div class="empty" style="padding:24px">ブックマークしたメッセージはありません。</div>'
@@ -480,7 +505,17 @@ function renderTalkPanelMessages(){
       ${reactionsHtml(m,isMe)}
     </div>`;
   }).join('');
-  el.scrollTop=el.scrollHeight;
+
+  // いちばん下を見ていたとき、または送信直後だけ下まで送る。
+  // それ以外は読んでいた位置に戻す（勝手に下へ飛ばない）
+  if(forceBottom===true || wasAtBottom){
+    el.scrollTop=el.scrollHeight;
+    updateChatNewMark(false);
+  } else {
+    el.scrollTop=prevTop;
+    // 上を読んでいる間に増えたぶんがあれば、案内を出す
+    if(el.querySelectorAll('.talk-bubble').length > prevCount) updateChatNewMark(true);
+  }
 }
 
 function sendTalkPanelMsg(){
@@ -492,7 +527,7 @@ function sendTalkPanelMsg(){
   if(editingMsgId){
     const id=editingMsgId;
     input.value=''; cancelEditMsg();
-    dbEditChatMessage(id,text).then(renderTalkPanelMessages).catch(()=>{});
+    dbEditChatMessage(id,text).then(()=>renderTalkPanelMessages(true)).catch(()=>{});
     return;
   }
   const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole!=='supplier') ? 'me' : 'them';
@@ -503,7 +538,7 @@ function sendTalkPanelMsg(){
   // 社内チャットは通知先の指定を反映（空＝ALL）
   const notify = (activeTalkPanelSupplier===INTERNAL_THREAD && notifyTargets.length) ? {notifyNames:[...notifyTargets]} : {};
   dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text,...extra,...notify})
-    .then(renderTalkPanelMessages)
+    .then(()=>renderTalkPanelMessages(true))
     .catch(()=>{});
 }
 
@@ -516,7 +551,7 @@ async function sendTalkPanelFile(fileInput){
   try{
     const fileUrl = await dbUploadChatFile(file);
     await dbAddChatMessage(activeTalkPanelSupplier,{role,type:'file',fileUrl,fileName:file.name,fileMime:file.type});
-    renderTalkPanelMessages();
+    renderTalkPanelMessages(true);   // 自分が送ったので、いちばん下まで送る
   }catch(e){}
 }
 
