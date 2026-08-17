@@ -713,6 +713,9 @@ function renderGantt() {
   const todayOff = diffDays(ganttD0str, todayS);
   const todayLine = (todayOff>=0&&todayOff<totalDays)
     ? `<div class="gantt-today-line" style="left:${todayOff*GANTT_CELL_W+Math.floor(GANTT_CELL_W/2)}px"></div>` : '';
+  // 今日の列そのものに色を敷く
+  const todayBand = (todayOff>=0&&todayOff<totalDays)
+    ? `<div class="gantt-today-band" style="left:${todayOff*GANTT_CELL_W}px;width:${GANTT_CELL_W}px"></div>` : '';
 
   // マイルストーン：各行に縦線／上部の帯に◆ラベル（同日が重なる場合は段をずらす）
   const msVisible = MILESTONE_LABELS
@@ -790,8 +793,23 @@ function renderGantt() {
          </div>`
       : '';
 
-    rightRows += `<div class="gantt-row gantt-row-right ${isActive?'tes-active-bg':''}" style="width:${W}px">
-      ${stripes}${msLines}${todayLine}${barHtml}
+    // 大工程ごとに背景の色を変えて、どこまでが同じ工事か分かるようにする
+    const gColor = _getTaskColor(task);
+    const rowBg = isMaj ? gColor + '2b' : gColor + '12';
+
+    // 大工程は、横にスクロールしても左端に名前と開閉のつまみが残るようにする
+    const grpChip = isMaj
+      ? `<div class="gantt-grp-chip" style="border-left-color:${gColor}"
+             onclick="event.stopPropagation();${hasKids?`schToggleCollapse(${task.id})`:''}">
+           ${hasKids ? `<span class="gantt-grp-caret">${task.collapsed?'▶':'▼'}</span>` : ''}
+           <span class="gantt-grp-name">${esc(task.name)||'（工程名未入力）'}</span>
+           ${hasKids && task.collapsed ? `<span class="gantt-grp-cnt">${scheduleTasks.filter(t=>t.parentId===task.id).length}</span>` : ''}
+         </div>`
+      : '';
+
+    rightRows += `<div class="gantt-row gantt-row-right ${isMaj?'gantt-row-major':''} ${isActive?'tes-active-bg':''}"
+      style="width:${W}px;background:${rowBg}">
+      ${stripes}${msLines}${todayBand}${todayLine}${barHtml}${grpChip}
     </div>`;
   });
 

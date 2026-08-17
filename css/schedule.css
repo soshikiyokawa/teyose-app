@@ -148,8 +148,40 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .tes-active-row  { background: rgba(59,130,246,.12) !important; outline: 1px solid rgba(59,130,246,.3); outline-offset: -1px; }
 
 .gantt-row-right { position: relative; flex-shrink: 0; }
-.gantt-body-right .gantt-row-right:nth-child(odd)  { background: var(--surface-1); }
-.gantt-body-right .gantt-row-right:nth-child(even) { background: var(--surface-2); }
+/* 行の背景は大工程ごとの色で分ける（renderGantt が直に指定する）ので、縞模様は付けない */
+.gantt-row-major { border-top: 2px solid rgba(0,0,0,.10); }
+
+/* 大工程の名前と開閉のつまみ。横にスクロールしても左端に残る */
+.gantt-grp-chip {
+  position: sticky;
+  left: 6px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 12px);
+  margin-left: 6px;
+  padding: 2px 9px 2px 7px;
+  border-left: 4px solid currentColor;
+  border-radius: 4px;
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 3px rgba(0,0,0,.18);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text, #33302b);
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* 大工程の名前はチップに出るので、まとめのバーには重ねて出さない */
+.gantt-row-major .gantt-bar-text { display: none; }
+.gantt-grp-caret { font-size: 9px; color: var(--text-muted); }
+.gantt-grp-name { overflow: hidden; text-overflow: ellipsis; }
+.gantt-grp-cnt {
+  font-size: 10px; font-weight: 700; color: var(--text-sub);
+  background: var(--surface2, #f2efe8); border-radius: 99px; padding: 0 6px;
+}
 .tes-active-bg { background: rgba(59,130,246,.06) !important; }
 
 /* Compact row contents */
@@ -173,6 +205,8 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 /* Decoration */
 .gantt-we-stripe { position: absolute; top: 0; bottom: 0; background: rgba(0,0,0,0.03); pointer-events: none; z-index: 0; }
 .gantt-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--danger, #ef4444); opacity: 0.5; z-index: 3; pointer-events: none; }
+/* 今日の列そのものにも色を敷く（線だけでは分かりにくいため） */
+.gantt-today-band { position: absolute; top: 0; bottom: 0; background: rgba(239,68,68,.10); pointer-events: none; z-index: 0; }
 
 /* ─ Gantt bars ─ */
 .gantt-bar {
