@@ -3,6 +3,9 @@
 #page-schedule { padding: 0; display: none; }
 #page-schedule.active { display: flex; flex-direction: column; height: calc(100vh - 112px); }
 body.sch-preview #page-schedule { display: flex; flex-direction: column; }
+/* index.html のインライン指定から移したもの（スマホ用の指定を効かせるため） */
+#gantt-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+#gantt-inner { flex: 1; min-height: 0; overflow: hidden; }
 body.sch-preview #gantt-wrap { overflow: visible; min-height: 0; height: auto; }
 body.sch-preview #gantt-inner { overflow: visible; min-height: 0; height: auto; }
 body.sch-preview .gantt-container { height: auto; overflow: visible; }
@@ -205,12 +208,21 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   color: #fff;
   font-weight: 500;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   text-shadow: 0 1px 1px rgba(0,0,0,.4);
-  flex: 1;
+  flex: 0 0 auto;
   pointer-events: none;
 }
+/* バーに収まらない工程名は、バーの外に出して最後まで読めるようにする。
+   背景の上に出るので、白い縁取りを付けて読めるようにする */
+.gantt-bar.gantt-bar-out-r .gantt-bar-text,
+.gantt-bar.gantt-bar-out-l .gantt-bar-text {
+  position: absolute;
+  color: var(--text, #33302b);
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  z-index: 4;
+}
+.gantt-bar.gantt-bar-out-r .gantt-bar-text { left: 100%; margin-left: 6px; }
+.gantt-bar.gantt-bar-out-l .gantt-bar-text { right: 100%; margin-right: 6px; }
 
 /* Resize handles at bar edges */
 .gantt-bar-hdl {
@@ -319,8 +331,16 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 
 /* ─ Mobile ─ */
 @media (max-width: 700px) {
-  #page-schedule { height: calc(100vh - 128px); }
-  .gantt-left-panel { width: 130px; }
+  /* 工程表は中だけスクロールせず、ページごと下へスクロールして全部見る */
+  #page-schedule, #page-schedule.active { height: auto; }
+  #gantt-wrap, #gantt-inner { overflow: visible; height: auto; min-height: 0; }
+  .gantt-container { height: auto; overflow: visible; }
+  .gantt-right-panel { height: auto; }
+  .gantt-body-right { overflow-x: auto; overflow-y: visible; height: auto; }
+  /* 左の工程名の列は出さない（画面いっぱいにバーを出す。工程名はバーに出る） */
+  .gantt-left-panel { display: none; }
+  /* 日付の見出しは上に貼り付けておく */
+  .gantt-head-right { position: sticky; top: 59px; z-index: 5; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
   .tes-fields { gap: 8px 10px; }
   .tes-field input[type=date] { width: 100px; }
 }

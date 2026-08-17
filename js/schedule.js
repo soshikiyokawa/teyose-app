@@ -623,6 +623,25 @@ function onProjectChanged() {
 }
 
 // ─ Gantt render ─
+// バーの幅に収まらない工程名を、バーの外（右、入らなければ左）に出す。
+// 幅は描いたあとでないと分からないので、描画のいちばん最後に呼ぶ
+function ganttFitBarLabels(){
+  const body = document.getElementById('gantt-body-right');
+  if (!body) return;
+  const total = body.scrollWidth;
+  body.querySelectorAll('.gantt-bar').forEach(bar => {
+    const t = bar.querySelector('.gantt-bar-text');
+    if (!t) return;
+    bar.classList.remove('gantt-bar-out-r', 'gantt-bar-out-l');
+    const room = bar.clientWidth - 20;          // 左右のつまみのぶんを引く
+    const need = t.scrollWidth;
+    if (need <= room) return;                   // 収まるならバーの中のまま
+    // 右に出すと画面の端で切れてしまう場合は、左に出す
+    const overflowRight = bar.offsetLeft + bar.offsetWidth + need + 12 > total;
+    bar.classList.add(overflowRight ? 'gantt-bar-out-l' : 'gantt-bar-out-r');
+  });
+}
+
 function renderGantt() {
   const inner = document.getElementById('gantt-inner');
   if (!inner) return;
@@ -821,6 +840,9 @@ function renderGantt() {
   } else if (todayOff > 5) {
     bodyR.scrollLeft = Math.max(0, (todayOff - 5) * GANTT_CELL_W);
   }
+
+  // 工程名がバーに収まらないときは、バーの外に出して全部読めるようにする
+  ganttFitBarLabels();
 
   // Restore edit sheet if a task was being edited
   if (editingTaskId && scheduleTasks.find(t => t.id === editingTaskId)) {
