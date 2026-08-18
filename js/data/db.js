@@ -557,7 +557,11 @@ async function dbAddChatMessage(supplierName, msg){
     sender_name: currentUserDisplayName||'',
     reply_to_id:msg.replyToId||null, reply_to_text:msg.replyToText||null, reply_to_sender:msg.replyToSender||null
   }).select().single();
-  if(error){showToast('送信に失敗しました：'+error.message);throw error;}
+  if(error){
+    const e = new Error(error.message); e.friendly = true;
+    showToast('送信に失敗しました：'+error.message);
+    throw e;
+  }
   if(!talkThreads[supplierName]) talkThreads[supplierName]=[];
   talkThreads[supplierName].push({id:data.id,role:data.role,type:data.type,text:data.text,orderData:data.order_data,fileUrl:data.file_url,fileName:data.file_name,fileMime:data.file_mime,ts:new Date(data.created_at).getTime(),unread:false,senderName:data.sender_name||'',reactions:{},replyToText:data.reply_to_text||'',replyToSender:data.reply_to_sender||'',editedAt:null,bookmarks:[]});
 
@@ -597,20 +601,35 @@ async function dbForwardToChatWork(supplierId, senderName, text){
 }
 
 // チャット添付ファイル（写真・PDF等）をSupabase Storageにアップロードし、公開URLを返す
-async function dbUploadChatFile(file){
+// fileName・mime を渡せる（写真は送る前にJPEGへ変換するため、元の名前と違うことがある）
+async function dbUploadChatFile(file, fileName, mime){
+  if(file.size > 40*1024*1024){
+    const e = new Error('ファイルが大きすぎます（40MBまで）'); e.friendly = true;
+    showToast(e.message); throw e;
+  }
   // 保存先のキーには日本語等が使えないため、拡張子だけ残して安全な名前に変換する
   // （元のファイル名はfile_nameに別途保存し、表示時に使う）
-  const extMatch = file.name.match(/\.[a-zA-Z0-9]+$/);
+  const name = fileName || file.name || '';
+  const extMatch = name.match(/\.[a-zA-Z0-9]+$/);
   const ext = extMatch ? extMatch[0] : '';
-  const path = `${Date.now()}_${Math.random().toString(36).slice(2,8)}${ext}`;
-  const put = () => sb.storage.from('chat-files').upload(path, file, { contentType: file.type || 'application/octet-stream' });
-  let { error } = await put();
-  if(error){   // ログインの期限切れなら入れ直して1回だけやり直す
+  const type = mime || file.type || 'application/octet-stream';
+  // 同じ名前にならないよう、やり直しのたびに別のキーにする
+  const put = () => {
+    const path = `${Date.now()}_${Math.random().toString(36).slice(2,8)}${ext}`;
+    return sb.storage.from('chat-files').upload(path, file, { contentType: type })
+      .then(r => ({ ...r, path }));
+  };
+  let res = await put();
+  if(res.error){   // ログインの期限切れなら入れ直して1回だけやり直す
     try{ await sb.auth.refreshSession(); }catch(_){}
-    ({ error } = await put());
+    res = await put();
   }
-  if(error){showToast('ファイルのアップロードに失敗しました：'+uploadErrorMessage(error));throw error;}
-  const { data } = sb.storage.from('chat-files').getPublicUrl(path);
+  if(res.error){
+    const e = new Error(uploadErrorMessage(res.error)); e.friendly = true;
+    showToast('ファイルのアップロードに失敗しました：'+e.message);
+    throw e;
+  }
+  const { data } = sb.storage.from('chat-files').getPublicUrl(res.path);
   return data.publicUrl;
 }
 

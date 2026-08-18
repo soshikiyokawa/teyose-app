@@ -547,12 +547,28 @@ async function sendTalkPanelFile(fileInput){
   fileInput.value='';
   if(!file||!activeTalkPanelSupplier) return;
   const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole!=='supplier') ? 'me' : 'them';
-  showToast('アップロード中…');
+  showToast('アップロード中…', 30000);
   try{
-    const fileUrl = await dbUploadChatFile(file);
-    await dbAddChatMessage(activeTalkPanelSupplier,{role,type:'file',fileUrl,fileName:file.name,fileMime:file.type});
+    // 写真は長辺1600pxのJPEGにしてから送る。
+    //   ・そのままだと1枚が数MBあり、電波が弱いと送れないことがある
+    //   ・iPhoneのHEICもJPEGになるので、パソコンやAndroidでも開ける
+    let body = file, name = file.name || '写真', mime = file.type || '';
+    if(mime.startsWith('image/') && typeof gbCompressImage==='function'){
+      const blob = await gbCompressImage(file);
+      if(blob && blob !== file && blob.size){
+        body = blob;
+        mime = blob.type || 'image/jpeg';
+        name = name.replace(/\.[^.]+$/,'') + '.jpg';
+      }
+    }
+    const fileUrl = await dbUploadChatFile(body, name, mime);
+    await dbAddChatMessage(activeTalkPanelSupplier,{role,type:'file',fileUrl,fileName:name,fileMime:mime});
+    showToast('送信しました');
     renderTalkPanelMessages(true);   // 自分が送ったので、いちばん下まで送る
-  }catch(e){}
+  }catch(e){
+    // 理由が出ていない落ち方（画像の変換に失敗したときなど）もここで知らせる
+    if(!e || !e.friendly) showToast('送れませんでした：'+((e&&e.message)||e||'原因不明'));
+  }
 }
 
 async function deleteTalkMessage(msgId){
