@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=293">
+<link rel="stylesheet" href="css/main.css?v=300">
 <link rel="stylesheet" href="css/schedule.css?v=295">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -2017,6 +2017,21 @@
     <div class="fg" style="margin-bottom:10px"><label>メールアドレス</label><input id="s-email" placeholder="例：tanaka@example.com" type="email"></div>
     <div class="fg" style="margin-bottom:10px"><label>取扱カテゴリ（メモ）</label><input id="s-cats" placeholder="例：木材、合板"></div>
     <div class="fg" style="margin-bottom:10px"><label>ChatWork ルームID（任意）</label><input id="s-chatwork" placeholder="例：123456789" inputmode="numeric"><div style="font-size:10px;color:var(--text-muted);margin-top:2px">設定すると、この発注先チャットで送った内容がChatWorkの該当ルームにも自動投稿されます</div></div>
+    <div class="fg" style="margin-bottom:10px">
+      <label>発注書の送付先</label>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px">
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:400">
+          <input type="checkbox" id="s-ch-chat" style="width:auto">手寄のチャット</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:400">
+          <input type="checkbox" id="s-ch-chatwork" style="width:auto">ChatWork（上のルームIDが必要）</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:400">
+          <input type="checkbox" id="s-ch-email" style="width:auto">メール（上のメールアドレスが必要）</label>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:4px;line-height:1.6">
+        発注を確定したときに、ここで選んだ先へ発注書が送られます。いくつでも選べます。<br>
+        ※メールは送る仕組みの用意がまだできていません。選んでも送られないため、いまはチャットかChatWorkをお使いください。
+      </div>
+    </div>
     <div class="fg"><label>備考</label><textarea id="s-note" placeholder="支払条件、営業時間など" style="min-height:50px"></textarea></div>
     <div class="modal-actions">
       <button class="btn danger" id="supplier-delete-btn" onclick="deleteSupplier()" style="display:none">
@@ -2451,7 +2466,7 @@
 <script src="js/state.js?v=245"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=296"></script>
+<script src="js/data/db.js?v=300"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=282"></script>
@@ -2485,7 +2500,7 @@
 <script src="js/schedule.js?v=295"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=202"></script>
+<script src="js/order/supplier-master.js?v=300"></script>
 <script src="js/order/item-price.js?v=270"></script>
 <script src="js/order/item-master.js?v=271"></script>
 <script src="js/order/invoice.js?v=281"></script>

@@ -5,6 +5,14 @@
 .fg label{font-size:11px;color:var(--text-sub);font-weight:600}
 .fg input,.fg select,.fg textarea{border:0.5px solid var(--border-s);border-radius:var(--radius);padding:8px 10px;font-size:13px;background:var(--surface2);color:var(--text);font-family:inherit;-webkit-appearance:none;width:100%}
 .fg input:focus,.fg select:focus,.fg textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;background:var(--surface)}
+/* チェックボックスは、上の指定で見た目が消えてしまうので付け直す（入／切が分かるように） */
+.fg input[type=checkbox]{-webkit-appearance:none;appearance:none;width:18px;height:18px;flex:0 0 18px;
+  padding:0;border-radius:4px;border:1.5px solid var(--border-s);background:var(--surface);
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;position:relative}
+.fg input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+.fg input[type=checkbox]:checked::after{content:"";width:5px;height:9px;border:solid #fff;
+  border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.fg input[type=checkbox]:focus{outline:2px solid var(--accent);outline-offset:2px}
 .fg textarea{resize:vertical;min-height:60px}
 
 .form-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}

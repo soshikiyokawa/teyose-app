@@ -20,6 +20,7 @@ function renderSupplierMaster(){
         <div style="font-size:13px;font-weight:700">${s.name}</div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${[s.contact,s.tel,s.email].filter(Boolean).join(' · ')}</div>
         ${s.cats?`<div style="font-size:11px;color:var(--accent-t);margin-top:1px">取扱：${s.cats}</div>`:''}
+        <div style="font-size:11px;color:var(--text-muted);margin-top:1px">発注書：${orderChannelsOf(s).map(c=>ORDER_CHANNEL_LABEL[c]||c).join('・')}</div>
         ${s.note?`<div style="font-size:11px;color:var(--text-muted);margin-top:1px">${s.note}</div>`:''}
       </div>
       <button style="padding:4px 9px;border-radius:6px;font-size:11px;border:0.5px solid var(--border);background:var(--surface2);cursor:pointer;font-family:inherit;color:var(--text-sub);white-space:nowrap" onclick="openSupplierEdit(${s.id})">編集</button>`;
@@ -51,8 +52,17 @@ async function saveSupplierOrder(){
 function openSupplierEdit(id){
   editingSupplierId=id;
   document.getElementById('supplier-modal-title').textContent=id===-1?'発注先を追加':'発注先を編集';
-  if(id===-1){['s-name','s-contact','s-tel','s-email','s-cats','s-note','s-chatwork'].forEach(i=>document.getElementById(i).value='');}
-  else{const s=suppliers.find(x=>x.id===id);if(!s)return;document.getElementById('s-name').value=s.name;document.getElementById('s-contact').value=s.contact;document.getElementById('s-tel').value=s.tel;document.getElementById('s-email').value=s.email;document.getElementById('s-cats').value=s.cats;document.getElementById('s-note').value=s.note;document.getElementById('s-chatwork').value=s.chatworkRoomId||'';}
+  if(id===-1){
+    ['s-name','s-contact','s-tel','s-email','s-cats','s-note','s-chatwork'].forEach(i=>document.getElementById(i).value='');
+    setSupplierChannels(['chat']);
+  } else {
+    const s=suppliers.find(x=>x.id===id);if(!s)return;
+    document.getElementById('s-name').value=s.name;document.getElementById('s-contact').value=s.contact;
+    document.getElementById('s-tel').value=s.tel;document.getElementById('s-email').value=s.email;
+    document.getElementById('s-cats').value=s.cats;document.getElementById('s-note').value=s.note;
+    document.getElementById('s-chatwork').value=s.chatworkRoomId||'';
+    setSupplierChannels(orderChannelsOf(s));
+  }
   document.getElementById('supplier-delete-btn').style.display=id===-1?'none':'inline-flex';
   document.getElementById('supplier-modal').classList.add('open');
 }
@@ -72,8 +82,11 @@ async function deleteSupplier(){
   showToast('発注先を削除しました');
 }
 async function saveSupplier(){
-  const item={name:document.getElementById('s-name').value.trim(),contact:document.getElementById('s-contact').value.trim(),tel:document.getElementById('s-tel').value.trim(),email:document.getElementById('s-email').value.trim(),cats:document.getElementById('s-cats').value.trim(),note:document.getElementById('s-note').value.trim(),chatworkRoomId:document.getElementById('s-chatwork').value.trim()};
+  const item={name:document.getElementById('s-name').value.trim(),contact:document.getElementById('s-contact').value.trim(),tel:document.getElementById('s-tel').value.trim(),email:document.getElementById('s-email').value.trim(),cats:document.getElementById('s-cats').value.trim(),note:document.getElementById('s-note').value.trim(),chatworkRoomId:document.getElementById('s-chatwork').value.trim(),orderChannels:getSupplierChannels()};
   if(!item.name){alert('発注先名を入力してください');return;}
+  if(!item.orderChannels.length){alert('発注書の送付先を1つ以上選んでください');return;}
+  if(item.orderChannels.includes('chatwork') && !item.chatworkRoomId){alert('ChatWorkに送るには、ルームIDを入れてください');return;}
+  if(item.orderChannels.includes('email') && !item.email){alert('メールで送るには、メールアドレスを入れてください');return;}
   try{
     if(editingSupplierId===-1) await dbAddSupplier(item);
     else{
@@ -86,4 +99,17 @@ async function saveSupplier(){
 
 function buildSupplierOptions(selected=''){
   return suppliers.map(s=>`<option${s.name===selected?' selected':''}>${s.name}</option>`).join('');
+}
+
+
+// ── 発注書の送付先（チェックボックス） ──
+function getSupplierChannels(){
+  return ['chat','chatwork','email'].filter(c=>document.getElementById('s-ch-'+c)?.checked);
+}
+function setSupplierChannels(list){
+  const on = new Set(list||[]);
+  ['chat','chatwork','email'].forEach(c=>{
+    const el = document.getElementById('s-ch-'+c);
+    if(el) el.checked = on.has(c);
+  });
 }

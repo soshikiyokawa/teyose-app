@@ -22,7 +22,7 @@ function supplierNameById(id){
 async function fetchAllData(){
   const { data: supplierRows, error: supErr } = await sb.from('suppliers').select('*').order('sort_order').order('id');
   if(supErr) throw supErr;
-  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',chatworkRoomId:r.chatwork_room_id||'',sortOrder:r.sort_order}));
+  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',chatworkRoomId:r.chatwork_room_id||'',orderChannels:(Array.isArray(r.order_channels)&&r.order_channels.length)?r.order_channels:['chat'],sortOrder:r.sort_order}));
   supplierIdSeq = Math.max(0,...suppliers.map(s=>s.id))+1;
 
   const { data: itemRows, error: itemErr } = await sb.from('master_items').select('*').order('sort_order').order('id');
@@ -235,12 +235,12 @@ async function dbSaveEstimateDefault(type,sectionsData){
 
 // ── 発注先 ──
 async function dbAddSupplier(item){
-  const { data, error } = await sb.from('suppliers').insert({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||''}).select().single();
+  const { data, error } = await sb.from('suppliers').insert({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||'',order_channels:item.orderChannels||['chat']}).select().single();
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   suppliers.push({id:data.id,...item});
 }
 async function dbUpdateSupplier(id,item){
-  const { error } = await sb.from('suppliers').update({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||''}).eq('id',id);
+  const { error } = await sb.from('suppliers').update({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||'',order_channels:item.orderChannels||['chat']}).eq('id',id);
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
 }
 async function dbDeleteSupplier(id){
@@ -397,7 +397,7 @@ async function dbConfirmOrder(order){
   const { error: costErr } = await sb.from('cost_entries').insert(costRows);
   if(costErr){showToast('原価登録に失敗しました：'+costErr.message);throw costErr;}
 
-  await dbAddChatMessage(order.suppliers,{role:'me',type:'order',orderData:order});
+  await dbSendOrderToSupplier(order);
   return orderRow;
 }
 async function dbMarkOrderReceived(orderNo, supplierName){
@@ -597,6 +597,7 @@ async function dbForwardToChatWork(supplierId, senderName, text){
   if(!supplierId || !text) return;
   const sup = suppliers.find(s=>s.id===supplierId);
   if(!sup || !sup.chatworkRoomId) return; // ルーム未設定なら送らない（無駄打ち防止）
+  if(!orderChannelsOf(sup).includes('chatwork')) return;   // 送付先に選ばれていない
   await sb.functions.invoke('chatwork-forward', { body:{ supplierId, senderName, text } });
 }
 
@@ -1256,4 +1257,38 @@ async function dbSaveInspectionGuide(projectId, kind, guidedDate){
     done_date:cur?.doneDate||null, note:cur?.note||'', user_name:currentUserDisplayName||''
   }, {onConflict:'project_id,kind'});
   if(error) inspectionSaveError(error);
+}
+
+
+// ════ 発注書の送付先（発注先マスタで選ぶ） ════
+//
+//   chat     … 手寄のチャットに発注書を出す（発注先のアカウントに届く）
+//   chatwork … ChatWorkのルームへ転送する（ルームIDを入れてある発注先のみ）
+//   email    … メールで送る
+//
+// 何も選ばれていない古いデータは、これまでどおり chat とみなす。
+const ORDER_CHANNEL_LABEL = {chat:'チャット', chatwork:'ChatWork', email:'メール'};
+function orderChannelsOf(sup){
+  const a = sup && Array.isArray(sup.orderChannels) ? sup.orderChannels.filter(Boolean) : [];
+  return a.length ? a : ['chat'];
+}
+
+// 発注確定のあと、選ばれている送り先へ発注書を送る
+async function dbSendOrderToSupplier(order){
+  const sup = (suppliers||[]).find(s=>s.name===order.suppliers);
+  const ch = orderChannelsOf(sup);
+
+  // チャット（ChatWorkへの転送は dbAddChatMessage の中で行われる）
+  if(ch.includes('chat')){
+    await dbAddChatMessage(order.suppliers,{role:'me',type:'order',orderData:order});
+  } else if(ch.includes('chatwork')){
+    // チャットには出さず、ChatWorkだけに送る
+    const preview = `発注書 ${order.no}（${order.project}）合計 ¥${fmt(order.total)}`;
+    dbForwardToChatWork(sup?.id, currentUserDisplayName||'', preview).catch(()=>{});
+  }
+
+  // メール（送る仕組みがまだ用意できていないので、その旨を伝える）
+  if(ch.includes('email')){
+    showToast(`${order.suppliers}はメール送付の設定ですが、メールを送る準備がまだできていません`, 4000);
+  }
 }
