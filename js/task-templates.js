@@ -377,9 +377,13 @@ let ttApplyPick = [];         // 取り込むテンプレートのID
 async function openTaskApply(){
   if(currentUserRole==='supplier'){ return; }
   const sel=document.getElementById('ta-project');
-  const list=(projects||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ja'));
+  // 取り込み先は、これから進める案件だけ（完工済みは出さない）
+  const list=(typeof taskProjectOptions==='function')
+    ? taskProjectOptions()
+    : (projects||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ja'));
   sel.innerHTML='<option value="">案件を選択...</option>'
     + list.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  if(ttApplyProjectId && !list.some(p=>p.id===ttApplyProjectId)) ttApplyProjectId=null;
   sel.value = ttApplyProjectId ? String(ttApplyProjectId) : '';
   ttApplyPick=[];
   document.getElementById('ta-list').innerHTML=

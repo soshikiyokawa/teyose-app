@@ -234,12 +234,30 @@ function openTaskEdit(id){
 }
 function closeTaskModal(){ document.getElementById('task-modal').classList.remove('open'); }
 
+// 案件の選択肢。もう終わった工事を選ばないよう、完工済みは外す
+// （案件一覧の「完工」バッジと同じ判定を使う）
+function taskProjectOptions(){
+  return (projects||[])
+    .filter(p=>!(typeof isProjectCompleted==='function' && isProjectCompleted(p)))
+    .sort((a,b)=>String(a.name).localeCompare(String(b.name),'ja'));
+}
+
 function renderTaskProjectSelect(projectId){
   const el=document.getElementById('task-project');
   if(!el) return;
-  const list=(projects||[]).slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'ja'));
+  const list=taskProjectOptions();
   el.innerHTML='<option value="">（案件に紐づけない）</option>'
     + list.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  // 完工したあとに開き直したタスクは、当時の案件がそのまま出るようにする
+  if(projectId && !list.some(p=>p.id===projectId)){
+    const p=(projects||[]).find(x=>x.id===projectId);
+    if(p){
+      const o=document.createElement('option');
+      o.value=String(p.id);
+      o.textContent=p.name+'（完工）';
+      el.appendChild(o);
+    }
+  }
   el.value = projectId ? String(projectId) : '';
 }
 
