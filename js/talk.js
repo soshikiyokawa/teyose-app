@@ -334,6 +334,7 @@ function openTalkPanelThread(supName){
   updateNotifyLabel();
   setupMsgMenuHandlers();
   updateChatNewMark(false);
+  _chatStick = true;
   renderTalkPanelMessages(true);
   // 開いた時刻を既読として記録し、未読バッジを更新する
   dbMarkThreadRead(threadKeyOf(supName)).then(updateChatBadge).catch(()=>{});
@@ -412,6 +413,33 @@ function chatAtBottom(el){
   if(!el) return true;
   return el.scrollHeight - el.scrollTop - el.clientHeight <= CHAT_BOTTOM_SLACK;
 }
+
+// いちばん下に貼り付いているか。写真の読み込みで高さが変わっても、
+// 貼り付いている間は下に居続ける（勝手に上へずれないようにするため）
+let _chatStick = true;
+
+// 自分でスクロールしたかどうかを見て、貼り付けを入り切りする
+function chatWatchScroll(el){
+  if(!el || el._chatWatched) return;
+  el._chatWatched = true;
+  el.addEventListener('scroll', ()=>{
+    _chatStick = chatAtBottom(el);
+    if(_chatStick) updateChatNewMark(false);
+  }, {passive:true});
+}
+
+// 写真は描いたあとに読み込まれ、そのぶん高さが増える。
+// 何もしないと、増えた高さのぶんだけ画面が上にずれてしまうので、
+// 貼り付け中は読み込みが終わるたびにいちばん下へ送り直す
+function chatKeepBottomOnLoad(el){
+  if(!el) return;
+  el.querySelectorAll('img').forEach(img=>{
+    if(img.complete) return;
+    const fix = ()=>{ if(_chatStick) el.scrollTop = el.scrollHeight; };
+    img.addEventListener('load', fix, {once:true});
+    img.addEventListener('error', fix, {once:true});
+  });
+}
 // 上に戻して読んでいる間に新しいメッセージが来たときに出す案内
 function updateChatNewMark(show){
   const b=document.getElementById('talk-new-msg');
@@ -420,6 +448,7 @@ function updateChatNewMark(show){
 function chatScrollToBottom(){
   const el=document.getElementById('talk-panel-messages');
   if(!el) return;
+  _chatStick = true;
   el.scrollTop=el.scrollHeight;
   updateChatNewMark(false);
 }
@@ -506,16 +535,25 @@ function renderTalkPanelMessages(forceBottom){
     </div>`;
   }).join('');
 
+  chatWatchScroll(el);
+
+  // 画面に出ていないとき（別のページを見ている間の描き直しなど）は、
+  // 高さが取れないので位置をいじらない
+  if(!el.clientHeight){ chatKeepBottomOnLoad(el); return; }
+
   // いちばん下を見ていたとき、または送信直後だけ下まで送る。
   // それ以外は読んでいた位置に戻す（勝手に下へ飛ばない）
   if(forceBottom===true || wasAtBottom){
+    _chatStick = true;
     el.scrollTop=el.scrollHeight;
     updateChatNewMark(false);
   } else {
+    _chatStick = false;
     el.scrollTop=prevTop;
     // 上を読んでいる間に増えたぶんがあれば、案内を出す
     if(el.querySelectorAll('.talk-bubble').length > prevCount) updateChatNewMark(true);
   }
+  chatKeepBottomOnLoad(el);
 }
 
 function sendTalkPanelMsg(){
