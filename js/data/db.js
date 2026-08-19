@@ -31,21 +31,7 @@ async function fetchAllData(){
     makerCode:r.maker_code||'', webPrice:(r.web_price==null?null:Number(r.web_price)), webPriceAt:r.web_price_at||''}));
   masterIdSeq = Math.max(0,...master.map(m=>m.id))+1;
 
-  // チャットは社内＝全件／発注先＝自社分のみ／大工＝社内チャットのみ（RLSが自動で絞る）
-  const { data: chatRows, error: chatErr } = await sb.from('chat_messages').select('*').order('created_at');
-  if(chatErr) throw chatErr;
-  talkThreads = {};
-  chatRows.forEach(r=>{
-    const name = r.project_id ? projectThreadName(r.project_id)
-               : r.is_internal ? INTERNAL_THREAD
-               : supplierNameById(r.supplier_id);
-    if(!talkThreads[name]) talkThreads[name]=[];
-    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{},replyToText:r.reply_to_text||'',replyToSender:r.reply_to_sender||'',editedAt:r.edited_at||null,bookmarks:r.bookmarks||[]});
-  });
-
-  // 既読管理
-  const { data: readRows } = await sb.from('chat_reads').select('*');
-  chatReads = (readRows||[]).map(r=>({userId:r.user_id,userName:r.user_name||'',thread:r.thread,lastReadAt:new Date(r.last_read_at).getTime()}));
+  await fetchChatData();
 
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
@@ -1116,8 +1102,8 @@ function subscribeRealtime(){
   sb.channel('app-changes')
     .on('postgres_changes',{event:'*',schema:'public',table:'suppliers'}, ()=>refetchAndRerender('suppliers'))
     .on('postgres_changes',{event:'*',schema:'public',table:'master_items'}, ()=>refetchAndRerender('master_items'))
-    .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'}, ()=>refetchAndRerender('chat_messages'))
-    .on('postgres_changes',{event:'*',schema:'public',table:'chat_reads'}, ()=>refetchAndRerender('chat_messages'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'}, ()=>refetchChatAndRerender())
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_reads'}, ()=>refetchChatAndRerender())
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'}, ()=>refetchAndRerender('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'cost_entries'}, ()=>refetchAndRerender('cost_entries'))
     .on('postgres_changes',{event:'*',schema:'public',table:'site_photos'}, ()=>refetchAndRerender('site_photos'))
@@ -1290,5 +1276,43 @@ async function dbSendOrderToSupplier(order){
   // メール（送る仕組みがまだ用意できていないので、その旨を伝える）
   if(ch.includes('email')){
     showToast(`${order.suppliers}はメール送付の設定ですが、メールを送る準備がまだできていません`, 4000);
+  }
+}
+
+
+// ════ チャットだけを取り直す ════
+//
+// 新しいメッセージが届いたときに、案件・見積・発注・タスクまで全部取り直していると
+// 何十件も通信が走って数秒かかる。チャットは2件だけ取れば足りるので分けてある。
+async function fetchChatData(){
+  // チャットは社内＝全件／発注先＝自社分のみ／大工＝社内チャットのみ（RLSが自動で絞る）
+  const { data: chatRows, error: chatErr } = await sb.from('chat_messages').select('*').order('created_at');
+  if(chatErr) throw chatErr;
+  talkThreads = {};
+  chatRows.forEach(r=>{
+    const name = r.project_id ? projectThreadName(r.project_id)
+               : r.is_internal ? INTERNAL_THREAD
+               : supplierNameById(r.supplier_id);
+    if(!talkThreads[name]) talkThreads[name]=[];
+    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{},replyToText:r.reply_to_text||'',replyToSender:r.reply_to_sender||'',editedAt:r.edited_at||null,bookmarks:r.bookmarks||[]});
+  });
+
+  // 既読管理
+  const { data: readRows } = await sb.from('chat_reads').select('*');
+  chatReads = (readRows||[]).map(r=>({userId:r.user_id,userName:r.user_name||'',thread:r.thread,lastReadAt:new Date(r.last_read_at).getTime()}));
+}
+
+// チャットの変更で呼ばれる。取り直すのはチャットだけにして、待ち時間を短くする
+async function refetchChatAndRerender(){
+  try{ await fetchChatData(); }
+  catch(e){ console.warn('チャットの再取得に失敗しました', e); return; }
+  notifyNewChatMessages();   // 着信音・未読バッジ
+  if(!talkPanelOpen) return;
+  if(activeTalkPanelSupplier){
+    renderTalkPanelMessages();
+    // 開いているスレッドは読んだものとして扱う
+    dbMarkThreadRead(threadKeyOf(activeTalkPanelSupplier)).then(updateChatBadge).catch(()=>{});
+  } else {
+    renderTalkPanelList();
   }
 }

@@ -527,10 +527,12 @@ function renderTalkPanelMessages(forceBottom){
         ${reactionsHtml(m,isMe)}
       </div>`;
     }
-    return `${sep}<div class="talk-bubble ${isMe?'me':'them'}" data-mid="${m.id}">
+    const sendMark = m.failed ? '<span class="talk-send-ng">送れませんでした</span>'
+                   : m.sending ? '<span class="talk-sending">送信中…</span>' : '';
+    return `${sep}<div class="talk-bubble ${isMe?'me':'them'}${m.sending?' sending':''}" data-mid="${m.id}">
       ${replyRefHtml(m)}
       <div class="bbl">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
-      <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}${msgMarks(m)}</div>
+      <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}${sendMark}${msgMarks(m)}</div>
       ${reactionsHtml(m,isMe)}
     </div>`;
   }).join('');
@@ -575,9 +577,33 @@ function sendTalkPanelMsg(){
   input.value=''; cancelQuote();
   // 社内チャットは通知先の指定を反映（空＝ALL）
   const notify = (activeTalkPanelSupplier===INTERNAL_THREAD && notifyTargets.length) ? {notifyNames:[...notifyTargets]} : {};
-  dbAddChatMessage(activeTalkPanelSupplier,{role,type:'text',text,...extra,...notify})
-    .then(()=>renderTalkPanelMessages(true))
-    .catch(()=>{});
+
+  // 送った内容をその場で出す（送り終わるのを待たない）。
+  // Supabaseへの登録が終わったら、本物のメッセージに差し替える
+  const thread = activeTalkPanelSupplier;
+  const temp = {
+    id: 'tmp-' + Date.now(), sending: true,
+    role, type:'text', text, ts: Date.now(),
+    senderName: currentUserDisplayName||'', unread:false, reactions:{}, bookmarks:[],
+    replyToText: extra.replyToText||'', replyToSender: extra.replyToSender||''
+  };
+  if(!talkThreads[thread]) talkThreads[thread]=[];
+  talkThreads[thread].push(temp);
+  renderTalkPanelMessages(true);
+
+  dbAddChatMessage(thread,{role,type:'text',text,...extra,...notify})
+    .then(()=>{
+      // dbAddChatMessage が本物を足しているので、仮の1件を外す
+      const list = talkThreads[thread]||[];
+      const i = list.indexOf(temp);
+      if(i>=0) list.splice(i,1);
+      renderTalkPanelMessages(true);
+    })
+    .catch(()=>{
+      // 送れなかったときは仮の1件に印を付けて残す（消えると何が送れなかったか分からなくなる）
+      temp.sending = false; temp.failed = true;
+      renderTalkPanelMessages(true);
+    });
 }
 
 async function sendTalkPanelFile(fileInput){
