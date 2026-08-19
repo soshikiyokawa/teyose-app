@@ -1273,10 +1273,32 @@ async function dbSendOrderToSupplier(order){
     dbForwardToChatWork(sup?.id, currentUserDisplayName||'', preview).catch(()=>{});
   }
 
-  // メール（送る仕組みがまだ用意できていないので、その旨を伝える）
+  // メール（発注書PDFを添えて送る）
   if(ch.includes('email')){
-    showToast(`${order.suppliers}はメール送付の設定ですが、メールを送る準備がまだできていません`, 4000);
+    await dbMailOrderToSupplier(order, sup);
   }
+}
+
+// 発注書をメールで送る。先にPDFを作ってから、そのPDFを添えて送信する
+async function dbMailOrderToSupplier(order, sup){
+  if(!sup?.email){
+    showToast(`${order.suppliers}にメールアドレスが登録されていません`, 4000);
+    return;
+  }
+  showToast(`${sup.name}へメールを送っています…`, 20000);
+  let pdfUrl = '';
+  try{
+    pdfUrl = await dbGenerateOrderPdf(order);   // 失敗しても本文だけで送る
+  }catch(_){}
+  const { data, error } = await sb.functions.invoke('send-order-mail', { body:{ order, pdfUrl } });
+  if(error || data?.error){
+    // Supabaseは2xx以外だと中身を読まずにエラーにするので、理由をこちらで取り出す
+    let detail = '';
+    try{ detail = (await error?.context?.json?.())?.error || ''; }catch(_){}
+    showToast('メールを送れませんでした：'+(data?.error || detail || error?.message || '原因不明'), 6000);
+    return;
+  }
+  showToast(`${sup.email} へ発注書をメールしました`, 4000);
 }
 
 
