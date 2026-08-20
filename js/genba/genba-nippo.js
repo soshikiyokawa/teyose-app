@@ -430,7 +430,7 @@ function printDezura(){
   // 日別セル：現場番号（同日複数現場は「1·2」、＊＝残業あり）／休＝休日出勤／有＝有給／半＝半休／振＝振替休日
   const users = {}; // userId -> {name, marks:{date:mark}, siteByDate:{date:{nos:Set,ot:bool}}, work, overtime, days, ...}
   const getU = (id,name)=>users[id] = users[id]||{name:name||'（名前未設定）',marks:{},siteByDate:{},work:0,overtime:0,days:new Set(),
-    holidayDays:0,leaveDays:0,subDays:0,
+    holidayDays:0,leaveDays:0,subDays:0,absenceDays:0,
     minByDate:{},              // 日ごとの実働（分）＝日報から。休日出勤の時間数に使う
     holidayDates:new Set(),    // 承認済みの休日出勤日（全部）
     premiumDates:new Set(),    // うち休日労働（割増あり）
@@ -472,11 +472,18 @@ function printDezura(){
   leaveRequests.filter(lr=>lr.status==='approved').forEach(lr=>{
     const u = getU(lr.userId, lr.userName);
     const half = lr.leaveType!=='全日';
+    // 有給の残日数が足りず、欠勤扱いにした日（承認のときに決まる）
+    const absent = new Set(Array.isArray(lr.absenceDates) ? lr.absenceDates : []);
     for(let d=new Date(lr.startDate+'T00:00:00'); dzDateStr(d)<=lr.endDate; d.setDate(d.getDate()+1)){
       const s = dzDateStr(d);
       if(!inPeriod(s)) continue;
-      u.marks[s] = u.marks[s]||(half?'半':'有');
-      u.leaveDays += half ? 0.5 : 1;
+      if(absent.has(s)){
+        u.marks[s] = u.marks[s]||'欠';
+        u.absenceDays += half ? 0.5 : 1;
+      } else {
+        u.marks[s] = u.marks[s]||(half?'半':'有');
+        u.leaveDays += half ? 0.5 : 1;
+      }
     }
   });
 
@@ -526,7 +533,8 @@ function printDezura(){
                : mk==='－' ? 'background:#f2efe8'
                : missing   ? 'background:#ffe0b2'  // 未入力を目立たせる
                : '';
-      const color = special==='休'?'color:#b5302a;font-weight:700'      // 休日労働（割増あり）
+      const color = special==='欠'?'color:#b5302a;font-weight:700'      // 欠勤（有給の残が足りなかった日）
+        : special==='休'?'color:#b5302a;font-weight:700'      // 休日労働（割増あり）
         : special==='替'?'color:#1f6f8b;font-weight:700'                 // 振替出勤（割増なし）
         : (special==='有'||special==='半')?'color:#2e7d52;font-weight:700'
         : special==='振'?'color:#8a6000;font-weight:700'
@@ -557,6 +565,7 @@ function printDezura(){
       ${premCell}
       ${hCell(furi)}
       <td class="sum" style="text-align:right">${u.leaveDays||''}</td>
+      <td class="sum" style="text-align:right;${u.absenceDays>0?'color:#b5302a;font-weight:700':''}">${u.absenceDays||''}</td>
       <td class="sum" style="text-align:right">${u.subDays||''}</td>
     </tr>`;
   }).join('');
@@ -637,12 +646,12 @@ function printDezura(){
   <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
     <h2 style="font-size:16px;margin:0">出面表　${y}年${m}月度</h2>
     <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
-    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　<span style="color:#b5302a;font-weight:700">休</span>=休日労働（割増対象）　<span style="color:#1f6f8b;font-weight:700">替</span>=振替出勤（事前に振替休日を指定＝労働日の振替のため割増なし）　休・替の下段は日報の実働時間　有=有給　半=半休　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　<span style="background:#ffcdd2;padding:0 4px">■</span>＝休日出勤の日報が未提出（時間数を計算できません）　※休日出勤・有給・振替は承認済みのみ　※役員は休日労働割増の対象外のため「休日労働(h)割増」は—</span>
+    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　<span style="color:#b5302a;font-weight:700">休</span>=休日労働（割増対象）　<span style="color:#1f6f8b;font-weight:700">替</span>=振替出勤（事前に振替休日を指定＝労働日の振替のため割増なし）　休・替の下段は日報の実働時間　有=有給　半=半休　<span style="color:#b5302a;font-weight:700">欠</span>=欠勤（有給の残日数が足りなかった日）　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　<span style="background:#ffcdd2;padding:0 4px">■</span>＝休日出勤の日報が未提出（時間数を計算できません）　※休日出勤・有給・振替は承認済みのみ　※役員は休日労働割増の対象外のため「休日労働(h)割増」は—</span>
   </div>
   <div style="font-size:10px;color:#888;margin-bottom:4px">← 横スクロールで日付が見られます（氏名は固定）</div>
   <div class="dz-scroll">
   <table class="dz">
-    <tr><th>氏名</th>${head}<th class="sum sum-first">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum" style="background:#fdeaea">休日労働<br>(h)割増</th><th class="sum" style="background:#e8f2f6">振替出勤<br>(h)</th><th class="sum">有給<br>日数</th><th class="sum">振休<br>日数</th></tr>
+    <tr><th>氏名</th>${head}<th class="sum sum-first">出勤<br>日数</th><th class="sum">実働<br>(h)</th><th class="sum">残業<br>(h)</th><th class="sum">休出<br>日数</th><th class="sum" style="background:#fdeaea">休日労働<br>(h)割増</th><th class="sum" style="background:#e8f2f6">振替出勤<br>(h)</th><th class="sum">有給<br>日数</th><th class="sum">欠勤<br>日数</th><th class="sum">振休<br>日数</th></tr>
     ${rows}
   </table>
   </div>

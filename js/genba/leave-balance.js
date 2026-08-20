@@ -86,8 +86,10 @@ function leaveLedger(userId, opt){
     : grants.slice();
 
   const mine = (typeof leaveRequests!=='undefined' ? leaveRequests : []).filter(lr=>lr.userId===userId);
+  // 欠勤扱いにした分は有給を使っていないので、取得日数から差し引く
   const taken = mine.filter(lr=>lr.status==='approved')
-    .map(lr=>({date:lr.startDate, days:Number(lr.days)||0}))
+    .map(lr=>({date:lr.startDate, days:Math.max(0, (Number(lr.days)||0) - leaveAbsenceDaysOf(lr))}))
+    .filter(t=>t.days>0)
     .sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:0);
 
   let shortage=0;   // どの付与でも賄えなかった取得（＝残日数が足りていない分）
@@ -415,4 +417,52 @@ async function saveLeaveSetting(){
   closeLeaveSetting();
   showToast('保存しました');
   renderLeave();
+}
+
+
+// ════ 有給残が足りないときの欠勤扱い ════
+//
+// 承認するときに、その人の残日数で賄えない日を「欠勤」にする。
+// 古い日から有給を当てて、あふれた後ろの日を欠勤にする。
+// 出面表では「欠」と出し、有給日数にも残日数の計算にも入れない。
+
+// その申請で欠勤扱いになっている日数
+function leaveAbsenceDaysOf(lr){
+  const list = Array.isArray(lr?.absenceDates) ? lr.absenceDates : [];
+  if(!list.length) return 0;
+  return list.length * (lr.leaveType!=='全日' ? 0.5 : 1);
+}
+
+// 申請に含まれる「有給を使う日」を古い順に並べる。
+// 勤務カレンダーの休日は有給を消化しないので外す（leaveWorkdaysBetween と同じ考え方）
+function leaveWorkDatesOf(lr){
+  const set = (typeof workHolidays!=='undefined' && workHolidays)
+    ? workHolidays[leaveCalOf(lr.userId)] : null;
+  const out = [];
+  let d = lr.startDate;
+  for(let i=0; i<400 && d<=lr.endDate; i++){
+    if(!set || !set.has(d)) out.push(d);
+    d = lvAddDays(d,1);
+  }
+  return out;
+}
+
+// この申請を承認したときに、欠勤扱いになる日を返す（足りていれば空）
+function leaveAbsenceDates(lr){
+  if(!lr) return [];
+  // 役員は有給の管理そのものをしていないので、欠勤扱いにもしない
+  if(typeof isLeaveExempt==='function' && isLeaveExempt(lr.userName)) return [];
+  let L;
+  try{ L = leaveLedger(lr.userId); }catch(_){ return []; }
+  if(!L || !isFinite(L.remain)) return [];
+
+  const half = lr.leaveType!=='全日';
+  const per = half ? 0.5 : 1;
+  const dates = leaveWorkDatesOf(lr);
+  if(!dates.length) return [];
+
+  // 残っている日数で賄える日数（古い日から順に当てる）
+  const canPay = Math.max(0, Math.floor((Math.max(0, L.remain) + 1e-9) / per));
+  if(canPay >= dates.length) return [];
+  return dates.slice(canPay);
 }

@@ -93,6 +93,7 @@ function leaveRowHtml(lr, forReview){
         ${currentUserRole==='staff' && !isMine ? `<div style="font-size:11px;color:var(--text-sub)">${esc(lr.userName)}</div>` : ''}
         ${lr.reason ? `<div style="font-size:11px;color:var(--text-sub)">${esc(lr.reason)}</div>` : ''}
         ${lr.status!=='pending' && lr.reviewNote ? `<div style="font-size:11px;color:var(--text-muted)">↳ ${esc(lr.reviewNote)}</div>` : ''}
+        ${(lr.absenceDates||[]).length ? `<div style="font-size:11px;color:var(--danger);font-weight:700">欠勤扱い ${lvNum(lr.absenceDates.length*(lr.leaveType!=='全日'?0.5:1))}日（${lr.absenceDates.map(x=>x.slice(5).replace('-','/')).join('・')}）　有給の残日数が足りなかったぶん</div>` : ''}
       </div>
       <span class="status-badge ${st.cls}">${st.label}</span>
       ${forReview
@@ -171,8 +172,27 @@ function closeLeaveReview(){
 async function reviewLeave(status){
   if(reviewingLeaveId==null) return;
   const note = document.getElementById('leave-review-note').value.trim();
+
+  // 有給の残日数が足りない場合は、欠勤扱いになることを先に伝えてから承認する
+  let absent = [];
+  if(status==='approved'){
+    const lr = leaveRequests.find(x=>x.id===reviewingLeaveId);
+    if(lr && typeof leaveAbsenceDates==='function') absent = leaveAbsenceDates(lr);
+    if(absent.length){
+      const half = lr.leaveType!=='全日';
+      const d = absent.length * (half?0.5:1);
+      const ok = confirm(
+        `${lr.userName}さんの有給の残日数が足りません。\n\n` +
+        `${lvNum(d)}日分（${absent.map(x=>x.slice(5).replace('-','/')).join('・')}）を欠勤として出面表に登録します。\n` +
+        `本人にもその旨を通知します。\n\nこの内容で承認しますか？`);
+      if(!ok) return;
+    }
+  }
+
   await dbReviewLeaveRequest(reviewingLeaveId, status, note);
   closeLeaveReview();
-  showToast(status==='approved' ? '承認しました（本人に通知されます）' : '却下しました（本人に通知されます）');
+  showToast(status==='approved'
+    ? (absent.length ? '承認しました（欠勤扱いを含みます。本人に通知されます）' : '承認しました（本人に通知されます）')
+    : '却下しました（本人に通知されます）');
   await refreshGenba();
 }

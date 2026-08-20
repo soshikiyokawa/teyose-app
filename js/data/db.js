@@ -721,7 +721,7 @@ async function fetchGenbaData(){
   dailyReports = (nippoRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',workKind:r.work_kind||'',content:r.content||'',startTime:r.start_time||'08:00',endTime:r.end_time||'18:00',breakMinutes:r.break_minutes,workMinutes:r.work_minutes,overtimeMinutes:r.overtime_minutes,otStatus:r.ot_status||'none',otApproverName:r.ot_approver_name||'',otReviewerName:r.ot_reviewer_name||'',otReviewNote:r.ot_review_note||''}));
 
   const { data: leaveRows } = await sb.from('leave_requests').select('*').order('created_at',{ascending:false});
-  leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
+  leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,absenceDates:r.absence_dates||[],createdAt:r.created_at}));
 
   const { data: holidayRows } = await sb.from('holiday_requests').select('*').order('created_at',{ascending:false});
   holidayRequests = (holidayRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',reason:r.reason||'',substituteDate:r.substitute_date||null,approverName:r.approver_name||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
@@ -1018,14 +1018,39 @@ async function dbAddLeaveRecord(rec){
 }
 async function dbReviewLeaveRequest(id, status, note){
   const lr = leaveRequests.find(x=>x.id===id);
-  const { error } = await sb.from('leave_requests').update({
+
+  // 承認するときは、残日数で足りない分を欠勤扱いにする
+  const absence = (status==='approved' && lr && typeof leaveAbsenceDates==='function')
+    ? leaveAbsenceDates(lr) : [];
+
+  const row = {
     status, review_note:note||'', reviewer_name:currentUserDisplayName||'', reviewed_at:new Date().toISOString()
-  }).eq('id',id);
+  };
+  if(status==='approved') row.absence_dates = absence;
+
+  let { error } = await sb.from('leave_requests').update(row).eq('id',id);
+  // absence_dates の列（migration-genba50.sql）が未適用でも承認は通す
+  if(error && /absence_dates/.test(error.message||'')){
+    console.warn('absence_dates列が未作成のため、欠勤扱いを保存せずに続行します');
+    delete row.absence_dates;
+    ({ error } = await sb.from('leave_requests').update(row).eq('id',id));
+  }
   if(error){showToast('更新に失敗しました：'+error.message);throw error;}
+  if(lr && row.absence_dates) lr.absenceDates = absence;
+
   // 申請者本人へ通知
   if(lr){
-    const label = status==='approved' ? '承認されました' : '却下されました';
-    dbSendPushToUser(lr.userId, '有給申請の結果', `${lr.startDate.replace(/-/g,'/')}〜の有給申請が${label}`, 'genba/leave').catch(()=>{});
+    const period = lr.startDate.replace(/-/g,'/');
+    if(status==='approved' && absence.length){
+      const half = lr.leaveType!=='全日';
+      const d = absence.length * (half?0.5:1);
+      dbSendPushToUser(lr.userId, '有給申請の結果（欠勤扱いを含みます）',
+        `${period}〜の申請を承認しました。ただし有給の残日数が足りないため、${lvNum(d)}日分（${absence.map(x=>x.slice(5).replace('-','/')).join('・')}）は欠勤として出面表に登録します。`,
+        'genba/leave').catch(()=>{});
+    } else {
+      const label = status==='approved' ? '承認されました' : '却下されました';
+      dbSendPushToUser(lr.userId, '有給申請の結果', `${period}〜の有給申請が${label}`, 'genba/leave').catch(()=>{});
+    }
   }
 }
 async function dbDeleteLeaveRequest(id){
