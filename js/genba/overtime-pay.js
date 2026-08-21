@@ -329,18 +329,24 @@ function otPayAllocation(month){
     u.holPay   = u.exempt ? 0 : yen(u.rate, st.rates.holiday,  u.holMin);
     u.nightPay = yen(u.rate, st.rates.night, u.nightMin);
     u.total    = u.otPay + u.naibuPay + u.holPay + u.nightPay;
-    // 現場ごとの金額。合計が u.total とぴったり合うように配る
+    // 現場ごとの金額。合計が u.total とぴったり合うように配る。
+    // siteYen＝ぜんぶ合わせた額／siteYenBy＝残業・休日労働・深夜・所定外それぞれの額
     u.siteYen = {};
-    const add = (yenTotal, minBySite) => {
+    u.siteYenBy = {ot:{}, hol:{}, night:{}, naibu:{}};
+    const add = (kind, yenTotal, minBySite) => {
       const names = Object.keys(minBySite);
       if(!yenTotal || !names.length) return;
       const parts = otSplitInt(yenTotal, names.map(n=>minBySite[n]));
-      names.forEach((n,i)=>{ if(parts[i]) u.siteYen[n] = (u.siteYen[n]||0) + parts[i]; });
+      names.forEach((n,i)=>{
+        if(!parts[i]) return;
+        u.siteYen[n] = (u.siteYen[n]||0) + parts[i];
+        u.siteYenBy[kind][n] = (u.siteYenBy[kind][n]||0) + parts[i];
+      });
     };
-    add(u.otPay,    u.otSite);
-    add(u.naibuPay, u.naibuSite);
-    add(u.holPay,   u.holSite);
-    add(u.nightPay, u.nightSite);
+    add('ot',    u.otPay,    u.otSite);
+    add('naibu', u.naibuPay, u.naibuSite);
+    add('hol',   u.holPay,   u.holSite);
+    add('night', u.nightPay, u.nightSite);
   });
 
   return {month, start, end, st, users, userIds};
@@ -488,14 +494,33 @@ function otPayBasisText(a){
        + `所定外（法定内）＝所定は超えたが①②にならなかった分で、割増は要らないぶん。`;
 }
 
-// 誰の時間外の賃金が、どの現場にいくら乗っているか
+// 時間外の中身の種類。表の列の並びもこの順
+const OT_KINDS = [
+  {key:'ot',    label:'残業代'},
+  {key:'hol',   label:'休日出勤'},
+  {key:'night', label:'深夜労働'},
+  {key:'naibu', label:'所定外'}
+];
+
+// 誰の時間外の賃金が、どの現場にいくら乗っているか。
+// 現場ごとに、残業・休日出勤・深夜労働・所定外の別でも金額が分かるようにする
 function otSiteTableHtml(a, forPrint){
   const bySite = {};                       // 現場名 -> {uid: 円}
+  const kindOf = {};                       // 現場名 -> {種類: 円}
   const colTotal = {}; a.userIds.forEach(id=>colTotal[id]=0);
+  const kindTotal = {}; OT_KINDS.forEach(k=>kindTotal[k.key]=0);
   a.userIds.forEach(id=>{
-    Object.entries(a.users[id].siteYen||{}).forEach(([name,v])=>{
-      (bySite[name] = bySite[name] || {})[id] = ((bySite[name]||{})[id]||0) + v;
+    const u = a.users[id];
+    Object.entries(u.siteYen||{}).forEach(([name,v])=>{
+      (bySite[name] = bySite[name] || {})[id] = (bySite[name][id]||0) + v;
       colTotal[id] += v;
+    });
+    OT_KINDS.forEach(k=>{
+      Object.entries((u.siteYenBy||{})[k.key]||{}).forEach(([name,v])=>{
+        const g = kindOf[name] = kindOf[name] || {};
+        g[k.key] = (g[k.key]||0) + v;
+        kindTotal[k.key] += v;
+      });
     });
   });
   const names = Object.keys(bySite).sort((x,y)=>{
@@ -505,29 +530,39 @@ function otSiteTableHtml(a, forPrint){
   });
   if(!names.length) return '';
   const ids = a.userIds.filter(id=>colTotal[id]);
+  // 4種類とも必ず出す。ゼロの月も「無かった」と分かるようにするため
+  const kinds = OT_KINDS;
   let grand = 0;
   const rows = names.map(name=>{
     const sum = ids.reduce((n,id)=>n+(bySite[name][id]||0), 0);
     grand += sum;
+    const g = kindOf[name] || {};
     return `<tr>
       <td class="who">${esc(name)}</td>
+      ${kinds.map(k=>`<td class="num">${g[k.key]?fmt(g[k.key]):''}</td>`).join('')}
       <td class="num total">${fmt(sum)}</td>
       ${ids.map(id=>`<td class="num">${bySite[name][id]?fmt(bySite[name][id]):''}</td>`).join('')}
     </tr>`;
   }).join('');
   return `
   <div class="otpay-year">
-    <div class="otpay-year-head">現場ごとの時間外の内訳（誰の分がいくら）</div>
+    <div class="otpay-year-head">現場ごとの時間外の内訳（種類別・誰の分がいくら）</div>
     <div class="otpay-year-note">
       残業・休日出勤・深夜労働が起きた日の日報から、その現場に乗せています。
       同じ日に2つの現場に出ていれば、その日の実働時間で分けています。現場別労務費の「時間外」と同じ金額です。
-      横に見ればその現場に誰の分がいくら入っているか、縦に見ればその人の月度の合計が分かります。
+      左半分がその現場の種類別の金額、右半分が誰の分か。縦に見ればその人の月度の合計になります。
+      ${kinds.map(k=>k.label).join('＋')}＝時間外の計です。
     </div>
     <div class="labor-scroll">
       <table class="otpay-tbl${forPrint?' print':''}">
-        <tr><th class="who">現場（工事）</th><th class="num total">時間外の計</th>${ids.map(id=>`<th class="num">${esc(a.users[id].name)}</th>`).join('')}</tr>
+        <tr><th class="who">現場（工事）</th>
+          ${kinds.map(k=>`<th class="num">${k.label}</th>`).join('')}
+          <th class="num total">時間外の計</th>
+          ${ids.map(id=>`<th class="num">${esc(a.users[id].name)}</th>`).join('')}</tr>
         ${rows}
-        <tr class="sum"><td class="who">合計</td><td class="num total">${fmt(grand)}</td>
+        <tr class="sum"><td class="who">合計</td>
+          ${kinds.map(k=>`<td class="num">${fmt(kindTotal[k.key])}</td>`).join('')}
+          <td class="num total">${fmt(grand)}</td>
           ${ids.map(id=>`<td class="num">${colTotal[id]?fmt(colTotal[id]):''}</td>`).join('')}</tr>
       </table>
     </div>
