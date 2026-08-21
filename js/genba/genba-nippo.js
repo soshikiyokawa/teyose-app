@@ -293,6 +293,7 @@ function nippoPeriod(month){
 
 function renderNippo(){
   if(!nippoMonth) nippoMonth = nippoMonthOf(gbToday());  // 今日が入る「◯月度」
+  renderDezuraPicker();
   if(!document.getElementById('nippo-date').value) resetNippoForm();
 
   // 「◯月度」は給与の締めに合わせて前月21日〜当月20日（出面表と同じ区切り）
@@ -413,13 +414,60 @@ function dzDateStr(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
-function printDezura(){
-  // 本日を基準に、進行中の締め期間（20日締め）を表示する。
-  // 21日以降＝当月21日〜翌月20日／20日以前＝前月21日〜当月20日
-  const t = new Date();
-  const afterCutoff = t.getDate() >= 21;
-  const start = new Date(t.getFullYear(), t.getMonth() + (afterCutoff ? 0 : -1), 21);
-  const end   = new Date(t.getFullYear(), t.getMonth() + (afterCutoff ? 1 : 0), 20);
+// 出面表で見ている「◯月度」（'YYYY-MM'）。締め日の年月で表す
+let dezuraMonth = '';
+
+// いま進行中の締め月（21日以降は翌月度）
+function dezuraCurrentMonth(){
+  return nippoMonthOf(gbToday());
+}
+
+// 選べる月の一覧（いちばん古い記録の月から、いまの月度まで）
+function dezuraMonthOptions(){
+  const all = [
+    ...(dailyReports||[]).map(n=>n.workDate),
+    ...(leaveRequests||[]).map(l=>l.startDate),
+    ...(holidayRequests||[]).map(h=>h.workDate)
+  ].filter(Boolean).sort();
+  const now = dezuraCurrentMonth();
+  let cur = all.length ? nippoMonthOf(all[0]) : now;
+  const out = [];
+  for(let i=0; i<120 && cur<=now; i++){
+    out.push(cur);
+    const [y,m] = cur.split('-').map(Number);
+    cur = m===12 ? `${y+1}-01` : `${y}-${String(m+1).padStart(2,'0')}`;
+  }
+  return out.reverse();   // 新しい月を上に
+}
+
+// 「2026年9月度（8/21〜9/20）」
+function dezuraMonthLabel(month){
+  const [y,m] = month.split('-').map(Number);
+  const p = nippoPeriod(month);
+  const md = s => { const [,mm,dd] = s.split('-'); return `${Number(mm)}/${Number(dd)}`; };
+  return `${y}年${m}月度（${md(p.start)}〜${md(p.end)}）`;
+}
+
+// 出面表のカード（月を選ぶプルダウンと開くボタン）
+function renderDezuraPicker(){
+  const sel = document.getElementById('dezura-month');
+  if(!sel) return;
+  const opts = dezuraMonthOptions();
+  if(!dezuraMonth || !opts.includes(dezuraMonth)) dezuraMonth = dezuraCurrentMonth();
+  sel.innerHTML = opts.map(mo=>{
+    const now = mo===dezuraCurrentMonth() ? '　※進行中' : '';
+    return `<option value="${mo}">${dezuraMonthLabel(mo)}${now}</option>`;
+  }).join('');
+  sel.value = dezuraMonth;
+}
+function setDezuraMonth(v){ dezuraMonth = v; }
+
+function printDezura(month){
+  // 指定した「◯月度」（20日締め）を出す。省略時は画面で選んでいる月度
+  const mo = month || dezuraMonth || dezuraCurrentMonth();
+  const p = nippoPeriod(mo);
+  const start = new Date(p.start + 'T00:00:00');
+  const end   = new Date(p.end   + 'T00:00:00');
   const y = end.getFullYear();      // 「◯月度」は締め日（end）の年月で表す
   const m = end.getMonth() + 1;
   const dates = [];

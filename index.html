@@ -950,11 +950,20 @@
     </div>
 
     <!-- 出面表は社員なら誰でも見られる（全員分。発注先には出さない） -->
-    <div class="employee-only" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:16px">
-      <button class="btn xs" onclick="printDezura()" title="全員分の勤怠一覧（前月21日〜当月20日）">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        出面表
-      </button>
+    <div class="card employee-only" id="dezura-card">
+      <div class="card-head"><span class="card-head-title">出面表</span></div>
+      <div style="padding:0 12px 12px">
+        <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+          社員全員の勤怠を1枚にまとめた表です。月度を選んで開くと、印刷やPDF保存ができます。
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="dezura-month" onchange="setDezuraMonth(this.value)" style="flex:1;min-width:170px;font-size:13px"></select>
+          <button class="btn primary" onclick="printDezura()" style="flex-shrink:0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="15" height="15" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            出面表を開く
+          </button>
+        </div>
+      </div>
     </div>
     <!-- 管理者ツール（勤務カレンダー・アカウント権限）。折り返し可 -->
     <div class="admin-only" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
@@ -2518,7 +2527,7 @@
 <script src="js/genba/genba-files.js?v=293"></script>
 <script src="js/genba/genba-photos.js?v=260"></script>
 <script src="js/genba/genba-drawings.js?v=293"></script>
-<script src="js/genba/genba-nippo.js?v=304"></script>
+<script src="js/genba/genba-nippo.js?v=305"></script>
 <script src="js/genba/leave-balance.js?v=304"></script>
 <script src="js/genba/genba-leave.js?v=304"></script>
 <script src="js/genba/genba-holiday.js?v=235"></script>
