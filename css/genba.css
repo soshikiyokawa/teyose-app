@@ -180,3 +180,6 @@ table.otpay-tbl tr.sum td{font-weight:700;background:var(--surface2)}
 .labor-warn.danger{color:#8a2018;background:#fdeaea}
 .ots-hint{font-size:10px;color:var(--text-muted);line-height:1.6;margin-bottom:8px}
 .ots-hint.bad{color:#8a2018;background:#fdeaea;border-radius:6px;padding:5px 7px}
+.ots-cal{border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+.ots-cal-name{font-size:12px;font-weight:700;margin-bottom:6px}
+.ots-hint.ok{color:#2e7d52;background:#eaf6ef;border-radius:6px;padding:5px 7px}

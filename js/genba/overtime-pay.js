@@ -24,9 +24,15 @@
 //
 // 権限：清川創史・清川優香のみ（給与と同じ）
 
+// 社員区分（勤務カレンダーの区分と同じ）
+const OT_CALS = [{key:'regular', label:'一般社員'}, {key:'trainee', label:'訓練校生'}];
+function otCalLabel(cal){ return (OT_CALS.find(c=>c.key===cal)||{}).label || cal; }
+
 const OT_PAY_DEFAULT = {
-  dailyHours: 8,          // 1日の所定労働時間
-  monthlyHours: {},       // {regular:160, trainee:160}。空なら勤務カレンダーから計算
+  dailyHours: 8,          // 1日の所定労働時間（区分ごとの指定が無いときに使う）
+  dailyHoursByCal: {},    // {trainee:7.5} 区分ごとの1日の所定労働時間
+  systems: {},            // {trainee:'yearly'} 労働時間制。'yearly'＝1年単位の変形労働時間制
+  monthlyHours: {},       // {regular:160} 1か月平均所定労働時間の直接指定。空なら自動
   rates: {overtime:1.25, holiday:1.35, night:0.25},
   baseItems: {basePay:true, familyAllowance:false, positionAllowance:true,
               skillAllowance:true, fixedOvertime:false,
@@ -37,11 +43,21 @@ function otPaySettings(){
   const s = (typeof appSettings!=='undefined' && appSettings && appSettings.overtime_pay) || {};
   return {
     dailyHours: Number(s.dailyHours)>0 ? Number(s.dailyHours) : OT_PAY_DEFAULT.dailyHours,
+    dailyHoursByCal: Object.assign({}, s.dailyHoursByCal||{}),
+    systems: Object.assign({}, s.systems||{}),
     monthlyHours: Object.assign({}, s.monthlyHours||{}),
     rates: Object.assign({}, OT_PAY_DEFAULT.rates, s.rates||{}),
     baseItems: Object.assign({}, OT_PAY_DEFAULT.baseItems, s.baseItems||{})
   };
 }
+
+// その区分の1日の所定労働時間
+function otDailyHours(cal, st){
+  const v = Number(st.dailyHoursByCal[cal]);
+  return v>0 ? v : st.dailyHours;
+}
+// その区分の労働時間制。'yearly'＝1年単位の変形労働時間制
+function otSystem(cal, st){ return st.systems[cal]==='yearly' ? 'yearly' : 'normal'; }
 
 // 割増賃金の基礎になる賃金
 function otBaseWage(salary, st){
@@ -68,23 +84,45 @@ function otWorkDaysInYear(cal, month){
   return {fy, days, holidays, work:days-holidays, hasData: !!(set && set.size)};
 }
 
-// 1か月平均所定労働時間の法定上限（週40時間 × 365日÷7 ÷ 12 ＝ 173.8時間）。
-// これを超える数字で割ると時間単価が低く出て、割増賃金が足りなくなってしまう
-const OT_LEGAL_MAX_MONTHLY = 173.8;
+// 年間に働ける法定の総枠（週40時間）。うるう年かどうかで変わるので暦日数から出す
+function otYearlyFrame(days){ return 40 * days / 7; }
+// 1か月平均所定労働時間の法定の上限（＝総枠 ÷ 12）。365日なら173.8時間
+function otLegalMaxMonthly(days){ return Math.round(otYearlyFrame(days)/12*10)/10; }
+// 1年単位の変形労働時間制の、年間所定労働日数の限度（対象期間が3か月を超える場合）
+const OT_YEARLY_MAX_DAYS = 280;
 
 // 1か月平均所定労働時間
+//
+//  通常の労働時間制 … 年間の所定労働日数 × 1日の所定労働時間 ÷ 12
+//  1年単位の変形労働時間制 … 年間の法定総枠（週40時間）÷ 12
+//      日ごとの所定がばらつく制度なので、カレンダーの日数×所定時間では割らない。
+//      年間平均で週40時間になるよう組む制度そのものの数字を使う。
 function otMonthlyHours(cal, month, st){
   st = st || otPaySettings();
-  const ov = Number(st.monthlyHours[cal]);
-  if(ov>0) return {hours:ov, source:'設定', capped:false};
   const w = otWorkDaysInYear(cal, month);
-  if(!w.hasData) return {hours:160, source:'既定', work:0, fy:w.fy, capped:false};
-  const raw = Math.round(w.work*st.dailyHours/12*10)/10;
+  const dh = otDailyHours(cal, st);
+  const yearly = otSystem(cal, st)==='yearly';
+  const frame = otYearlyFrame(w.days);                 // 年間の法定総枠（時間）
+  const planned = w.hasData ? Math.round(w.work*dh*10)/10 : 0;   // カレンダー上の年間所定労働時間
+  const info = {cal, fy:w.fy, days:w.days, work:w.work, dailyHours:dh, yearly,
+                frame:Math.round(frame*10)/10, planned, hasData:w.hasData,
+                overDays: yearly && w.hasData && w.work > OT_YEARLY_MAX_DAYS,
+                overFrame: w.hasData && planned > frame};
+
+  const ov = Number(st.monthlyHours[cal]);
+  if(ov>0) return Object.assign(info, {hours:ov, source:'設定', capped:false});
+
+  if(yearly)
+    return Object.assign(info, {hours:Math.round(frame/12*10)/10, source:'1年変形', capped:false});
+
+  if(!w.hasData) return Object.assign(info, {hours:160, source:'既定', capped:false});
+
+  const raw = Math.round(w.work*dh/12*10)/10;
+  const max = otLegalMaxMonthly(w.days);
   // 勤務カレンダーの休日が足りていないと、ありえない大きさになる。
-  // そのまま使うと賃金が不足するので、法定の上限で頭打ちにして画面で知らせる
-  if(raw > OT_LEGAL_MAX_MONTHLY)
-    return {hours:OT_LEGAL_MAX_MONTHLY, source:'法定上限', work:w.work, fy:w.fy, capped:true, raw};
-  return {hours:raw, source:'勤務カレンダー', work:w.work, fy:w.fy, capped:false};
+  // そのまま使うと時間単価が低く出て賃金が不足するので、法定の上限で頭打ちにして画面で知らせる
+  if(raw > max) return Object.assign(info, {hours:max, source:'法定上限', capped:true, raw, max});
+  return Object.assign(info, {hours:raw, source:'勤務カレンダー', capped:false});
 }
 
 // その日報のうち深夜（22時〜翌5時）に重なる分数。
@@ -214,11 +252,11 @@ function otPayBasisText(a){
   const cals = [...new Set(a.userIds.map(id=>a.users[id].cal))];
   const parts = cals.map(c=>{
     const mh = otMonthlyHours(c, a.month, st);
-    const label = c==='trainee' ? '訓練校生' : '一般社員';
-    const how = mh.source==='勤務カレンダー' ? `（${mh.fy}年度の所定労働日数${mh.work}日×${st.dailyHours}時間÷12）`
+    const how = mh.source==='勤務カレンダー' ? `（${mh.fy}年度の所定労働日数${mh.work}日×${mh.dailyHours}時間÷12）`
+              : mh.source==='1年変形' ? `（1年単位の変形労働時間制。${mh.fy}年度の法定総枠 週40時間×${mh.days}日÷7＝${mh.frame}時間 ÷12）`
               : mh.capped ? `（法定上限。勤務カレンダーからは${mh.raw}時間）`
               : `（${mh.source}）`;
-    return `${label} ${mh.hours}時間${how}`;
+    return `${otCalLabel(c)} ${mh.hours}時間${how}`;
   });
   return `時間単価＝割増の基礎になる賃金 ÷ 1か月平均所定労働時間［${parts.join('／')}］　`
        + `割増率：残業${st.rates.overtime}／休日労働${st.rates.holiday}／深夜+${st.rates.night}`;
@@ -239,14 +277,23 @@ function renderOtPay(){
     return;
   }
   const noSalary = a.userIds.filter(id=>!a.users[id].salary).map(id=>a.users[id].name);
-  // 勤務カレンダーの休日が足りず、所定労働時間が法定の上限を超えてしまった区分
-  const capped = [...new Set(a.userIds.map(id=>a.users[id].cal))]
-    .map(c=>({cal:c, mh:otMonthlyHours(c, a.month, a.st)}))
-    .filter(x=>x.mh.capped)
-    .map(x=>`${x.cal==='trainee'?'訓練校生':'一般社員'}（カレンダーからは${x.mh.raw}時間）`);
+  const warns = [];
+  [...new Set(a.userIds.map(id=>a.users[id].cal))].forEach(c=>{
+    const mh = otMonthlyHours(c, a.month, a.st);
+    const who = otCalLabel(c);
+    if(mh.capped)
+      warns.push(`${who}：1か月平均所定労働時間が法定の上限（週40時間＝月${mh.max}時間）を超えています（勤務カレンダーからは${mh.raw}時間）。`
+        + `勤務カレンダーの休日が足りていない可能性があります。いまは上限の${mh.max}時間で計算しています。`
+        + `1年単位の変形労働時間制なら、設定でそう選んでください。`);
+    if(mh.overDays)
+      warns.push(`${who}：${mh.fy}年度の所定労働日数が${mh.work}日で、1年単位の変形労働時間制の限度（${OT_YEARLY_MAX_DAYS}日）を超えています。`);
+    if(mh.overFrame)
+      warns.push(`${who}：${mh.fy}年度は、どの日も${mh.dailyHours}時間として数えると年間${mh.planned}時間（${mh.work}日×${mh.dailyHours}時間）になり、`
+        + `法定の総枠${mh.frame}時間を超えます。設定で1日の所定労働時間の平均（${Math.floor(mh.frame/mh.work*100)/100}時間以下）を入れるか、勤務カレンダーの休日を増やしてください。`);
+  });
   wrap.innerHTML =
     (noSalary.length ? `<div class="labor-warn">給与が未登録のため金額を出せない人：${esc(noSalary.join('、'))}</div>` : '')
-    + (capped.length ? `<div class="labor-warn danger">1か月平均所定労働時間が法定の上限（週40時間＝月${OT_LEGAL_MAX_MONTHLY}時間）を超えています：${esc(capped.join('、'))}。勤務カレンダーの休日が足りていない可能性があります。いまは上限の${OT_LEGAL_MAX_MONTHLY}時間で計算していますが、カレンダーを直すか、設定で正しい時間数を入れてください。</div>` : '')
+    + warns.map(w=>`<div class="labor-warn danger">${esc(w)}</div>`).join('')
     + `<div class="labor-scroll">${otPayTableHtml(a, false)}</div>`
     + `<div class="otpay-basis">${esc(otPayBasisText(a))}</div>`;
 }
@@ -287,55 +334,116 @@ function printOtPay(){
 }
 
 // ════ 計算の設定 ════
+// 社員区分ごとの設定欄を組み立てる
+function renderOtCalSettings(){
+  const st = otPaySettings();
+  const mo = otPayMonth || dezuraCurrentMonth();
+  document.getElementById('ots-cals').innerHTML = OT_CALS.map(c=>`
+    <div class="ots-cal">
+      <div class="ots-cal-name">${esc(c.label)}</div>
+      <div class="fg" style="margin-bottom:6px"><label>労働時間制</label>
+        <select id="ots-sys-${c.key}" onchange="otCalSettingChanged()">
+          <option value="normal">通常の労働時間制</option>
+          <option value="yearly">1年単位の変形労働時間制</option>
+        </select></div>
+      <div class="pay-grid">
+        <div class="fg"><label>1日の所定労働時間（平均）</label>
+          <input type="number" id="ots-dh-${c.key}" step="0.25" min="0" placeholder="共通の値" oninput="otCalSettingChanged()"></div>
+        <div class="fg"><label>1か月平均所定労働時間</label>
+          <input type="number" id="ots-mh-${c.key}" step="0.1" min="0" placeholder="自動" oninput="otCalSettingChanged()"></div>
+      </div>
+      <div class="ots-hint" id="ots-hint-${c.key}"></div>
+    </div>`).join('');
+  OT_CALS.forEach(c=>{
+    document.getElementById('ots-sys-'+c.key).value = otSystem(c.key, st);
+    document.getElementById('ots-dh-'+c.key).value = Number(st.dailyHoursByCal[c.key])>0 ? st.dailyHoursByCal[c.key] : '';
+    document.getElementById('ots-mh-'+c.key).value = Number(st.monthlyHours[c.key])>0 ? st.monthlyHours[c.key] : '';
+  });
+  otCalSettingChanged();
+}
+
+// 入力に合わせて説明を出し直す（保存しなくても結果が読めるように）
+function otCalSettingChanged(){
+  const mo = otPayMonth || dezuraCurrentMonth();
+  const st = otSettingsFromForm();
+  OT_CALS.forEach(c=>{
+    const mh = otMonthlyHours(c.key, mo, st);
+    const hint = document.getElementById('ots-hint-'+c.key);
+    if(!hint) return;
+    const lines = [];
+    if(mh.source==='設定') lines.push(`直接指定した ${mh.hours}時間 で計算します。`);
+    else if(mh.source==='1年変形')
+      lines.push(`${mh.fy}年度の法定総枠 週40時間×${mh.days}日÷7＝${mh.frame}時間。1か月平均は ${mh.hours}時間 で計算します。`);
+    else if(!mh.hasData) lines.push('勤務カレンダーが未登録のため、160時間で計算します。');
+    else if(mh.capped)
+      lines.push(`勤務カレンダーからは ${mh.raw}時間（所定労働日数${mh.work}日×${mh.dailyHours}時間÷12）ですが、`
+        + `法定の上限（週40時間＝月${mh.max}時間）を超えています。いまは${mh.max}時間で計算します。`);
+    else lines.push(`勤務カレンダーから ${mh.hours}時間（${mh.fy}年度の所定労働日数${mh.work}日×${mh.dailyHours}時間÷12）。`);
+
+    let bad = mh.capped;
+    if(mh.hasData){
+      if(mh.overDays){
+        lines.push(`${mh.fy}年度の所定労働日数が${mh.work}日で、1年単位の変形労働時間制の限度（${OT_YEARLY_MAX_DAYS}日）を超えています。`);
+        bad = true;
+      }
+      if(mh.overFrame){
+        lines.push(`点検：どの日も${mh.dailyHours}時間として数えると年間${mh.planned}時間（${mh.work}日×${mh.dailyHours}時間）になり、法定の総枠${mh.frame}時間を超えます。`
+          + `1日の所定労働時間の平均を${Math.floor(mh.frame/mh.work*100)/100}時間以下にするか、休日を増やしてください。`
+          + `日によって所定が違う場合は、その平均を入れてください。`);
+        bad = true;
+      } else if(mh.yearly){
+        lines.push(`点検：どの日も${mh.dailyHours}時間として数えると年間${mh.planned}時間（${mh.work}日×${mh.dailyHours}時間）で、総枠${mh.frame}時間に収まっています。`);
+      }
+    }
+    hint.textContent = lines.join('');
+    hint.className = 'ots-hint' + (bad ? ' bad' : mh.yearly ? ' ok' : '');
+  });
+}
+
+// いま画面に入っている値で設定オブジェクトを作る
+function otSettingsFromForm(){
+  const num = (id, def) => { const el=document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isFinite(v)&&v>=0 ? v : def; };
+  const st = otPaySettings();
+  st.dailyHours = num('ots-daily', 8) || 8;
+  st.dailyHoursByCal = {}; st.monthlyHours = {}; st.systems = {};
+  OT_CALS.forEach(c=>{
+    const dh = num('ots-dh-'+c.key, 0); if(dh>0) st.dailyHoursByCal[c.key] = dh;
+    const mh = num('ots-mh-'+c.key, 0); if(mh>0) st.monthlyHours[c.key] = mh;
+    const sys = document.getElementById('ots-sys-'+c.key);
+    if(sys && sys.value==='yearly') st.systems[c.key] = 'yearly';
+  });
+  st.rates = {overtime:num('ots-rate-ot',1.25), holiday:num('ots-rate-hol',1.35), night:num('ots-rate-night',0.25)};
+  const bi = {};
+  SALARY_ITEMS.forEach(i=>{ const el=document.getElementById('ots-base-'+i.key); bi[i.key] = el ? el.checked : st.baseItems[i.key]; });
+  st.baseItems = bi;
+  return st;
+}
+
 function openOtPaySettings(){
   if(!isPayrollAdmin()) return;
   const st = otPaySettings();
-  const mo = otPayMonth || dezuraCurrentMonth();
   document.getElementById('ots-daily').value = st.dailyHours;
-  ['regular','trainee'].forEach(cal=>{
-    const el = document.getElementById('ots-mh-'+cal);
-    el.value = Number(st.monthlyHours[cal])>0 ? st.monthlyHours[cal] : '';
-    const w = otWorkDaysInYear(cal, mo);
-    const auto = Math.round(w.work*st.dailyHours/12*10)/10;
-    const hint = document.getElementById('ots-mh-'+cal+'-hint');
-    if(!w.hasData){
-      hint.textContent = '勤務カレンダーが未登録のため、空欄なら160時間';
-      hint.className = 'ots-hint';
-    } else if(auto > OT_LEGAL_MAX_MONTHLY){
-      hint.textContent = `勤務カレンダーからは ${auto}時間（${w.fy}年度の所定労働日数 ${w.work}日）ですが、`
-        + `法定の上限（週40時間＝月${OT_LEGAL_MAX_MONTHLY}時間）を超えています。`
-        + `カレンダーの休日が足りていない可能性があります。空欄のままなら${OT_LEGAL_MAX_MONTHLY}時間で計算します。`;
-      hint.className = 'ots-hint bad';
-    } else {
-      hint.textContent = `空欄なら勤務カレンダーから ${auto}時間（${w.fy}年度の所定労働日数 ${w.work}日）`;
-      hint.className = 'ots-hint';
-    }
-  });
   document.getElementById('ots-rate-ot').value    = st.rates.overtime;
   document.getElementById('ots-rate-hol').value   = st.rates.holiday;
   document.getElementById('ots-rate-night').value = st.rates.night;
   document.getElementById('ots-base-items').innerHTML = SALARY_ITEMS.map(i=>`
-    <label class="ots-check"><input type="checkbox" id="ots-base-${i.key}"${st.baseItems[i.key]?' checked':''}>${esc(i.label)}</label>`).join('');
+    <label class="ots-check"><input type="checkbox" id="ots-base-${i.key}"${st.baseItems[i.key]?' checked':''} onchange="otCalSettingChanged()">${esc(i.label)}</label>`).join('');
+  renderOtCalSettings();
   document.getElementById('otpay-settings-modal').classList.add('open');
 }
 function closeOtPaySettings(){ document.getElementById('otpay-settings-modal').classList.remove('open'); }
 
 async function saveOtPaySettings(){
-  const num = (id, def) => { const v = parseFloat(document.getElementById(id).value); return isFinite(v) && v>=0 ? v : def; };
-  const mh = {};
-  ['regular','trainee'].forEach(cal=>{
-    const v = parseFloat(document.getElementById('ots-mh-'+cal).value);
-    if(isFinite(v) && v>0) mh[cal] = v;      // 空欄なら勤務カレンダーから計算する
-  });
-  const baseItems = {};
-  SALARY_ITEMS.forEach(i=>baseItems[i.key] = document.getElementById('ots-base-'+i.key).checked);
+  const st = otSettingsFromForm();
+  if(!(st.dailyHours>0)){ showToast('1日の所定労働時間を入れてください'); return; }
   const v = {
-    dailyHours: num('ots-daily', 8),
-    monthlyHours: mh,
-    rates: {overtime:num('ots-rate-ot',1.25), holiday:num('ots-rate-hol',1.35), night:num('ots-rate-night',0.25)},
-    baseItems
+    dailyHours: st.dailyHours,
+    dailyHoursByCal: st.dailyHoursByCal,
+    systems: st.systems,
+    monthlyHours: st.monthlyHours,
+    rates: st.rates,
+    baseItems: st.baseItems
   };
-  if(v.dailyHours<=0){ showToast('1日の所定労働時間を入れてください'); return; }
   await dbSaveAppSetting('overtime_pay', v);
   closeOtPaySettings();
   showToast('計算の設定を保存しました');
