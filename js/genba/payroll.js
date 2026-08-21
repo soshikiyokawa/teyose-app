@@ -10,7 +10,8 @@
 // 振り分け方
 //   給与ぶん … その月度にその人が働いた実働時間を現場ごとに集計し、その割合で分ける。
 //     （例：労務費30万円で、A邸に16人工・B邸に4人工なら A邸24万円／B邸6万円）
-//     有給・欠勤・休みの日は実働が無いので、その分の給与も働いた現場に乗る。
+//     欠勤があった月は、実際に払う額に合わせて欠勤控除を差し引いてから配る。
+//     有給・休みの日は給与が出るので、その分は働いた現場に乗る。
 //     その月度にひとつも現場に出ていない人は「未配賦」としてまとめて出す。
 //   時間外 … 給与と違って「どの日にどの現場で起きたか」が日報から分かるので、
 //     起きた現場にそのまま乗せる。同じ日に2つの現場に出ていれば、その日の実働時間で分ける。
@@ -218,9 +219,22 @@ function laborAllocation(month){
   const sites = {};   // 現場名 -> {minutes, byUser:{uid:分}}
   const users = {};   // uid -> {name, minutes, labor, salary}
 
+  // 時間外の賃金と欠勤控除を先に出す。
+  // 給与ぶんは、実際に払う額に合わせて欠勤控除を差し引いてから現場に配る
+  let ot = null, otReady = false;
+  if(typeof otPayAllocation==='function'){
+    try{ ot = otPayAllocation(month); otReady = true; }
+    catch(e){ console.warn('時間外の賃金を出せませんでした', e); }
+  }
+  const deductOf = uid => (ot && ot.users[uid] && ot.users[uid].deduct) || 0;
+
   nippoEmployees().forEach(p=>{
-    users[p.id] = {id:p.id, name:p.displayName, minutes:0, labor:0, salary:salaryFor(p.id, month)};
-    users[p.id].labor = salaryLaborCost(users[p.id].salary);
+    const salary = salaryFor(p.id, month);
+    const full = salaryLaborCost(salary);
+    const deduct = Math.min(deductOf(p.id), full);   // 控除が給与を超えることはない
+    users[p.id] = {id:p.id, name:p.displayName, minutes:0, salary,
+                   laborFull:full, deduct, labor:full-deduct,
+                   absenceDays:(ot && ot.users[p.id] && ot.users[p.id].absenceDays) || 0};
   });
 
   (dailyReports||[]).filter(n=>n.workDate>=start && n.workDate<=end).forEach(n=>{
@@ -238,22 +252,17 @@ function laborAllocation(month){
   // 給与と違って「どの現場で起きたか」が日報から分かるので、起きた現場にそのまま乗せる
   const otPay = {};      // 現場名 -> {uid: 円}
   const otByUser = {};   // uid -> 円
-  let otReady = false;
-  if(typeof otPayAllocation==='function'){
-    try{
-      const a = otPayAllocation(month);
-      otReady = true;
-      a.userIds.forEach(uid=>{
-        const u = a.users[uid];
-        if(!u.total) return;
-        otByUser[uid] = u.total;
-        if(!users[uid]) return;                      // 社員一覧に無い人は数えない
-        Object.keys(u.siteYen||{}).forEach(name=>{
-          if(!sites[name]) sites[name] = {name, minutes:0, byUser:{}};
-          (otPay[name] = otPay[name] || {})[uid] = (otPay[name][uid]||0) + u.siteYen[name];
-        });
+  if(ot){
+    ot.userIds.forEach(uid=>{
+      const u = ot.users[uid];
+      if(!u.total) return;
+      otByUser[uid] = u.total;
+      if(!users[uid]) return;                      // 社員一覧に無い人は数えない
+      Object.keys(u.siteYen||{}).forEach(name=>{
+        if(!sites[name]) sites[name] = {name, minutes:0, byUser:{}};
+        (otPay[name] = otPay[name] || {})[uid] = (otPay[name][uid]||0) + u.siteYen[name];
       });
-    }catch(e){ console.warn('時間外の賃金を出せませんでした', e); }
+    });
   }
 
   const siteNames = Object.keys(sites).sort((a,b)=>{
@@ -360,13 +369,19 @@ function laborTableHtml(a, forPrint, mode){
   </table>`;
 }
 
-// 時間外の賃金の合計を一行そえる
+// 時間外の賃金と欠勤控除について一行そえる
 function laborOtNote(a){
   if(!a.otReady) return '';
   const total = Object.values(a.otByUser||{}).reduce((n,v)=>n+v, 0);
-  return total
-    ? `<div class="labor-note">時間外の賃金 ${fmt(total)}円 を、起きた現場に乗せています（内訳は「残業代・休日手当」の画面）。</div>`
-    : '<div class="labor-note">この月度は残業・休日出勤・深夜労働がありません。</div>';
+  const ded = a.userIds.filter(id=>a.users[id].deduct);
+  const dedSum = ded.reduce((n,id)=>n+a.users[id].deduct, 0);
+  const lines = [];
+  lines.push(total
+    ? `時間外の賃金 ${fmt(total)}円 を、起きた現場に乗せています（内訳は「残業代・休日手当」の画面）。`
+    : 'この月度は残業・休日出勤・深夜労働がありません。');
+  if(dedSum) lines.push(`欠勤控除 ${fmt(dedSum)}円 を給与ぶんから差し引いてから配っています（`
+    + ded.map(id=>`${esc(a.users[id].name)} ${a.users[id].absenceDays}日 -${fmt(a.users[id].deduct)}円`).join('、') + '）。');
+  return `<div class="labor-note">${lines.join('<br>')}</div>`;
 }
 
 function renderLabor(){
@@ -423,8 +438,8 @@ function printLabor(){
   </div>
   <div style="font-size:10px;color:#555;margin-bottom:8px">
     給与ぶん＝基本給・家族手当・役付手当・技能・資格手当・固定残業代の合計（非課税通勤手当と非課税車両借上料は含みません）。
-    社員ごとの給与を、その月度に出た現場の実働時間の割合で分けています（人工＝実働8時間で1.0）。
-    有給・欠勤・休みの日も給与は発生するため、その分は出た現場に含まれます。
+    社員ごとの給与から欠勤控除を差し引いた額を、その月度に出た現場の実働時間の割合で分けています（人工＝実働8時間で1.0）。
+    有給・休みの日も給与は発生するため、その分は出た現場に含まれます。
     時間外＝残業代・休日手当・深夜割増・所定外の賃金で、日報からどの日のどの現場で起きたかが分かるため、起きた現場にそのまま乗せています。
   </div>
   ${laborTableHtml(a, true, 'total')}
