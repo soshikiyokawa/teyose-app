@@ -54,6 +54,29 @@ function renderNippoOwnerSelect(){
 function setNippoOwner(v){
   nippoOwnerId = v;
   renderGenbaProjectSelects();   // 「休み」（役員のみ）の出し分けを選んだ人に合わせる
+  if(!editingNippoId) applyNippoDefaultTimes();   // 書きかけの新規なら、選んだ人の初期値に合わせる
+}
+
+// ── 日報の時刻の初期値 ──
+// 所定労働時間が区分で違うので、その人の勤務区分に合わせて出す。
+// 訓練校生は所定7.5時間なので 8:00〜17:30（休憩120分）。
+// （割増賃金の計算に使う所定労働時間は js/genba/overtime-pay.js の設定側で持っている）
+const NIPPO_DEFAULT_TIMES = {
+  regular: {start:'08:00', end:'18:00', brk:'120'},
+  trainee: {start:'08:00', end:'17:30', brk:'120'}
+};
+function nippoCalOf(userId){
+  const p = (typeof allProfiles!=='undefined' ? allProfiles : []).find(x=>x.id===userId);
+  return (p && p.workGroup==='訓練校生') ? 'trainee' : 'regular';
+}
+function nippoDefaultTimes(userId){ return NIPPO_DEFAULT_TIMES[nippoCalOf(userId)]; }
+function applyNippoDefaultTimes(){
+  const t = nippoDefaultTimes(nippoOwnerId || currentUserId);
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v; };
+  set('nippo-start', t.start);
+  set('nippo-end',   t.end);
+  set('nippo-break', t.brk);
+  if(typeof nippoRecalc==='function') nippoRecalc();
 }
 
 // 出面表・集計での社員の並び順（この順で先頭から。ここに無い人は末尾に五十音順）
@@ -143,9 +166,7 @@ function resetNippoForm(){
   document.getElementById('nippo-work-kind').value = '';
   nippoProjectChanged();
   document.getElementById('nippo-content').value = '';
-  document.getElementById('nippo-start').value = '08:00';
-  document.getElementById('nippo-end').value = '18:00';
-  document.getElementById('nippo-break').value = '120';
+  applyNippoDefaultTimes();      // 訓練校生なら 8:00〜17:30（所定7.5時間）
   document.getElementById('nippo-ot-approver').value = '';
   document.getElementById('nippo-form-title').textContent = '日報を書く';
   document.getElementById('nippo-cancel-btn').style.display = 'none';
