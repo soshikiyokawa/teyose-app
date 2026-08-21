@@ -712,37 +712,51 @@ function printOtPay(){
   if(!a.userIds.length){ showToast('この月度は残業も休日出勤もありません'); return; }
   const md = s => { const [,m,d] = s.split('-'); return `${Number(m)}/${Number(d)}`; };
   const label = dezuraMonthLabel(mo);
+  // A4縦1枚に収める。列が多いので table-layout:fixed で幅を等分し、
+  // 文字と余白を小さめにして、はみ出しても折り返すようにしている
   const html = `
   <style>
-    @page{size:A4 landscape;margin:12mm}
-    table.otpay-tbl{border-collapse:collapse;font-size:11px;width:100%}
-    table.otpay-tbl th,table.otpay-tbl td{border:0.4pt solid #b9b9b9;padding:4px 6px;white-space:nowrap}
-    table.otpay-tbl th{background:#f0ece3;font-weight:700;font-size:10px}
+    @page{size:A4 portrait;margin:9mm}
+    *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+    body{max-width:none !important;padding:0 !important}
+    .otpay-sheet{width:100%}
+    table.otpay-tbl{border-collapse:collapse;font-size:9.5px;width:100%;table-layout:fixed;margin:0}
+    table.otpay-tbl th,table.otpay-tbl td{border:0.3pt solid #b9b9b9;padding:3px 4px;
+      white-space:normal;overflow-wrap:anywhere;line-height:1.35;vertical-align:middle}
+    table.otpay-tbl th{background:#f0ece3;font-weight:700;font-size:8px;line-height:1.25}
     table.otpay-tbl td.num{text-align:right}
-    table.otpay-tbl td.who,table.otpay-tbl th.who{text-align:left;min-width:110px}
-    table.otpay-tbl td.who .note{font-size:8px;color:#666;font-weight:400}
+    table.otpay-tbl td.who,table.otpay-tbl th.who{text-align:left;width:13%}
+    table.otpay-tbl td.who .note{font-size:7.5px;color:#666;font-weight:400;line-height:1.25}
+    table.otpay-tbl td.minus{color:#8a2018}
     table.otpay-tbl td.total{font-weight:700;background:#faf7f0}
-    table.otpay-tbl tr.sum td{font-weight:700;background:#f7f3eb;border-top:0.8pt solid #8a8a8a}
-    .otpay-year{margin-top:14px}
-    .otpay-year-head{font-size:12px;font-weight:700;margin-bottom:4px}
-    .otpay-year-note{font-size:10px;color:#555;line-height:1.7;margin-bottom:6px}
+    table.otpay-tbl tr.sum td{font-weight:700;background:#f7f3eb;border-top:0.6pt solid #8a8a8a}
+    table.otpay-tbl tr.zero td{color:#777}
+    /* 現場の内訳は現場名が長いので、名前の列を広めにとる */
+    .otpay-year table.otpay-tbl td.who,.otpay-year table.otpay-tbl th.who{width:20%}
+    .otpay-year{margin-top:11px}
+    .otpay-year-head{font-size:11px;font-weight:700;margin-bottom:3px}
+    .otpay-year-note{font-size:8.5px;color:#555;line-height:1.6;margin-bottom:5px}
     .labor-scroll{overflow:visible}
+    @media print{ .otpay-sheet{page-break-inside:avoid} }
   </style>
-  <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
-    <h2 style="font-size:16px;margin:0">残業代・休日手当　${label}</h2>
-    <span style="font-size:11px">対象期間：${md(a.start)}〜${md(a.end)}（20日締め）</span>
+  <div class="otpay-sheet">
+  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+    <h2 style="font-size:15px;margin:0">残業代・休日手当　${label}</h2>
+    <span style="font-size:10px">対象期間：${md(a.start)}〜${md(a.end)}（20日締め）</span>
   </div>
-  <div style="font-size:10px;color:#555;margin-bottom:8px;line-height:1.7">
+  <div style="font-size:8.5px;color:#555;margin-bottom:7px;line-height:1.6">
     ${esc(otPayBasisText(a))}<br>
     割増の基礎に入れる項目：${SALARY_ITEMS.filter(i=>a.st.baseItems[i.key]).map(i=>i.label).join('・')||'（なし）'}。
     休日労働の日は全時間を休日労働として見るため、残業には数えていません。
     振替出勤（事前に振替休日を決めた日）は労働日の振替なので割増せず、8時間を超えた分だけ残業に入れています。
     役員（管理監督者）は時間外・休日の割増の対象外ですが、深夜割増は計算しています。
-    残業は1日8時間を超えた分で数えており、週40時間を超えた分の判定は入れていません。
+    残業は1日8時間を超えた分と週40時間を超えた分で数えています。
   </div>
   ${otPayTableHtml(a, true)}
   ${otSiteTableHtml(a, true)}
-  <div style="font-size:9px;color:#555;margin-top:8px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
+  ${otYearlyHtml(otYearlySettlement(mo))}
+  <div style="font-size:8px;color:#555;margin-top:6px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>
+  </div>`;
   printHtml(`残業代・休日手当 ${label}`, html);
 }
 
