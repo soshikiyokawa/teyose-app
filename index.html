@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=311">
+<link rel="stylesheet" href="css/main.css?v=313">
 <link rel="stylesheet" href="css/schedule.css?v=295">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -1828,7 +1828,8 @@
   <div class="modal-sheet" style="max-width:900px">
     <h3>現場別の労務費</h3>
     <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
-      社員ごとの労務費（基本給・家族手当・役付手当・技能・資格手当・固定残業代の合計）を、その月度に出た現場の実働時間の割合で分けています。人工は実働8時間で1.0です。
+      <b>給与ぶん</b>は、社員ごとの労務費（基本給・家族手当・役付手当・技能・資格手当・固定残業代の合計）を、その月度に出た現場の実働時間の割合で分けています。人工は実働8時間で1.0です。<br>
+      <b>時間外</b>は、残業代・休日手当・深夜割増・所定外の賃金です。日報からどの日のどの現場で起きたかが分かるので、起きた現場にそのまま乗せています（同じ日に2つの現場に出ていれば、その日の実働時間で分けます）。
     </div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <select id="labor-month" onchange="setLaborMonth(this.value)" style="flex:1;min-width:0;font-size:13px"></select>
@@ -2718,8 +2719,8 @@
 <script src="js/genba/genba-drawings.js?v=293"></script>
 <script src="js/genba/genba-nippo.js?v=312"></script>
 <script src="js/genba/genba-dezura.js?v=306"></script>
-<script src="js/genba/payroll.js?v=309"></script>
-<script src="js/genba/overtime-pay.js?v=311"></script>
+<script src="js/genba/payroll.js?v=313"></script>
+<script src="js/genba/overtime-pay.js?v=313"></script>
 <script src="js/genba/leave-balance.js?v=304"></script>
 <script src="js/genba/genba-leave.js?v=304"></script>
 <script src="js/genba/genba-holiday.js?v=235"></script>

@@ -173,7 +173,9 @@ function otIsWorkDay(cal, dateStr){
 //   schedOv … {日付: 所定労働日か} 振替出勤・振替休日の入れ替えを反映する
 function otSplitHours(cal, fromDate, toDate, dayMin, premSet, st, schedOv){
   const dailyMin = Math.round(otDailyHours(cal, st) * 60);
-  const out = {otMin:0, naibuMin:0, actualMin:0, weeks:0};
+  // otByDate / naibuByDate は「その時間がどの日に起きたか」。
+  // 現場ごとの労務費に割り振るときに、その日の日報の現場へ配るために使う
+  const out = {otMin:0, naibuMin:0, actualMin:0, weeks:0, otByDate:{}, naibuByDate:{}};
   const seen = new Set();
   for(let d=fromDate; d<=toDate; d=otAddDays(d,1)){
     const sat = otSaturdayOf(d);
@@ -182,6 +184,7 @@ function otSplitHours(cal, fromDate, toDate, dayMin, premSet, st, schedOv){
     out.weeks++;
     const sun = otAddDays(sat,-6);
     let wActual=0, wOt1=0, wNaibu=0, wSchedMin=0;
+    const dayOt1={}, dayNaibu={};
     for(let k=0; k<7; k++){
       const day = otAddDays(sun,k);
       // 振替出勤の日は所定労働日、その振替休日は休日として数える（カレンダーより優先）
@@ -194,17 +197,40 @@ function otSplitHours(cal, fromDate, toDate, dayMin, premSet, st, schedOv){
       if(!actual) continue;
       const dayLimit = Math.max(scheduled, 480);      // 所定が8時間未満の日は8時間が境目
       const ot1 = Math.max(0, actual - dayLimit);
-      wOt1 += ot1;
-      wNaibu += Math.max(0, (actual - ot1) - scheduled);
-      wActual += actual;
+      const naibu = Math.max(0, (actual - ot1) - scheduled);
+      dayOt1[day] = ot1; dayNaibu[day] = naibu;
+      wOt1 += ot1; wNaibu += naibu; wActual += actual;
     }
     const weekLimit = Math.max(wSchedMin, 40*60);     // 所定が40時間未満の週は40時間が境目
     const ot2 = Math.min(Math.max(0, wActual - weekLimit - wOt1), wNaibu);
     out.otMin    += wOt1 + ot2;
     out.naibuMin += wNaibu - ot2;
     out.actualMin += wActual;
+
+    // 週の②は、法内だった時間から出るので、その日ごとの法内の多さで按分する
+    const days = Object.keys(dayNaibu);
+    const share = otSplitInt(ot2, days.map(x=>dayNaibu[x]));
+    days.forEach((day,i)=>{
+      out.otByDate[day]    = (out.otByDate[day]||0)    + dayOt1[day] + share[i];
+      out.naibuByDate[day] = (out.naibuByDate[day]||0) + dayNaibu[day] - share[i];
+    });
+    Object.keys(dayOt1).forEach(day=>{
+      if(dayNaibu[day]===undefined) out.otByDate[day] = (out.otByDate[day]||0) + dayOt1[day];
+    });
   }
   return out;
+}
+
+// 合計がぴったり合うように整数で按分する（端数はいちばん惜しいものから1ずつ）
+function otSplitInt(total, weights){
+  const sum = weights.reduce((a,b)=>a+b, 0);
+  if(!total || !sum) return weights.map(()=>0);
+  const raw = weights.map(w=>total*w/sum);
+  const outv = raw.map(v=>Math.floor(v));
+  let rest = total - outv.reduce((a,b)=>a+b, 0);
+  const order = raw.map((v,i)=>[v-Math.floor(v), i]).sort((a,b)=>b[0]-a[0]);
+  for(let k=0; k<order.length && rest>0; k++, rest--) outv[order[k][1]]++;
+  return outv;
 }
 
 // その月度の社員ごとの割増賃金
@@ -247,25 +273,48 @@ function otPayAllocation(month){
 
   // 週の判定で締め期間の前後にはみ出すので、日報は少し広めに拾う
   const wideFrom = otAddDays(start,-7), wideTo = otAddDays(end,7);
-  const dayMin = {};   // uid -> {日付: 実働分}
+  const dayMin = {};    // uid -> {日付: 実働分}
+  const daySite = {};   // uid -> {日付: {現場名: 実働分}}   割増を現場へ配るのに使う
+  const holSite = {};   // uid -> {現場名: 休日労働の分}
+  const nightSite = {}; // uid -> {現場名: 深夜の分}
+  const siteOf = n => n.projectName || '（工事未設定）';
   (dailyReports||[]).filter(n=>n.workDate>=wideFrom && n.workDate<=wideTo).forEach(n=>{
     const u = users[n.userId];
     if(!u || isNippoStateName(n.projectName)) return;      // 休み・欠勤は働いていない
     const inPeriod = n.workDate>=start && n.workDate<=end;
+    const site = siteOf(n);
     if(prem[n.userId] && prem[n.userId].has(n.workDate)){
-      if(inPeriod) u.holMin += n.workMinutes;   // 休日労働：全時間を1.35で見る
+      if(inPeriod){
+        u.holMin += n.workMinutes;             // 休日労働：全時間を1.35で見る
+        const h = holSite[n.userId] = holSite[n.userId] || {};
+        h[site] = (h[site]||0) + n.workMinutes;
+      }
     } else {
       (dayMin[n.userId] = dayMin[n.userId] || {})[n.workDate] =
         (dayMin[n.userId][n.workDate] || 0) + n.workMinutes;
+      if(inPeriod){
+        const ds = daySite[n.userId] = daySite[n.userId] || {};
+        const dd = ds[n.workDate] = ds[n.workDate] || {};
+        dd[site] = (dd[site]||0) + n.workMinutes;
+      }
       if(inPeriod && furi[n.userId] && furi[n.userId].has(n.workDate)) u.furiMin += n.workMinutes;
     }
-    if(inPeriod) u.nightMin += otNightMinutes(n.startTime, n.endTime);
+    if(inPeriod){
+      const nm = otNightMinutes(n.startTime, n.endTime);
+      u.nightMin += nm;
+      if(nm){ const g = nightSite[n.userId] = nightSite[n.userId] || {}; g[site] = (g[site]||0) + nm; }
+    }
   });
 
   Object.keys(users).forEach(id=>{
     const u = users[id];
     const s = otSplitHours(u.cal, start, end, dayMin[id]||{}, prem[id], st, schedOv[id]);
     u.otMin = s.otMin; u.naibuMin = s.naibuMin; u.workedMin = s.actualMin;
+    // 日ごとの時間外・所定外を、その日に出た現場へ実働時間の割合で配る
+    u.otSite = otSpreadToSites(s.otByDate,    daySite[id]||{}, start, end);
+    u.naibuSite = otSpreadToSites(s.naibuByDate, daySite[id]||{}, start, end);
+    u.holSite = holSite[id] || {};
+    u.nightSite = nightSite[id] || {};
   });
 
   const yen = (rate, mult, min) => Math.round(rate * mult * min / 60);
@@ -280,9 +329,38 @@ function otPayAllocation(month){
     u.holPay   = u.exempt ? 0 : yen(u.rate, st.rates.holiday,  u.holMin);
     u.nightPay = yen(u.rate, st.rates.night, u.nightMin);
     u.total    = u.otPay + u.naibuPay + u.holPay + u.nightPay;
+    // 現場ごとの金額。合計が u.total とぴったり合うように配る
+    u.siteYen = {};
+    const add = (yenTotal, minBySite) => {
+      const names = Object.keys(minBySite);
+      if(!yenTotal || !names.length) return;
+      const parts = otSplitInt(yenTotal, names.map(n=>minBySite[n]));
+      names.forEach((n,i)=>{ if(parts[i]) u.siteYen[n] = (u.siteYen[n]||0) + parts[i]; });
+    };
+    add(u.otPay,    u.otSite);
+    add(u.naibuPay, u.naibuSite);
+    add(u.holPay,   u.holSite);
+    add(u.nightPay, u.nightSite);
   });
 
   return {month, start, end, st, users, userIds};
+}
+
+// 日ごとの分数を、その日に出た現場へ実働時間の割合で配る
+//   byDate  … {日付: 分}
+//   daySite … {日付: {現場名: 実働分}}
+function otSpreadToSites(byDate, daySite, start, end){
+  const out = {};
+  Object.keys(byDate||{}).forEach(day=>{
+    const min = byDate[day];
+    if(!min || day<start || day>end) return;      // 締め期間の中だけ
+    const sites = daySite[day];
+    if(!sites){ out['（工事未設定）'] = (out['（工事未設定）']||0) + min; return; }
+    const names = Object.keys(sites);
+    const parts = otSplitInt(min, names.map(n=>sites[n]));
+    names.forEach((n,i)=>{ if(parts[i]) out[n] = (out[n]||0) + parts[i]; });
+  });
+  return out;
 }
 
 // ════ 1年単位の変形労働時間制の年間精算 ════

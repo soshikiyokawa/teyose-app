@@ -5,12 +5,16 @@
 //
 //  労務費に入れる5項目 … 基本給・家族手当・役付手当・技能・資格手当・固定残業代
 //  労務費に入れない2項目… 非課税通勤手当・非課税車両借上料
+//  これに加えて、その月度の時間外の賃金（残業代・休日手当・深夜割増・所定外）も足す。
 //
 // 振り分け方
-//   その月度にその人が働いた実働時間を現場ごとに集計し、その割合で労務費を分ける。
-//   （例：労務費30万円で、A邸に16人工・B邸に4人工なら A邸24万円／B邸6万円）
-//   有給・欠勤・休みの日は実働が無いので、その分の給与も働いた現場に乗る。
-//   その月度にひとつも現場に出ていない人は「未配賦」としてまとめて出す。
+//   給与ぶん … その月度にその人が働いた実働時間を現場ごとに集計し、その割合で分ける。
+//     （例：労務費30万円で、A邸に16人工・B邸に4人工なら A邸24万円／B邸6万円）
+//     有給・欠勤・休みの日は実働が無いので、その分の給与も働いた現場に乗る。
+//     その月度にひとつも現場に出ていない人は「未配賦」としてまとめて出す。
+//   時間外 … 給与と違って「どの日にどの現場で起きたか」が日報から分かるので、
+//     起きた現場にそのまま乗せる。同じ日に2つの現場に出ていれば、その日の実働時間で分ける。
+//     （計算そのものは js/genba/overtime-pay.js）
 //
 // 給与は変わるので「いつから適用するか（月度）」で履歴を残し、
 // ある月度の給与は「その月度以前でいちばん新しい登録」を使う。
@@ -230,27 +234,57 @@ function laborAllocation(month){
     u.minutes += n.workMinutes;
   });
 
+  // ── 時間外の賃金（残業代・休日手当・深夜割増・所定外） ──
+  // 給与と違って「どの現場で起きたか」が日報から分かるので、起きた現場にそのまま乗せる
+  const otPay = {};      // 現場名 -> {uid: 円}
+  const otByUser = {};   // uid -> 円
+  let otReady = false;
+  if(typeof otPayAllocation==='function'){
+    try{
+      const a = otPayAllocation(month);
+      otReady = true;
+      a.userIds.forEach(uid=>{
+        const u = a.users[uid];
+        if(!u.total) return;
+        otByUser[uid] = u.total;
+        if(!users[uid]) return;                      // 社員一覧に無い人は数えない
+        Object.keys(u.siteYen||{}).forEach(name=>{
+          if(!sites[name]) sites[name] = {name, minutes:0, byUser:{}};
+          (otPay[name] = otPay[name] || {})[uid] = (otPay[name][uid]||0) + u.siteYen[name];
+        });
+      });
+    }catch(e){ console.warn('時間外の賃金を出せませんでした', e); }
+  }
+
   const siteNames = Object.keys(sites).sort((a,b)=>{
     const ra=laborSiteRank(a), rb=laborSiteRank(b);
     return ra!==rb ? ra-rb : (sites[b].minutes-sites[a].minutes) || a.localeCompare(b,'ja');
   });
   const userIds = Object.keys(users)
-    .filter(id=>users[id].labor>0 || users[id].minutes>0)
+    .filter(id=>users[id].labor>0 || users[id].minutes>0 || otByUser[id])
     .sort((a,b)=>cmpEmployee(users[a].name, users[b].name));
 
-  // 社員ごとに、その人の労務費を出た現場の実働時間で分ける
-  const cell = {};       // 現場名 -> {uid: 円}
-  siteNames.forEach(n=>cell[n] = {});
+  // 社員ごとに、その人の労務費（給与ぶん）を出た現場の実働時間で分ける
+  const base = {};       // 現場名 -> {uid: 円}（給与ぶん）
+  const cell = {};       // 現場名 -> {uid: 円}（給与ぶん＋時間外）
+  siteNames.forEach(n=>{ base[n] = {}; cell[n] = {}; });
   const unassigned = {}; // 現場に出ていない人の労務費
   userIds.forEach(uid=>{
     const u = users[uid];
-    if(!u.labor) return;
-    if(!u.minutes){ unassigned[uid] = u.labor; return; }
-    const yen = splitYen(u.labor, siteNames.map(n=>sites[n].byUser[uid]||0));
-    siteNames.forEach((n,i)=>{ if(yen[i]) cell[n][uid] = yen[i]; });
+    if(u.labor){
+      if(!u.minutes){ unassigned[uid] = u.labor; }
+      else {
+        const yen = splitYen(u.labor, siteNames.map(n=>sites[n].byUser[uid]||0));
+        siteNames.forEach((n,i)=>{ if(yen[i]) base[n][uid] = yen[i]; });
+      }
+    }
+    siteNames.forEach(n=>{
+      const v = (base[n][uid]||0) + ((otPay[n]||{})[uid]||0);
+      if(v) cell[n][uid] = v;
+    });
   });
 
-  return {month, start, end, sites, siteNames, users, userIds, cell, unassigned};
+  return {month, start, end, sites, siteNames, users, userIds, cell, base, otPay, otByUser, otReady, unassigned};
 }
 
 let laborMonth = '';
@@ -270,17 +304,22 @@ function laborTableHtml(a, forPrint){
   const colTotal = {}; a.userIds.forEach(uid=>colTotal[uid]=0);
   let grand = 0;
 
+  let grandBase = 0, grandOt = 0;
   const rows = a.siteNames.map(name=>{
-    let sum = 0;
+    let sum = 0, sumBase = 0, sumOt = 0;
     const cells = a.userIds.map(uid=>{
       const v = a.cell[name][uid]||0;
       sum += v; colTotal[uid] += v;
+      sumBase += a.base[name][uid]||0;
+      sumOt   += (a.otPay[name]||{})[uid]||0;
       return `<td class="num">${v?fmt(v):''}</td>`;
     }).join('');
-    grand += sum;
+    grand += sum; grandBase += sumBase; grandOt += sumOt;
     return `<tr>
       <td class="site">${esc(name)}</td>
       <td class="num ninku">${ninku(a.sites[name].minutes)}</td>
+      <td class="num">${sumBase?fmt(sumBase):''}</td>
+      <td class="num">${sumOt?fmt(sumOt):''}</td>
       <td class="num total">${fmt(sum)}</td>
       ${cells}
     </tr>`;
@@ -291,21 +330,34 @@ function laborTableHtml(a, forPrint){
   const unRow = unSum ? `<tr class="unassigned">
       <td class="site">未配賦（この月度に現場の日報がない人）</td>
       <td class="num ninku">0</td>
+      <td class="num">${fmt(unSum)}</td>
+      <td class="num"></td>
       <td class="num total">${fmt(unSum)}</td>
       ${a.userIds.map(uid=>{ const v=a.unassigned[uid]||0; colTotal[uid]+=v; return `<td class="num">${v?fmt(v):''}</td>`; }).join('')}
     </tr>` : '';
-  grand += unSum;
+  grand += unSum; grandBase += unSum;
 
   return `<table class="labor-tbl${forPrint?' print':''}">
-    <tr><th class="site">現場（工事）</th><th class="ninku">人工</th><th class="total">労務費</th>${head}</tr>
+    <tr><th class="site">現場（工事）</th><th class="ninku">人工</th><th>給与ぶん</th><th>時間外</th><th class="total">労務費</th>${head}</tr>
     ${rows}${unRow}
     <tr class="sum">
       <td class="site">合計</td>
       <td class="num ninku">${ninku(a.siteNames.reduce((n,s)=>n+a.sites[s].minutes,0))}</td>
+      <td class="num">${fmt(grandBase)}</td>
+      <td class="num">${fmt(grandOt)}</td>
       <td class="num total">${fmt(grand)}</td>
       ${a.userIds.map(uid=>`<td class="num">${colTotal[uid]?fmt(colTotal[uid]):''}</td>`).join('')}
     </tr>
   </table>`;
+}
+
+// 時間外の賃金の合計を一行そえる
+function laborOtNote(a){
+  if(!a.otReady) return '';
+  const total = Object.values(a.otByUser||{}).reduce((n,v)=>n+v, 0);
+  return total
+    ? `<div class="labor-note">時間外の賃金 ${fmt(total)}円 を、起きた現場に乗せています（内訳は「残業代・休日手当」の画面）。</div>`
+    : '<div class="labor-note">この月度は残業・休日出勤・深夜労働がありません。</div>';
 }
 
 function renderLabor(){
@@ -328,7 +380,8 @@ function renderLabor(){
   }
   wrap.innerHTML =
     (noSalary.length ? `<div class="labor-warn">給与が未登録のため労務費に入っていない人：${esc(noSalary.join('、'))}</div>` : '')
-    + `<div class="labor-scroll">${laborTableHtml(a, false)}</div>`;
+    + `<div class="labor-scroll">${laborTableHtml(a, false)}</div>`
+    + laborOtNote(a);
 }
 
 function printLabor(){
@@ -355,9 +408,10 @@ function printLabor(){
     <span style="font-size:11px">対象期間：${md(a.start)}〜${md(a.end)}（20日締め）</span>
   </div>
   <div style="font-size:10px;color:#555;margin-bottom:8px">
-    労務費＝基本給・家族手当・役付手当・技能・資格手当・固定残業代の合計（非課税通勤手当と非課税車両借上料は含みません）。
-    社員ごとの労務費を、その月度に出た現場の実働時間の割合で分けています（人工＝実働8時間で1.0）。
+    給与ぶん＝基本給・家族手当・役付手当・技能・資格手当・固定残業代の合計（非課税通勤手当と非課税車両借上料は含みません）。
+    社員ごとの給与を、その月度に出た現場の実働時間の割合で分けています（人工＝実働8時間で1.0）。
     有給・欠勤・休みの日も給与は発生するため、その分は出た現場に含まれます。
+    時間外＝残業代・休日手当・深夜割増・所定外の賃金で、日報からどの日のどの現場で起きたかが分かるため、起きた現場にそのまま乗せています。
   </div>
   ${laborTableHtml(a, true)}
   <div style="font-size:9px;color:#555;margin-top:8px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
