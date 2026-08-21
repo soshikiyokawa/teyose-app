@@ -517,10 +517,11 @@ function otSiteTableHtml(a, forPrint){
   }).join('');
   return `
   <div class="otpay-year">
-    <div class="otpay-year-head">この時間外の賃金がどの現場に乗るか</div>
+    <div class="otpay-year-head">現場ごとの時間外の内訳（誰の分がいくら）</div>
     <div class="otpay-year-note">
       残業・休日出勤・深夜労働が起きた日の日報から、その現場に乗せています。
       同じ日に2つの現場に出ていれば、その日の実働時間で分けています。現場別労務費の「時間外」と同じ金額です。
+      横に見ればその現場に誰の分がいくら入っているか、縦に見ればその人の月度の合計が分かります。
     </div>
     <div class="labor-scroll">
       <table class="otpay-tbl${forPrint?' print':''}">
