@@ -297,8 +297,18 @@ function openLabor(){
 function closeLabor(){ document.getElementById('labor-modal').classList.remove('open'); }
 function setLaborMonth(v){ laborMonth = v; renderLabor(); }
 
+// 表に出す金額の選び方。'total'＝給与ぶん＋時間外／'base'＝給与ぶんだけ／'ot'＝時間外だけ
+let laborMode = 'total';
+function setLaborMode(v){ laborMode = v; renderLabor(); }
+function laborCellOf(a, name, uid, mode){
+  if(mode==='base') return a.base[name][uid]||0;
+  if(mode==='ot')   return (a.otPay[name]||{})[uid]||0;
+  return a.cell[name][uid]||0;
+}
+
 // 表のHTML（画面にも印刷にも同じものを使う）
-function laborTableHtml(a, forPrint){
+function laborTableHtml(a, forPrint, mode){
+  mode = mode || 'total';
   const ninku = min => (Math.round(min/480*100)/100).toFixed(2).replace(/\.?0+$/,'') || '0';
   const head = a.userIds.map(uid=>`<th>${esc(a.users[uid].name)}</th>`).join('');
   const colTotal = {}; a.userIds.forEach(uid=>colTotal[uid]=0);
@@ -308,7 +318,7 @@ function laborTableHtml(a, forPrint){
   const rows = a.siteNames.map(name=>{
     let sum = 0, sumBase = 0, sumOt = 0;
     const cells = a.userIds.map(uid=>{
-      const v = a.cell[name][uid]||0;
+      const v = laborCellOf(a, name, uid, mode);
       sum += v; colTotal[uid] += v;
       sumBase += a.base[name][uid]||0;
       sumOt   += (a.otPay[name]||{})[uid]||0;
@@ -318,8 +328,7 @@ function laborTableHtml(a, forPrint){
     return `<tr>
       <td class="site">${esc(name)}</td>
       <td class="num ninku">${ninku(a.sites[name].minutes)}</td>
-      <td class="num">${sumBase?fmt(sumBase):''}</td>
-      <td class="num">${sumOt?fmt(sumOt):''}</td>
+      ${mode==='total' ? `<td class="num">${sumBase?fmt(sumBase):''}</td><td class="num">${sumOt?fmt(sumOt):''}</td>` : ''}
       <td class="num total">${fmt(sum)}</td>
       ${cells}
     </tr>`;
@@ -327,24 +336,24 @@ function laborTableHtml(a, forPrint){
 
   const unIds = Object.keys(a.unassigned);
   let unSum = 0; unIds.forEach(uid=>unSum += a.unassigned[uid]);
-  const unRow = unSum ? `<tr class="unassigned">
+  // 未配賦は給与ぶんだけなので、「時間外だけ」で見ているときは出さない
+  const unRow = (unSum && mode!=='ot') ? `<tr class="unassigned">
       <td class="site">未配賦（この月度に現場の日報がない人）</td>
       <td class="num ninku">0</td>
-      <td class="num">${fmt(unSum)}</td>
-      <td class="num"></td>
+      ${mode==='total' ? `<td class="num">${fmt(unSum)}</td><td class="num"></td>` : ''}
       <td class="num total">${fmt(unSum)}</td>
       ${a.userIds.map(uid=>{ const v=a.unassigned[uid]||0; colTotal[uid]+=v; return `<td class="num">${v?fmt(v):''}</td>`; }).join('')}
     </tr>` : '';
-  grand += unSum; grandBase += unSum;
+  if(mode!=='ot') grand += unSum;
+  grandBase += unSum;
 
   return `<table class="labor-tbl${forPrint?' print':''}">
-    <tr><th class="site">現場（工事）</th><th class="ninku">人工</th><th>給与ぶん</th><th>時間外</th><th class="total">労務費</th>${head}</tr>
+    <tr><th class="site">現場（工事）</th><th class="ninku">人工</th>${mode==='total' ? '<th>給与ぶん</th><th>時間外</th>' : ''}<th class="total">${mode==='base'?'給与ぶん':mode==='ot'?'時間外':'労務費'}</th>${head}</tr>
     ${rows}${unRow}
     <tr class="sum">
       <td class="site">合計</td>
       <td class="num ninku">${ninku(a.siteNames.reduce((n,s)=>n+a.sites[s].minutes,0))}</td>
-      <td class="num">${fmt(grandBase)}</td>
-      <td class="num">${fmt(grandOt)}</td>
+      ${mode==='total' ? `<td class="num">${fmt(grandBase)}</td><td class="num">${fmt(grandOt)}</td>` : ''}
       <td class="num total">${fmt(grand)}</td>
       ${a.userIds.map(uid=>`<td class="num">${colTotal[uid]?fmt(colTotal[uid]):''}</td>`).join('')}
     </tr>
@@ -380,7 +389,11 @@ function renderLabor(){
   }
   wrap.innerHTML =
     (noSalary.length ? `<div class="labor-warn">給与が未登録のため労務費に入っていない人：${esc(noSalary.join('、'))}</div>` : '')
-    + `<div class="labor-scroll">${laborTableHtml(a, false)}</div>`
+    + `<div class="labor-tabs">`
+      + [['total','合計'],['base','給与ぶん'],['ot','時間外だけ']]
+          .map(([k,l])=>`<button class="btn xs${laborMode===k?' primary':''}" onclick="setLaborMode('${k}')">${l}</button>`).join('')
+      + `</div>`
+    + `<div class="labor-scroll">${laborTableHtml(a, false, laborMode)}</div>`
     + laborOtNote(a);
 }
 
@@ -413,7 +426,7 @@ function printLabor(){
     有給・欠勤・休みの日も給与は発生するため、その分は出た現場に含まれます。
     時間外＝残業代・休日手当・深夜割増・所定外の賃金で、日報からどの日のどの現場で起きたかが分かるため、起きた現場にそのまま乗せています。
   </div>
-  ${laborTableHtml(a, true)}
+  ${laborTableHtml(a, true, 'total')}
   <div style="font-size:9px;color:#555;margin-top:8px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
   printHtml(`現場別労務費 ${label}`, html);
 }

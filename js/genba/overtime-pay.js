@@ -488,6 +488,51 @@ function otPayBasisText(a){
        + `所定外（法定内）＝所定は超えたが①②にならなかった分で、割増は要らないぶん。`;
 }
 
+// 誰の時間外の賃金が、どの現場にいくら乗っているか
+function otSiteTableHtml(a, forPrint){
+  const bySite = {};                       // 現場名 -> {uid: 円}
+  const colTotal = {}; a.userIds.forEach(id=>colTotal[id]=0);
+  a.userIds.forEach(id=>{
+    Object.entries(a.users[id].siteYen||{}).forEach(([name,v])=>{
+      (bySite[name] = bySite[name] || {})[id] = ((bySite[name]||{})[id]||0) + v;
+      colTotal[id] += v;
+    });
+  });
+  const names = Object.keys(bySite).sort((x,y)=>{
+    const sx = Object.values(bySite[x]).reduce((n,v)=>n+v,0);
+    const sy = Object.values(bySite[y]).reduce((n,v)=>n+v,0);
+    return sy-sx || x.localeCompare(y,'ja');
+  });
+  if(!names.length) return '';
+  const ids = a.userIds.filter(id=>colTotal[id]);
+  let grand = 0;
+  const rows = names.map(name=>{
+    const sum = ids.reduce((n,id)=>n+(bySite[name][id]||0), 0);
+    grand += sum;
+    return `<tr>
+      <td class="who">${esc(name)}</td>
+      <td class="num total">${fmt(sum)}</td>
+      ${ids.map(id=>`<td class="num">${bySite[name][id]?fmt(bySite[name][id]):''}</td>`).join('')}
+    </tr>`;
+  }).join('');
+  return `
+  <div class="otpay-year">
+    <div class="otpay-year-head">この時間外の賃金がどの現場に乗るか</div>
+    <div class="otpay-year-note">
+      残業・休日出勤・深夜労働が起きた日の日報から、その現場に乗せています。
+      同じ日に2つの現場に出ていれば、その日の実働時間で分けています。現場別労務費の「時間外」と同じ金額です。
+    </div>
+    <div class="labor-scroll">
+      <table class="otpay-tbl${forPrint?' print':''}">
+        <tr><th class="who">現場（工事）</th><th class="num total">時間外の計</th>${ids.map(id=>`<th class="num">${esc(a.users[id].name)}</th>`).join('')}</tr>
+        ${rows}
+        <tr class="sum"><td class="who">合計</td><td class="num total">${fmt(grand)}</td>
+          ${ids.map(id=>`<td class="num">${colTotal[id]?fmt(colTotal[id]):''}</td>`).join('')}</tr>
+      </table>
+    </div>
+  </div>`;
+}
+
 // 1年単位の変形労働時間制の年間精算（該当する区分の社員がいるときだけ出す）
 function otYearlyHtml(y){
   if(!y.rows.length) return '';
@@ -553,6 +598,7 @@ function renderOtPay(){
     (noSalary.length ? `<div class="labor-warn">給与が未登録のため金額を出せない人：${esc(noSalary.join('、'))}</div>` : '')
     + warns.map(w=>`<div class="labor-warn danger">${esc(w)}</div>`).join('')
     + `<div class="labor-scroll">${otPayTableHtml(a, false)}</div>`
+    + otSiteTableHtml(a, false)
     + otYearlyHtml(otYearlySettlement(mo))
     + `<div class="otpay-basis">${esc(otPayBasisText(a))}</div>`;
 }
@@ -588,6 +634,7 @@ function printOtPay(){
     残業は1日8時間を超えた分で数えており、週40時間を超えた分の判定は入れていません。
   </div>
   ${otPayTableHtml(a, true)}
+  ${otSiteTableHtml(a, true)}
   <div style="font-size:9px;color:#555;margin-top:8px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
   printHtml(`残業代・休日手当 ${label}`, html);
 }

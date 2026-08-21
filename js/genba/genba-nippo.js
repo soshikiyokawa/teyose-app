@@ -803,7 +803,37 @@ function printDezura(month){
     <tr style="background:#f7f3eb"><td></td><td style="font-weight:700;text-align:right">合計</td><td style="text-align:right;font-weight:700">${fmtNinku(siteTotal)}</td>${empTotalCells}</tr>
   </table>
   </div>
+  ${dezuraLaborHtml(mo)}
   <div style="font-size:9px;color:#555;margin-top:6px">出力日時：${new Date().toLocaleString('ja-JP')}　手寄（てよせ）</div>`;
 
   printHtml(`出面表 ${y}年${m}月度`, html);
+}
+
+// 出面表に付ける現場別労務費。
+// 給与の入った表なので、清川創史さん・清川優香さんが開いたときだけ出す。
+// （出面表そのものは社員なら誰でも開けるため、ここで必ず絞る）
+function dezuraLaborHtml(month){
+  if(typeof isPayrollAdmin!=='function' || !isPayrollAdmin()) return '';
+  if(typeof laborAllocation!=='function' || typeof laborTableHtml!=='function') return '';
+  let a;
+  try{ a = laborAllocation(month); }catch(e){ console.warn('労務費を出せませんでした', e); return ''; }
+  if(!a.siteNames.length && !Object.keys(a.unassigned).length) return '';
+  return `
+  <div style="font-size:11px;font-weight:700;margin-top:16px">現場別 労務費（時間外の賃金を含む）</div>
+  <div style="font-size:10px;color:#555;margin-bottom:4px">
+    給与ぶん＝基本給・家族手当・役付手当・技能・資格手当・固定残業代の合計を、その月度に出た現場の実働時間の割合で分けたもの。
+    時間外＝残業代・休日手当・深夜割増・所定外の賃金で、起きた現場に乗せたもの。
+    この表は清川創史さん・清川優香さんにしか出ません。
+  </div>
+  <div class="dz-scroll">${laborTableHtml(a, true, 'total')}</div>
+  <style>
+    table.labor-tbl{border-collapse:collapse;font-size:10px;width:100%}
+    table.labor-tbl th,table.labor-tbl td{border:0.4pt solid #b9b9b9;padding:3px 5px;white-space:nowrap}
+    table.labor-tbl th{background:#f0ece3;font-weight:700;font-size:9px}
+    table.labor-tbl td.num{text-align:right}
+    table.labor-tbl td.site,table.labor-tbl th.site{text-align:left;min-width:140px}
+    table.labor-tbl td.total{font-weight:700;background:#faf7f0}
+    table.labor-tbl tr.sum td{font-weight:700;background:#f7f3eb;border-top:0.7pt solid #8a8a8a}
+    table.labor-tbl tr.unassigned td{background:#fdf3ea}
+  </style>`;
 }
