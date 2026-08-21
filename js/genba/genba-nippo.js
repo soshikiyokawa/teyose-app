@@ -20,6 +20,37 @@ const NIPPO_ABSENT = '欠勤';
 // 工事ではなく勤怠の状態を表す選択肢（作業内容も時刻も使わない）
 function isNippoStateName(name){ return name===NIPPO_REST || name===NIPPO_ABSENT; }
 
+// ── 日報の二重登録さがし ──
+// 同じ人・同じ日・同じ現場・同じ時刻の日報が2件以上あれば、まず入力の重複。
+// 放っておくと実働時間が倍になり、人工・労務費・残業代まで多く出てしまうので、
+// 出面表と給与まわりの画面で知らせる。
+// （同じ日でも時刻が違えば午前・午後で分けた正しい入力なので拾わない）
+function nippoDuplicates(start, end){
+  const map = {};
+  (dailyReports||[]).forEach(n=>{
+    if(start && (n.workDate<start || n.workDate>end)) return;
+    if(isNippoStateName(n.projectName)) return;
+    const key = [n.userId, n.workDate, n.projectName, n.startTime, n.endTime].join('|');
+    (map[key] = map[key] || []).push(n);
+  });
+  return Object.values(map).filter(v=>v.length>1).map(v=>({
+    userId:v[0].userId, userName:v[0].userName, date:v[0].workDate,
+    project:v[0].projectName, startTime:v[0].startTime, endTime:v[0].endTime,
+    count:v.length, minutes:v.reduce((n,x)=>n+x.workMinutes,0), reports:v
+  })).sort((a,b)=> a.date<b.date?-1 : a.date>b.date?1 : String(a.userName).localeCompare(String(b.userName),'ja'));
+}
+function nippoDupText(list){
+  return list.map(d=>`${d.userName} ${d.date.slice(5).replace('-','/')} ${d.project}（${d.startTime}〜${d.endTime}）が${d.count}件・合計${Math.round(d.minutes/60*10)/10}時間`).join('／');
+}
+// 画面に出す注意書き。重複が無ければ空
+function nippoDupWarnHtml(start, end){
+  const list = nippoDuplicates(start, end);
+  if(!list.length) return '';
+  return `<div class="labor-warn danger">同じ日・同じ現場・同じ時刻の日報が重なっています。`
+       + `実働時間が多く出て、人工も労務費も残業代も過大になります：${esc(nippoDupText(list))}。`
+       + `「出面表を手直しする」からその日を開いて、余分なほうを削除してください。</div>`;
+}
+
 // 他人の日報を編集できる人（この人だけ。他は自分の日報のみ編集可）
 const NIPPO_EDITOR = '清川創史';
 function canEditOthersNippo(){ return currentUserDisplayName === NIPPO_EDITOR; }
@@ -788,6 +819,11 @@ function printDezura(month){
     <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
     <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　<span style="color:#b5302a;font-weight:700">休</span>=休日労働（割増対象）　<span style="color:#1f6f8b;font-weight:700">替</span>=振替出勤（事前に振替休日を指定＝労働日の振替のため割増なし）　休・替の下段は日報の実働時間　有=有給　半=半休　<span style="color:#b5302a;font-weight:700">欠</span>=欠勤（有給の残日数が足りなかった日、または欠勤として登録した日）　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　<span style="background:#ffcdd2;padding:0 4px">■</span>＝休日出勤の日報が未提出（時間数を計算できません）　※休日出勤・有給・振替は承認済みのみ　※役員は休日労働割増の対象外のため「休日労働(h)割増」は—</span>
   </div>
+  ${(function(){
+    const dup = nippoDuplicates(dzDateStr(start), dzDateStr(end));
+    return dup.length ? `<div style="font-size:10px;color:#8a2018;background:#fdeaea;border-radius:4px;padding:5px 8px;margin-bottom:6px">
+      同じ日・同じ現場・同じ時刻の日報が重なっています。実働時間と人工が多く出ています：${esc(nippoDupText(dup))}</div>` : '';
+  })()}
   <div style="font-size:10px;color:#888;margin-bottom:4px">← 横スクロールで日付が見られます（氏名は固定）</div>
   <div class="dz-scroll">
   <table class="dz">

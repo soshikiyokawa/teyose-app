@@ -51,6 +51,16 @@ function dzeDayState(uid, s){
   };
 }
 
+// その日に、同じ現場・同じ時刻の日報が2件以上あるか（入力の二重登録）
+function dzeHasDuplicate(st){
+  const seen = new Set();
+  return st.workReports.some(n=>{
+    const k = [n.projectName, n.startTime, n.endTime].join('|');
+    if(seen.has(k)) return true;
+    seen.add(k); return false;
+  });
+}
+
 // その日の見え方（出面表と同じ並び）
 function dzeLabel(st){
   const parts = [];
@@ -60,6 +70,8 @@ function dzeLabel(st){
   st.workReports.forEach(n=>parts.push(
     (n.projectName||'（工事未設定）') + '　' + gbMinLabel(n.workMinutes)
     + (n.overtimeMinutes>0 ? '（残業'+gbMinLabel(n.overtimeMinutes)+'）' : '')));
+  // 同じ現場・同じ時刻の日報が重なっていたら、その場で気づけるようにする
+  if(dzeHasDuplicate(st)){ parts.push('日報が重複しています'); cls = 'bad'; }
   if(st.leave && !st.leaveAbsent) parts.push(st.leave.leaveType==='全日' ? '有給' : '半休（'+st.leave.leaveType+'）');
   if(st.substitute) parts.push('振替休日');
   if(st.restReport) parts.push('休み');

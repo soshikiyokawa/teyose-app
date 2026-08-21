@@ -388,7 +388,8 @@ function renderLabor(){
     return;
   }
   wrap.innerHTML =
-    (noSalary.length ? `<div class="labor-warn">給与が未登録のため労務費に入っていない人：${esc(noSalary.join('、'))}</div>` : '')
+    (typeof nippoDupWarnHtml==='function' ? nippoDupWarnHtml(a.start, a.end) : '')
+    + (noSalary.length ? `<div class="labor-warn">給与が未登録のため労務費に入っていない人：${esc(noSalary.join('、'))}</div>` : '')
     + `<div class="labor-tabs">`
       + [['total','合計'],['base','給与ぶん'],['ot','時間外だけ']]
           .map(([k,l])=>`<button class="btn xs${laborMode===k?' primary':''}" onclick="setLaborMode('${k}')">${l}</button>`).join('')

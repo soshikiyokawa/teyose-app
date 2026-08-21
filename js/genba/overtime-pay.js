@@ -595,7 +595,8 @@ function renderOtPay(){
         + `法定の総枠${mh.frame}時間を超えます。設定で1日の所定労働時間の平均（${Math.floor(mh.frame/mh.work*100)/100}時間以下）を入れるか、勤務カレンダーの休日を増やしてください。`);
   });
   wrap.innerHTML =
-    (noSalary.length ? `<div class="labor-warn">給与が未登録のため金額を出せない人：${esc(noSalary.join('、'))}</div>` : '')
+    (typeof nippoDupWarnHtml==='function' ? nippoDupWarnHtml(a.start, a.end) : '')
+    + (noSalary.length ? `<div class="labor-warn">給与が未登録のため金額を出せない人：${esc(noSalary.join('、'))}</div>` : '')
     + warns.map(w=>`<div class="labor-warn danger">${esc(w)}</div>`).join('')
     + `<div class="labor-scroll">${otPayTableHtml(a, false)}</div>`
     + otSiteTableHtml(a, false)
