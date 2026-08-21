@@ -242,10 +242,12 @@ function laborAllocation(month){
     const u = users[n.userId];
     if(!u) return;                                   // 退職などで社員一覧に無い人は数えない
     const key = n.projectName || '（工事未設定）';
-    const site = sites[key] = sites[key] || {name:key, minutes:0, byUser:{}};
+    const site = sites[key] = sites[key] || {name:key, minutes:0, ninku:0, byUser:{}};
     site.minutes += n.workMinutes;
+    site.ninku += nippoNinku(n);   // 人によって1人工の時間が違うので、日報ごとに足す
     site.byUser[n.userId] = (site.byUser[n.userId]||0) + n.workMinutes;
     u.minutes += n.workMinutes;
+    u.ninku = (u.ninku||0) + nippoNinku(n);
   });
 
   // ── 時間外の賃金（残業代・休日手当・深夜割増・所定外） ──
@@ -259,7 +261,7 @@ function laborAllocation(month){
       otByUser[uid] = u.total;
       if(!users[uid]) return;                      // 社員一覧に無い人は数えない
       Object.keys(u.siteYen||{}).forEach(name=>{
-        if(!sites[name]) sites[name] = {name, minutes:0, byUser:{}};
+        if(!sites[name]) sites[name] = {name, minutes:0, ninku:0, byUser:{}};
         (otPay[name] = otPay[name] || {})[uid] = (otPay[name][uid]||0) + u.siteYen[name];
       });
     });
@@ -318,7 +320,7 @@ function laborCellOf(a, name, uid, mode){
 // 表のHTML（画面にも印刷にも同じものを使う）
 function laborTableHtml(a, forPrint, mode){
   mode = mode || 'total';
-  const ninku = min => (Math.round(min/480*100)/100).toFixed(2).replace(/\.?0+$/,'') || '0';
+  const ninku = v => (Math.round(v*100)/100).toFixed(2).replace(/\.?0+$/,'') || '0';
   const head = a.userIds.map(uid=>`<th>${esc(a.users[uid].name)}</th>`).join('');
   const colTotal = {}; a.userIds.forEach(uid=>colTotal[uid]=0);
   let grand = 0;
@@ -336,7 +338,7 @@ function laborTableHtml(a, forPrint, mode){
     grand += sum; grandBase += sumBase; grandOt += sumOt;
     return `<tr>
       <td class="site">${esc(name)}</td>
-      <td class="num ninku">${ninku(a.sites[name].minutes)}</td>
+      <td class="num ninku">${ninku(a.sites[name].ninku)}</td>
       ${mode==='total' ? `<td class="num">${sumBase?fmt(sumBase):''}</td><td class="num">${sumOt?fmt(sumOt):''}</td>` : ''}
       <td class="num total">${fmt(sum)}</td>
       ${cells}
@@ -361,12 +363,63 @@ function laborTableHtml(a, forPrint, mode){
     ${rows}${unRow}
     <tr class="sum">
       <td class="site">合計</td>
-      <td class="num ninku">${ninku(a.siteNames.reduce((n,s)=>n+a.sites[s].minutes,0))}</td>
+      <td class="num ninku">${ninku(a.siteNames.reduce((n,s)=>n+a.sites[s].ninku,0))}</td>
       ${mode==='total' ? `<td class="num">${fmt(grandBase)}</td><td class="num">${fmt(grandOt)}</td>` : ''}
       <td class="num total">${fmt(grand)}</td>
       ${a.userIds.map(uid=>`<td class="num">${colTotal[uid]?fmt(colTotal[uid]):''}</td>`).join('')}
     </tr>
   </table>`;
+}
+
+// ════ 1人工あたりの労務費（原価サマリーで使う単価） ════
+//
+// 原価サマリーは全社員（管理者）が見られる画面なので、そこに個人の給与を出すわけにいかない。
+// 実額をそのまま乗せると、その現場に1人しか出ていない月があれば
+//   その現場の労務費 ÷ その人の実働割合 ＝ 月給
+// と割り戻せてしまう。
+// そこで「その月度に現場へ配った労務費の合計 ÷ 人工の合計」の1つの数字だけを設定に保存し、
+// 原価サマリーはこれまでどおり「人工 × 単価」で計算する。
+// 10人ぶんの平均なので、個人の給与は分からない。
+//
+// 未配賦（その月度に現場の日報がない人の給与）は現場の労務費ではないので含めない。
+function laborRateFromMonth(month){
+  let a;
+  try{ a = laborAllocation(month); }catch(e){ return null; }
+  const ninku = a.siteNames.reduce((n,s)=>n+a.sites[s].ninku, 0);
+  if(!ninku) return null;
+  let yen = 0;
+  a.siteNames.forEach(n=>a.userIds.forEach(u=>{ yen += a.cell[n][u]||0; }));
+  if(!yen) return null;
+  return {month, ninku:Math.round(ninku*100)/100, yen, rate:Math.round(yen/ninku)};
+}
+
+function laborRateBoxHtml(month){
+  const r = laborRateFromMonth(month);
+  const now = (typeof laborCostPerNinku==='function') ? laborCostPerNinku() : 0;
+  if(!r) return '';
+  const same = now === r.rate;
+  return `
+  <div class="labor-rate">
+    <div class="labor-rate-head">原価サマリーの「1人工あたりの労務費」</div>
+    <div class="labor-rate-note">
+      この月度に現場へ配った労務費 ${fmt(r.yen)}円 ÷ 人工 ${r.ninku} ＝ <b>${fmt(r.rate)}円／人工</b>。
+      未配賦（現場の日報がない人の給与）は入れていません。<br>
+      原価サマリーは管理者なら誰でも見られるので、個人の給与ではなくこの全社平均の単価を使います。
+      いまの設定は ${now?fmt(now)+'円':'未設定'}。
+    </div>
+    <button class="btn xs${same?'':' primary'}" onclick="applyLaborRate(${r.rate})"${same?' disabled':''}>
+      ${same ? 'この単価で設定済み' : `${fmt(r.rate)}円に更新する`}
+    </button>
+  </div>`;
+}
+
+async function applyLaborRate(rate){
+  if(!isPayrollAdmin()) return;
+  if(!confirm(`原価サマリーの「1人工あたりの労務費」を ${fmt(rate)}円 にします。\nすべての案件の原価の計算に使われます。よろしいですか？`)) return;
+  await dbSaveAppSetting('labor_cost_per_ninku', {amount:rate, source:laborMonth||dezuraCurrentMonth()});
+  showToast(`1人工あたり ¥${fmt(rate)} で計算します`);
+  renderLabor();
+  if(typeof renderCost==='function') try{ renderCost(); }catch(_){}
 }
 
 // 時間外の賃金と欠勤控除について一行そえる
@@ -410,7 +463,8 @@ function renderLabor(){
           .map(([k,l])=>`<button class="btn xs${laborMode===k?' primary':''}" onclick="setLaborMode('${k}')">${l}</button>`).join('')
       + `</div>`
     + `<div class="labor-scroll">${laborTableHtml(a, false, laborMode)}</div>`
-    + laborOtNote(a);
+    + laborOtNote(a)
+    + laborRateBoxHtml(mo);
 }
 
 function printLabor(){

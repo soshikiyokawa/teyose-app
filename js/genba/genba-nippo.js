@@ -622,7 +622,7 @@ function printDezura(month){
     u.work += n.workMinutes; u.overtime += n.overtimeMinutes; u.days.add(n.workDate);
     u.minByDate[n.workDate] = (u.minByDate[n.workDate]||0) + n.workMinutes;
     const site = getSite(n.projectName);
-    const ninku = n.workMinutes/480;
+    const ninku = nippoNinku(n);   // 1人工＝その人の所定労働時間（訓練校生は7.5時間）
     site.total += ninku;
     site.byUser[u.name] = (site.byUser[u.name]||0) + ninku;
     const cell = u.siteByDate[n.workDate] = u.siteByDate[n.workDate]||{nos:new Set(),ot:false};

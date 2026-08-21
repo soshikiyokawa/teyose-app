@@ -129,15 +129,15 @@ function renderCost(){
 
   // 人工（日報の実働から累計。日報の追加・修正はRealtimeで即時反映される）
   const targetReports=dailyReports.filter(n=>n.projectName===target);
-  const ninku=targetReports.reduce((s,n)=>s+n.workMinutes/480,0);
+  const ninku=targetReports.reduce((s,n)=>s+nippoNinku(n),0);
   document.getElementById('c-ninku').textContent=ninku?fmtNinku(ninku)+'人工':'—';
 
   // 作業種別（新築：木工事／上棟／墨付け刻み）ごとの人工内訳
   const kindMin={};
-  targetReports.forEach(n=>{ const k=n.workKind||''; kindMin[k]=(kindMin[k]||0)+n.workMinutes; });
+  targetReports.forEach(n=>{ const k=n.workKind||''; kindMin[k]=(kindMin[k]||0)+nippoNinku(n); });
   const bd=document.getElementById('c-ninku-breakdown');
-  const parts=['木工事','上棟','墨付け刻み'].filter(k=>kindMin[k]).map(k=>`${k} <b>${fmtNinku(kindMin[k]/480)}</b>`);
-  if(kindMin['']&&parts.length) parts.push(`種別なし <b>${fmtNinku(kindMin['']/480)}</b>`);
+  const parts=['木工事','上棟','墨付け刻み'].filter(k=>kindMin[k]).map(k=>`${k} <b>${fmtNinku(kindMin[k])}</b>`);
+  if(kindMin['']&&parts.length) parts.push(`種別なし <b>${fmtNinku(kindMin[''])}</b>`);
   bd.innerHTML = parts.length ? '人工内訳：'+parts.join('　／　') : '';
   bd.style.display = parts.length ? '' : 'none';
 

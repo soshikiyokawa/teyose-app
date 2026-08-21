@@ -30,7 +30,7 @@ function costBudgetData(projectName){
   const ordered=(costEntries||[]).filter(e=>(e.project||'')===projectName)
     .reduce((s,e)=>s+e.amount,0);
   const ninku=(dailyReports||[]).filter(n=>n.projectName===projectName)
-    .reduce((s,n)=>s+n.workMinutes/480,0);
+    .reduce((s,n)=>s+nippoNinku(n),0);
   const rate=laborCostPerNinku();
   const labor=Math.round(ninku*rate);
   const actual=ordered+labor;
@@ -55,7 +55,7 @@ function renderCostBudget(){
              style="width:100px;font-size:12px;padding:3px 6px;text-align:right">
       <span style="font-size:11px;color:var(--text-sub)">円</span>
       <button class="btn xs primary" onclick="saveLaborRate()">保存</button>
-      <span style="font-size:11px;color:var(--text-muted)">全案件の計算に使います</span>
+      <span style="font-size:11px;color:var(--text-muted)">全案件の計算に使います${(appSettings?.labor_cost_per_ninku?.source) ? `（${esc(appSettings.labor_cost_per_ninku.source.replace('-','年'))}月度の実績から）` : ''}</span>
     </div>` : '';
 
   if(!d.est){

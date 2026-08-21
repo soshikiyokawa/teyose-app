@@ -224,3 +224,23 @@ function enableDragSort(container, rowSelector, onDrop){
   container.addEventListener('pointercancel', finish);
   container.addEventListener('lostpointercapture', ()=>{ if(srcRow) drop(); });
 }
+
+// ════ 人工（1人日） ════
+//
+// 1人工＝その人の1日の所定労働時間ぶんの労働。
+// 一般社員は8時間、訓練校生は7.5時間（勤務区分ごとの所定労働時間）。
+// 区分ごとの時間は「残業代の計算の設定」（app_settings.overtime_pay）と同じものを使う。
+// 出面表・現場別労務費・原価サマリー・案件カードで同じ数え方になるよう、ここに集めてある。
+function ninkuMinutesOf(userId){
+  const s = (typeof appSettings!=='undefined' && appSettings && appSettings.overtime_pay) || {};
+  const p = (typeof allProfiles!=='undefined' ? allProfiles : []).find(x=>x.id===userId);
+  const cal = (p && p.workGroup==='訓練校生') ? 'trainee' : 'regular';
+  const per  = Number((s.dailyHoursByCal||{})[cal]);
+  const base = Number(s.dailyHours);
+  const hours = per>0 ? per : (base>0 ? base : 8);
+  return Math.max(1, Math.round(hours*60));
+}
+// 日報1件ぶんの人工
+function nippoNinku(n){
+  return n && n.workMinutes ? n.workMinutes / ninkuMinutesOf(n.userId) : 0;
+}
