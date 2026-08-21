@@ -854,36 +854,23 @@ function dezuraLaborHtml(month){
   let a;
   try{ a = laborAllocation(month); }catch(e){ console.warn('労務費を出せませんでした', e); return ''; }
   if(!a.siteNames.length && !Object.keys(a.unassigned).length) return '';
-  // 時間外が現場ごとに誰のいくらか（残業代の画面と同じ表）
-  let otSite = '';
-  try{
-    if(typeof otPayAllocation==='function' && typeof otSiteTableHtml==='function')
-      otSite = otSiteTableHtml(otPayAllocation(month), true);
-  }catch(e){ console.warn('時間外の内訳を出せませんでした', e); }
-
   return `
   <div style="font-size:11px;font-weight:700;margin-top:16px">現場別 労務費（時間外の賃金を含む）</div>
   <div style="font-size:10px;color:#555;margin-bottom:4px">
     給与ぶん＝基本給・家族手当・役付手当・技能・資格手当・固定残業代の合計を、その月度に出た現場の実働時間の割合で分けたもの。
     時間外＝残業代・休日手当・深夜割増・所定外の賃金で、起きた現場に乗せたもの。
+    時間外を残業・休日出勤・深夜労働の別で見るときは「残業代・休日手当」の画面へ。
     この表は清川創史さん・清川優香さんにしか出ません。
   </div>
   <div class="dz-scroll">${laborTableHtml(a, true, 'total')}</div>
-  ${otSite}
   <style>
-    table.labor-tbl,table.otpay-tbl{border-collapse:collapse;font-size:10px;width:100%}
-    table.labor-tbl th,table.labor-tbl td,
-    table.otpay-tbl th,table.otpay-tbl td{border:0.4pt solid #b9b9b9;padding:3px 5px;white-space:nowrap}
-    table.labor-tbl th,table.otpay-tbl th{background:#f0ece3;font-weight:700;font-size:9px}
-    table.labor-tbl td.num,table.otpay-tbl td.num{text-align:right}
-    table.labor-tbl td.site,table.labor-tbl th.site,
-    table.otpay-tbl td.who,table.otpay-tbl th.who{text-align:left;min-width:140px}
-    table.labor-tbl td.total,table.otpay-tbl td.total{font-weight:700;background:#faf7f0}
-    table.labor-tbl tr.sum td,table.otpay-tbl tr.sum td{font-weight:700;background:#f7f3eb;border-top:0.7pt solid #8a8a8a}
+    table.labor-tbl{border-collapse:collapse;font-size:10px;width:100%}
+    table.labor-tbl th,table.labor-tbl td{border:0.4pt solid #b9b9b9;padding:3px 5px;white-space:nowrap}
+    table.labor-tbl th{background:#f0ece3;font-weight:700;font-size:9px}
+    table.labor-tbl td.num{text-align:right}
+    table.labor-tbl td.site,table.labor-tbl th.site{text-align:left;min-width:140px}
+    table.labor-tbl td.total{font-weight:700;background:#faf7f0}
+    table.labor-tbl tr.sum td{font-weight:700;background:#f7f3eb;border-top:0.7pt solid #8a8a8a}
     table.labor-tbl tr.unassigned td{background:#fdf3ea}
-    .otpay-year{margin-top:14px}
-    .otpay-year-head{font-size:11px;font-weight:700;margin-bottom:3px}
-    .otpay-year-note{font-size:10px;color:#555;line-height:1.6;margin-bottom:4px}
-    .labor-scroll{overflow:visible}
   </style>`;
 }
