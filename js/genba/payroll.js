@@ -51,6 +51,15 @@ function salaryFor(userId, month){
 function salaryRowAt(userId, month){
   return (employeeSalaries||[]).find(s=>s.userId===userId && s.effectiveMonth===month) || null;
 }
+// その月度より後の登録のうち、いちばん近いもの。
+// 先に今月分だけ入れたあとで「先月度にも同じ金額を入れたい」ときの下敷きに使う
+function salaryLaterThan(userId, month){
+  return (employeeSalaries||[])
+    .filter(s=>s.userId===userId && s.effectiveMonth>month)
+    .sort((a,b)=> a.effectiveMonth<b.effectiveMonth ? -1 : 1)[0] || null;
+}
+// 「2026年9月度」（締め期間の括弧を落とした表記）
+function payMonthShort(month){ return dezuraMonthLabel(month).replace(/（.*/,''); }
 
 // 給与を登録できる月度：出面表と同じ並びに、翌月・翌々月を足す（昇給を先に入れられるように）
 function payMonthOptions(){
@@ -93,10 +102,13 @@ function renderPayroll(){
     const s = salaryFor(p.id, mo);
     const here = salaryRowAt(p.id, mo);
     if(s){ labor += salaryLaborCost(s); total += salaryTotal(s); } else { unset++; }
+    const later = s ? null : salaryLaterThan(p.id, mo);
     const since = s
       ? (here ? '<span class="pay-since now">この月度から登録</span>'
-              : `<span class="pay-since">${esc(dezuraMonthLabel(s.effectiveMonth).replace(/（.*/,''))}から</span>`)
-      : '<span class="pay-since none">未登録</span>';
+              : `<span class="pay-since">${esc(payMonthShort(s.effectiveMonth))}から</span>`)
+      : later
+        ? `<span class="pay-since none">未登録（${esc(payMonthShort(later.effectiveMonth))}から登録あり）</span>`
+        : '<span class="pay-since none">未登録</span>';
     return `
       <div class="pay-row" onclick="openSalaryEdit('${p.id}')">
         <div class="pay-name">${esc(p.displayName)}${since}</div>
@@ -122,15 +134,18 @@ function openSalaryEdit(userId){
   editingSalaryUserId = userId;
   const mo = payMonth || dezuraCurrentMonth();
   const name = (allProfiles.find(p=>p.id===userId)||{}).displayName || '';
-  const here = salaryRowAt(userId, mo);
-  const base = here || salaryFor(userId, mo);   // 前の月度の内容を引き継いで初期表示する
+  const here  = salaryRowAt(userId, mo);
+  const prev  = here ? null : salaryFor(userId, mo);        // ひとつ前の月度の登録
+  const later = (here || prev) ? null : salaryLaterThan(userId, mo);  // 後の月度の登録
+  const base  = here || prev || later;                      // 中身の下敷き
 
   document.getElementById('pay-edit-title').textContent = `${name}さんの給与`;
   document.getElementById('pay-edit-month').textContent = dezuraMonthLabel(mo) + ' から適用';
-  document.getElementById('pay-edit-note-lbl').innerHTML = here
-    ? 'この月度の登録を編集します。'
-    : (base ? `${esc(dezuraMonthLabel(base.effectiveMonth).replace(/（.*/,''))}の内容を引き継いで表示しています。保存すると<b>この月度からの登録</b>になります。`
-            : 'まだ登録がありません。保存するとこの月度からの登録になります。');
+  document.getElementById('pay-edit-note-lbl').innerHTML =
+      here  ? 'この月度の登録を編集します。'
+    : prev  ? `${esc(payMonthShort(prev.effectiveMonth))}の内容を引き継いで表示しています。保存すると<b>この月度からの登録</b>になります。`
+    : later ? `${esc(payMonthShort(later.effectiveMonth))}からの登録の内容を表示しています。保存すると<b>この月度からも同じ金額</b>が使われます。`
+    : 'まだ登録がありません。保存するとこの月度からの登録になります。';
   SALARY_ITEMS.forEach(i=>payAmtLoad('sal-'+i.key, base ? base[i.key] : 0));
   document.getElementById('sal-note').value = here ? (here.note||'') : '';
   document.getElementById('sal-delete-btn').style.display = here ? '' : 'none';
