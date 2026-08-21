@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=314">
+<link rel="stylesheet" href="css/main.css?v=319">
 <link rel="stylesheet" href="css/schedule.css?v=295">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -1848,7 +1848,7 @@
   <div class="modal-sheet" style="max-width:900px">
     <h3>残業代・休日手当</h3>
     <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
-      日報の実働時間と登録した給与から、その月度の割増賃金を出しています。休日労働の日は全時間を休日労働として見るため、残業には数えていません。振替出勤は労働日の振替なので割増せず、8時間を超えた分だけ残業に入れています。
+      日報の実働時間と登録した給与から、その月度の割増賃金と欠勤控除を出しています。休日労働の日は全時間を休日労働として見るため、残業には数えていません。振替出勤は労働日の振替なので割増せず、8時間を超えた分だけ残業に入れています。
       <br>残業は ①1日の所定（8時間に満たない日は8時間）を超えた分 ②その週の所定（40時間に満たない週は40時間）を超えた分（①を除く） の順に数えています。所定は超えたけれど①②にならなかった分は「所定外（法定内）」として、割増なし（1.0倍）で別の列に出します。深夜（22時〜翌5時）は日報の開始・終了時刻から拾っていますが、休憩がその時間帯にあっても差し引いていません。
     </div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -1899,6 +1899,13 @@
       家族手当・通勤手当・車両借上料は法律で基礎から除くことになっています。固定残業代は割増賃金そのものなので入れません。
     </div>
     <div id="ots-base-items" class="ots-checks"></div>
+
+    <div class="section-lbl" style="margin:12px 0 4px">欠勤控除の基礎に入れる項目</div>
+    <div style="font-size:10px;color:var(--text-muted);line-height:1.6;margin-bottom:6px">
+      欠勤1日ぶんを差し引くときの金額です。控除額＝ここで選んだ項目の合計 ÷ 1か月平均所定労働日数 × 欠勤日数。
+      固定残業代は残業に対するもの、非課税手当は実費なので既定では入れていません。
+    </div>
+    <div id="ots-deduct-items" class="ots-checks"></div>
 
     <div class="modal-actions">
       <button class="btn" onclick="closeOtPaySettings()">やめる</button>
@@ -2720,7 +2727,7 @@
 <script src="js/genba/genba-nippo.js?v=318"></script>
 <script src="js/genba/genba-dezura.js?v=315"></script>
 <script src="js/genba/payroll.js?v=315"></script>
-<script src="js/genba/overtime-pay.js?v=317"></script>
+<script src="js/genba/overtime-pay.js?v=319"></script>
 <script src="js/genba/leave-balance.js?v=304"></script>
 <script src="js/genba/genba-leave.js?v=304"></script>
 <script src="js/genba/genba-holiday.js?v=235"></script>

@@ -189,3 +189,4 @@ table.otpay-tbl tr.sum td{font-weight:700;background:var(--surface2)}
 table.otpay-tbl tr.over td.total{color:#8a2018}
 .labor-note{font-size:10px;color:var(--text-muted);line-height:1.7;margin-top:6px}
 .labor-tabs{display:flex;gap:6px;margin-bottom:8px}
+table.otpay-tbl td.minus{color:#8a2018}

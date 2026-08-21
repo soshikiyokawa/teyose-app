@@ -35,6 +35,12 @@ const OT_PAY_DEFAULT = {
   dailyHoursByCal: {},    // {trainee:7.5} 区分ごとの1日の所定労働時間
   systems: {},            // {trainee:'yearly'} 労働時間制。'yearly'＝1年単位の変形労働時間制
   monthlyHours: {},       // {regular:160} 1か月平均所定労働時間の直接指定。空なら自動
+  monthlyDays: {},        // {regular:20} 1か月平均所定労働日数の直接指定。空なら自動
+  // 欠勤1日ぶんを差し引くときの基礎になる項目。
+  // 固定残業代は残業に対するもの、非課税手当は実費なので既定では入れない
+  deductItems: {basePay:true, familyAllowance:true, positionAllowance:true,
+                skillAllowance:true, fixedOvertime:false,
+                commuteAllowance:false, vehicleAllowance:false},
   // naibu＝所定外だが法定内（8時間以内）。割増は要らないので1.0倍
   rates: {overtime:1.25, holiday:1.35, night:0.25, naibu:1.0},
   baseItems: {basePay:true, familyAllowance:false, positionAllowance:true,
@@ -49,6 +55,8 @@ function otPaySettings(){
     dailyHoursByCal: Object.assign({}, s.dailyHoursByCal||{}),
     systems: Object.assign({}, s.systems||{}),
     monthlyHours: Object.assign({}, s.monthlyHours||{}),
+    monthlyDays: Object.assign({}, s.monthlyDays||{}),
+    deductItems: Object.assign({}, OT_PAY_DEFAULT.deductItems, s.deductItems||{}),
     rates: Object.assign({}, OT_PAY_DEFAULT.rates, s.rates||{}),
     baseItems: Object.assign({}, OT_PAY_DEFAULT.baseItems, s.baseItems||{})
   };
@@ -66,6 +74,12 @@ function otSystem(cal, st){ return st.systems[cal]==='yearly' ? 'yearly' : 'norm
 function otBaseWage(salary, st){
   if(!salary) return 0;
   return SALARY_ITEMS.reduce((n,i)=> n + (st.baseItems[i.key] ? (Number(salary[i.key])||0) : 0), 0);
+}
+
+// 欠勤控除の基礎になる賃金
+function otDeductWage(salary, st){
+  if(!salary) return 0;
+  return SALARY_ITEMS.reduce((n,i)=> n + (st.deductItems[i.key] ? (Number(salary[i.key])||0) : 0), 0);
 }
 
 // その月度が属する年度（4月始まり）
@@ -126,6 +140,43 @@ function otMonthlyHours(cal, month, st){
   // そのまま使うと時間単価が低く出て賃金が不足するので、法定の上限で頭打ちにして画面で知らせる
   if(raw > max) return Object.assign(info, {hours:max, source:'法定上限', capped:true, raw, max});
   return Object.assign(info, {hours:raw, source:'勤務カレンダー', capped:false});
+}
+
+// ════ 欠勤控除 ════
+//
+//  欠勤控除額 ＝ 控除の基礎になる賃金 ÷ 1か月平均所定労働日数 × 欠勤日数
+//
+//  1か月平均所定労働日数 ＝ 年間の所定労働日数 ÷ 12（勤務カレンダーから。設定で固定もできる）
+//  月ごとの所定労働日数で割ると月によって1日の重みが変わってしまうので、年間の平均を使う。
+//  欠勤日数は出面表の「欠」と同じ数え方（日報の欠勤＝1日／有給の欠勤扱い＝全日1日・半休0.5日）。
+
+function otMonthlyDays(cal, month, st){
+  st = st || otPaySettings();
+  const ov = Number(st.monthlyDays[cal]);
+  const w = otWorkDaysInYear(cal, month);
+  if(ov>0) return {days:ov, source:'設定', work:w.work, fy:w.fy};
+  if(!w.hasData) return {days:20, source:'既定', work:0, fy:w.fy};
+  return {days: Math.round(w.work/12*10)/10, source:'勤務カレンダー', work:w.work, fy:w.fy};
+}
+
+// その人のその月度の欠勤日数（出面表の「欠」と同じ）
+function otAbsenceDays(userId, month){
+  const {start, end} = nippoPeriod(month);
+  const marked = new Set();
+  let days = 0;
+  (dailyReports||[]).forEach(n=>{
+    if(n.userId!==userId || n.projectName!==NIPPO_ABSENT) return;
+    if(n.workDate<start || n.workDate>end || marked.has(n.workDate)) return;
+    marked.add(n.workDate); days += 1;
+  });
+  (leaveRequests||[]).filter(lr=>lr.userId===userId && lr.status==='approved').forEach(lr=>{
+    const per = lr.leaveType!=='全日' ? 0.5 : 1;
+    (lr.absenceDates||[]).forEach(s=>{
+      if(s<start || s>end || marked.has(s)) return;   // 日報の欠勤が優先（出面表と同じ）
+      marked.add(s); days += per;
+    });
+  });
+  return days;
 }
 
 // その日報のうち深夜（22時〜翌5時）に重なる分数。
@@ -243,7 +294,9 @@ function otPayAllocation(month){
     const cal = p.workGroup==='訓練校生' ? 'trainee' : 'regular';
     const salary = salaryFor(p.id, month);
     const mh = otMonthlyHours(cal, month, st);
+    const md = otMonthlyDays(cal, month, st);
     const base = otBaseWage(salary, st);
+    const dw = otDeductWage(salary, st);
     users[p.id] = {
       id:p.id, name:p.displayName, cal, salary,
       // 役員（管理監督者）は時間外・休日の割増の対象外。深夜割増だけ計算する
@@ -251,6 +304,10 @@ function otPayAllocation(month){
       monthlyHours: mh.hours, monthlyHoursSource: mh.source, yearly: mh.yearly,
       baseWage: base,
       rate: base ? Math.round(base / mh.hours) : 0,
+      // 欠勤控除
+      monthlyDays: md.days, deductWage: dw,
+      dailyWage: dw ? Math.round(dw / md.days) : 0,
+      absenceDays: otAbsenceDays(p.id, month),
       otMin:0, naibuMin:0, holMin:0, furiMin:0, nightMin:0
     };
   });
@@ -319,7 +376,7 @@ function otPayAllocation(month){
 
   const yen = (rate, mult, min) => Math.round(rate * mult * min / 60);
   const userIds = Object.keys(users)
-    .filter(id=>users[id].otMin || users[id].naibuMin || users[id].holMin || users[id].nightMin)
+    .filter(id=>users[id].otMin || users[id].naibuMin || users[id].holMin || users[id].nightMin || users[id].absenceDays)
     .sort((a,b)=>cmpEmployee(users[a].name, users[b].name));
 
   userIds.forEach(id=>{
@@ -328,7 +385,9 @@ function otPayAllocation(month){
     u.naibuPay = u.exempt ? 0 : yen(u.rate, st.rates.naibu,    u.naibuMin);
     u.holPay   = u.exempt ? 0 : yen(u.rate, st.rates.holiday,  u.holMin);
     u.nightPay = yen(u.rate, st.rates.night, u.nightMin);
-    u.total    = u.otPay + u.naibuPay + u.holPay + u.nightPay;
+    u.total    = u.otPay + u.naibuPay + u.holPay + u.nightPay;   // 時間外の計
+    u.deduct   = u.absenceDays ? Math.round(u.dailyWage * u.absenceDays) : 0;   // 欠勤控除（引く額）
+    u.netTotal = u.total - u.deduct;                              // 差引
     // 現場ごとの金額。合計が u.total とぴったり合うように配る。
     // siteYen＝ぜんぶ合わせた額／siteYenBy＝残業・休日労働・深夜・所定外それぞれの額
     u.siteYen = {};
@@ -440,7 +499,7 @@ function otPayTableHtml(a, forPrint){
     if(u.exempt) note.push('役員（時間外・休日は対象外）');
     if(u.furiMin) note.push('振替出勤 '+otH(u.furiMin)+'h');
     if(!u.salary) note.push('給与が未登録');
-    return `<tr${u.total?'':' class="zero"'}>
+    return `<tr${(u.total||u.deduct)?'':' class="zero"'}>
       <td class="who">${esc(u.name)}${note.length?`<div class="note">${esc(note.join('／'))}</div>`:''}</td>
       <td class="num">${u.rate?fmt(u.rate):'—'}</td>
       <td class="num">${u.naibuMin?otH(u.naibuMin):''}</td>
@@ -451,7 +510,10 @@ function otPayTableHtml(a, forPrint){
       <td class="num">${u.holPay?fmt(u.holPay):''}</td>
       <td class="num">${u.nightMin?otH(u.nightMin):''}</td>
       <td class="num">${u.nightPay?fmt(u.nightPay):''}</td>
-      <td class="num total">${u.total?fmt(u.total):''}</td>
+      <td class="num">${u.total?fmt(u.total):''}</td>
+      <td class="num">${u.absenceDays?u.absenceDays:''}</td>
+      <td class="num minus">${u.deduct?'-'+fmt(u.deduct):''}</td>
+      <td class="num total">${u.netTotal?fmt(u.netTotal):''}</td>
     </tr>`;
   }).join('');
   const sum = k => a.userIds.reduce((n,id)=>n+(a.users[id][k]||0), 0);
@@ -462,7 +524,9 @@ function otPayTableHtml(a, forPrint){
       <th class="num">残業<br>(h)</th><th class="num">残業代</th>
       <th class="num">休日労働<br>(h)</th><th class="num">休日手当</th>
       <th class="num">深夜<br>(h)</th><th class="num">深夜割増</th>
-      <th class="num total">合計</th>
+      <th class="num">時間外<br>の計</th>
+      <th class="num">欠勤<br>(日)</th><th class="num">欠勤控除</th>
+      <th class="num total">差引</th>
     </tr>
     ${rows}
     <tr class="sum">
@@ -471,7 +535,10 @@ function otPayTableHtml(a, forPrint){
       <td class="num">${otH(sum('otMin'))}</td><td class="num">${fmt(sum('otPay'))}</td>
       <td class="num">${otH(sum('holMin'))}</td><td class="num">${fmt(sum('holPay'))}</td>
       <td class="num">${otH(sum('nightMin'))}</td><td class="num">${fmt(sum('nightPay'))}</td>
-      <td class="num total">${fmt(sum('total'))}</td>
+      <td class="num">${fmt(sum('total'))}</td>
+      <td class="num">${sum('absenceDays')||''}</td>
+      <td class="num minus">${sum('deduct')?'-'+fmt(sum('deduct')):''}</td>
+      <td class="num total">${fmt(sum('netTotal'))}</td>
     </tr>
   </table>`;
 }
@@ -491,7 +558,8 @@ function otPayBasisText(a){
   return `時間単価＝割増の基礎になる賃金 ÷ 1か月平均所定労働時間［${parts.join('／')}］　`
        + `割増率：残業${st.rates.overtime}／休日労働${st.rates.holiday}／深夜+${st.rates.night}／所定外（法定内）${st.rates.naibu}　`
        + `残業＝①1日の所定（8時間未満の日は8時間）を超えた分＋②週の所定（40時間未満の週は40時間）を超えた分。`
-       + `所定外（法定内）＝所定は超えたが①②にならなかった分で、割増は要らないぶん。`;
+       + `所定外（法定内）＝所定は超えたが①②にならなかった分で、割増は要らないぶん。　`
+       + `欠勤控除＝控除の基礎になる賃金 ÷ 1か月平均所定労働日数［${cals.map(c=>`${otCalLabel(c)} ${otMonthlyDays(c, a.month, st).days}日`).join('／')}］× 欠勤日数。`;
 }
 
 // 時間外の中身の種類。表の列の並びもこの順
@@ -694,6 +762,8 @@ function renderOtCalSettings(){
           <input type="number" id="ots-dh-${c.key}" step="0.25" min="0" placeholder="共通の値" oninput="otCalSettingChanged()"></div>
         <div class="fg"><label>1か月平均所定労働時間</label>
           <input type="number" id="ots-mh-${c.key}" step="0.1" min="0" placeholder="自動" oninput="otCalSettingChanged()"></div>
+        <div class="fg"><label>1か月平均所定労働日数</label>
+          <input type="number" id="ots-md-${c.key}" step="0.1" min="0" placeholder="自動" oninput="otCalSettingChanged()"></div>
       </div>
       <div class="ots-hint" id="ots-hint-${c.key}"></div>
     </div>`).join('');
@@ -701,6 +771,7 @@ function renderOtCalSettings(){
     document.getElementById('ots-sys-'+c.key).value = otSystem(c.key, st);
     document.getElementById('ots-dh-'+c.key).value = Number(st.dailyHoursByCal[c.key])>0 ? st.dailyHoursByCal[c.key] : '';
     document.getElementById('ots-mh-'+c.key).value = Number(st.monthlyHours[c.key])>0 ? st.monthlyHours[c.key] : '';
+    document.getElementById('ots-md-'+c.key).value = Number(st.monthlyDays[c.key])>0 ? st.monthlyDays[c.key] : '';
   });
   otCalSettingChanged();
 }
@@ -722,6 +793,8 @@ function otCalSettingChanged(){
       lines.push(`勤務カレンダーからは ${mh.raw}時間（所定労働日数${mh.work}日×${mh.dailyHours}時間÷12）ですが、`
         + `法定の上限（週40時間＝月${mh.max}時間）を超えています。いまは${mh.max}時間で計算します。`);
     else lines.push(`勤務カレンダーから ${mh.hours}時間（${mh.fy}年度の所定労働日数${mh.work}日×${mh.dailyHours}時間÷12）。`);
+    const md = otMonthlyDays(c.key, mo, st);
+    lines.push(`欠勤控除に使う1か月平均所定労働日数は ${md.days}日${md.source==='勤務カレンダー'?`（${md.fy}年度の所定労働日数${md.work}日÷12）`:`（${md.source}）`}。`);
 
     let bad = mh.capped;
     if(mh.hasData){
@@ -748,10 +821,11 @@ function otSettingsFromForm(){
   const num = (id, def) => { const el=document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isFinite(v)&&v>=0 ? v : def; };
   const st = otPaySettings();
   st.dailyHours = num('ots-daily', 8) || 8;
-  st.dailyHoursByCal = {}; st.monthlyHours = {}; st.systems = {};
+  st.dailyHoursByCal = {}; st.monthlyHours = {}; st.monthlyDays = {}; st.systems = {};
   OT_CALS.forEach(c=>{
     const dh = num('ots-dh-'+c.key, 0); if(dh>0) st.dailyHoursByCal[c.key] = dh;
     const mh = num('ots-mh-'+c.key, 0); if(mh>0) st.monthlyHours[c.key] = mh;
+    const md = num('ots-md-'+c.key, 0); if(md>0) st.monthlyDays[c.key] = md;
     const sys = document.getElementById('ots-sys-'+c.key);
     if(sys && sys.value==='yearly') st.systems[c.key] = 'yearly';
   });
@@ -760,6 +834,9 @@ function otSettingsFromForm(){
   const bi = {};
   SALARY_ITEMS.forEach(i=>{ const el=document.getElementById('ots-base-'+i.key); bi[i.key] = el ? el.checked : st.baseItems[i.key]; });
   st.baseItems = bi;
+  const di = {};
+  SALARY_ITEMS.forEach(i=>{ const el=document.getElementById('ots-ded-'+i.key); di[i.key] = el ? el.checked : st.deductItems[i.key]; });
+  st.deductItems = di;
   return st;
 }
 
@@ -773,6 +850,8 @@ function openOtPaySettings(){
   document.getElementById('ots-rate-naibu').value = st.rates.naibu;
   document.getElementById('ots-base-items').innerHTML = SALARY_ITEMS.map(i=>`
     <label class="ots-check"><input type="checkbox" id="ots-base-${i.key}"${st.baseItems[i.key]?' checked':''} onchange="otCalSettingChanged()">${esc(i.label)}</label>`).join('');
+  document.getElementById('ots-deduct-items').innerHTML = SALARY_ITEMS.map(i=>`
+    <label class="ots-check"><input type="checkbox" id="ots-ded-${i.key}"${st.deductItems[i.key]?' checked':''}>${esc(i.label)}</label>`).join('');
   renderOtCalSettings();
   document.getElementById('otpay-settings-modal').classList.add('open');
 }
@@ -786,6 +865,8 @@ async function saveOtPaySettings(){
     dailyHoursByCal: st.dailyHoursByCal,
     systems: st.systems,
     monthlyHours: st.monthlyHours,
+    monthlyDays: st.monthlyDays,
+    deductItems: st.deductItems,
     rates: st.rates,
     baseItems: st.baseItems
   };
