@@ -961,18 +961,30 @@ async function dbSaveNippo(n){
   if(n.otStatus!=='approved' && n.otStatus!=='rejected'){
     row.ot_reviewer_name=''; row.ot_review_note=''; row.ot_reviewed_at=null;
   }
+  // 誰の日報か。清川創史が社員の代わりに書くときだけ自分以外になる
+  const ownerId = n.userId || currentUserId;
+  const ownerName = n.userId ? (n.userName||'') : (currentUserDisplayName||'');
   if(n.id){
-    const { error } = await sb.from('daily_reports').update(row).eq('id',n.id);
+    const { error } = await sb.from('daily_reports').update({...row, user_id:ownerId, user_name:ownerName}).eq('id',n.id);
     if(error){showToast('日報の保存に失敗しました：'+error.message);throw error;}
     return n.id;
   }
-  const { data, error } = await sb.from('daily_reports').insert({...row, user_id:currentUserId, user_name:currentUserDisplayName||''}).select().single();
+  const { data, error } = await sb.from('daily_reports').insert({...row, user_id:ownerId, user_name:ownerName}).select().single();
   if(error){showToast('日報の保存に失敗しました：'+error.message);throw error;}
   return data.id;
 }
 async function dbDeleteNippo(id){
   const { error } = await sb.from('daily_reports').delete().eq('id',id);
   if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+}
+
+// 出面表の手直し：承認済みの有給のうち、指定した日を欠勤扱いにする／戻す（管理者のみ）
+async function dbSetLeaveAbsence(id, dates){
+  const list = [...new Set(dates||[])].sort();
+  const { error } = await sb.from('leave_requests').update({absence_dates:list}).eq('id',id);
+  if(error){showToast('更新に失敗しました：'+error.message);throw error;}
+  const lr = leaveRequests.find(x=>x.id===id);
+  if(lr) lr.absenceDates = list;
 }
 
 // 残業の承認・却下（承認者のみ。結果は本人に通知）

@@ -117,3 +117,16 @@
   font-size:10px; font-weight:700; padding:1px 6px; border-radius:99px;
   background:var(--warn-bg); color:var(--warn-t); margin-left:4px; white-space:nowrap;
 }
+
+/* ── 出面表の手直し（清川創史のみ）── */
+.dze-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-bottom:0.5px solid var(--border)}
+.dze-row:last-child{border-bottom:none}
+.dze-row.sun{background:rgba(200,60,50,0.05)}
+.dze-row.sat{background:rgba(60,110,200,0.05)}
+.dze-date{flex-shrink:0;width:46px;font-size:12px;font-weight:700;line-height:1.25}
+.dze-date span{display:block;font-size:10px;font-weight:400;color:var(--text-muted)}
+.dze-txt{flex:1;min-width:0;font-size:11.5px;line-height:1.4;overflow:hidden;text-overflow:ellipsis}
+.dze-txt.bad{color:var(--danger);font-weight:700}
+.dze-txt.muted{color:var(--text-muted)}
+.dze-txt.miss{color:#8a6000;font-weight:700}
+.dze-btns{flex-shrink:0;display:flex;gap:4px}

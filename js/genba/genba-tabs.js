@@ -53,9 +53,12 @@ function renderGenbaProjectSelects(){
     // 役員は日報に「休み」を出す（いちばん下）。出面表では日曜日と同じ扱いになる
     const restOpt = (id==='nippo-project' && typeof isNippoRestUser==='function' && isNippoRestUser())
       ? `<option value="${NIPPO_REST}">${NIPPO_REST}</option>` : '';
+    // 「欠勤」は出面表を直す人（清川創史）だけに出す
+    const absentOpt = (id==='nippo-project' && typeof canEditOthersNippo==='function' && canEditOthersNippo())
+      ? `<option value="${NIPPO_ABSENT}">${NIPPO_ABSENT}</option>` : '';
     el.innerHTML = withOther
       ? optsActive + (id==='nippo-project' ? `<option value="school">${NIPPO_SCHOOL}</option>` : '')
-             + '<option value="other">その他</option>' + restOpt
+             + '<option value="other">その他</option>' + restOpt + absentOpt
       : opts;
     // 選択状態を維持（写真・図面は共通のgenbaProjectIdを優先）
     if(!withOther && genbaProjectId) el.value = String(genbaProjectId);
