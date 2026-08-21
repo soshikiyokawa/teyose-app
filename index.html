@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=306">
+<link rel="stylesheet" href="css/main.css?v=307">
 <link rel="stylesheet" href="css/schedule.css?v=295">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -978,6 +978,27 @@
       </div>
     </div>
 
+    <!-- 給与と労務費（清川創史・清川優香のみ。他の社員には出ないしデータも返らない） -->
+    <div class="card" id="payroll-card" style="display:none">
+      <div class="card-head"><span class="card-head-title">給与・労務費</span></div>
+      <div style="padding:0 12px 12px">
+        <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+          社員ごとの給与を登録すると、その月度の日報から現場ごとの労務費を出せます。
+          この枠と中身は清川創史さん・清川優香さんにしか見えません。
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="openPayroll()" style="flex:1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            給与を登録
+          </button>
+          <button class="btn primary" onclick="openLabor()" style="flex:1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="14" height="14" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            現場別の労務費
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 管理者ツール（勤務カレンダー・アカウント権限）。折り返し可 -->
     <div class="admin-only" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
       <button class="btn xs" onclick="openWorkCalendar()" title="出勤日・休日と社員区分の設定">
@@ -1746,6 +1767,77 @@
   </div>
 </div>
 
+<!-- ════ 給与の一覧（清川創史・清川優香のみ） ════ -->
+<div class="modal-overlay" id="pay-modal" onclick="if(event.target.id==='pay-modal')closePayroll()">
+  <div class="modal-sheet">
+    <h3>給与の登録</h3>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+      月度を選んで社員をタップすると、その月度からの給与を登録できます。昇給したら、その月度で登録し直してください。前の月度の登録はそのまま残ります。
+    </div>
+    <select id="pay-month" onchange="setPayMonth(this.value)" style="width:100%;font-size:13px;margin-bottom:8px"></select>
+    <div id="pay-list" style="max-height:50vh;overflow-y:auto;border:0.5px solid var(--border);border-radius:8px"></div>
+    <div id="pay-total" style="font-size:12px;text-align:right;margin-top:8px;color:var(--text-sub)"></div>
+    <div class="modal-actions"><button class="btn primary" onclick="closePayroll()">閉じる</button></div>
+  </div>
+</div>
+
+<!-- ════ 給与の入力（清川創史・清川優香のみ） ════ -->
+<div class="modal-overlay" id="pay-edit-modal" onclick="if(event.target.id==='pay-edit-modal')closeSalaryEdit()">
+  <div class="modal-sheet">
+    <h3 id="pay-edit-title">給与</h3>
+    <div style="font-size:12px;font-weight:700;color:var(--accent-t)" id="pay-edit-month"></div>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin:4px 0 10px" id="pay-edit-note-lbl"></div>
+
+    <div class="section-lbl" style="margin:0 0 4px">労務費に入る項目</div>
+    <div class="pay-grid">
+      <div class="fg"><label>基本給</label><input id="sal-basePay" inputmode="numeric" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this);salaryRecalc()" oninput="salaryRecalc()"></div>
+      <div class="fg"><label>家族手当</label><input id="sal-familyAllowance" inputmode="numeric" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this);salaryRecalc()" oninput="salaryRecalc()"></div>
+      <div class="fg"><label>役付手当</label><input id="sal-positionAllowance" inputmode="numeric" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this);salaryRecalc()" oninput="salaryRecalc()"></div>
+      <div class="fg"><label>技能・資格手当</label><input id="sal-skillAllowance" inputmode="numeric" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this);salaryRecalc()" oninput="salaryRecalc()"></div>
+      <div class="fg"><label>固定残業代</label><input id="sal-fixedOvertime" inputmode="numeric" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this);salaryRecalc()" oninput="salaryRecalc()"></div>
+    </div>
+
+    <div class="section-lbl" style="margin:12px 0 4px">労務費に入らない項目</div>
+    <div class="pay-grid">
+      <div class="fg"><label>非課税通勤手当</label><input id="sal-commuteAllowance" inputmode="numeric" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this);salaryRecalc()" oninput="salaryRecalc()"></div>
+      <div class="fg"><label>非課税車両借上料</label><input id="sal-vehicleAllowance" inputmode="numeric" onfocus="payAmtFocus(this)" onblur="payAmtBlur(this);salaryRecalc()" oninput="salaryRecalc()"></div>
+    </div>
+
+    <div class="pay-calc">
+      <div>労務費（5項目）<b id="sal-labor">0円</b></div>
+      <div>総支給 <b id="sal-total">0円</b></div>
+    </div>
+
+    <div class="fg" style="margin-top:8px"><label>メモ（任意）</label><input id="sal-note" maxlength="120" placeholder="例：4月昇給"></div>
+
+    <div class="modal-actions" style="display:flex;align-items:center;gap:8px">
+      <button class="btn danger" id="sal-delete-btn" onclick="deleteSalary()" style="display:none">削除</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeSalaryEdit()">やめる</button>
+      <button class="btn primary" onclick="saveSalary()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════ 現場別の労務費（清川創史・清川優香のみ） ════ -->
+<div class="modal-overlay" id="labor-modal" onclick="if(event.target.id==='labor-modal')closeLabor()">
+  <div class="modal-sheet" style="max-width:900px">
+    <h3>現場別の労務費</h3>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+      社員ごとの労務費（基本給・家族手当・役付手当・技能・資格手当・固定残業代の合計）を、その月度に出た現場の実働時間の割合で分けています。人工は実働8時間で1.0です。
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <select id="labor-month" onchange="setLaborMonth(this.value)" style="flex:1;min-width:0;font-size:13px"></select>
+      <button class="btn" onclick="printLabor()" style="flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        印刷・PDF
+      </button>
+    </div>
+    <div id="labor-body" style="max-height:56vh;overflow-y:auto"></div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeLabor()">閉じる</button></div>
+  </div>
+</div>
+
 <!-- ════ 出面表の手直し（清川創史のみ）：社員と月度を選び、1日ずつ直す ════ -->
 <div class="modal-overlay" id="dze-modal" onclick="if(event.target.id==='dze-modal')closeDezuraEdit()">
   <div class="modal-sheet">
@@ -2501,10 +2593,10 @@
 <script src="js/utils.js?v=281"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=245"></script>
+<script src="js/state.js?v=307"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=306"></script>
+<script src="js/data/db.js?v=307"></script>
 
 <!-- 画面共通ナビゲーション -->
 <script src="js/nav.js?v=282"></script>
@@ -2556,8 +2648,9 @@
 <script src="js/genba/genba-files.js?v=293"></script>
 <script src="js/genba/genba-photos.js?v=260"></script>
 <script src="js/genba/genba-drawings.js?v=293"></script>
-<script src="js/genba/genba-nippo.js?v=306"></script>
+<script src="js/genba/genba-nippo.js?v=307"></script>
 <script src="js/genba/genba-dezura.js?v=306"></script>
+<script src="js/genba/payroll.js?v=307"></script>
 <script src="js/genba/leave-balance.js?v=304"></script>
 <script src="js/genba/genba-leave.js?v=304"></script>
 <script src="js/genba/genba-holiday.js?v=235"></script>

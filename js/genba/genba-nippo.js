@@ -353,6 +353,7 @@ function renderNippo(){
   if(!nippoMonth) nippoMonth = nippoMonthOf(gbToday());  // 今日が入る「◯月度」
   renderDezuraPicker();
   renderNippoOwnerSelect();
+  if(typeof renderPayrollCard==='function') renderPayrollCard();
   if(!document.getElementById('nippo-date').value) resetNippoForm();
 
   // 「◯月度」は給与の締めに合わせて前月21日〜当月20日（出面表と同じ区切り）

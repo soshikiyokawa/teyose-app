@@ -130,3 +130,33 @@
 .dze-txt.muted{color:var(--text-muted)}
 .dze-txt.miss{color:#8a6000;font-weight:700}
 .dze-btns{flex-shrink:0;display:flex;gap:4px}
+
+/* ── 給与・労務費（清川創史・清川優香のみ）── */
+.pay-row{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:0.5px solid var(--border);cursor:pointer}
+.pay-row:last-child{border-bottom:none}
+.pay-name{flex:1;min-width:0;font-size:13px;font-weight:700}
+.pay-since{display:block;font-size:10px;font-weight:400;color:var(--text-muted);margin-top:2px}
+.pay-since.now{color:var(--accent-t);font-weight:700}
+.pay-since.none{color:var(--danger);font-weight:700}
+.pay-amt{flex-shrink:0;text-align:right}
+.pay-amt .labor{font-size:14px;font-weight:700}
+.pay-amt .sub{font-size:10px;color:var(--text-muted)}
+.pay-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pay-grid .fg{margin:0}
+.pay-grid input{text-align:right}
+.pay-calc{display:flex;gap:14px;flex-wrap:wrap;background:var(--surface2);border-radius:8px;padding:8px 12px;margin-top:10px;font-size:12px}
+.pay-calc b{font-size:15px;margin-left:4px}
+.labor-warn{font-size:11px;color:#8a6000;background:#fff4e0;border-radius:6px;padding:6px 8px;margin-bottom:8px;line-height:1.6}
+.labor-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:0.5px solid var(--border);border-radius:8px}
+table.labor-tbl{border-collapse:collapse;font-size:11.5px;white-space:nowrap}
+table.labor-tbl th,table.labor-tbl td{border:0.5px solid var(--border);padding:5px 8px}
+table.labor-tbl th{background:var(--surface2);font-weight:700;font-size:10px;position:sticky;top:0;z-index:1}
+table.labor-tbl td.num{text-align:right}
+/* 現場名は横スクロールしても見えるよう左に固定する */
+table.labor-tbl td.site,table.labor-tbl th.site{text-align:left;min-width:126px;position:sticky;left:0;background:var(--surface);z-index:2;box-shadow:1px 0 0 var(--border)}
+table.labor-tbl th.site{background:var(--surface2);z-index:3}
+table.labor-tbl tr.sum td.site,table.labor-tbl tr.unassigned td.site{background:var(--surface2)}
+table.labor-tbl td.ninku{color:var(--text-muted)}
+table.labor-tbl td.total{font-weight:700;background:var(--surface2)}
+table.labor-tbl tr.sum td{font-weight:700;background:var(--surface2)}
+table.labor-tbl tr.unassigned td{background:#fdf3ea}

@@ -734,6 +734,45 @@ async function fetchGenbaData(){
     insurer:r.insurer||'', liabilityPerson:r.liability_person||'', liabilityObject:r.liability_object||'',
     insuranceExpire:r.insurance_expire||'', insurancePhoto:r.insurance_photo||'',
     note:r.note||'', updatedAt:r.updated_at, updatedBy:r.updated_by||''}));
+
+  // 給与（清川創史・清川優香のみ。他の人は取りにいかないし、RLSも1行も返さない）
+  if(typeof isPayrollAdmin==='function' && isPayrollAdmin()) await fetchSalaries();
+}
+
+// ── 給与（清川創史・清川優香のみ） ──
+async function fetchSalaries(){
+  const { data, error } = await sb.from('employee_salaries').select('*')
+    .order('user_id').order('effective_month',{ascending:false});
+  salaryTableReady = !error;
+  employeeSalaries = (data||[]).map(r=>({
+    id:r.id, userId:r.user_id, userName:r.user_name||'', effectiveMonth:r.effective_month,
+    basePay:Number(r.base_pay)||0, familyAllowance:Number(r.family_allowance)||0,
+    positionAllowance:Number(r.position_allowance)||0, skillAllowance:Number(r.skill_allowance)||0,
+    fixedOvertime:Number(r.fixed_overtime)||0, commuteAllowance:Number(r.commute_allowance)||0,
+    vehicleAllowance:Number(r.vehicle_allowance)||0,
+    note:r.note||'', updatedBy:r.updated_by||'', updatedAt:r.updated_at
+  }));
+}
+
+// 同じ社員・同じ適用月度の登録は1つだけ（あれば上書き）
+async function dbSaveSalary(s){
+  const row = {
+    user_id:s.userId, user_name:s.userName||'', effective_month:s.effectiveMonth,
+    base_pay:s.basePay|0, family_allowance:s.familyAllowance|0,
+    position_allowance:s.positionAllowance|0, skill_allowance:s.skillAllowance|0,
+    fixed_overtime:s.fixedOvertime|0, commute_allowance:s.commuteAllowance|0,
+    vehicle_allowance:s.vehicleAllowance|0, note:s.note||'',
+    updated_by:currentUserDisplayName||'', updated_at:new Date().toISOString()
+  };
+  const { error } = await sb.from('employee_salaries').upsert(row, {onConflict:'user_id,effective_month'});
+  if(error){showToast('給与の保存に失敗しました：'+error.message);throw error;}
+  await fetchSalaries();
+}
+
+async function dbDeleteSalary(id){
+  const { error } = await sb.from('employee_salaries').delete().eq('id',id);
+  if(error){showToast('削除に失敗しました：'+error.message);throw error;}
+  await fetchSalaries();
 }
 
 // ── 車両管理 ──
