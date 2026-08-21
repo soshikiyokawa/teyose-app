@@ -616,10 +616,8 @@ function otSiteTableHtml(a, forPrint){
   <div class="otpay-year">
     <div class="otpay-year-head">現場ごとの時間外の内訳（種類別・誰の分がいくら）</div>
     <div class="otpay-year-note">
-      残業・休日出勤・深夜労働が起きた日の日報から、その現場に乗せています。
-      同じ日に2つの現場に出ていれば、その日の実働時間で分けています。現場別労務費の「時間外」と同じ金額です。
-      左半分がその現場の種類別の金額、右半分が誰の分か。縦に見ればその人の月度の合計になります。
-      ${kinds.map(k=>k.label).join('＋')}＝時間外の計です。
+      左半分がその現場の種類別の金額、右半分が誰の分かです（${kinds.map(k=>k.label).join('＋')}＝時間外の計）。縦に見ればその人の月度の合計になります。<br>
+      金額は、残業・休日出勤・深夜労働が起きた日の日報からその現場に乗せたもので、現場別労務費の「時間外」と同じです。同じ日に2つの現場に出ていれば、その日の実働時間で分けています。
     </div>
     <div class="labor-scroll">
       <table class="otpay-tbl${forPrint?' print':''}">
@@ -725,6 +723,10 @@ function printOtPay(){
     table.otpay-tbl td.who .note{font-size:8px;color:#666;font-weight:400}
     table.otpay-tbl td.total{font-weight:700;background:#faf7f0}
     table.otpay-tbl tr.sum td{font-weight:700;background:#f7f3eb;border-top:0.8pt solid #8a8a8a}
+    .otpay-year{margin-top:14px}
+    .otpay-year-head{font-size:12px;font-weight:700;margin-bottom:4px}
+    .otpay-year-note{font-size:10px;color:#555;line-height:1.7;margin-bottom:6px}
+    .labor-scroll{overflow:visible}
   </style>
   <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
     <h2 style="font-size:16px;margin:0">残業代・休日手当　${label}</h2>

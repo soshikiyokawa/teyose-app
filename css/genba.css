@@ -184,8 +184,10 @@ table.otpay-tbl tr.sum td{font-weight:700;background:var(--surface2)}
 .ots-cal-name{font-size:12px;font-weight:700;margin-bottom:6px}
 .ots-hint.ok{color:#2e7d52;background:#eaf6ef;border-radius:6px;padding:5px 7px}
 .otpay-year{margin-top:14px}
-.otpay-year-head{font-size:12px;font-weight:700;margin-bottom:4px}
-.otpay-year-note{font-size:10px;color:var(--text-muted);line-height:1.7;margin-bottom:6px}
+.otpay-year-head{font-size:13px;font-weight:700;margin-bottom:5px}
+/* 説明文は画面上部の説明と同じ大きさにそろえる */
+.otpay-year-note{font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px}
+.otpay-basis{font-size:11px}
 table.otpay-tbl tr.over td.total{color:#8a2018}
 .labor-note{font-size:10px;color:var(--text-muted);line-height:1.7;margin-top:6px}
 .labor-tabs{display:flex;gap:6px;margin-bottom:8px}
