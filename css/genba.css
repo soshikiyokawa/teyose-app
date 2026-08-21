@@ -183,3 +183,7 @@ table.otpay-tbl tr.sum td{font-weight:700;background:var(--surface2)}
 .ots-cal{border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px}
 .ots-cal-name{font-size:12px;font-weight:700;margin-bottom:6px}
 .ots-hint.ok{color:#2e7d52;background:#eaf6ef;border-radius:6px;padding:5px 7px}
+.otpay-year{margin-top:14px}
+.otpay-year-head{font-size:12px;font-weight:700;margin-bottom:4px}
+.otpay-year-note{font-size:10px;color:var(--text-muted);line-height:1.7;margin-bottom:6px}
+table.otpay-tbl tr.over td.total{color:#8a2018}

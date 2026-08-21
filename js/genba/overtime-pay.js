@@ -9,14 +9,16 @@
 //    基礎から除くことになっている。固定残業代は割増賃金そのものなので入れない。
 //    （どの項目を入れるかは「計算の設定」で変えられる）
 //
-//  1か月平均所定労働時間 ＝ 年間の所定労働日数 × 1日の所定労働時間 ÷ 12
+//  1か月平均所定労働時間
+//    通常の労働時間制 … 年間の所定労働日数 × 1日の所定労働時間 ÷ 12
+//    1年単位の変形労働時間制 … 年間の法定総枠（週40時間）÷ 12
 //    年間の所定労働日数は勤務カレンダー（4月始まりの年度）から数える。
 //    社員区分ごとにカレンダーが違うので、一般社員と訓練校生で別に出す。
 //    設定で固定の数字を入れることもできる。
 //
-//  割増率（既定）… 残業1.25／休日労働1.35／深夜+0.25
+//  割増率（既定）… 残業1.25／休日労働1.35／深夜+0.25／所定外（法定内）1.0
 //    振替出勤（事前に振替休日を決めた日）は労働日の振替なので割増しない。
-//    ただしその日も8時間を超えれば残業として数える。
+//    その日を所定労働日、振替休日を休日として数え直したうえで①②を見る。
 //    休日労働の日は全時間を1.35で見るので、残業には二重に数えない。
 //
 //  役員（管理監督者）は時間外・休日の割増の対象外。
@@ -33,7 +35,8 @@ const OT_PAY_DEFAULT = {
   dailyHoursByCal: {},    // {trainee:7.5} 区分ごとの1日の所定労働時間
   systems: {},            // {trainee:'yearly'} 労働時間制。'yearly'＝1年単位の変形労働時間制
   monthlyHours: {},       // {regular:160} 1か月平均所定労働時間の直接指定。空なら自動
-  rates: {overtime:1.25, holiday:1.35, night:0.25},
+  // naibu＝所定外だが法定内（8時間以内）。割増は要らないので1.0倍
+  rates: {overtime:1.25, holiday:1.35, night:0.25, naibu:1.0},
   baseItems: {basePay:true, familyAllowance:false, positionAllowance:true,
               skillAllowance:true, fixedOvertime:false,
               commuteAllowance:false, vehicleAllowance:false}
@@ -135,6 +138,75 @@ function otNightMinutes(startTime, endTime){
   return ov(0, 5*60) + ov(22*60, 24*60);
 }
 
+// ════ 労働時間の切り分け ════
+//
+// 時間外（割増あり）になるのは、次の順に数えたもの。二重には数えない。
+//   ① 1日 … その日の所定労働時間（8時間に満たない日は8時間）を超えた分
+//   ② 1週 … その週の所定労働時間（40時間に満たない週は40時間）を超えた分（①を除く）
+//   ③ 所定外だが法定内 … 所定は超えたが①②にならなかった分。割増は要らないが賃金は要る
+//
+// 週は日曜はじまり。土曜日が締め期間に入る週を、その月度の週として数える。
+// こうすると月をまたいでも週が分かれず、二重にも数えない。
+// 法定休日の労働（出面表の「休」）は別枠（1.35倍）なので、この計算からは外す。
+
+function otSaturdayOf(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate() + (6 - d.getDay()));
+  return dzDateStr(d);
+}
+function otAddDays(dateStr, n){
+  const d = new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+n);
+  return dzDateStr(d);
+}
+// その日がその区分の所定労働日か（勤務カレンダーの休日でなければ所定労働日）
+function otIsWorkDay(cal, dateStr){
+  const set = (typeof workHolidays!=='undefined' && workHolidays) ? workHolidays[cal] : null;
+  if(set && set.size) return !set.has(dateStr);
+  const dow = new Date(dateStr+'T00:00:00').getDay();
+  return dow!==0 && dow!==6;
+}
+
+// fromDate〜toDate の週（土曜がその範囲に入る週）について、①②③を切り分ける。
+//   dayMin  … {日付: 実働分}（休み・欠勤・法定休日労働は入れない）
+//   premSet … 法定休日労働の日（週の計算から外す）
+//   schedOv … {日付: 所定労働日か} 振替出勤・振替休日の入れ替えを反映する
+function otSplitHours(cal, fromDate, toDate, dayMin, premSet, st, schedOv){
+  const dailyMin = Math.round(otDailyHours(cal, st) * 60);
+  const out = {otMin:0, naibuMin:0, actualMin:0, weeks:0};
+  const seen = new Set();
+  for(let d=fromDate; d<=toDate; d=otAddDays(d,1)){
+    const sat = otSaturdayOf(d);
+    if(sat<fromDate || sat>toDate || seen.has(sat)) continue;   // 土曜が範囲内の週だけ
+    seen.add(sat);
+    out.weeks++;
+    const sun = otAddDays(sat,-6);
+    let wActual=0, wOt1=0, wNaibu=0, wSchedMin=0;
+    for(let k=0; k<7; k++){
+      const day = otAddDays(sun,k);
+      // 振替出勤の日は所定労働日、その振替休日は休日として数える（カレンダーより優先）
+      const ov = schedOv ? schedOv[day] : undefined;
+      const isWork = (ov===undefined) ? otIsWorkDay(cal, day) : ov;
+      const scheduled = isWork ? dailyMin : 0;
+      wSchedMin += scheduled;
+      if(premSet && premSet.has(day)) continue;       // 法定休日労働は別枠
+      const actual = dayMin[day] || 0;
+      if(!actual) continue;
+      const dayLimit = Math.max(scheduled, 480);      // 所定が8時間未満の日は8時間が境目
+      const ot1 = Math.max(0, actual - dayLimit);
+      wOt1 += ot1;
+      wNaibu += Math.max(0, (actual - ot1) - scheduled);
+      wActual += actual;
+    }
+    const weekLimit = Math.max(wSchedMin, 40*60);     // 所定が40時間未満の週は40時間が境目
+    const ot2 = Math.min(Math.max(0, wActual - weekLimit - wOt1), wNaibu);
+    out.otMin    += wOt1 + ot2;
+    out.naibuMin += wNaibu - ot2;
+    out.actualMin += wActual;
+  }
+  return out;
+}
+
 // その月度の社員ごとの割増賃金
 function otPayAllocation(month){
   const st = otPaySettings();
@@ -150,47 +222,117 @@ function otPayAllocation(month){
       id:p.id, name:p.displayName, cal, salary,
       // 役員（管理監督者）は時間外・休日の割増の対象外。深夜割増だけ計算する
       exempt: typeof isLeaveExempt==='function' && isLeaveExempt(p.displayName),
-      monthlyHours: mh.hours, monthlyHoursSource: mh.source,
+      monthlyHours: mh.hours, monthlyHoursSource: mh.source, yearly: mh.yearly,
       baseWage: base,
       rate: base ? Math.round(base / mh.hours) : 0,
-      otMin:0, holMin:0, furiMin:0, nightMin:0
+      otMin:0, naibuMin:0, holMin:0, furiMin:0, nightMin:0
     };
   });
 
-  // 承認済みの休日出勤を「休日労働（割増あり）」と「振替出勤（割増なし）」に分ける
-  const prem = {}, furi = {};
+  // 承認済みの休日出勤を「休日労働（割増あり）」と「振替出勤（割増なし）」に分ける。
+  // 週の計算で締め期間の外側も見るので、期間で絞らずに全部拾っておく
+  const prem = {}, furi = {}, schedOv = {};
   (holidayRequests||[]).filter(hr=>hr.status==='approved').forEach(hr=>{
-    if(!hr.workDate || hr.workDate<start || hr.workDate>end) return;
-    const m = isFurikaeHoliday(hr) ? furi : prem;
-    (m[hr.userId] = m[hr.userId] || new Set()).add(hr.workDate);
+    if(!hr.workDate) return;
+    if(isFurikaeHoliday(hr)){
+      (furi[hr.userId] = furi[hr.userId] || new Set()).add(hr.workDate);
+      // 労働日の振替：出た日が所定労働日になり、振替休日が休日になる
+      const o = schedOv[hr.userId] = schedOv[hr.userId] || {};
+      o[hr.workDate] = true;
+      if(hr.substituteDate) o[hr.substituteDate] = false;
+    } else {
+      (prem[hr.userId] = prem[hr.userId] || new Set()).add(hr.workDate);
+    }
   });
 
-  (dailyReports||[]).filter(n=>n.workDate>=start && n.workDate<=end).forEach(n=>{
+  // 週の判定で締め期間の前後にはみ出すので、日報は少し広めに拾う
+  const wideFrom = otAddDays(start,-7), wideTo = otAddDays(end,7);
+  const dayMin = {};   // uid -> {日付: 実働分}
+  (dailyReports||[]).filter(n=>n.workDate>=wideFrom && n.workDate<=wideTo).forEach(n=>{
     const u = users[n.userId];
     if(!u || isNippoStateName(n.projectName)) return;      // 休み・欠勤は働いていない
+    const inPeriod = n.workDate>=start && n.workDate<=end;
     if(prem[n.userId] && prem[n.userId].has(n.workDate)){
-      u.holMin += n.workMinutes;             // 休日労働：全時間を1.35で見る（残業には数えない）
+      if(inPeriod) u.holMin += n.workMinutes;   // 休日労働：全時間を1.35で見る
     } else {
-      u.otMin += n.overtimeMinutes;          // 8時間を超えた分
-      if(furi[n.userId] && furi[n.userId].has(n.workDate)) u.furiMin += n.workMinutes;
+      (dayMin[n.userId] = dayMin[n.userId] || {})[n.workDate] =
+        (dayMin[n.userId][n.workDate] || 0) + n.workMinutes;
+      if(inPeriod && furi[n.userId] && furi[n.userId].has(n.workDate)) u.furiMin += n.workMinutes;
     }
-    u.nightMin += otNightMinutes(n.startTime, n.endTime);
+    if(inPeriod) u.nightMin += otNightMinutes(n.startTime, n.endTime);
+  });
+
+  Object.keys(users).forEach(id=>{
+    const u = users[id];
+    const s = otSplitHours(u.cal, start, end, dayMin[id]||{}, prem[id], st, schedOv[id]);
+    u.otMin = s.otMin; u.naibuMin = s.naibuMin; u.workedMin = s.actualMin;
   });
 
   const yen = (rate, mult, min) => Math.round(rate * mult * min / 60);
   const userIds = Object.keys(users)
-    .filter(id=>users[id].otMin || users[id].holMin || users[id].nightMin)
+    .filter(id=>users[id].otMin || users[id].naibuMin || users[id].holMin || users[id].nightMin)
     .sort((a,b)=>cmpEmployee(users[a].name, users[b].name));
 
   userIds.forEach(id=>{
     const u = users[id];
     u.otPay    = u.exempt ? 0 : yen(u.rate, st.rates.overtime, u.otMin);
+    u.naibuPay = u.exempt ? 0 : yen(u.rate, st.rates.naibu,    u.naibuMin);
     u.holPay   = u.exempt ? 0 : yen(u.rate, st.rates.holiday,  u.holMin);
     u.nightPay = yen(u.rate, st.rates.night, u.nightMin);
-    u.total    = u.otPay + u.holPay + u.nightPay;
+    u.total    = u.otPay + u.naibuPay + u.holPay + u.nightPay;
   });
 
   return {month, start, end, st, users, userIds};
+}
+
+// ════ 1年単位の変形労働時間制の年間精算 ════
+//
+// この制度では、対象期間（年度）ぜんぶで見て法定の総枠を超えた時間も時間外になる。
+// 毎日の8時間・毎週の40時間で数えた分を引いた残りが、年度末に出てくる時間外。
+// 年度の途中でも「いまいくら分たまっているか」が分かるように出す。
+function otYearlySettlement(month){
+  const st = otPaySettings();
+  const {from, to, fy} = otFiscalRange(month);
+  const today = (typeof gbToday==='function') ? gbToday() : to;
+  const upto = today < to ? today : to;
+  const rows = [];
+
+  const prem = {}, schedOv = {};
+  (holidayRequests||[]).filter(hr=>hr.status==='approved' && hr.workDate).forEach(hr=>{
+    if(!isFurikaeHoliday(hr)){ (prem[hr.userId] = prem[hr.userId] || new Set()).add(hr.workDate); return; }
+    const o = schedOv[hr.userId] = schedOv[hr.userId] || {};
+    o[hr.workDate] = true;
+    if(hr.substituteDate) o[hr.substituteDate] = false;
+  });
+  const dayMin = {};
+  (dailyReports||[]).filter(n=>n.workDate>=from && n.workDate<=upto).forEach(n=>{
+    if(isNippoStateName(n.projectName)) return;
+    if(prem[n.userId] && prem[n.userId].has(n.workDate)) return;
+    (dayMin[n.userId] = dayMin[n.userId] || {})[n.workDate] =
+      (dayMin[n.userId][n.workDate] || 0) + n.workMinutes;
+  });
+
+  nippoEmployees().forEach(p=>{
+    const cal = p.workGroup==='訓練校生' ? 'trainee' : 'regular';
+    if(otSystem(cal, st)!=='yearly') return;                 // 1年変形の区分だけ
+    if(typeof isLeaveExempt==='function' && isLeaveExempt(p.displayName)) return;  // 役員は対象外
+    const s = otSplitHours(cal, from, upto, dayMin[p.id]||{}, prem[p.id], st, schedOv[p.id]);
+    const mh = otMonthlyHours(cal, month, st);
+    const frameMin = Math.round(mh.frame * 60);
+    // 年度の途中なので、総枠も経過日数で按分して見通しを出す
+    const passed = Math.round((new Date(upto+'T00:00:00') - new Date(from+'T00:00:00'))/86400000) + 1;
+    const overMin = Math.max(0, s.actualMin - frameMin - s.otMin);
+    const salary = salaryFor(p.id, month);
+    const base = otBaseWage(salary, st);
+    const rate = base ? Math.round(base / mh.hours) : 0;
+    rows.push({id:p.id, name:p.displayName, cal, fy, from, upto, passed, days:mh.days,
+      actualMin:s.actualMin, frameMin, countedMin:s.otMin, naibuMin:s.naibuMin, overMin, rate,
+      overPay: rate ? Math.round(rate * st.rates.overtime * overMin/60) : 0,
+      // このペースで年度末まで進んだときの見込み
+      forecastMin: passed>0 ? Math.round(s.actualMin * mh.days / passed) : 0});
+  });
+  rows.sort((a,b)=>cmpEmployee(a.name, b.name));
+  return {fy, from, upto, rows};
 }
 
 // ════ 画面 ════
@@ -217,6 +359,8 @@ function otPayTableHtml(a, forPrint){
     return `<tr${u.total?'':' class="zero"'}>
       <td class="who">${esc(u.name)}${note.length?`<div class="note">${esc(note.join('／'))}</div>`:''}</td>
       <td class="num">${u.rate?fmt(u.rate):'—'}</td>
+      <td class="num">${u.naibuMin?otH(u.naibuMin):''}</td>
+      <td class="num">${u.naibuPay?fmt(u.naibuPay):''}</td>
       <td class="num">${u.otMin?otH(u.otMin):''}</td>
       <td class="num">${u.otPay?fmt(u.otPay):''}</td>
       <td class="num">${u.holMin?otH(u.holMin):''}</td>
@@ -230,6 +374,7 @@ function otPayTableHtml(a, forPrint){
   return `<table class="otpay-tbl${forPrint?' print':''}">
     <tr>
       <th class="who">社員</th><th class="num">時間単価</th>
+      <th class="num">所定外<br>(h)</th><th class="num">所定外<br>の賃金</th>
       <th class="num">残業<br>(h)</th><th class="num">残業代</th>
       <th class="num">休日労働<br>(h)</th><th class="num">休日手当</th>
       <th class="num">深夜<br>(h)</th><th class="num">深夜割増</th>
@@ -238,6 +383,7 @@ function otPayTableHtml(a, forPrint){
     ${rows}
     <tr class="sum">
       <td class="who">合計</td><td class="num"></td>
+      <td class="num">${otH(sum('naibuMin'))}</td><td class="num">${fmt(sum('naibuPay'))}</td>
       <td class="num">${otH(sum('otMin'))}</td><td class="num">${fmt(sum('otPay'))}</td>
       <td class="num">${otH(sum('holMin'))}</td><td class="num">${fmt(sum('holPay'))}</td>
       <td class="num">${otH(sum('nightMin'))}</td><td class="num">${fmt(sum('nightPay'))}</td>
@@ -259,7 +405,41 @@ function otPayBasisText(a){
     return `${otCalLabel(c)} ${mh.hours}時間${how}`;
   });
   return `時間単価＝割増の基礎になる賃金 ÷ 1か月平均所定労働時間［${parts.join('／')}］　`
-       + `割増率：残業${st.rates.overtime}／休日労働${st.rates.holiday}／深夜+${st.rates.night}`;
+       + `割増率：残業${st.rates.overtime}／休日労働${st.rates.holiday}／深夜+${st.rates.night}／所定外（法定内）${st.rates.naibu}　`
+       + `残業＝①1日の所定（8時間未満の日は8時間）を超えた分＋②週の所定（40時間未満の週は40時間）を超えた分。`
+       + `所定外（法定内）＝所定は超えたが①②にならなかった分で、割増は要らないぶん。`;
+}
+
+// 1年単位の変形労働時間制の年間精算（該当する区分の社員がいるときだけ出す）
+function otYearlyHtml(y){
+  if(!y.rows.length) return '';
+  const md = s => { const [,m,d] = s.split('-'); return `${Number(m)}/${Number(d)}`; };
+  const rows = y.rows.map(r=>`<tr${r.overMin?' class="over"':''}>
+      <td class="who">${esc(r.name)}</td>
+      <td class="num">${otH(r.actualMin)}</td>
+      <td class="num">${otH(r.frameMin)}</td>
+      <td class="num">${r.countedMin?otH(r.countedMin):''}</td>
+      <td class="num total">${r.overMin?otH(r.overMin):''}</td>
+      <td class="num total">${r.overPay?fmt(r.overPay):''}</td>
+      <td class="num">${otH(r.forecastMin)}</td>
+    </tr>`).join('');
+  return `
+  <div class="otpay-year">
+    <div class="otpay-year-head">1年単位の変形労働時間制の年間精算（${y.fy}年度）</div>
+    <div class="otpay-year-note">
+      この制度は、対象期間ぜんぶで見て法定の総枠を超えた時間も時間外になります。
+      毎日の8時間・毎週の40時間で数えた分を引いた残りが、年度末に出てくる時間外です。
+      いまは ${md(y.from)}〜${md(y.upto)} までの途中経過です。「このままの見込み」は、今のペースで年度末まで進んだ場合の実労働時間です。
+    </div>
+    <div class="labor-scroll">
+      <table class="otpay-tbl">
+        <tr><th class="who">社員</th><th class="num">実労働<br>(h)</th><th class="num">法定総枠<br>(h)</th>
+          <th class="num">計上済み<br>の時間外</th><th class="num total">総枠超過<br>(h)</th><th class="num total">その賃金</th>
+          <th class="num">このままの<br>見込み(h)</th></tr>
+        ${rows}
+      </table>
+    </div>
+  </div>`;
 }
 
 function renderOtPay(){
@@ -295,6 +475,7 @@ function renderOtPay(){
     (noSalary.length ? `<div class="labor-warn">給与が未登録のため金額を出せない人：${esc(noSalary.join('、'))}</div>` : '')
     + warns.map(w=>`<div class="labor-warn danger">${esc(w)}</div>`).join('')
     + `<div class="labor-scroll">${otPayTableHtml(a, false)}</div>`
+    + otYearlyHtml(otYearlySettlement(mo))
     + `<div class="otpay-basis">${esc(otPayBasisText(a))}</div>`;
 }
 
@@ -412,7 +593,8 @@ function otSettingsFromForm(){
     const sys = document.getElementById('ots-sys-'+c.key);
     if(sys && sys.value==='yearly') st.systems[c.key] = 'yearly';
   });
-  st.rates = {overtime:num('ots-rate-ot',1.25), holiday:num('ots-rate-hol',1.35), night:num('ots-rate-night',0.25)};
+  st.rates = {overtime:num('ots-rate-ot',1.25), holiday:num('ots-rate-hol',1.35),
+              night:num('ots-rate-night',0.25), naibu:num('ots-rate-naibu',1.0)};
   const bi = {};
   SALARY_ITEMS.forEach(i=>{ const el=document.getElementById('ots-base-'+i.key); bi[i.key] = el ? el.checked : st.baseItems[i.key]; });
   st.baseItems = bi;
@@ -426,6 +608,7 @@ function openOtPaySettings(){
   document.getElementById('ots-rate-ot').value    = st.rates.overtime;
   document.getElementById('ots-rate-hol').value   = st.rates.holiday;
   document.getElementById('ots-rate-night').value = st.rates.night;
+  document.getElementById('ots-rate-naibu').value = st.rates.naibu;
   document.getElementById('ots-base-items').innerHTML = SALARY_ITEMS.map(i=>`
     <label class="ots-check"><input type="checkbox" id="ots-base-${i.key}"${st.baseItems[i.key]?' checked':''} onchange="otCalSettingChanged()">${esc(i.label)}</label>`).join('');
   renderOtCalSettings();
