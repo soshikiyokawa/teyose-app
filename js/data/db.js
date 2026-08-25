@@ -519,6 +519,18 @@ async function dbToggleBookmark(msgId){
   if(error){showToast('保存に失敗しました：'+error.message);return;}
   msg.bookmarks=arr;
 }
+// 開いているスレッドを既読にする。
+// すでに最新のメッセージまで読んでいるなら書かない。
+// 毎回書くと chat_reads のリアルタイム通知が飛んで、再取得・描き直しが繰り返される。
+function markThreadReadIfNeeded(supplier){
+  const thread = threadKeyOf(supplier);
+  const msgs = talkThreads[supplier] || [];
+  const newest = msgs.reduce((t,m)=>Math.max(t, m.ts||0), 0);
+  const mine = (chatReads||[]).find(r=>r.userId===currentUserId && r.thread===thread);
+  if(newest && mine && mine.lastReadAt >= newest) return Promise.resolve();
+  return dbMarkThreadRead(thread).then(updateChatBadge).catch(()=>{});
+}
+
 // スレッドを開いた時刻を既読として記録
 async function dbMarkThreadRead(thread){
   const nowMs=Date.now();
@@ -1179,7 +1191,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'suppliers'}, ()=>refetchAndRerender('suppliers'))
     .on('postgres_changes',{event:'*',schema:'public',table:'master_items'}, ()=>refetchAndRerender('master_items'))
     .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'}, ()=>refetchChatAndRerender())
-    .on('postgres_changes',{event:'*',schema:'public',table:'chat_reads'}, ()=>refetchChatAndRerender())
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_reads'}, ()=>refetchChatAndRerender(true))
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'}, ()=>refetchAndRerender('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'cost_entries'}, ()=>refetchAndRerender('cost_entries'))
     .on('postgres_changes',{event:'*',schema:'public',table:'site_photos'}, ()=>refetchAndRerender('site_photos'))
@@ -1400,16 +1412,20 @@ async function fetchChatData(){
   chatReads = (readRows||[]).map(r=>({userId:r.user_id,userName:r.user_name||'',thread:r.thread,lastReadAt:new Date(r.last_read_at).getTime()}));
 }
 
-// チャットの変更で呼ばれる。取り直すのはチャットだけにして、待ち時間を短くする
-async function refetchChatAndRerender(){
+// チャットの変更で呼ばれる。取り直すのはチャットだけにして、待ち時間を短くする。
+//
+//   fromReads … 既読（chat_reads）が変わっただけのとき true。
+//     このときは既読を書き直さない。書き直すとまたリアルタイムで通知が飛んできて
+//     「再取得 → 既読を書く → 通知 → 再取得 …」と延々と回り、画面がチカチカする。
+async function refetchChatAndRerender(fromReads){
   try{ await fetchChatData(); }
   catch(e){ console.warn('チャットの再取得に失敗しました', e); return; }
   notifyNewChatMessages();   // 着信音・未読バッジ
   if(!talkPanelOpen) return;
   if(activeTalkPanelSupplier){
     renderTalkPanelMessages();
-    // 開いているスレッドは読んだものとして扱う
-    dbMarkThreadRead(threadKeyOf(activeTalkPanelSupplier)).then(updateChatBadge).catch(()=>{});
+    // 開いているスレッドは読んだものとして扱う（まだ読んでいない分があるときだけ書く）
+    if(!fromReads) markThreadReadIfNeeded(activeTalkPanelSupplier);
   } else {
     renderTalkPanelList();
   }

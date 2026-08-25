@@ -319,6 +319,7 @@ function renderTalkPanelList(){
 
 function openTalkPanelThread(supName){
   activeTalkPanelSupplier=supName;
+  resetChatRenderSignature();   // スレッドを開いたら必ず描き直す
   if(!talkThreads[supName]) talkThreads[supName]=[];
   const sup=suppliers.find(s=>s.name===supName);
   document.getElementById('talk-panel-title').textContent=supName;
@@ -391,6 +392,7 @@ function updateChatBadge(){
 
 function closeTalkPanelThread(){
   activeTalkPanelSupplier=null;
+  resetChatRenderSignature();
   document.getElementById('talk-panel-list').style.display='flex';
   document.getElementById('talk-panel-detail').style.display='none';
   renderTalkPanelList();
@@ -455,12 +457,30 @@ function chatScrollToBottom(){
 
 // 上に戻して読んでいる途中に描き直しが入っても、勝手に下へ飛ばさない。
 // forceBottom＝true のときだけ、いちばん下まで送る（スレッドを開いたとき・自分が送ったとき）
+// いま画面に出ている中身の見分け札。
+// 描き直しても同じ中身になるなら、そのまま置いておく。
+// 毎回 innerHTML を作り直すと写真が読み込み直しになって画面がチカチカするため。
+let _chatRenderSig = '';
+function chatRenderSignature(supplier, msgs){
+  return supplier + '|' + (chatBookmarkFilter?'bm':'') + '|' + msgs.map(m=>[
+    m.id, m.ts, m.type, m.text, m.editedAt, m.fileUrl,
+    JSON.stringify(m.reactions||{}), (m.bookmarks||[]).join(','),
+    m.sending?'s':'', m.failed?'f':''
+  ].join('~')).join('|');
+}
+function resetChatRenderSignature(){ _chatRenderSig = ''; }
+
 function renderTalkPanelMessages(forceBottom){
   const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD || isProjectThread(activeTalkPanelSupplier);
   let msgs=talkThreads[activeTalkPanelSupplier]||[];
   if(chatBookmarkFilter) msgs=msgs.filter(m=>Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName));
   document.getElementById('talk-bm-filter')?.classList.toggle('active',chatBookmarkFilter);
   const el=document.getElementById('talk-panel-messages');
+
+  // 中身が前と同じなら描き直さない（他の人の既読などで呼ばれたとき）
+  const sig = chatRenderSignature(activeTalkPanelSupplier, msgs);
+  if(forceBottom!==true && sig===_chatRenderSig && el && el.children.length) return;
+  _chatRenderSig = sig;
   // 描き直す前の位置と、いちばん下を見ていたかどうかを覚えておく
   const wasAtBottom = chatAtBottom(el);
   const prevTop = el ? el.scrollTop : 0;
