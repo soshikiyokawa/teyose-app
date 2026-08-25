@@ -60,7 +60,7 @@ function notifyAllLabel(){
   const t = activeTalkPanelSupplier;
   if(t===INTERNAL_THREAD) return '全員';
   if(isProjectThread(t)) return '参加メンバー';
-  return currentUserRole==='supplier' ? 'きよかわの担当者' : 'この発注先';
+  return currentUserRole==='supplier' ? 'きよかわの社員' : 'この発注先';
 }
 function closeNotifyPicker(){ document.getElementById('notify-modal').classList.remove('open'); updateNotifyLabel(); }
 function pickNotifyAll(){ notifyTargets = []; closeNotifyPicker(); }

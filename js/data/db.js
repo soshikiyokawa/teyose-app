@@ -590,9 +590,10 @@ async function dbAddChatMessage(supplierName, msg){
     // ChatWorkルームが設定されていれば転送（片方向）。宛先の指定にかかわらず送る
     dbForwardToChatWork(supplier_id, currentUserDisplayName||'', preview).catch(()=>{});
   } else {
-    // 発注先→きよかわ。宛先を選んでいればその人だけ
+    // 発注先→きよかわ。宛先を選んでいればその人だけ、
+    // 指定なし（ALL）なら社員全員（管理者＋一般社員）へ。発注先チャットは大工も見られるため
     if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview).catch(()=>{});
-    else dbSendPush('staff', null, supplierName, preview).catch(()=>{});
+    else dbSendPush('employee', null, supplierName, preview, currentUserId).catch(()=>{});
   }
 }
 
