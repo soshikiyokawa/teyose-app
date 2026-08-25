@@ -1407,7 +1407,8 @@ async function dbMailOrderToSupplier(order, sup){
 // 新しいメッセージが届いたときに、案件・見積・発注・タスクまで全部取り直していると
 // 何十件も通信が走って数秒かかる。チャットは2件だけ取れば足りるので分けてある。
 async function fetchChatData(){
-  // チャットは社内＝全件／発注先＝自社分のみ／大工＝社内チャットのみ（RLSが自動で絞る）
+  // チャットは社内・発注先とも社員（管理者＋一般社員）は全件、
+  // 案件チャットは参加メンバー、発注先は自社分のみ（RLSが自動で絞る）
   const { data: chatRows, error: chatErr } = await sb.from('chat_messages').select('*').order('created_at');
   if(chatErr) throw chatErr;
   talkThreads = {};

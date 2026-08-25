@@ -2,12 +2,10 @@
 let notifyTargets = [];   // 空＝ALL（全員）。表示名の配列
 
 // 社員（発注先ではない人）の表示名。自分は除く。
-// onlyStaff=true なら管理者だけ。発注先チャットは一般社員には見えないので、
-// そこの通知先には管理者しか出さない（通知だけ届いて開けないのを防ぐ）
-function _staffNames(onlyStaff){
+// 発注先チャットは管理者も一般社員も見られて書き込めるので、どちらも候補に出す
+function _staffNames(){
   return (typeof allProfiles!=='undefined' ? allProfiles : [])
-    .filter(p=>(onlyStaff ? p.role==='staff' : p.role!=='supplier')
-            && p.displayName && p.displayName!==currentUserDisplayName)
+    .filter(p=>p.role!=='supplier' && p.displayName && p.displayName!==currentUserDisplayName)
     .map(p=>p.displayName);
 }
 // その発注先のアカウント（担当者）の表示名。自分は除く
@@ -33,7 +31,7 @@ function notifyGroups(){
   }
   return [
     {label:'発注先の担当者', names:_supplierNames(t)},
-    {label:'きよかわの担当者', names:_staffNames(true)}
+    {label:'きよかわの社員', names:_staffNames()}
   ].filter(g=>g.names.length);
 }
 // 候補をひとまとめにした配列（残っている宛先の掃除に使う）
