@@ -92,3 +92,5 @@
 .talk-bubble.sending{ opacity:.65; }
 .talk-sending{ margin-left:6px; color:var(--text-muted); }
 .talk-send-ng{ margin-left:6px; color:var(--danger); font-weight:700; }
+/* 通知先の候補のまとまり（発注先の担当者／きよかわの社員） */
+.notify-group{font-size:10px;font-weight:700;color:var(--text-muted);padding:8px 4px 3px}

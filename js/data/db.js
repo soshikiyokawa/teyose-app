@@ -566,27 +566,33 @@ async function dbAddChatMessage(supplierName, msg){
   // 通知の送信。失敗してもチャット送信自体は成立させる（msg.silent=trueなら通知しない：自動転記用）
   if(msg.silent) return;
   const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}` : msg.type==='file' ? `📎 ${msg.fileName||'ファイル'}` : (msg.text||'');
+  // 宛先が指定されていれば、どのスレッドでもその人にだけ通知する（自分は除く）
+  const picked = Array.isArray(msg.notifyNames)
+    ? msg.notifyNames.filter(n=>n && n!==currentUserDisplayName) : [];
+
   if(isProject){
-    // 案件チャット：参加メンバー（自分以外）へ通知
+    // 案件チャット：指定があればその人、無ければ参加メンバー（自分以外）へ
     const proj = projects.find(p=>p.id===project_id);
-    const names = otherMemberNames(proj?.members);
+    const names = picked.length ? picked : otherMemberNames(proj?.members);
     if(names.length) dbSendPushToNames(names, `${supplierName} ${currentUserDisplayName||''}`, preview, null).catch(()=>{});
   } else if(isInternal){
     const title = `${INTERNAL_THREAD} ${currentUserDisplayName||''}`;
-    if(Array.isArray(msg.notifyNames) && msg.notifyNames.length){
-      // 宛先が指定されている場合はその人にだけ通知（自分は除く）
-      const names = msg.notifyNames.filter(n=>n!==currentUserDisplayName);
-      if(names.length) dbSendPushToNames(names, title, preview).catch(()=>{});
+    if(picked.length){
+      dbSendPushToNames(picked, title, preview).catch(()=>{});
     } else {
       // 既定：自分以外の社員全員（staff＋carpenter）へ
       dbSendPush('employee', null, title, preview, currentUserId).catch(()=>{});
     }
   } else if(msg.role==='me'){
-    dbSendPush('supplier', supplier_id, supplierName, preview).catch(()=>{});
-    // きよかわ→発注先：ChatWorkルームが設定されていれば転送（片方向）
+    // きよかわ→発注先。宛先を選んでいればその人だけ（発注先の担当者でも社員でも指名できる）
+    if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview).catch(()=>{});
+    else dbSendPush('supplier', supplier_id, supplierName, preview).catch(()=>{});
+    // ChatWorkルームが設定されていれば転送（片方向）。宛先の指定にかかわらず送る
     dbForwardToChatWork(supplier_id, currentUserDisplayName||'', preview).catch(()=>{});
   } else {
-    dbSendPush('staff', null, supplierName, preview).catch(()=>{});
+    // 発注先→きよかわ。宛先を選んでいればその人だけ
+    if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview).catch(()=>{});
+    else dbSendPush('staff', null, supplierName, preview).catch(()=>{});
   }
 }
 
@@ -1177,6 +1183,12 @@ async function dbSendPushToUser(targetUserId, title, body, tab){
 // 表示名で宛先を指定して送信（残業承認者への通知用）。21時〜翌7時は送らない（cronのリマインドに任せる）
 async function dbSendPushToNames(targetNames, title, body, tab){
   if(isQuietHoursJST()) return;
+  await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body, tab } });
+}
+// 表示名で宛先を指定して、時間帯にかかわらず送る。
+// 発注先チャットの宛先指定に使う（発注先への通知はもともと夜でも送っているので、
+// 宛先を選んだときだけ届かなくなると分かりにくいため）
+async function dbSendPushToNamesNow(targetNames, title, body, tab){
   await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body, tab } });
 }
 // 役割（staff など）でまとめて通知する

@@ -1,30 +1,68 @@
 // ════ 社内チャットの通知先（ALL＝全員／個別指定） ════
 let notifyTargets = [];   // 空＝ALL（全員）。表示名の配列
 
-// 通知先の候補。案件チャットは参加メンバー、社内チャットは社員全員（いずれも自分は除く）
-function _employeeNames(){
-  if(isProjectThread(activeTalkPanelSupplier)){
-    const p = projects.find(x=>x.id===projectThreadIds[activeTalkPanelSupplier]);
-    return otherMemberNames(p?.members);
-  }
+// 社員（発注先ではない人）の表示名。自分は除く。
+// onlyStaff=true なら管理者だけ。発注先チャットは一般社員には見えないので、
+// そこの通知先には管理者しか出さない（通知だけ届いて開けないのを防ぐ）
+function _staffNames(onlyStaff){
   return (typeof allProfiles!=='undefined' ? allProfiles : [])
-    .filter(p=>p.role!=='supplier' && p.displayName && p.displayName!==currentUserDisplayName)
+    .filter(p=>(onlyStaff ? p.role==='staff' : p.role!=='supplier')
+            && p.displayName && p.displayName!==currentUserDisplayName)
+    .map(p=>p.displayName);
+}
+// その発注先のアカウント（担当者）の表示名。自分は除く
+function _supplierNames(supName){
+  const sid = supplierIdByName(supName);
+  if(!sid) return [];
+  return (typeof allProfiles!=='undefined' ? allProfiles : [])
+    .filter(p=>p.role==='supplier' && p.supplierId===sid && p.displayName && p.displayName!==currentUserDisplayName)
     .map(p=>p.displayName);
 }
 
+// 通知先の候補。まとまりごとに分けて返す
+//   社内チャット … 社員全員
+//   案件チャット … 参加メンバー
+//   発注先チャット … その発注先の担当者と、きよかわの社員
+//     （発注先の人から見れば自分の会社の同僚は候補に出ない。自分は常に除く）
+function notifyGroups(){
+  const t = activeTalkPanelSupplier;
+  if(t===INTERNAL_THREAD) return [{label:'', names:_staffNames()}];
+  if(isProjectThread(t)){
+    const p = projects.find(x=>x.id===projectThreadIds[t]);
+    return [{label:'', names:otherMemberNames(p?.members)}];
+  }
+  return [
+    {label:'発注先の担当者', names:_supplierNames(t)},
+    {label:'きよかわの担当者', names:_staffNames(true)}
+  ].filter(g=>g.names.length);
+}
+// 候補をひとまとめにした配列（残っている宛先の掃除に使う）
+function notifyCandidateNames(){
+  return notifyGroups().reduce((a,g)=>a.concat(g.names), []);
+}
+
 function openNotifyPicker(){
-  const names = _employeeNames();
+  const groups = notifyGroups();
   const el = document.getElementById('notify-picker');
+  const btn = n => `<button class="notify-opt${notifyTargets.includes(n)?' mine':''}" onclick="toggleNotifyTarget('${n.replace(/'/g,"\\'")}')">
+      ${notifyTargets.includes(n)?'✓ ':''}${esc(n)}
+    </button>`;
+  const body = groups.length
+    ? groups.map(g=>(g.label?`<div class="notify-group">${esc(g.label)}</div>`:'') + g.names.map(btn).join('')).join('')
+    : '<div style="font-size:12px;color:var(--text-muted);padding:8px">通知できる相手が登録されていません</div>';
   el.innerHTML =
     `<button class="notify-opt${notifyTargets.length?'':' mine'}" onclick="pickNotifyAll()">
-       <span style="font-weight:800">ALL（全員に通知）</span>
-     </button>` +
-    (names.length
-      ? names.map(n=>`<button class="notify-opt${notifyTargets.includes(n)?' mine':''}" onclick="toggleNotifyTarget('${n.replace(/'/g,"\\'")}')">
-           ${notifyTargets.includes(n)?'✓ ':''}${esc(n)}
-         </button>`).join('')
-      : '<div style="font-size:12px;color:var(--text-muted);padding:8px">他の社員が登録されていません</div>');
+       <span style="font-weight:800">ALL（${esc(notifyAllLabel())}）</span>
+     </button>` + body;
   document.getElementById('notify-modal').classList.add('open');
+}
+
+// ALL を選んだときに誰へ行くか。スレッドの種類と自分の立場で変わる
+function notifyAllLabel(){
+  const t = activeTalkPanelSupplier;
+  if(t===INTERNAL_THREAD) return '全員';
+  if(isProjectThread(t)) return '参加メンバー';
+  return currentUserRole==='supplier' ? 'きよかわの担当者' : 'この発注先';
 }
 function closeNotifyPicker(){ document.getElementById('notify-modal').classList.remove('open'); updateNotifyLabel(); }
 function pickNotifyAll(){ notifyTargets = []; closeNotifyPicker(); }
@@ -38,11 +76,11 @@ function toggleNotifyTarget(name){
 function updateNotifyLabel(){
   const bar = document.getElementById('talk-notify-bar');
   if(!bar) return;
-  const showBar = activeTalkPanelSupplier===INTERNAL_THREAD || isProjectThread(activeTalkPanelSupplier);
+  // 発注先チャットでも宛先を選べる。相手がいないスレッドだけ隠す
+  const showBar = !!activeTalkPanelSupplier && notifyCandidateNames().length>0;
   bar.style.display = showBar ? 'flex' : 'none';
   if(!showBar) return;
-  const label = notifyTargets.length ? notifyTargets.join('、')
-    : (isProjectThread(activeTalkPanelSupplier) ? 'ALL（参加メンバー）' : 'ALL（全員）');
+  const label = notifyTargets.length ? notifyTargets.join('、') : 'ALL（'+notifyAllLabel()+'）';
   document.getElementById('talk-notify-label').textContent = label;
 }
 
@@ -595,8 +633,8 @@ function sendTalkPanelMsg(){
   const q = quotingMsg;
   const extra = q ? {replyToId:q.id, replyToSender:q.senderName||(activeTalkPanelSupplier===INTERNAL_THREAD?'':'きよかわ'), replyToText:(q.text||(q.type==='file'?'📎 '+(q.fileName||'ファイル'):q.type==='order'?'📋 発注書':'')).slice(0,80)} : {};
   input.value=''; cancelQuote();
-  // 社内チャットは通知先の指定を反映（空＝ALL）
-  const notify = (activeTalkPanelSupplier===INTERNAL_THREAD && notifyTargets.length) ? {notifyNames:[...notifyTargets]} : {};
+  // 通知先の指定を反映（空＝ALL）。社内・案件・発注先のどのスレッドでも効く
+  const notify = notifyTargets.length ? {notifyNames:[...notifyTargets]} : {};
 
   // 送った内容をその場で出す（送り終わるのを待たない）。
   // Supabaseへの登録が終わったら、本物のメッセージに差し替える
