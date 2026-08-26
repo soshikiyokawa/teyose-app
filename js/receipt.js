@@ -6,23 +6,71 @@ function openReceiptCamera() {
   document.getElementById('receipt-file-input').click();
 }
 
+// 写真は大きいまま送ると失敗しやすいので、長辺2200pxくらいに縮めてから送る
+// （明細の文字が読める程度は保ちつつ、通信量を減らす）
+function receiptShrinkImage(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const max = 2200;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      if (scale >= 1 && file.size <= 3*1024*1024) { resolve(null); return; }  // そのままで十分小さい
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width*scale); cv.height = Math.round(img.height*scale);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      resolve({ base64: cv.toDataURL('image/jpeg', 0.85).split(',')[1], mediaType: 'image/jpeg' });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('画像を開けませんでした')); };
+    img.src = url;
+  });
+}
+
+// 呼び出しの失敗から、本当の理由を取り出す。
+// そのままだと「Edge Function returned a non-2xx status code」としか出ない
+async function receiptErrorText(error, data){
+  if (data?.error) return data.error;
+  if (error?.context && typeof error.context.json === 'function') {
+    try { const j = await error.context.json(); if (j?.error) return j.error; } catch (_) {}
+    try { const t = await error.context.text(); if (t) return t.slice(0, 200); } catch (_) {}
+  }
+  const m = error?.message || '';
+  if (/Failed to send|NetworkError|Failed to fetch/i.test(m)) {
+    return '読み取りの機能につながりませんでした。通信をご確認ください';
+  }
+  return m || '読み取りに失敗しました';
+}
+
 async function onReceiptFileChange(input) {
   const file = input.files?.[0];
   if (!file) return;
   input.value = '';
 
+  const isPdf = /pdf/i.test(file.type) || /\.pdf$/i.test(file.name || '');
+  if (isPdf && file.size > 25*1024*1024) { showToast('PDFが大きすぎます（25MBまで）。ページを分けてください'); return; }
+
   showReceiptLoading(true);
 
   try {
-    const base64 = await fileToBase64(input.files[0] || file);
-    const mediaType = file.type || 'image/jpeg';
+    let base64, mediaType = file.type || '';
+    if (!isPdf) {
+      const small = await receiptShrinkImage(file).catch(() => null);
+      if (small) { base64 = small.base64; mediaType = small.mediaType; }
+    }
+    if (!base64) base64 = await fileToBase64(file);
 
     const { data, error } = await sb.functions.invoke('read-receipt', {
-      body: { image: base64, mediaType }
+      // スマホから選ぶと種類が空のことがあるので、ファイル名も送って判断してもらう
+      body: { file: base64, image: base64, mediaType, fileName: file.name || '' }
     });
 
-    if (error) throw new Error(error.message);
-    if (!data?.items?.length) { showToast('品目を読み取れませんでした。もう一度お試しください。'); showReceiptLoading(false); return; }
+    if (error || data?.error) throw new Error(await receiptErrorText(error, data));
+    if (!data?.items?.length) {
+      showReceiptLoading(false);
+      showToast(data?.reason || '品目を読み取れませんでした。明細の表が全部入るように撮り直すか、PDFで読み込んでください');
+      return;
+    }
 
     receiptItems = data.items.map((it, i) => ({
       _id: 'rc_' + i,
@@ -34,6 +82,7 @@ async function onReceiptFileChange(input) {
     }));
 
     showReceiptLoading(false);
+    if (data.reason) showToast(data.reason);
     openReceiptConfirm();
   } catch (e) {
     showReceiptLoading(false);
