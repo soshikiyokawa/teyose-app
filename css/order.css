@@ -107,3 +107,7 @@
 /* 並び替え中は文字選択やスクロールが起きないようにする */
 body.drag-sorting{user-select:none;-webkit-user-select:none;overscroll-behavior:none}
 body.drag-sorting .drag-handle{cursor:grabbing}
+/* レシート読み取り：明細が税込か税抜かの切り替え */
+.rr-tax{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--text-sub);
+  background:var(--surface2);border-radius:8px;padding:7px 9px;margin-bottom:8px}
+.rr-tax-note{color:var(--text-muted);font-size:10px}

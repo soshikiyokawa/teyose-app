@@ -16,7 +16,12 @@ const PROMPT = `これはレシート・購入明細（ネットショップの�
 品目の行をすべて読み取って、save_receipt_items の道具で返してください。
 
 読み取り方:
-- 金額は必ず税込を使う（税抜・税込が両方あるときは税込）
+- 単価・金額は、明細にそのまま書かれている数字を使う（税を足したり引いたりしない）
+- そのうえで、明細の単価・金額が税込か税抜かを taxIncluded で必ず答える
+  ・「合計」とは別に「消費税」の行がある → 明細は税抜（false）
+  ・単価や金額に「(税込)」と書いてある、または合計＝明細の合計 → 税込（true）
+  ・レシートに「※印は軽減税率」のような但し書きだけがある場合、日本のレシートは
+    ふつう税込表示なので true
 - 送料・手数料・代引き手数料なども1つの品目として含める
 - 単価が書かれていなければ 金額÷数量 で計算する
 - 数量・単位が読めないときは qty:1, unit:"式"
@@ -30,6 +35,10 @@ const TOOL = {
     type: "object" as const,
     properties: {
       shop: { type: "string", description: "店名・ショップ名。分からなければ空文字" },
+      taxIncluded: {
+        type: "boolean",
+        description: "明細の単価・金額が税込かどうか。消費税の行が別にあるなら false",
+      },
       items: {
         type: "array",
         description: "品目の行",
@@ -39,14 +48,14 @@ const TOOL = {
             name: { type: "string", description: "品目名" },
             qty: { type: "number", description: "数量" },
             unit: { type: "string", description: "単位" },
-            price: { type: "number", description: "単価（税込）" },
-            amount: { type: "number", description: "金額（税込）" },
+            price: { type: "number", description: "単価。明細に書かれているまま" },
+            amount: { type: "number", description: "金額。明細に書かれているまま" },
           },
           required: ["name"],
         },
       },
     },
-    required: ["items"],
+    required: ["items", "taxIncluded"],
   },
 };
 
@@ -119,6 +128,8 @@ Deno.serve(async (req) => {
 
     return json({
       shop: String(use.input?.shop || "").trim(),
+      // 読めなかったときは、日本のレシートで多い税込として扱う
+      taxIncluded: use.input?.taxIncluded !== false,
       items,
       reason: message.stop_reason === "max_tokens"
         ? "品目が多く、途中までしか読み取れていない可能性があります" : "",
