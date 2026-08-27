@@ -139,3 +139,7 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .ope-hist-note{color:var(--text-muted);font-size:10px}
 .badge.price-edited{background:var(--accent-bg);color:var(--accent-t);border:0.5px solid var(--accent)}
 .ocb-row .ope-old{color:var(--text-muted);text-decoration:line-through;font-size:10px}
+/* 単価の欄は数字を直接入れる（上下ボタンは出さない） */
+.ope-after input{-moz-appearance:textfield}
+.ope-after input::-webkit-outer-spin-button,
+.ope-after input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}

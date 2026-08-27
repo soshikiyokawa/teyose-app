@@ -50,38 +50,26 @@ function openOrderPriceEdit(orderNo){
 }
 function closeOrderPriceEdit(){ document.getElementById('ope-modal').classList.remove('open'); }
 
+// 単価を入れたとき。打っている最中に欄を作り直すとカーソルが飛ぶので、
+// 入力欄には触らず、金額と合計の表示だけを更新する
 function setOpePrice(i, v){
-  const n = Math.max(0, Math.round(parseFloat(String(v).replace(/,/g,'')) || 0));
+  const n = Math.max(0, Math.round(parseFloat(String(v).replace(/[^\d.]/g,'')) || 0));
   opeItems[i].after = n;
-  renderOrderPriceEdit();
+  const row = document.getElementById('ope-row-' + i);
+  if(row) row.classList.toggle('changed', n !== opeItems[i].before);
+  const amt = document.getElementById('ope-amt-' + i);
+  if(amt) amt.innerHTML = opeAmtHtml(opeItems[i]);
+  renderOpeTotal();
 }
 
-function renderOrderPriceEdit(){
-  const wrap = document.getElementById('ope-list');
-  if(!wrap) return;
-  wrap.innerHTML = opeItems.map((it, i) => {
-    const changed = it.after !== it.before;
-    return `
-    <div class="ope-row${changed ? ' changed' : ''}">
-      <div class="ope-name">${esc(it.name)}<span>${it.qty}${esc(it.unit)}</span></div>
-      <div class="ope-price">
-        <div class="ope-before">
-          <span>いまの単価</span>
-          <b>¥${fmt(it.before)}</b>
-        </div>
-        <div class="ope-arrow">→</div>
-        <div class="ope-after">
-          <span>直した単価</span>
-          <input type="number" min="0" step="1" value="${it.after}"
-                 oninput="setOpePrice(${i}, this.value)">
-        </div>
-      </div>
-      <div class="ope-amt">${changed
-        ? `<span class="old">¥${fmt(it.before * it.qty)}</span> <b>¥${fmt(it.after * it.qty)}</b>`
-        : `<b>¥${fmt(it.after * it.qty)}</b>`}</div>
-    </div>`;
-  }).join('');
+// 行の右端に出す金額（変えたときは変更前を取り消し線で添える）
+function opeAmtHtml(it){
+  return it.after !== it.before
+    ? `<span class="old">¥${fmt(it.before * it.qty)}</span> <b>¥${fmt(it.after * it.qty)}</b>`
+    : `<b>¥${fmt(it.after * it.qty)}</b>`;
+}
 
+function renderOpeTotal(){
   const subBefore = opeItems.reduce((s,it)=>s + it.before*it.qty, 0);
   const subAfter  = opeItems.reduce((s,it)=>s + it.after*it.qty, 0);
   const totBefore = subBefore + Math.round(subBefore*0.1);
@@ -95,6 +83,29 @@ function renderOrderPriceEdit(){
        <div class="ope-sum-note">単価を直すと、ここに変更後の金額が出ます</div>`;
   const btn = document.getElementById('ope-save-btn');
   if(btn) btn.disabled = !n;
+}
+
+function renderOrderPriceEdit(){
+  const wrap = document.getElementById('ope-list');
+  if(!wrap) return;
+  wrap.innerHTML = opeItems.map((it, i) => `
+    <div class="ope-row${it.after !== it.before ? ' changed' : ''}" id="ope-row-${i}">
+      <div class="ope-name">${esc(it.name)}<span>${it.qty}${esc(it.unit)}</span></div>
+      <div class="ope-price">
+        <div class="ope-before">
+          <span>いまの単価</span>
+          <b>¥${fmt(it.before)}</b>
+        </div>
+        <div class="ope-arrow">→</div>
+        <div class="ope-after">
+          <span>直した単価</span>
+          <input type="text" inputmode="numeric" value="${it.after}"
+                 onfocus="this.select()" oninput="setOpePrice(${i}, this.value)">
+        </div>
+      </div>
+      <div class="ope-amt" id="ope-amt-${i}">${opeAmtHtml(it)}</div>
+    </div>`).join('');
+  renderOpeTotal();
 }
 
 // ── 保存 ──
