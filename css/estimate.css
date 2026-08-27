@@ -133,3 +133,4 @@
 /* 工種に割り当てた「頼む先」（見積と実績の突き合わせに使う） */
 .sec-sup{font-size:10px;font-weight:700;color:var(--accent-t);background:var(--accent-bg);
   border-radius:99px;padding:1px 7px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis}
+.sec-foot-nums{display:flex;gap:12px;flex-wrap:wrap;align-items:center}

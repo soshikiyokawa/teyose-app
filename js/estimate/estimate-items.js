@@ -16,12 +16,43 @@ function syncActiveTextInput(){
   }
 }
 
-// 工種を「どこに頼むか」。見積の原価と、実際にその発注先へ出した発注を突き合わせるのに使う。
-// 自社の大工でやる工種は EST_SELF_LABOR にしておくと、日報からの労務費と比べられる。
+// ── 明細ごとの発注先 ──
+//
+// 見積の原価と、実際にその発注先へ出した発注を突き合わせるのに使う。
+// 自社の大工でやる行は EST_SELF_LABOR にしておくと、日報からの労務費と比べられる。
+// 工種の欄で選ぶと、その工種の全明細にまとめて入る（一括設定）。
 const EST_SELF_LABOR = '__self__';
+const estSupplierLabel = v => v===EST_SELF_LABOR ? '自社（労務）' : v;
+
+// 発注先の選択肢（明細・工種の両方で使う）
+function estSupplierOptions(selected){
+  return `<option value="">未設定</option>
+    <option value="${EST_SELF_LABOR}"${selected===EST_SELF_LABOR?' selected':''}>自社（労務）</option>
+    ${(suppliers||[]).filter(x=>x.name!=='在庫分')
+      .map(x=>`<option value="${esc(x.name)}"${selected===x.name?' selected':''}>${esc(x.name)}</option>`).join('')}`;
+}
+
+// 工種のなかで発注先が揃っているか。揃っていればその名前、ばらばらなら null
+function estSecSupplier(sec){
+  const list=(sec.items||[]).map(i=>i.supplier||'');
+  if(!list.length) return sec.supplier||'';
+  return list.every(v=>v===list[0]) ? list[0] : null;
+}
+
+// 明細1行ごとの発注先
+function updateItemSupplier(secId, itemId, name){
+  const sec=sections.find(s=>s.id===secId); if(!sec) return;
+  const item=sec.items.find(i=>i.id===itemId); if(!item) return;
+  item.supplier=name||'';
+  estDirty=true;
+  renderSections();
+}
+
+// 工種の全明細にまとめて入れる（一括設定）
 function updateSecSupplier(secId, name){
   const sec=sections.find(s=>s.id===secId); if(!sec) return;
   sec.supplier=name||'';
+  sec.items.forEach(i=>{ i.supplier=name||''; });
   estDirty=true;
   renderSections();
 }
@@ -29,14 +60,14 @@ function updateSecSupplier(secId, name){
 function addSection(name=''){
   sections.push({id:secSeq++,name:name||'',open:true,supplier:'',items:[]});
   const sec=sections[sections.length-1];
-  sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0});
+  sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0,supplier:''});
   estDirty=true;
   renderSections();
 }
 
 function addItem(secId){
   const sec=sections.find(s=>s.id===secId);
-  if(sec) sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0});
+  if(sec) sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0,supplier:''});
   estDirty=true;
   renderSections();
 }
@@ -88,6 +119,7 @@ function _updateSecTotals(secId){
   if(mEl) mEl.textContent='粗利 '+sMargin.toFixed(1)+'%';
   const tEl=document.getElementById('sec-total-disp-'+secId);
   if(tEl) tEl.textContent='¥'+fmt(sTotal);
+  // 数字の部分だけ書き換える（発注先の一括設定はそのまま残す）
   const fEl=document.getElementById('sec-foot-'+secId);
   if(fEl) fEl.innerHTML=`<span class="muted">原価：¥${fmt(sCost)}</span><span style="color:var(--accent-t)">粗利：¥${fmt(sTotal-sCost)}（${sMargin.toFixed(1)}%）</span><span>小計：¥${fmt(sTotal)}</span>`;
 }
@@ -222,6 +254,7 @@ function renderSections(){
     const sCost=sec.items.reduce((s,i)=>s+i.qty*i.cost,0);
     gTotal+=sTotal;gCost+=sCost;
     const sMargin=sTotal>0?((sTotal-sCost)/sTotal*100):0;
+    const secSup=estSecSupplier(sec);   // 揃っていれば発注先名、ばらばらなら null
     const secPresets=(estimatePresets||[]).filter(p=>p.cat===sec.name && p.workType===currentEstWorkType());
     const secDatalistId=`item-presets-list-${sec.id}`;
     const rows=sec.items.map(item=>{
@@ -242,6 +275,7 @@ function renderSections(){
         <td id="item-price-${item.id}" class="num" style="color:var(--wood-t);font-weight:600;padding-right:6px">¥${fmt(item.price)}</td>
         <td id="item-amt-${item.id}" class="amt">¥${fmt(item.qty*item.price)}</td>
         <td id="item-cost-tot-${item.id}" class="amt" style="color:var(--text-muted)">¥${fmt(item.qty*item.cost)}</td>
+        <td><select onchange="updateItemSupplier(${sec.id},${item.id},this.value)" style="width:108px;font-size:11px;padding:2px 4px">${estSupplierOptions(item.supplier||'')}</select></td>
         <td style="width:24px;text-align:center"><button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeItem(${sec.id},${item.id})" style="padding:2px 5px">×</button></td>
       </tr>`;}).join('');
     return `<div class="section-block">
@@ -257,7 +291,8 @@ function renderSections(){
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepSecMargin(${sec.id},1)" style="padding:1px 5px;font-size:13px">＋</button>
           <span style="font-size:10px;color:var(--text-muted)">%</span>
         </div>
-        ${sec.supplier ? `<span class="sec-sup" title="この工種を頼む先">${sec.supplier===EST_SELF_LABOR?'自社（労務）':esc(sec.supplier)}</span>` : ''}
+        ${secSup===null ? '<span class="sec-sup" title="明細ごとに発注先が違います">発注先：明細ごと</span>'
+          : secSup ? `<span class="sec-sup" title="この工種の発注先">${esc(estSupplierLabel(secSup))}</span>` : ''}
         <span id="sec-total-disp-${sec.id}" style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
         <button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
       </div>
@@ -272,25 +307,26 @@ function renderSections(){
             <th class="r" style="width:86px">単価（円）</th>
             <th class="r" style="width:86px">金額（円）</th>
             <th class="r" style="width:86px">原価合計（円）</th>
+            <th style="width:110px">発注先</th>
             <th style="width:26px"></th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
         <button class="add-row-btn" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="addItem(${sec.id})">＋ 行を追加</button>
       </div>
-      <div id="sec-foot-${sec.id}" class="sec-foot">
+      <div class="sec-foot">
         <span class="muted" style="display:flex;align-items:center;gap:5px">
-          頼む先
+          発注先を一括で
           <select onchange="updateSecSupplier(${sec.id},this.value)" style="width:auto;font-size:11px;padding:2px 5px">
-            <option value="">未割り当て</option>
-            <option value="${EST_SELF_LABOR}"${sec.supplier===EST_SELF_LABOR?' selected':''}>自社（労務）</option>
-            ${(suppliers||[]).filter(x=>x.name!=='在庫分')
-              .map(x=>`<option value="${esc(x.name)}"${sec.supplier===x.name?' selected':''}>${esc(x.name)}</option>`).join('')}
+            ${estSupplierOptions(secSup===null ? '' : secSup)}
           </select>
+          ${secSup===null?'<i style="font-style:normal;color:var(--warn-t);font-size:10px">明細ごとに違います</i>':''}
         </span>
-        <span class="muted">原価：¥${fmt(sCost)}</span>
-        <span style="color:var(--accent-t)">粗利：¥${fmt(sTotal-sCost)}（${sMargin.toFixed(1)}%）</span>
-        <span>小計：¥${fmt(sTotal)}</span>
+        <span id="sec-foot-${sec.id}" class="sec-foot-nums">
+          <span class="muted">原価：¥${fmt(sCost)}</span>
+          <span style="color:var(--accent-t)">粗利：¥${fmt(sTotal-sCost)}（${sMargin.toFixed(1)}%）</span>
+          <span>小計：¥${fmt(sTotal)}</span>
+        </span>
       </div>`:''}
     </div>`;
   }).join('');

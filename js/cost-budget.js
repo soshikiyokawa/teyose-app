@@ -109,24 +109,28 @@ function renderCostBudget(){
 
 // ════ 見積と実績を、発注先ごとに突き合わせる ════
 //
-// 見積の工種に「頼む先」を割り当てておくと、その発注先への発注合計と比べられる。
+// 見積の明細に発注先を入れておくと、その発注先への発注合計と比べられる。
 // 「左官工事は◯◯さんに ¥800,000 で見ていたが、実際は ¥920,000」が分かる。
 //
-// 自社（労務）に割り当てた工種は、日報の人工×1人工あたりの労務費と比べる。
-// 割り当てていない工種は「未割り当て」にまとめ、設定を促す。
+// 自社（労務）にした明細は、日報の人工×1人工あたりの労務費と比べる。
+// 設定していない明細は「未設定」にまとめ、設定を促す。
 
 function estVsOrderRows(projectName){
   const est=budgetEstimateOf(projectName);
   const byName=new Map();   // 発注先名 → {est, actual}
   const pick=n=>{ if(!byName.has(n)) byName.set(n,{name:n, est:0, actual:0}); return byName.get(n); };
 
-  // 見積の側：工種ごとの原価合計を、割り当てた先へ足す
+  // 見積の側：明細1行ごとの原価を、その行の発注先へ足す。
+  // 行に入っていなければ工種の設定を使う（古い見積との互換）
   let unassigned=0;
   for(const sec of (est?.sections||[])){
-    const cost=(sec.items||[]).reduce((t,i)=>t+(i.qty*i.cost||0),0);
-    if(!cost) continue;
-    if(!sec.supplier){ unassigned+=cost; continue; }
-    pick(sec.supplier).est+=cost;
+    for(const i of (sec.items||[])){
+      const cost=(i.qty*i.cost)||0;
+      if(!cost) continue;
+      const sup=i.supplier || sec.supplier || '';
+      if(!sup){ unassigned+=cost; continue; }
+      pick(sup).est+=cost;
+    }
   }
 
   // 実績の側：その現場の原価を発注先ごとに足す
@@ -178,16 +182,16 @@ function renderEstVsOrder(){
     <div class="section-lbl">見積と実績（発注先ごと）</div>
     <div class="card" style="padding:0;overflow-x:auto">
       ${assigned ? `<table class="cost-type-table evo-table">
-        <thead><tr><th>頼む先</th><th class="r">見積の原価</th><th class="r">実績</th><th class="r">差額</th></tr></thead>
+        <thead><tr><th>発注先</th><th class="r">見積の原価</th><th class="r">実績</th><th class="r">差額</th></tr></thead>
         <tbody>${rows}
-          ${d.unassigned?`<tr class="evo-un"><td>（工種に頼む先が未割り当て）</td><td class="r">¥${fmt(d.unassigned)}</td><td class="r">—</td><td class="r">—</td></tr>`:''}
+          ${d.unassigned?`<tr class="evo-un"><td>（明細に発注先が未設定）</td><td class="r">¥${fmt(d.unassigned)}</td><td class="r">—</td><td class="r">—</td></tr>`:''}
           <tr class="total"><td>合計</td><td class="r">¥${fmt(tEst)}</td><td class="r">¥${fmt(tAct)}</td>
             <td class="r">${tAct-tEst===0?'一致':(tAct-tEst>0?'＋':'−')+'¥'+fmt(Math.abs(tAct-tEst))}</td></tr>
         </tbody>
       </table>`
       : `<div style="padding:12px;font-size:12px;color:var(--text-sub);line-height:1.8">
-          見積の工種に「頼む先」がまだ割り当てられていません。<br>
-          見積の明細入力で、工種ごとに頼む先（発注先／自社）を選ぶと、ここで見積と実績を並べて比べられます。
+見積の明細に「発注先」がまだ設定されていません。<br>
+          見積の明細入力で、行ごと（または工種ごとに一括）で発注先を選ぶと、ここで見積と実績を並べて比べられます。
         </div>`}
     </div>
     ${assigned?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.7">
