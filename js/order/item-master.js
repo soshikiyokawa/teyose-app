@@ -93,11 +93,22 @@ function setMasterSupplier(name){
   renderMaster();
 }
 
+// カテゴリは自由に書ける。よく使うものと、すでに登録してあるものを候補に出す
+const MASTER_CAT_PRESETS=['木材','面材','合板','金物','断熱','下地','設備','外構','その他'];
+function renderMasterCatList(){
+  const el=document.getElementById('m-cat-list');
+  if(!el) return;
+  const used=[...new Set((master||[]).map(m=>(m.cat||'').trim()).filter(Boolean))];
+  const list=[...new Set([...used, ...MASTER_CAT_PRESETS])].sort((a,b)=>a.localeCompare(b,'ja'));
+  el.innerHTML=list.map(c=>`<option value="${esc(c)}">`).join('');
+}
+
 function openMasterEdit(id){
   editingMasterId = (id===-1||id==='-1') ? -1 : Number(id);
   // 発注先セレクトを最新状態に更新
   document.getElementById('m-supplier-sel').innerHTML=buildSupplierOptions();
   document.getElementById('master-modal-title').textContent=editingMasterId===-1?'品目を追加':'品目を編集';
+  renderMasterCatList();
   if(editingMasterId===-1){
     ['m-name','m-unit','m-maker-code'].forEach(i=>document.getElementById(i).value='');
     ['m-price','m-cost'].forEach(i=>document.getElementById(i).value='');
@@ -245,7 +256,8 @@ async function askSupplierForPrice(item){
 }
 async function saveMasterItem(){
   const item={
-    cat: document.getElementById('m-cat').value,
+    // 空のままだと一覧の見出しが作れないので「その他」に寄せる
+    cat: document.getElementById('m-cat').value.trim() || 'その他',
     name: document.getElementById('m-name').value.trim(),
     unit: document.getElementById('m-unit').value.trim()||'式',
     cost: parseInt(document.getElementById('m-cost').value)||0,
