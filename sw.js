@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v339';
+const CACHE_NAME = 'teyose-v340';
 const ASSETS = [
   './',
   './index.html',
@@ -83,9 +83,22 @@ self.addEventListener('activate', e=>{
 });
 
 self.addEventListener('fetch', e=>{
-  e.respondWith(
-    caches.match(e.request).then(cached=>cached || fetch(e.request))
-  );
+  const req = e.request;
+
+  // GET以外（ファイルの送信など、本文のある通信）には一切手を出さない。
+  //
+  // これまでは全ての通信を受けて caches.match（非同期）を挟んでから fetch し直していた。
+  // 本文つきの通信でこれをやると、待っている間に本文が読めなくなり、
+  // 中身が空のまま送られてしまう。請求書の送信が
+  // 「請求書の保存に失敗しました：No content provided」で失敗していたのはこれが原因。
+  if(req.method !== 'GET') return;
+
+  // アプリ以外への通信（Supabaseなど）もそのまま通す。保存してある物とは関係がないため
+  let sameOrigin = false;
+  try{ sameOrigin = new URL(req.url).origin === self.location.origin; }catch(_){}
+  if(!sameOrigin) return;
+
+  e.respondWith(caches.match(req).then(cached => cached || fetch(req)));
 });
 
 // ── 通知の設定（バナー・サウンド・バッジ）。アプリ側から受け取って保持する ──

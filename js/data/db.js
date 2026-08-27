@@ -455,9 +455,26 @@ async function dbAddInvoice({supplierId, supplierName, month, file, amount, note
   const title=`${supplierName}_${y}年${m}月`;
   // 保管場所は「発注先ID/請求月/日時.拡張子」。日本語はキーに使えないため
   const path=`${supplierId}/${month}/${Date.now()}${ext}`;
-  const { error: upErr } = await sb.storage.from('invoices')
+  // 中身が空のファイルは送っても保存できない（保管場所が「No content provided」で断る）
+  if(!file.size){
+    showToast('このファイルは中身が空です。別のファイルを選んでください');
+    throw new Error('empty file');
+  }
+  const put = () => sb.storage.from('invoices')
     .upload(path, file, { contentType:file.type || 'application/octet-stream' });
-  if(upErr){ showToast('請求書の保存に失敗しました：'+upErr.message); throw upErr; }
+  let { error: upErr } = await put();
+  if(upErr){
+    // ログインの期限切れなら入れ直して1回だけやり直す（チャットの添付と同じ）
+    try{ await sb.auth.refreshSession(); }catch(_){}
+    ({ error: upErr } = await put());
+  }
+  if(upErr){
+    // 原因を切り分けられるよう、選んだファイルの様子も一緒に出す
+    const kind = `${Math.round(file.size/1024)}KB／${file.type||'種類不明'}`;
+    showToast(`請求書の保存に失敗しました：${upErr.message}（${kind}）`);
+    console.error('請求書の保存に失敗', {path, size:file.size, type:file.type, name:file.name, error:upErr});
+    throw upErr;
+  }
 
   const { data, error } = await sb.from('invoices').insert({
     supplier_id:supplierId, supplier_name:supplierName, month, title,
@@ -466,7 +483,9 @@ async function dbAddInvoice({supplierId, supplierName, month, file, amount, note
   }).select().single();
   if(error){
     await sb.storage.from('invoices').remove([path]);   // 一覧に載らないファイルを残さない
-    showToast(/invoices/.test(error.message||'')
+    // 表が無いときだけ準備を促す。それ以外は本当のエラーをそのまま出す
+    // （以前は「invoices」の字が入っていれば何でも準備不足と出していて、原因が隠れていた）
+    showToast(error.code==='42P01'
       ? 'データベースの準備が必要です。supabase/migration-genba38.sql を実行してください'
       : '請求書の登録に失敗しました：'+error.message);
     throw error;
