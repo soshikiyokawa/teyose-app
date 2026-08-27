@@ -155,3 +155,12 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .ope-ship-yen{font-size:13px;color:var(--text-sub)}
 .ope-ship-in input{width:100px;text-align:right;font-size:13px}
 .ope-ship-note{font-size:10px;color:var(--text-muted);margin-top:5px;line-height:1.6}
+/* 直した単価を品目マスタにも反映するか */
+.ope-mst{margin-top:8px;border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--surface2)}
+.ope-mst-q{font-size:12.5px;font-weight:700;margin-bottom:6px}
+.ope-mst-row{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12px}
+.ope-mst-row.on{background:var(--accent-bg)}
+.ope-mst-row input{width:auto;margin:0;flex:none}
+.ope-mst-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ope-mst-price{color:var(--text-sub);white-space:nowrap}
+.ope-mst-note{font-size:10px;color:var(--text-muted);margin-top:5px;line-height:1.6}

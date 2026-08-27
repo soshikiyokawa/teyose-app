@@ -12,6 +12,7 @@
 let opeOrderNo = '';    // いま直している発注番号
 let opeItems = [];      // {index, name, qty, unit, before, after}（送料は含めない）
 let opeShip = null;     // 送料 {before, after}。発注のあとで足せる唯一の品目
+let opeMasterOff = null;  // 「品目マスタにも反映」をわざと外した品目（index の集合）
 
 const OPE_SHIPPING_NAME = '送料';
 function isShippingItem(it){ return it?.isShipping === true || String(it?.name || '') === OPE_SHIPPING_NAME; }
@@ -51,6 +52,7 @@ function openOrderPriceEdit(orderNo){
   const ship = (o.items || []).find(isShippingItem);
   const shipNow = ship ? itemNowPrice(ship) : 0;
   opeShip = { before: shipNow, after: shipNow };
+  opeMasterOff = new Set();
   document.getElementById('ope-title').textContent = `単価・送料を直す（${orderNo}）`;
   document.getElementById('ope-meta').textContent = `${o.date}　${o.project}　${o.suppliers}`;
   document.getElementById('ope-note').value = '';
@@ -68,6 +70,7 @@ function setOpePrice(i, v){
   if(row) row.classList.toggle('changed', n !== opeItems[i].before);
   const amt = document.getElementById('ope-amt-' + i);
   if(amt) amt.innerHTML = opeAmtHtml(opeItems[i]);
+  renderOpeMaster();
   renderOpeTotal();
 }
 
@@ -103,6 +106,65 @@ function renderOpeShipping(){
     <div class="ope-ship-note">${had
       ? '0にすると、送料の行を消します。'
       : '送料がかかる場合はここに金額を入れてください。発注書にも原価にも「送料」として1行足します。'}</div>`;
+}
+
+// ── 直した単価を、品目マスタにも反映するか ──
+//
+// 発注書の単価を直したということは、たいてい次からもその金額になる。
+// ただし今回だけの特価ということもあるので、必ず選んでもらう。
+// 反映するときは、発注先が品目マスタから変えるのと同じ道を通る
+// （単価の変更履歴に残り、社内にもお知らせが出る）。
+
+// その品目に対応する品目マスタの行。発注先と品目名で突き合わせる
+function opeMasterOf(it){
+  const o = orderByNo(opeOrderNo);
+  if(!o || typeof master === 'undefined') return null;
+  return (master || []).find(m => m.name === it.name && m.supplier === o.suppliers) || null;
+}
+// いまのマスタ単価（先の日付の変更予定がある場合も考慮する）
+function opeMasterCost(m){
+  return (typeof itemCurrentCost === 'function') ? itemCurrentCost(m) : (Number(m.cost) || 0);
+}
+// 反映するか聞く対象。単価を直していて、マスタの単価と食い違っているものだけ
+function opeMasterCandidates(){
+  return opeItems.map((it, i) => {
+    if(it.after === it.before) return null;
+    const m = opeMasterOf(it);
+    if(!m) return null;
+    const now = opeMasterCost(m);
+    if(now === it.after) return null;
+    return { i, it, m, now };
+  }).filter(Boolean);
+}
+function opeMasterPicked(){ return opeMasterCandidates().filter(c => !opeMasterOff.has(c.i)); }
+
+function toggleOpeMaster(i){
+  if(opeMasterOff.has(i)) opeMasterOff.delete(i); else opeMasterOff.add(i);
+  renderOpeMaster();
+  renderOpeTotal();
+}
+
+function renderOpeMaster(){
+  const wrap = document.getElementById('ope-master');
+  if(!wrap) return;
+  const cands = opeMasterCandidates();
+  if(!cands.length){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <div class="ope-mst">
+      <div class="ope-mst-q">この単価を、品目マスタにも反映しますか？</div>
+      ${cands.map(c => {
+        const on = !opeMasterOff.has(c.i);
+        return `<label class="ope-mst-row${on ? ' on' : ''}">
+          <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleOpeMaster(${c.i})">
+          <span class="ope-mst-name">${esc(c.it.name)}</span>
+          <span class="ope-mst-price">¥${fmt(c.now)} → <b>¥${fmt(c.it.after)}</b></span>
+        </label>`;
+      }).join('')}
+      <div class="ope-mst-note">
+        反映すると、これからの発注はこの単価で作られます（本日から）。
+        今回だけの金額なら、チェックを外してください。
+      </div>
+    </div>`;
 }
 
 function renderOpeTotal(){
@@ -149,6 +211,7 @@ function renderOrderPriceEdit(){
       <div class="ope-amt" id="ope-amt-${i}">${opeAmtHtml(it)}</div>
     </div>`).join('');
   renderOpeShipping();
+  renderOpeMaster();
   renderOpeTotal();
 }
 
@@ -166,7 +229,13 @@ async function saveOrderPriceEdit(){
       ? `${OPE_SHIPPING_NAME}　¥${fmt(opeShip.before)} → 行を消す`
       : `${OPE_SHIPPING_NAME}　${opeShip.before === 0 ? '（新しく足す）' : `¥${fmt(opeShip.before)} → `}¥${fmt(opeShip.after)}`);
   }
-  if(!confirm(`次のとおり直します。\n\n${lines.join('\n')}\n\nきよかわの社員に通知され、原価管理の金額も変わります。よろしいですか？`)) return;
+  // 品目マスタにも反映するぶん（チェックが入っているもの）
+  const toMaster = opeMasterPicked();
+  const masterNote = toMaster.length
+    ? `\n\n品目マスタも次のとおり直します（本日から）。\n` +
+      toMaster.map(c => `${c.it.name}　¥${fmt(c.now)} → ¥${fmt(c.it.after)}`).join('\n')
+    : '';
+  if(!confirm(`次のとおり直します。\n\n${lines.join('\n')}${masterNote}\n\nきよかわの社員に通知され、原価管理の金額も変わります。よろしいですか？`)) return;
 
   const btn = document.getElementById('ope-save-btn');
   if(btn){ btn.disabled = true; btn.textContent = '保存中…'; }
@@ -179,10 +248,14 @@ async function saveOrderPriceEdit(){
     // あとで通知に使うので、画面を閉じる前に控えておく
     const notifyLines = (data?.edit?.changes || []).map(c => ({ name:c.name, before:c.before, after:c.after }));
     const done = [changed.length ? `${changed.length}品目の単価` : '', shipChanged ? '送料' : ''].filter(Boolean).join('と');
+
+    // 品目マスタへの反映（発注の変更はもう済んでいるので、ここで失敗しても巻き戻さない）
+    const mstDone = await applyOpeToMaster(toMaster);
+
     closeOrderPriceEdit();
     showToast(data?.pdfError
       ? `${done}を直しました（発注書PDFの作り直しに失敗）`
-      : `${done}を直しました。発注書PDFも直りました`);
+      : `${done}を直しました。発注書PDFも直りました${mstDone ? `／品目マスタも${mstDone}品目直しました` : ''}`);
     // 通知とチャットへの記録（失敗しても変更自体は成立している）
     notifyOrderPriceEdit(o, notifyLines.length ? notifyLines : changed, data, note).catch(()=>{});
     await refetchOrdersAndCost();
@@ -191,6 +264,32 @@ async function saveOrderPriceEdit(){
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = 'この内容で直す'; }
   }
+}
+
+// 選ばれた品目を、品目マスタにも反映する。
+// 発注先が品目マスタから単価を変えるのと同じ道を通す（変更履歴が残り、社内にもお知らせが出る）。
+// 何品目直せたかを返す。
+async function applyOpeToMaster(list){
+  if(!list || !list.length) return 0;
+  const today = (typeof ipToday === 'function') ? ipToday() : new Date().toISOString().slice(0,10);
+  let done = 0;
+  for(const c of list){
+    try{
+      await dbSaveItemPrice(c.m, c.it.after, today);
+      // 手元の一覧にも反映しておく（画面を開き直さなくても新しい単価になる）
+      const prevCost = c.m.cost;
+      c.m.cost = c.it.after; c.m.price = c.it.after;
+      // 発注先が変えたときだけ、きよかわにお知らせする（品目マスタから変えたときと同じ）
+      if(currentUserRole === 'supplier' && typeof notifyPriceChange === 'function'){
+        await notifyPriceChange(c.m, c.it.after, today, prevCost).catch(()=>{});
+      }
+      done++;
+    }catch(e){
+      showToast(`「${c.it.name}」の品目マスタへの反映に失敗しました`);
+    }
+  }
+  if(done && typeof renderMaster === 'function') try{ renderMaster(); }catch(_){}
+  return done;
 }
 
 async function opeErrorText(error, data){
