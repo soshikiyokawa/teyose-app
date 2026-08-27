@@ -53,7 +53,8 @@ function openSupplierEdit(id){
   editingSupplierId=id;
   document.getElementById('supplier-modal-title').textContent=id===-1?'発注先を追加':'発注先を編集';
   if(id===-1){
-    ['s-name','s-contact','s-tel','s-email','s-cats','s-note','s-chatwork'].forEach(i=>document.getElementById(i).value='');
+    ['s-name','s-contact','s-tel','s-email','s-cats','s-note','s-chatwork','s-regno'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('s-closing').value='0';
     setSupplierChannels(['chat']);
   } else {
     const s=suppliers.find(x=>x.id===id);if(!s)return;
@@ -61,6 +62,8 @@ function openSupplierEdit(id){
     document.getElementById('s-tel').value=s.tel;document.getElementById('s-email').value=s.email;
     document.getElementById('s-cats').value=s.cats;document.getElementById('s-note').value=s.note;
     document.getElementById('s-chatwork').value=s.chatworkRoomId||'';
+    document.getElementById('s-closing').value=String(s.closingDay||0);
+    document.getElementById('s-regno').value=s.invoiceRegNo||'';
     setSupplierChannels(orderChannelsOf(s));
   }
   document.getElementById('supplier-delete-btn').style.display=id===-1?'none':'inline-flex';
@@ -82,8 +85,13 @@ async function deleteSupplier(){
   showToast('発注先を削除しました');
 }
 async function saveSupplier(){
-  const item={name:document.getElementById('s-name').value.trim(),contact:document.getElementById('s-contact').value.trim(),tel:document.getElementById('s-tel').value.trim(),email:document.getElementById('s-email').value.trim(),cats:document.getElementById('s-cats').value.trim(),note:document.getElementById('s-note').value.trim(),chatworkRoomId:document.getElementById('s-chatwork').value.trim(),orderChannels:getSupplierChannels()};
+  const item={name:document.getElementById('s-name').value.trim(),contact:document.getElementById('s-contact').value.trim(),tel:document.getElementById('s-tel').value.trim(),email:document.getElementById('s-email').value.trim(),cats:document.getElementById('s-cats').value.trim(),note:document.getElementById('s-note').value.trim(),chatworkRoomId:document.getElementById('s-chatwork').value.trim(),orderChannels:getSupplierChannels(),
+    closingDay:Number(document.getElementById('s-closing').value)||0,
+    invoiceRegNo:document.getElementById('s-regno').value.trim().toUpperCase()};
   if(!item.name){alert('発注先名を入力してください');return;}
+  if(item.invoiceRegNo && !/^Td{13}$/.test(item.invoiceRegNo)){
+    alert('登録番号は T のあとに数字13桁で入れてください（例：T1234567890123）');return;
+  }
   if(!item.orderChannels.length){alert('発注書の送付先を1つ以上選んでください');return;}
   if(item.orderChannels.includes('chatwork') && !item.chatworkRoomId){alert('ChatWorkに送るには、ルームIDを入れてください');return;}
   if(item.orderChannels.includes('email') && !item.email){alert('メールで送るには、メールアドレスを入れてください');return;}

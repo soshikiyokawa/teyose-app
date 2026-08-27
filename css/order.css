@@ -164,3 +164,16 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .ope-mst-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ope-mst-price{color:var(--text-sub);white-space:nowrap}
 .ope-mst-note{font-size:10px;color:var(--text-muted);margin-top:5px;line-height:1.6}
+
+/* ── 請求書（発注額との突き合わせ・支払・インボイス） ── */
+.inv-tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;margin-left:5px;vertical-align:middle}
+.inv-tag.inv-ok{background:var(--ok-bg);color:var(--ok-t)}
+.inv-tag.inv-ng{background:var(--danger-bg,#fbe9e7);color:var(--danger)}
+.inv-tag.inv-warn{background:var(--warn-bg);color:var(--warn-t)}
+.inv-cmp{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;padding:5px 8px;
+  background:var(--surface2);border-radius:6px;font-size:11px}
+.inv-cmp i{font-style:normal;color:var(--text-muted)}
+.inv-cmp .inv-ok{color:var(--ok-t);font-weight:700}
+.inv-cmp .inv-ng{color:var(--danger);font-weight:700}
+.inv-cmp .inv-warn{color:var(--warn-t);font-weight:700}
+.inv-paid{font-size:11px;color:var(--text-sub);margin-top:4px}

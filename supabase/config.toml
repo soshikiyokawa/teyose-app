@@ -28,3 +28,10 @@ verify_jwt = true
 
 [functions.update-order-price]
 verify_jwt = true
+
+[functions.read-invoice]
+verify_jwt = true
+
+# pg_cron から呼ぶので verify_jwt は false（x-remind-secret で守る）
+[functions.invoice-remind]
+verify_jwt = false

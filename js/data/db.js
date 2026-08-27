@@ -22,7 +22,8 @@ function supplierNameById(id){
 async function fetchAllData(){
   const { data: supplierRows, error: supErr } = await sb.from('suppliers').select('*').order('sort_order').order('id');
   if(supErr) throw supErr;
-  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',chatworkRoomId:r.chatwork_room_id||'',orderChannels:(Array.isArray(r.order_channels)&&r.order_channels.length)?r.order_channels:['chat'],sortOrder:r.sort_order}));
+  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',chatworkRoomId:r.chatwork_room_id||'',orderChannels:(Array.isArray(r.order_channels)&&r.order_channels.length)?r.order_channels:['chat'],sortOrder:r.sort_order,
+    closingDay:Number(r.closing_day)||0, invoiceRegNo:r.invoice_reg_no||''}));
   supplierIdSeq = Math.max(0,...suppliers.map(s=>s.id))+1;
 
   const { data: itemRows, error: itemErr } = await sb.from('master_items').select('*').order('sort_order').order('id');
@@ -222,12 +223,12 @@ async function dbSaveEstimateDefault(type,sectionsData){
 
 // ── 発注先 ──
 async function dbAddSupplier(item){
-  const { data, error } = await sb.from('suppliers').insert({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||'',order_channels:item.orderChannels||['chat']}).select().single();
+  const { data, error } = await sb.from('suppliers').insert({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||'',order_channels:item.orderChannels||['chat'],closing_day:item.closingDay||0,invoice_reg_no:item.invoiceRegNo||''}).select().single();
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   suppliers.push({id:data.id,...item});
 }
 async function dbUpdateSupplier(id,item){
-  const { error } = await sb.from('suppliers').update({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||'',order_channels:item.orderChannels||['chat']}).eq('id',id);
+  const { error } = await sb.from('suppliers').update({name:item.name,contact:item.contact,tel:item.tel,email:item.email,cats:item.cats,note:item.note,chatwork_room_id:item.chatworkRoomId||'',order_channels:item.orderChannels||['chat'],closing_day:item.closingDay||0,invoice_reg_no:item.invoiceRegNo||''}).eq('id',id);
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
 }
 async function dbDeleteSupplier(id){
@@ -441,11 +442,13 @@ async function fetchInvoices(){
   invoicesReady = !error;
   invoices = (data||[]).map(r=>({id:r.id, supplierId:r.supplier_id, supplierName:r.supplier_name||'', month:r.month||'',
     title:r.title||'', filePath:r.file_path, fileName:r.file_name||'', fileMime:r.file_mime||'',
-    amount:(r.amount==null?null:Number(r.amount)), note:r.note||'', uploadedBy:r.uploaded_by||'', createdAt:r.created_at}));
+    amount:(r.amount==null?null:Number(r.amount)), note:r.note||'', uploadedBy:r.uploaded_by||'', createdAt:r.created_at,
+    regNo:r.reg_no||'', dueOn:r.due_on||'', paidOn:r.paid_on||'',
+    paidAmount:(r.paid_amount==null?null:Number(r.paid_amount)), readByAi:!!r.read_by_ai}));
 }
 
 // 請求書を送る（ファイルを保管して、一覧に1件足す）
-async function dbAddInvoice({supplierId, supplierName, month, file, amount, note}){
+async function dbAddInvoice({supplierId, supplierName, month, file, amount, note, regNo, readByAi, dueOn}){
   // 請求月は保管場所の一部にもなるので、形が違うものは受け付けない
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month||''))){
     showToast('請求月が正しくありません'); throw new Error('bad month');
@@ -479,7 +482,8 @@ async function dbAddInvoice({supplierId, supplierName, month, file, amount, note
   const { data, error } = await sb.from('invoices').insert({
     supplier_id:supplierId, supplier_name:supplierName, month, title,
     file_path:path, file_name:file.name||'', file_mime:file.type||'',
-    amount:amount||null, note:note||'', uploaded_by:currentUserDisplayName||''
+    amount:amount||null, note:note||'', uploaded_by:currentUserDisplayName||'',
+    reg_no:regNo||'', read_by_ai:!!readByAi, due_on:dueOn||null
   }).select().single();
   if(error){
     await sb.storage.from('invoices').remove([path]);   // 一覧に載らないファイルを残さない
@@ -489,6 +493,27 @@ async function dbAddInvoice({supplierId, supplierName, month, file, amount, note
       ? 'データベースの準備が必要です。supabase/migration-genba38.sql を実行してください'
       : '請求書の登録に失敗しました：'+error.message);
     throw error;
+  }
+  return data;
+}
+
+// 支払の記録を書き換える（管理者のみ。DB側のトリガーでも発注先を止めている）
+async function dbSetInvoicePayment(id, {dueOn, paidOn, paidAmount}){
+  const { error } = await sb.from('invoices')
+    .update({ due_on:dueOn||null, paid_on:paidOn||null, paid_amount:(paidAmount??null) })
+    .eq('id', id);
+  if(error){ showToast('支払の記録に失敗しました：'+error.message); throw error; }
+}
+
+// 請求書のPDF・写真をAIに読ませて、請求額などを取り出す
+async function dbReadInvoice(filePath){
+  const { data, error } = await sb.functions.invoke('read-invoice', { body:{ filePath } });
+  if(error || data?.error){
+    let msg = data?.error;
+    if(!msg && error?.context && typeof error.context.json==='function'){
+      try{ const j = await error.context.json(); msg = j?.error; }catch(_){}
+    }
+    throw new Error(msg || error?.message || '読み取りに失敗しました');
   }
   return data;
 }
