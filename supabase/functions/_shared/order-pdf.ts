@@ -28,6 +28,62 @@ const origPrice = (it: any) =>
     ? nowPrice(it)
     : Math.round(Number(it.origPrice) || 0);
 
+// 数字が間延びするのを防ぐ。
+//
+// pdf-lib は「文字コードから引ける字形」の幅しかPDFに書き込まない。
+// ところがフォントは、英字と数字が並ぶ型番（SUS410 など）のとき、数字を別の字形に
+// 置き換える。その字形の幅がPDFに無いため、閲覧ソフトが既定の全角幅で描いてしまい、
+// 「SUS4 1 0」のように数字だけ間延びしていた（電話番号も同じ）。
+// フォントに入っている全ての字形の幅を書き込むことで、どの字形でも正しい幅になる。
+function embedAllGlyphWidths(pdfFont: any) {
+  try {
+    const emb = pdfFont?.embedder;
+    const fk = emb?.font;
+    if (!emb || !fk?.numGlyphs) return;
+    const scale = 1000 / fk.unitsPerEm;
+    const widths: number[] = [];
+    for (let id = 0; id < fk.numGlyphs; id++) {
+      widths.push(Math.round((fk.getGlyph(id)?.advanceWidth || 0) * scale));
+    }
+    emb.computeWidths = () => [0, widths];   // 0番の字形から順に全ての幅
+  } catch (e) {
+    console.warn("字形の幅の書き込みに失敗しました（数字が間延びする可能性）", e);
+  }
+}
+
+// 決まった幅に収まるように文字を折り返す。
+// 日本語には単語の区切りがないので、1文字ずつ幅を測って入るところまで詰める。
+// 英数字の続き（型番など）は、途中で切れると読みにくいので手前で折り返す。
+function wrapByWidth(text: string, font: any, size: number, maxWidth: number): string[] {
+  const lines: string[] = [];
+  let cur = "";
+  const width = (s: string) => {
+    try { return font.widthOfTextAtSize(s, size); } catch { return s.length * size; }
+  };
+  const isWordChar = (c: string) => /[0-9A-Za-z._\-/#()]/.test(c);
+  for (const ch of Array.from(text)) {
+    if (ch === "\n") { lines.push(cur); cur = ""; continue; }
+    if (cur && width(cur + ch) > maxWidth) {
+      // 英数字の途中なら、その語のはじめまで戻して次の行へ送る
+      let head = cur, tail = "";
+      if (isWordChar(ch)) {
+        while (head && isWordChar(head[head.length - 1])) {
+          tail = head[head.length - 1] + tail;
+          head = head.slice(0, -1);
+        }
+        // 行のほとんどが1つの語なら、戻さずそのまま切る
+        if (!head || width(tail) > maxWidth * 0.6) { head = cur; tail = ""; }
+      }
+      lines.push(head);
+      cur = tail + ch;
+    } else {
+      cur += ch;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [""];
+}
+
 // PDFを組み立ててStorageに保存し、表示用のURLを返す。
 // 同じ発注番号なら同じ場所を上書きするため、古いURLを開いても新しい中身が出る。
 // URLの末尾に時刻を付けているのは、端末やCDNに残った古いPDFを掴まないようにするため。
@@ -55,6 +111,8 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   // サブセット化せずフォント全体をそのまま埋め込む
   const font = await pdfDoc.embedFont(regularBytes, { subset: false });
   const fontBold = await pdfDoc.embedFont(boldBytes, { subset: false });
+  embedAllGlyphWidths(font);
+  embedAllGlyphWidths(fontBold);
 
   const PAGE_W = 595.28, PAGE_H = 841.89; // A4 (pt)
   const marginX = 42;
@@ -116,35 +174,53 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
 
   y -= boxH + 16;
   const colX = [marginX, marginX + 260, marginX + 320, marginX + 380, marginX + 440];
-  page.drawRectangle({ x: marginX, y: y - 20, width: tableW, height: 20, color: darkBrown });
-  const headerY = y - 14;
-  page.drawText("品目名", { x: colX[0] + 8, y: headerY, size: 9, font, color: gold });
-  page.drawText("単位", { x: colX[1] + 8, y: headerY, size: 9, font, color: gold });
-  page.drawText("数量", { x: colX[2] + 8, y: headerY, size: 9, font, color: gold });
-  page.drawText("単価", { x: colX[3] + 8, y: headerY, size: 9, font, color: gold });
-  page.drawText("金額", { x: colX[4] + 8, y: headerY, size: 9, font, color: gold });
-  y -= 20;
+  const PAD = 8;
+  // 品目名を書ける幅。ここを超えたら折り返して、単位の欄に食い込まないようにする
+  const nameW = colX[1] - colX[0] - PAD * 2;
+  const ROW_SIZE = 9;
+  const LINE_H = 12;
+
+  const drawTableHead = () => {
+    page.drawRectangle({ x: marginX, y: y - 20, width: tableW, height: 20, color: darkBrown });
+    const hy = y - 14;
+    page.drawText("品目名", { x: colX[0] + PAD, y: hy, size: 9, font, color: gold });
+    page.drawText("単位", { x: colX[1] + PAD, y: hy, size: 9, font, color: gold });
+    page.drawText("数量", { x: colX[2] + PAD, y: hy, size: 9, font, color: gold });
+    page.drawText("単価", { x: colX[3] + PAD, y: hy, size: 9, font, color: gold });
+    page.drawText("金額", { x: colX[4] + PAD, y: hy, size: 9, font, color: gold });
+    y -= 20;
+  };
+  drawTableHead();
 
   for (const it of o.items || []) {
     const price = nowPrice(it);
     const orig = origPrice(it);
     const qty = Number(it.qty) || 0;
     const changed = orig !== price;
-    newPageIfNeeded(changed ? 34 : 24);
+    // 長い品目名は、欄の幅で折り返して行を増やす
+    const nameLines = wrapByWidth(String(it.name || ""), font, ROW_SIZE, nameW);
+    const rowH = Math.max(20, 6 + nameLines.length * LINE_H + 2);
+    if (y - (rowH + (changed ? LINE_H : 0)) < 50) {
+      page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      y = 800;
+      drawTableHead();   // 次のページにも見出しを出す
+    }
     page.drawLine({ start: { x: marginX, y }, end: { x: marginX + tableW, y }, thickness: 0.5, color: lineColor });
     const rowY = y - 14;
-    page.drawText(String(it.name || ""), { x: colX[0] + 8, y: rowY, size: 9, font, color: black });
-    page.drawText(String(it.unit || ""), { x: colX[1] + 8, y: rowY, size: 9, font, color: black });
-    page.drawText(String(qty), { x: colX[2] + 8, y: rowY, size: 9, font, color: black });
-    page.drawText("¥" + fmt(price), { x: colX[3] + 8, y: rowY, size: 9, font, color: black });
-    page.drawText("¥" + fmt(price * qty), { x: colX[4] + 8, y: rowY, size: 9, font, color: black });
-    y -= 20;
+    nameLines.forEach((line, i) => {
+      page.drawText(line, { x: colX[0] + PAD, y: rowY - i * LINE_H, size: ROW_SIZE, font, color: black });
+    });
+    page.drawText(String(it.unit || ""), { x: colX[1] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    page.drawText(String(qty), { x: colX[2] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    page.drawText("¥" + fmt(price), { x: colX[3] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    page.drawText("¥" + fmt(price * qty), { x: colX[4] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    y -= rowH;
     // 直した品目は、当初いくらだったかを小さく添える
     if (changed) {
       page.drawText(`（当初 ¥${fmt(orig)} → ¥${fmt(price)}）`, {
-        x: colX[0] + 8, y: y - 2, size: 7.5, font, color: gray,
+        x: colX[0] + PAD, y: y - 2, size: 7.5, font, color: gray,
       });
-      y -= 12;
+      y -= LINE_H;
     }
   }
   page.drawLine({ start: { x: marginX, y }, end: { x: marginX + tableW, y }, thickness: 0.5, color: lineColor });

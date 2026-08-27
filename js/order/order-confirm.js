@@ -72,7 +72,7 @@ function openOrderPreview(){
       <div style="flex:1.2;padding:6px 8px;text-align:right">金額</div>
     </div>
     ${cart.map(c=>`<div style="display:flex;font-size:12px;border-bottom:0.5px solid #e8e0d0">
-      <div style="flex:3;padding:6px 8px">${c.name}</div>
+      <div style="flex:3;min-width:0;padding:6px 8px;word-break:break-word;overflow-wrap:anywhere">${c.name}</div>
       <div style="flex:1;padding:6px 8px;text-align:center">${c.unit}</div>
       <div style="flex:1;padding:6px 8px;text-align:right">${c.qty}</div>
       <div style="flex:1.2;padding:6px 8px;text-align:right">¥${fmt(c.cost)}</div>
@@ -151,6 +151,6 @@ function buildOrderPdfHtml(o){
     const orig=(typeof itemOrigPrice==='function')?itemOrigPrice(c):now;
     const q=Number(c.qty)||0;
     const was=orig!==now?`<div style="font-size:10px;color:#999">当初 ¥${fmt(orig)}</div>`:'';
-    return `<tr><td style="padding:6px 8px;border:0.5px solid #e8e0d0">${c.name}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0">${c.unit}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right">${q}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right">¥${fmt(now)}${was}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right;font-weight:600">¥${fmt(now*q)}</td></tr>`;
+    return `<tr><td style="padding:6px 8px;border:0.5px solid #e8e0d0;word-break:break-word;overflow-wrap:anywhere">${c.name}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;white-space:nowrap">${c.unit}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right">${q}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right">¥${fmt(now)}${was}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right;font-weight:600">¥${fmt(now*q)}</td></tr>`;
   }).join('')}</tbody></table><div style="margin-top:12px;text-align:right;font-size:13px;line-height:2.2"><div>小計：¥${fmt(o.subtotal)}</div><div>消費税（10%）：¥${fmt(o.tax)}</div><div style="font-size:17px;font-weight:800;color:#4a3010">合計：¥${fmt(o.total)}</div>${last?`<div style="font-size:11px;color:#888;line-height:1.6">（当初の合計：¥${fmt(edits[0]?.total?.before)}）</div>`:''}</div>${o.paymentMethod?`<div style="margin-top:14px;font-size:11px;color:#888;border-top:1px solid #e0d8c8;padding-top:10px">この発注はレシートから取り込んだ支払済みの記録です（支払方法：${o.paymentMethod}）。</div>`:`<div style="margin-top:14px;font-size:11px;color:#888;border-top:1px solid #e0d8c8;padding-top:10px">納品場所：${o.project} 現場　／　ご納品の際は現場担当者へご連絡ください。</div>`}`;
 }
