@@ -125,6 +125,7 @@ function renderCost(){
     const msg='<div class="empty">左の案件一覧から案件を選択してください</div>';
     ['cost-by-project','cost-by-supplier','cost-list'].forEach(id=>document.getElementById(id).innerHTML=msg);
     renderCostBudget && renderCostBudget();
+    renderEstVsOrder && renderEstVsOrder();
     return;
   }
 
@@ -150,6 +151,7 @@ function renderCost(){
   bd.style.display = parts.length ? '' : 'none';
 
   renderCostBudget && renderCostBudget();
+    renderEstVsOrder && renderEstVsOrder();
   renderCostByType(entries);
   renderCostBySupplier(entries);
 

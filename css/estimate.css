@@ -129,3 +129,7 @@
 @media(max-width:599px){
   .ps-table th,.ps-table td{padding:6px 5px;font-size:11px}
 }
+
+/* 工種に割り当てた「頼む先」（見積と実績の突き合わせに使う） */
+.sec-sup{font-size:10px;font-weight:700;color:var(--accent-t);background:var(--accent-bg);
+  border-radius:99px;padding:1px 7px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis}

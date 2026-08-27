@@ -16,8 +16,18 @@ function syncActiveTextInput(){
   }
 }
 
+// 工種を「どこに頼むか」。見積の原価と、実際にその発注先へ出した発注を突き合わせるのに使う。
+// 自社の大工でやる工種は EST_SELF_LABOR にしておくと、日報からの労務費と比べられる。
+const EST_SELF_LABOR = '__self__';
+function updateSecSupplier(secId, name){
+  const sec=sections.find(s=>s.id===secId); if(!sec) return;
+  sec.supplier=name||'';
+  estDirty=true;
+  renderSections();
+}
+
 function addSection(name=''){
-  sections.push({id:secSeq++,name:name||'',open:true,items:[]});
+  sections.push({id:secSeq++,name:name||'',open:true,supplier:'',items:[]});
   const sec=sections[sections.length-1];
   sec.items.push({id:itemSeq++,name:'',spec:'',unit:'式',qty:1,cost:0,margin:30,price:0});
   estDirty=true;
@@ -247,6 +257,7 @@ function renderSections(){
           <button class="btn xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="stepSecMargin(${sec.id},1)" style="padding:1px 5px;font-size:13px">＋</button>
           <span style="font-size:10px;color:var(--text-muted)">%</span>
         </div>
+        ${sec.supplier ? `<span class="sec-sup" title="この工種を頼む先">${sec.supplier===EST_SELF_LABOR?'自社（労務）':esc(sec.supplier)}</span>` : ''}
         <span id="sec-total-disp-${sec.id}" style="font-size:12px;font-weight:700;color:var(--wood-t);white-space:nowrap">¥${fmt(sTotal)}</span>
         <button class="btn danger xs" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="removeSection(${sec.id})" style="padding:2px 6px;margin-left:4px">削除</button>
       </div>
@@ -268,6 +279,15 @@ function renderSections(){
         <button class="add-row-btn" ontouchstart="syncActiveTextInput()" onmousedown="syncActiveTextInput()" onclick="addItem(${sec.id})">＋ 行を追加</button>
       </div>
       <div id="sec-foot-${sec.id}" class="sec-foot">
+        <span class="muted" style="display:flex;align-items:center;gap:5px">
+          頼む先
+          <select onchange="updateSecSupplier(${sec.id},this.value)" style="width:auto;font-size:11px;padding:2px 5px">
+            <option value="">未割り当て</option>
+            <option value="${EST_SELF_LABOR}"${sec.supplier===EST_SELF_LABOR?' selected':''}>自社（労務）</option>
+            ${(suppliers||[]).filter(x=>x.name!=='在庫分')
+              .map(x=>`<option value="${esc(x.name)}"${sec.supplier===x.name?' selected':''}>${esc(x.name)}</option>`).join('')}
+          </select>
+        </span>
         <span class="muted">原価：¥${fmt(sCost)}</span>
         <span style="color:var(--accent-t)">粗利：¥${fmt(sTotal-sCost)}（${sMargin.toFixed(1)}%）</span>
         <span>小計：¥${fmt(sTotal)}</span>

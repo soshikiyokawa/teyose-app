@@ -177,3 +177,10 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .inv-cmp .inv-ng{color:var(--danger);font-weight:700}
 .inv-cmp .inv-warn{color:var(--warn-t);font-weight:700}
 .inv-paid{font-size:11px;color:var(--text-sub);margin-top:4px}
+
+/* ── 見積と実績（発注先ごと） ── */
+.evo-table td:first-child{white-space:normal}
+.evo-table tr.evo-over td:last-child{color:var(--danger);font-weight:700}
+.evo-table tr.evo-under td:last-child{color:var(--ok-t);font-weight:700}
+.evo-table tr.evo-new td,.evo-table tr.evo-un td{color:var(--text-sub)}
+.evo-tag{font-size:10px;color:var(--warn-t);background:var(--warn-bg);border-radius:99px;padding:1px 6px;margin-left:5px}
