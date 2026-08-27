@@ -10,7 +10,9 @@ function _staffNames(){
 }
 // その発注先のアカウント（担当者）の表示名。自分は除く
 function _supplierNames(supName){
-  const sid = supplierIdByName(supName);
+  // 発注先の人が自社のスレッドを見ている場合は、発注先の一覧が無くても自分の所属で引ける
+  const sid = supplierIdByName(supName)
+    || (currentUserRole==='supplier' ? currentUserSupplierId : null);
   if(!sid) return [];
   return (typeof allProfiles!=='undefined' ? allProfiles : [])
     .filter(p=>p.role==='supplier' && p.supplierId===sid && p.displayName && p.displayName!==currentUserDisplayName)
@@ -21,7 +23,8 @@ function _supplierNames(supName){
 //   社内チャット … 社員全員
 //   案件チャット … 参加メンバー
 //   発注先チャット … その発注先の担当者と、きよかわの社員
-//     （発注先の人から見れば自分の会社の同僚は候補に出ない。自分は常に除く）
+//     きよかわ側からも発注先側からも同じ候補が出る（自分は常に除く）。
+//     発注先の人が見られる名簿は chat_directory に絞ってある（migration-genba54.sql）
 function notifyGroups(){
   const t = activeTalkPanelSupplier;
   if(t===INTERNAL_THREAD) return [{label:'', names:_staffNames()}];

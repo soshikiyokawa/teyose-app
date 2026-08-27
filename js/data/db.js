@@ -55,6 +55,7 @@ async function fetchAllData(){
         members:r.members||[]}));
     // 現場写真・図面・フォルダ（参加している案件の分だけRLSが返す）
     await fetchSupplierGenbaData();
+    await fetchProfiles();   // 名前だけの名簿（チャットの通知先を指名するのに使う）
     // 自社宛の発注（受領ボタンの状態に使う）
     const { data: myOrders } = await sb.from('orders').select('*').order('date',{ascending:false});
     orders = (myOrders||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,
@@ -648,7 +649,15 @@ async function fetchWorkCalendar(){
 
 // 社員一覧（区分の割り当て・チャットの通知先選択に使う）。社員なら誰でも取得
 async function fetchProfiles(){
-  if(currentUserRole==='supplier') return;
+  // 発注先の人は、名前と区分だけの名簿を読む（チャットの通知先を指名するために使う）。
+  // 見えるのは きよかわの社員と、自分と同じ発注先の担当者だけ（migration-genba54.sql）
+  if(currentUserRole==='supplier'){
+    const { data: dir, error } = await sb.from('chat_directory').select('id, display_name, role, supplier_id');
+    if(error){ console.warn('名簿の取得に失敗しました', error); allProfiles = []; return; }
+    allProfiles = (dir||[]).map(p=>({id:p.id, displayName:p.display_name||'', role:p.role,
+      workGroup:'', supplierId:p.supplier_id||null, hireDate:'', leaveAdjust:0, leaveAdjustNote:''}));
+    return;
+  }
   // 有給の列（migration-genba20.sql）が未適用でも動くよう、失敗したら従来の列だけで取得する
   const BASE = 'id, display_name, role, work_group, supplier_id';
   let { data: profs, error } = await sb.from('profiles').select(BASE+', hire_date, leave_adjust, leave_adjust_note').order('display_name');
