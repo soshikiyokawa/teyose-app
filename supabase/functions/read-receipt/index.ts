@@ -6,6 +6,11 @@
 // 読めなかったときは理由（reason）を返し、画面で何が起きたか分かるようにする。
 
 import Anthropic from "npm:@anthropic-ai/sdk";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +68,25 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // ── 呼び出し元が、ログイン済みの社員であることを確認する ──
+    //
+    // Supabase の verify_jwt だけでは足りない。公開されている接続キー（anon key）も
+    // 正しいJWTなので通ってしまい、誰でもAI利用料を使えてしまう。
+    // ここで本当に「人」がログインしているかを見る。
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) return json({ error: "ログインが必要です" }, 401);
+
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { data: profile } = await admin.from("profiles").select("role")
+      .eq("id", userData.user.id).single();
+    if (!profile || (profile.role !== "staff" && profile.role !== "carpenter")) {
+      return json({ error: "この機能を使えるのは社員だけです" }, 403);
+    }
+
     const body = await req.json();
     // image は昔の呼び方。file でも受ける
     const file = body.file || body.image;

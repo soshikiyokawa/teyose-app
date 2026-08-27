@@ -1,0 +1,15 @@
+# Supabase CLI の設定。
+#
+# ここに書いた Edge Function は、デプロイのたびにこの設定が使われる。
+# 書いていない関数は、いまサーバーに入っている設定のまま変わらない。
+#
+# verify_jwt = true  … ログインしている人しか呼べない（アプリの画面から使うもの）
+# verify_jwt = false … 誰でも呼べる。pg_cron や外部のWebhookから叩くものだけ
+#
+# 読み取り系（read-receipt / read-quote / read-license）はAI利用料がかかるので、
+# 公開されている接続キーだけで呼ばれないよう、必ず true にしておくこと。
+
+project_id = "uotzxrwtzlpdnpfbaqpi"
+
+[functions.read-receipt]
+verify_jwt = true
