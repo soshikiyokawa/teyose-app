@@ -184,3 +184,7 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .evo-table tr.evo-under td:last-child{color:var(--ok-t);font-weight:700}
 .evo-table tr.evo-new td,.evo-table tr.evo-un td{color:var(--text-sub)}
 .evo-tag{font-size:10px;color:var(--warn-t);background:var(--warn-bg);border-radius:99px;padding:1px 6px;margin-left:5px}
+.evo-table tr.evo-res td{color:var(--text-sub);background:var(--surface2)}
+.evo-res-note{font-size:11.5px;font-weight:700;color:var(--ok-t);background:var(--ok-bg);
+  padding:7px 10px;border-top:0.5px solid var(--border)}
+.evo-res-note.over{color:var(--danger);background:var(--danger-bg,#fdecea)}

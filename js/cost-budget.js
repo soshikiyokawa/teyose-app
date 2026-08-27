@@ -145,14 +145,33 @@ function estVsOrderRows(projectName){
     pick(EST_SELF_LABOR).actual+=d.labor;
   }
 
+  // 予備費は発注先ではないので、突き合わせの行からは外して別に持つ
+  const reserve = byName.get(EST_RESERVE)?.est || 0;
+  byName.delete(EST_RESERVE);
+
   const rows=[...byName.values()]
     .map(r=>({...r, diff:r.actual-r.est}))
     .sort((a,b)=> Math.abs(b.diff)-Math.abs(a.diff));
-  return {est, rows, unassigned, labor:d.labor, ninku:d.ninku, rate:d.rate};
+
+  // 予備費を除いた見積と実績を比べ、超過が予備費の範囲に収まっているかを見る
+  const estExReserve = rows.reduce((s,r)=>s+r.est,0) + unassigned;
+  const actual = rows.reduce((s,r)=>s+r.actual,0);
+  const over = actual - estExReserve;
+
+  return {est, rows, unassigned, reserve, estExReserve, actual, over,
+    labor:d.labor, ninku:d.ninku, rate:d.rate};
 }
 
 function estVsOrderLabel(name){
-  return name===EST_SELF_LABOR ? '自社（労務）' : name;
+  return name===EST_SELF_LABOR ? '自社（労務）' : name===EST_RESERVE ? '予備費' : name;
+}
+
+// 予備費の使いぐあいを一言で
+function estReserveNote(d){
+  if(!d.reserve) return '';
+  if(d.over<=0) return `予備費 ¥${fmt(d.reserve)} は手つかずです（さらに ¥${fmt(-d.over)} 余っています）`;
+  if(d.over<=d.reserve) return `予備費 ¥${fmt(d.reserve)} のうち ¥${fmt(d.over)} を使い、残り ¥${fmt(d.reserve-d.over)}`;
+  return `予備費 ¥${fmt(d.reserve)} を ¥${fmt(d.over-d.reserve)} 超えています`;
 }
 
 function renderEstVsOrder(){
@@ -165,7 +184,7 @@ function renderEstVsOrder(){
   const d=estVsOrderRows(target);
   if(!d.est){ el.innerHTML=''; return; }   // 見積が無い場合は「予算と実績」側の案内に任せる
 
-  const assigned=d.rows.some(r=>r.est>0);
+  const assigned=d.rows.some(r=>r.est>0) || d.reserve>0;
   const rows=d.rows.map(r=>{
     const cls=r.est===0 ? 'evo-new' : r.diff>0 ? 'evo-over' : r.diff<0 ? 'evo-under' : '';
     return `<tr class="${cls}">
@@ -175,8 +194,10 @@ function renderEstVsOrder(){
       <td class="r">${r.est===0?'—':r.diff===0?'一致':(r.diff>0?'＋':'−')+'¥'+fmt(Math.abs(r.diff))}</td>
     </tr>`;
   }).join('');
-  const tEst=d.rows.reduce((s,r)=>s+r.est,0)+d.unassigned;
-  const tAct=d.rows.reduce((s,r)=>s+r.actual,0);
+  const tEst=d.estExReserve+d.reserve;   // 予備費も含めた見積の総額
+  const tAct=d.actual;
+  const resNote=estReserveNote(d);
+  const resOver=d.reserve && d.over>d.reserve;
 
   el.innerHTML=`
     <div class="section-lbl">見積と実績（発注先ごと）</div>
@@ -185,10 +206,13 @@ function renderEstVsOrder(){
         <thead><tr><th>発注先</th><th class="r">見積の原価</th><th class="r">実績</th><th class="r">差額</th></tr></thead>
         <tbody>${rows}
           ${d.unassigned?`<tr class="evo-un"><td>（明細に発注先が未設定）</td><td class="r">¥${fmt(d.unassigned)}</td><td class="r">—</td><td class="r">—</td></tr>`:''}
+          ${d.reserve?`<tr class="evo-res"><td>予備費<span class="evo-tag">超過に備えるぶん</span></td>
+            <td class="r">¥${fmt(d.reserve)}</td><td class="r">—</td><td class="r">—</td></tr>`:''}
           <tr class="total"><td>合計</td><td class="r">¥${fmt(tEst)}</td><td class="r">¥${fmt(tAct)}</td>
             <td class="r">${tAct-tEst===0?'一致':(tAct-tEst>0?'＋':'−')+'¥'+fmt(Math.abs(tAct-tEst))}</td></tr>
         </tbody>
-      </table>`
+      </table>
+      ${resNote?`<div class="evo-res-note${resOver?' over':''}">${resNote}</div>`:''}`
       : `<div style="padding:12px;font-size:12px;color:var(--text-sub);line-height:1.8">
 見積の明細に「発注先」がまだ設定されていません。<br>
           見積の明細入力で、行ごと（または工種ごとに一括）で発注先を選ぶと、ここで見積と実績を並べて比べられます。

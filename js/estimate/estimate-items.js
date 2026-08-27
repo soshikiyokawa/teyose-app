@@ -22,12 +22,17 @@ function syncActiveTextInput(){
 // 自社の大工でやる行は EST_SELF_LABOR にしておくと、日報からの労務費と比べられる。
 // 工種の欄で選ぶと、その工種の全明細にまとめて入る（一括設定）。
 const EST_SELF_LABOR = '__self__';
-const estSupplierLabel = v => v===EST_SELF_LABOR ? '自社（労務）' : v;
+// 予備費（どこかに頼むお金ではなく、超過に備えて見ておくぶん）。
+// 実績と1対1では突き合わない。全体の超過をこの範囲で吸収できたかを見る。
+const EST_RESERVE = '__reserve__';
+const estSupplierLabel = v =>
+  v===EST_SELF_LABOR ? '自社（労務）' : v===EST_RESERVE ? '予備費' : v;
 
 // 発注先の選択肢（明細・工種の両方で使う）
 function estSupplierOptions(selected){
   return `<option value="">未設定</option>
     <option value="${EST_SELF_LABOR}"${selected===EST_SELF_LABOR?' selected':''}>自社（労務）</option>
+    <option value="${EST_RESERVE}"${selected===EST_RESERVE?' selected':''}>予備費</option>
     ${(suppliers||[]).filter(x=>x.name!=='在庫分')
       .map(x=>`<option value="${esc(x.name)}"${selected===x.name?' selected':''}>${esc(x.name)}</option>`).join('')}`;
 }
