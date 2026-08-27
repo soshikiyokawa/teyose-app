@@ -59,7 +59,7 @@ async function fetchAllData(){
     const { data: myOrders } = await sb.from('orders').select('*').order('date',{ascending:false});
     orders = (myOrders||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,
       paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,
-      subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||''}));
+      subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[]}));
   }
   // 請求書は社内も発注先も見る（RLSで自社分に絞られる。テーブルが無くても落とさない）
   try{ await fetchInvoices(); }catch(_){ invoicesReady=false; }
@@ -101,7 +101,7 @@ async function fetchAllData(){
     estSeq = estimates.length+1;
 
     const { data: orderRows } = await sb.from('orders').select('*').order('created_at',{ascending:false});
-    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||''}));
+    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[]}));
 
     const { data: costRows } = await sb.from('cost_entries').select('*').order('created_at',{ascending:false});
     costEntries = (costRows||[]).map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status}));

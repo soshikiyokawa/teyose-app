@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=329">
+<link rel="stylesheet" href="css/main.css?v=330">
 <link rel="stylesheet" href="css/schedule.css?v=295">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
@@ -1771,6 +1771,25 @@
   </div>
 </div>
 
+<!-- ════ 発注済みの単価を直す（発注先・きよかわの管理者） ════ -->
+<div class="modal-overlay" id="ope-modal" onclick="if(event.target.id==='ope-modal')closeOrderPriceEdit()">
+  <div class="modal-sheet" style="max-width:560px">
+    <h3 id="ope-title">単価を直す</h3>
+    <div style="font-size:12px;font-weight:700;color:var(--accent-t)" id="ope-meta"></div>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin:5px 0 10px">
+      単価を直すと、変更前と変更後が発注に残り、きよかわの社員に通知が届きます。原価管理の金額も同時に変わります。
+    </div>
+    <div id="ope-list" style="max-height:46vh;overflow-y:auto"></div>
+    <div id="ope-total" class="ope-sum"></div>
+    <div class="fg" style="margin-top:8px"><label>ひとこと（任意）</label>
+      <input id="ope-note" maxlength="200" placeholder="例：仕入価格の改定のため"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeOrderPriceEdit()">やめる</button>
+      <button class="btn primary" id="ope-save-btn" onclick="saveOrderPriceEdit()">この内容で直す</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════ 給与の一覧（清川創史・清川優香のみ） ════ -->
 <div class="modal-overlay" id="pay-modal" onclick="if(event.target.id==='pay-modal')closePayroll()">
   <div class="modal-sheet">
@@ -2713,7 +2732,8 @@
 <script src="js/order/ekrea-price.js?v=244"></script>
 <script src="js/order/order-cart.js?v=270"></script>
 <script src="js/order/order-confirm.js?v=216"></script>
-<script src="js/order/order-history.js?v=323"></script>
+<script src="js/order/order-price-edit.js?v=330"></script>
+<script src="js/order/order-history.js?v=330"></script>
 <script src="js/cost-budget.js?v=323"></script>
 <script src="js/order/card-match.js?v=220"></script>
 <script src="js/receipt.js?v=329"></script>

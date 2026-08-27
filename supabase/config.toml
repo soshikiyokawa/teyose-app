@@ -13,3 +13,6 @@ project_id = "uotzxrwtzlpdnpfbaqpi"
 
 [functions.read-receipt]
 verify_jwt = true
+
+[functions.update-order-price]
+verify_jwt = true

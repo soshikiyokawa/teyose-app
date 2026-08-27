@@ -6,11 +6,13 @@ function renderOrders(){
     <div class="order-item">
       <div class="order-hd"><span class="order-no">${o.no}</span><span class="order-name">${o.project}</span>
         <span class="badge ${o.status==='received'?'received':'pending'}">${o.status==='received'?'受領済み':'発注済み'}</span>
+        ${orderHasPriceEdit(o)?'<span class="badge price-edited">単価変更あり</span>':''}
       </div>
       <div class="order-meta"><span>📅 ${o.date}</span><span>🏪 ${o.suppliers}</span><span>📦 ${o.items.length}品目</span>${o.costType?`<span>🏷️ ${o.costType}</span>`:''}<span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
       <div class="order-actions">
         <button class="btn sm" onclick="reShowOrder(${i})"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 発注書</button>
         ${o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`:''}
+        <button class="btn sm" onclick="openOrderPriceEdit('${esc(o.no)}')">単価を直す</button>
         <button class="btn sm danger" onclick="deleteOrderFromHistory(${i})">削除</button>
       </div>
     </div>`).join(''):'<div class="empty">発注履歴はありません</div>';
@@ -29,7 +31,13 @@ async function deleteOrderFromHistory(i){
   showToast('発注履歴を削除しました');
 }
 function reShowOrder(i){
-  document.getElementById('order-pdf-body').innerHTML=`<div style="padding:20px;font-size:13px;color:#555;line-height:2"><strong>${orders[i].no}</strong><br>発注日：${orders[i].date}<br>物件：${orders[i].project}<br>発注先：${orders[i].suppliers}<br>合計：¥${fmt(orders[i].total)}<br><br>${orders[i].items.map(it=>`・${it.name} × ${it.qty}${it.unit}　¥${fmt(it.price*it.qty)}`).join('<br>')}</div>`;
+  const o=orders[i];
+  const rows=o.items.map(it=>{
+    const now=itemNowPrice(it), orig=itemOrigPrice(it), q=Number(it.qty)||0;
+    return `・${esc(it.name)} × ${q}${esc(it.unit||'')}　${
+      orig!==now ? `<span style="color:#999;text-decoration:line-through">¥${fmt(orig*q)}</span> ` : ''}¥${fmt(now*q)}`;
+  }).join('<br>');
+  document.getElementById('order-pdf-body').innerHTML=`<div style="padding:20px;font-size:13px;color:#555;line-height:2"><strong>${o.no}</strong><br>発注日：${o.date}<br>物件：${o.project}<br>発注先：${o.suppliers}<br>合計：¥${fmt(o.total)}<br><br>${rows}${orderPriceEditHtml(o)}</div>`;
   document.getElementById('order-pdf-foot').style.display='none';
   document.getElementById('order-pdf-overlay').classList.add('open');
 }

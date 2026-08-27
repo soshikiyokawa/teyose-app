@@ -111,3 +111,31 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .rr-tax{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--text-sub);
   background:var(--surface2);border-radius:8px;padding:7px 9px;margin-bottom:8px}
 .rr-tax-note{color:var(--text-muted);font-size:10px}
+
+/* ── 発注済みの単価を直す ── */
+.ope-row{border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:7px}
+.ope-row.changed{border-color:var(--accent);background:var(--accent-bg)}
+.ope-name{font-size:12.5px;font-weight:700;margin-bottom:5px}
+.ope-name span{font-weight:400;color:var(--text-muted);font-size:11px;margin-left:6px}
+.ope-price{display:flex;align-items:flex-end;gap:8px}
+.ope-before,.ope-after{display:flex;flex-direction:column;gap:2px}
+.ope-before span,.ope-after span{font-size:10px;color:var(--text-muted)}
+.ope-before b{font-size:13px}
+.ope-after input{width:110px;text-align:right;font-size:13px}
+.ope-arrow{color:var(--text-muted);padding-bottom:4px}
+.ope-amt{text-align:right;font-size:12px;margin-top:4px}
+.ope-amt .old,.ope-sum .old,.ope-hist .old{color:var(--text-muted);text-decoration:line-through}
+.ope-sum{margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:8px}
+.ope-sum-line{font-size:12px;line-height:1.9}
+.ope-sum-line.big{font-size:15px;font-weight:700}
+.ope-sum-note{font-size:10px;color:var(--text-muted);margin-top:2px}
+/* 変更履歴 */
+.ope-hist-wrap{margin-top:8px;border-top:0.5px solid var(--border);padding-top:7px}
+.ope-hist-title{font-size:11px;font-weight:700;color:var(--accent-t);margin-bottom:4px}
+.ope-hist{font-size:11px;line-height:1.7;margin-bottom:6px}
+.ope-hist-head{color:var(--text-muted);font-size:10px}
+.ope-hist-row{display:flex;justify-content:space-between;gap:8px}
+.ope-hist-total{font-weight:700}
+.ope-hist-note{color:var(--text-muted);font-size:10px}
+.badge.price-edited{background:var(--accent-bg);color:var(--accent-t);border:0.5px solid var(--accent)}
+.ocb-row .ope-old{color:var(--text-muted);text-decoration:line-through;font-size:10px}
