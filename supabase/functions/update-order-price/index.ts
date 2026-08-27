@@ -6,11 +6,13 @@
 //   ② 発注の単価を差し替え、小計・消費税・合計を計算し直す
 //   ③ 変更の履歴（いくらから いくらへ）を発注に残す
 //   ④ 原価管理の金額（cost_entries）も同じ品目のぶんだけ直す
+//   ⑤ 発注書PDFを新しい単価で作り直し、チャットの発注書にも反映する
 //
 // きよかわの社員も同じ発注の単価を直せる（発注先に代わって入れる場合）。
 // 通知とチャットへの記録は、呼び出した画面の側で行う。
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { saveOrderPdf } from "../_shared/order-pdf.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -115,6 +117,32 @@ Deno.serve(async (req) => {
       if (!error) costUpdated.push({ name: row.name, before: num(row.amount), after: want });
     }
 
+    // ── ⑤ 発注書PDFを新しい単価で作り直す ──
+    // 失敗しても単価の変更そのものは成立させる（フォントの取得に失敗することがあるため）。
+    // PDFは発注番号ごとに同じ場所へ上書きするので、古いリンクを開いても新しい中身が出る。
+    let pdfUrl = "";
+    let pdfError = "";
+    try {
+      const { data: sup } = await admin.from("suppliers")
+        .select("name").eq("id", order.supplier_id).single();
+      pdfUrl = await saveOrderPdf(admin, {
+        no: order.no,
+        date: order.date,
+        dueDate: order.due_date || "",
+        costType: order.cost_type || "",
+        project: order.project || "",
+        suppliers: sup?.name || "",
+        items, subtotal, tax, total,
+        priceEdits: [...history, edit],
+      });
+      await updateChatOrderCard(admin, orderNo, { items, subtotal, tax, total, pdfUrl });
+    } catch (e) {
+      pdfError = String((e as any)?.message || e);
+      console.warn("発注書PDFの作り直しに失敗しました", pdfError);
+      // PDFが作れなくても、チャットの発注書の中身だけは新しい単価に直しておく
+      try { await updateChatOrderCard(admin, orderNo, { items, subtotal, tax, total }); } catch (_) {}
+    }
+
     return json({
       ok: true,
       orderNo,
@@ -123,12 +151,26 @@ Deno.serve(async (req) => {
       costUpdated: costUpdated.length,
       // 原価の行が見つからなかった品目があれば知らせる（発注後に原価を消した場合など）
       costMissing: items.length - used.size,
+      pdfUrl, pdfError,
       edit,
     });
   } catch (err) {
     return json({ error: String((err as any)?.message || err) }, 500);
   }
 });
+
+// チャットに流れている発注書の吹き出しも、新しい単価に差し替える。
+// 吹き出しは発注時の内容をそのまま持っているので、ここを直さないと
+// 「PDFを表示」が古いPDFのままになる。
+async function updateChatOrderCard(admin: any, orderNo: string, patch: Record<string, unknown>) {
+  const { data: rows } = await admin.from("chat_messages")
+    .select("id, order_data").eq("type", "order").eq("order_data->>no", orderNo);
+  for (const row of rows || []) {
+    await admin.from("chat_messages")
+      .update({ order_data: { ...(row.order_data || {}), ...patch } })
+      .eq("id", row.id);
+  }
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

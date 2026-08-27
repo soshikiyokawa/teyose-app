@@ -727,5 +727,8 @@ function downloadOrderPdf(msgId){
   const sup=activeTalkPanelSupplier;
   const msg=(talkThreads[sup]||[]).find(m=>m.id===msgId);
   if(!msg||msg.type!=='order') return;
-  printHtml(`発注書 ${msg.orderData.no}`, buildOrderPdfHtml(msg.orderData));
+  // 単価をあとから直していることがあるので、いまの発注の中身で出す
+  const live=(typeof orderByNo==='function') ? orderByNo(msg.orderData.no) : null;
+  const o=live ? {...msg.orderData, ...live} : msg.orderData;
+  printHtml(`発注書 ${o.no}`, buildOrderPdfHtml(o));
 }

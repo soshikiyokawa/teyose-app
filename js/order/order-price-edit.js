@@ -127,7 +127,9 @@ async function saveOrderPriceEdit(){
     if(error || data?.error) throw new Error(await opeErrorText(error, data));
 
     closeOrderPriceEdit();
-    showToast(`${changed.length}品目の単価を直しました`);
+    showToast(data?.pdfError
+      ? `${changed.length}品目の単価を直しました（発注書PDFの作り直しに失敗）`
+      : `${changed.length}品目の単価を直しました。発注書PDFも直りました`);
     // 通知とチャットへの記録（失敗しても単価の変更自体は成立している）
     notifyOrderPriceEdit(o, changed, data).catch(()=>{});
     await refetchOrdersAndCost();
@@ -164,7 +166,9 @@ async function notifyOrderPriceEdit(order, changed, data){
   }).catch(()=>{});
 }
 
-// 発注と原価を取り直して、開いている画面に反映する
+// 発注と原価とチャットを取り直して、開いている画面に反映する。
+// チャットも取り直すのは、発注書の吹き出しが持っているPDFのリンクが
+// サーバー側で作り直されているため（古いままだと前の単価のPDFが開く）。
 async function refetchOrdersAndCost(){
   try{
     const { data: rows } = await sb.from('orders').select('*').order('created_at',{ascending:false});
@@ -179,6 +183,8 @@ async function refetchOrdersAndCost(){
         orderNo:r.order_no,costType:r.cost_type,status:r.status}));
     }
   }catch(e){ console.warn('発注の取り直しに失敗', e); }
+  try{ if(typeof fetchChatData==='function') await fetchChatData(); }
+  catch(e){ console.warn('チャットの取り直しに失敗', e); }
   if(typeof renderOrders==='function') try{ renderOrders(); }catch(_){}
   if(typeof renderCost==='function') try{ renderCost(); }catch(_){}
   if(typeof renderTalkPanelMessages==='function' && typeof activeTalkPanelSupplier!=='undefined' && activeTalkPanelSupplier){
