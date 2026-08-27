@@ -74,6 +74,7 @@ function renderAccountPerms(){
       <select onchange="acctSetRole('${p.id}',this.value)"${isSelf?' disabled':''} style="font-size:12px;padding:4px 6px">
         ${PERM_OPTIONS.map(([r,l])=>`<option value="${r}"${p.role===r?' selected':''}>${l}</option>`).join('')}
       </select>
+      ${isSelf?'':`<button class="btn sm" onclick="openSetPassword('${p.id}')" style="font-size:11px">パスワード</button>`}
       ${supSel}
     </div>`;
   }).join('');
@@ -87,6 +88,72 @@ async function acctSetRole(userId, role){
   p.role=role; p.supplierId=supplierId;
   showToast('権限を保存しました（本人の次回ログインで反映）');
   renderAccountPerms();
+}
+
+// ── 管理者が、他の人のパスワードを決める ──
+//
+// 本来はご本人が招待メール・再設定メールのリンクから決める形。
+// 発注先の方などでメールが使えない・急ぎのときのための手段として用意している。
+let setpwUserId = '';
+
+function openSetPassword(userId){
+  if(currentUserRole!=='staff'){ showToast('パスワードの設定は管理者のみです'); return; }
+  if(userId===currentUserId){ showToast('自分のパスワードは「アカウント設定」から変えてください'); return; }
+  const p=allProfiles.find(x=>x.id===userId); if(!p) return;
+  setpwUserId=userId;
+  document.getElementById('setpw-target').textContent=`${p.displayName||'（名前未設定）'} さんのパスワードを決めます`;
+  document.getElementById('setpw-1').value='';
+  document.getElementById('setpw-2').value='';
+  setpwToggleReveal(false);
+  document.getElementById('setpw-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('setpw-1')?.focus(),100);
+}
+
+function closeSetPassword(){
+  // 入力したパスワードを画面に残さない
+  document.getElementById('setpw-1').value='';
+  document.getElementById('setpw-2').value='';
+  setpwUserId='';
+  document.getElementById('setpw-modal').classList.remove('open');
+}
+
+function setpwToggleReveal(on){
+  const t=on?'text':'password';
+  document.getElementById('setpw-1').type=t;
+  document.getElementById('setpw-2').type=t;
+}
+
+async function saveSetPassword(){
+  const p1=document.getElementById('setpw-1').value;
+  const p2=document.getElementById('setpw-2').value;
+  if(p1.length<8){ showToast('パスワードは8文字以上にしてください'); return; }
+  if(p1!==p2){ showToast('パスワードが一致しません'); return; }
+  const p=allProfiles.find(x=>x.id===setpwUserId);
+  if(!confirm(`${p?.displayName||''}さんのパスワードを、いま入力したものに変えます。\nこれまでのパスワードは使えなくなります。よろしいですか？`)) return;
+
+  const btn=document.getElementById('setpw-btn');
+  btn.disabled=true; btn.textContent='設定中…';
+  try{
+    const { data, error } = await sb.functions.invoke('set-user-password', {
+      body:{ userId:setpwUserId, password:p1 }
+    });
+    if(error || data?.error) throw new Error(await setpwErrorText(error, data));
+    const name=p?.displayName||'';
+    closeSetPassword();
+    showToast(`${name}さんのパスワードを設定しました。ご本人にお伝えください`);
+  }catch(e){
+    showToast('設定に失敗しました：'+e.message);
+  }finally{
+    btn.disabled=false; btn.textContent='このパスワードにする';
+  }
+}
+
+async function setpwErrorText(error, data){
+  if(data?.error) return data.error;
+  if(error?.context && typeof error.context.json==='function'){
+    try{ const j=await error.context.json(); if(j?.error) return j.error; }catch(_){}
+  }
+  return error?.message || '不明なエラー';
 }
 
 async function acctSetSupplier(userId, val){

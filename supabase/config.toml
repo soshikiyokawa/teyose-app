@@ -17,5 +17,11 @@ verify_jwt = true
 [functions.generate-order-pdf]
 verify_jwt = true
 
+[functions.invite-user]
+verify_jwt = true
+
+[functions.set-user-password]
+verify_jwt = true
+
 [functions.update-order-price]
 verify_jwt = true

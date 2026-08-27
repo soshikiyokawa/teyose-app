@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=334">
-<link rel="stylesheet" href="css/schedule.css?v=334">
+<link rel="stylesheet" href="css/main.css?v=335">
+<link rel="stylesheet" href="css/schedule.css?v=335">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -1688,6 +1688,31 @@
   </div>
 </div>
 
+<!-- ════ パスワードを決める（管理者専用） ════ -->
+<!-- アカウント権限の画面（z-index:200）より前に出す -->
+<div id="setpw-modal" class="modal-overlay" style="z-index:260">
+  <div class="modal-sheet" style="max-width:420px">
+    <div style="font-size:15px;font-weight:800;margin-bottom:2px">パスワードを決める</div>
+    <div id="setpw-target" style="font-size:12px;color:var(--text-muted);margin-bottom:10px"></div>
+    <div style="background:var(--warn-bg,#fdf6e3);border-radius:7px;padding:9px 11px;font-size:11px;line-height:1.7;margin-bottom:12px">
+      本来はご本人が、招待メール・再設定メールのリンクから決める形です。<br>
+      ここで決めた場合は、<b>決めたパスワードをご本人に伝える途中で漏れないよう</b>ご注意ください。
+      ご本人には、使い始めたあとで「アカウント設定」から自分のパスワードに変えてもらってください。
+    </div>
+    <div class="fg"><label>新しいパスワード（8文字以上）</label>
+      <input id="setpw-1" type="password" autocomplete="new-password"></div>
+    <div class="fg" style="margin-top:8px"><label>もう一度</label>
+      <input id="setpw-2" type="password" autocomplete="new-password"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);margin-top:8px;cursor:pointer">
+      <input type="checkbox" onchange="setpwToggleReveal(this.checked)" style="width:auto;margin:0"> 入力した文字を表示する
+    </label>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" style="flex:1;justify-content:center" onclick="closeSetPassword()">やめる</button>
+      <button class="btn primary" style="flex:1;justify-content:center" id="setpw-btn" onclick="saveSetPassword()">このパスワードにする</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════ 勤務カレンダー管理（事務専用） ════ -->
 <div id="wc-modal">
   <div id="wc-modal-sheet">
@@ -2681,89 +2706,89 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=334"></script>
+<script src="js/supabase-client.js?v=335"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=334"></script>
+<script src="js/utils.js?v=335"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=334"></script>
+<script src="js/state.js?v=335"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=334"></script>
+<script src="js/data/db.js?v=335"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=334"></script>
+<script src="js/nav.js?v=335"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=334"></script>
+<script src="js/talk.js?v=335"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=334"></script>
+<script src="js/push.js?v=335"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=334"></script>
-<script src="js/estimate/estimate-items.js?v=334"></script>
-<script src="js/estimate/quote-import.js?v=334"></script>
-<script src="js/estimate/estimate-master.js?v=334"></script>
-<script src="js/estimate/estimate-summary.js?v=334"></script>
-<script src="js/estimate/estimate-crud.js?v=334"></script>
-<script src="js/estimate/parking.js?v=334"></script>
-<script src="js/estimate/estimate-pdf.js?v=334"></script>
-<script src="js/estimate/estimate-invoice.js?v=334"></script>
+<script src="js/estimate/estimate-tabs.js?v=335"></script>
+<script src="js/estimate/estimate-items.js?v=335"></script>
+<script src="js/estimate/quote-import.js?v=335"></script>
+<script src="js/estimate/estimate-master.js?v=335"></script>
+<script src="js/estimate/estimate-summary.js?v=335"></script>
+<script src="js/estimate/estimate-crud.js?v=335"></script>
+<script src="js/estimate/parking.js?v=335"></script>
+<script src="js/estimate/estimate-pdf.js?v=335"></script>
+<script src="js/estimate/estimate-invoice.js?v=335"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=334"></script>
-<script src="js/payment-schedule.js?v=334"></script>
-<script src="js/inspection.js?v=334"></script>
+<script src="js/orders-list.js?v=335"></script>
+<script src="js/payment-schedule.js?v=335"></script>
+<script src="js/inspection.js?v=335"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=334"></script>
+<script src="js/chusho.js?v=335"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=334"></script>
+<script src="js/schedule.js?v=335"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=334"></script>
-<script src="js/order/item-price.js?v=334"></script>
-<script src="js/order/item-master.js?v=334"></script>
-<script src="js/order/invoice.js?v=334"></script>
-<script src="js/order/ekrea-price.js?v=334"></script>
-<script src="js/order/order-cart.js?v=334"></script>
-<script src="js/order/order-confirm.js?v=334"></script>
-<script src="js/order/order-price-edit.js?v=334"></script>
-<script src="js/order/order-history.js?v=334"></script>
-<script src="js/cost-budget.js?v=334"></script>
-<script src="js/order/card-match.js?v=334"></script>
-<script src="js/receipt.js?v=334"></script>
+<script src="js/order/supplier-master.js?v=335"></script>
+<script src="js/order/item-price.js?v=335"></script>
+<script src="js/order/item-master.js?v=335"></script>
+<script src="js/order/invoice.js?v=335"></script>
+<script src="js/order/ekrea-price.js?v=335"></script>
+<script src="js/order/order-cart.js?v=335"></script>
+<script src="js/order/order-confirm.js?v=335"></script>
+<script src="js/order/order-price-edit.js?v=335"></script>
+<script src="js/order/order-history.js?v=335"></script>
+<script src="js/cost-budget.js?v=335"></script>
+<script src="js/order/card-match.js?v=335"></script>
+<script src="js/receipt.js?v=335"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=334"></script>
-<script src="js/genba/supplier-view.js?v=334"></script>
-<script src="js/genba/genba-files.js?v=334"></script>
-<script src="js/genba/genba-photos.js?v=334"></script>
-<script src="js/genba/genba-drawings.js?v=334"></script>
-<script src="js/genba/genba-nippo.js?v=334"></script>
-<script src="js/genba/genba-dezura.js?v=334"></script>
-<script src="js/genba/payroll.js?v=334"></script>
-<script src="js/genba/overtime-pay.js?v=334"></script>
-<script src="js/genba/leave-balance.js?v=334"></script>
-<script src="js/genba/genba-leave.js?v=334"></script>
-<script src="js/genba/genba-holiday.js?v=334"></script>
-<script src="js/genba/license.js?v=334"></script>
-<script src="js/genba/vehicle.js?v=334"></script>
-<script src="js/genba/work-calendar.js?v=334"></script>
-<script src="js/genba/account-perms.js?v=334"></script>
+<script src="js/genba/genba-tabs.js?v=335"></script>
+<script src="js/genba/supplier-view.js?v=335"></script>
+<script src="js/genba/genba-files.js?v=335"></script>
+<script src="js/genba/genba-photos.js?v=335"></script>
+<script src="js/genba/genba-drawings.js?v=335"></script>
+<script src="js/genba/genba-nippo.js?v=335"></script>
+<script src="js/genba/genba-dezura.js?v=335"></script>
+<script src="js/genba/payroll.js?v=335"></script>
+<script src="js/genba/overtime-pay.js?v=335"></script>
+<script src="js/genba/leave-balance.js?v=335"></script>
+<script src="js/genba/genba-leave.js?v=335"></script>
+<script src="js/genba/genba-holiday.js?v=335"></script>
+<script src="js/genba/license.js?v=335"></script>
+<script src="js/genba/vehicle.js?v=335"></script>
+<script src="js/genba/work-calendar.js?v=335"></script>
+<script src="js/genba/account-perms.js?v=335"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=334"></script>
+<script src="js/init.js?v=335"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=334"></script>
-<script src="js/tasks.js?v=334"></script>
-<script src="js/task-templates.js?v=334"></script>
-<script src="js/auth.js?v=334"></script>
-<script src="js/account.js?v=334"></script>
+<script src="js/notifications.js?v=335"></script>
+<script src="js/tasks.js?v=335"></script>
+<script src="js/task-templates.js?v=335"></script>
+<script src="js/auth.js?v=335"></script>
+<script src="js/account.js?v=335"></script>
 </body>
 </html>
