@@ -29,6 +29,14 @@ async function doLogout(){
 async function bootstrapApp(){
   const { data: sessionData } = await sb.auth.getSession();
   if(!sessionData.session){
+    // メールのリンクから来たのに入れなかった場合は、その理由を出す
+    if(APP_LINK_EXPIRED){
+      const errEl = document.getElementById('login-error');
+      errEl.innerHTML = 'メールのリンクの期限が切れているか、すでに使われています。<br>'+
+        '下の「パスワードをお忘れの方」から、新しいリンクをお送りください。';
+      errEl.style.display='block';
+      history.replaceState(null,'',location.pathname+location.search);
+    }
     document.getElementById('login-overlay').classList.add('open');
     return;
   }

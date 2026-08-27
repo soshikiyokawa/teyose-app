@@ -34,14 +34,23 @@ Deno.serve(async (req) => {
     if (callerProf?.role !== "staff") return json({ error: "アカウントの追加は管理者のみ可能です" }, 403);
 
     // ── 入力チェック ──
-    const { email, displayName, role, supplierId, workGroup } = await req.json();
+    const { email, displayName, role, supplierId, workGroup, redirectTo: wantRedirect } = await req.json();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "メールアドレスが正しくありません" });
     if (!displayName) return json({ error: "表示名を入力してください" });
     if (!["staff", "carpenter", "supplier"].includes(role)) return json({ error: "権限の指定が正しくありません" });
     if (workGroup && !["役員", "一般社員", "訓練校生"].includes(workGroup)) return json({ error: "勤怠区分の指定が正しくありません" });
 
     // ── 招待メールを送信（リンクは呼び出し元のアプリURLへ戻す） ──
-    const redirectTo = req.headers.get("origin") || undefined;
+    //
+    // origin だけでは https://soshikiyokawa.github.io になり、アプリのある
+    // /teyose-app/ に届かない（存在しないページに飛ばされ、パスワードを決められない）。
+    // 画面から渡してもらったアプリのURLを使い、それが無いときはSupabase側の
+    // Site URL に任せる（undefined を渡すとSite URLが使われる）。
+    const origin = req.headers.get("origin") || "";
+    const redirectTo =
+      typeof wantRedirect === "string" && origin && wantRedirect.startsWith(origin)
+        ? wantRedirect
+        : undefined;
     const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
     if (invErr) {
       const msg = /already/i.test(invErr.message)

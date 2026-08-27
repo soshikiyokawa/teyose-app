@@ -689,7 +689,10 @@ async function dbSetRole(userId, role, supplierId){
 }
 // アカウント新規作成（メール招待）。Edge Functionが招待メール送信とプロフィール作成を行う（管理者のみ）
 async function dbInviteUser(payload){
-  const { data, error } = await sb.functions.invoke('invite-user', { body: payload });
+  // 招待メールのリンクの戻り先。アプリはGitHub Pagesのサブフォルダ（/teyose-app/）にあるので、
+  // ここで渡さないとサイトの入口（存在しないページ）に飛んでしまう
+  const redirectTo = location.origin + location.pathname;
+  const { data, error } = await sb.functions.invoke('invite-user', { body: {...payload, redirectTo} });
   if(error){showToast('招待に失敗しました：'+error.message);throw error;}
   if(data?.error){showToast(data.error);throw new Error(data.error);}
 }
