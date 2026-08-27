@@ -28,6 +28,10 @@ const num = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+// 送料の行。発注のあとに足せる唯一の品目
+const SHIPPING_NAME = "送料";
+const isShippingItem = (it: any) => it?.isShipping === true || String(it?.name || "") === SHIPPING_NAME;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -45,9 +49,15 @@ Deno.serve(async (req) => {
       .select("role, display_name, supplier_id").eq("id", userData.user.id).single();
     if (!profile) return json({ error: "利用者の情報が見つかりません" }, 403);
 
-    const { orderNo, prices, note } = await req.json();
+    const { orderNo, prices, note, shipping } = await req.json();
     if (!orderNo) return json({ error: "発注番号がありません" }, 400);
-    if (!Array.isArray(prices) || !prices.length) return json({ error: "変更する単価がありません" }, 400);
+    const wantShipping = typeof shipping === "number" && Number.isFinite(shipping);
+    if ((!Array.isArray(prices) || !prices.length) && !wantShipping) {
+      return json({ error: "変更する単価がありません" }, 400);
+    }
+    if (wantShipping && (shipping < 0 || shipping > 9_999_999)) {
+      return json({ error: "送料の金額が正しくありません" }, 400);
+    }
 
     const { data: order, error: ordErr } = await admin.from("orders")
       .select("*").eq("no", orderNo).single();
@@ -65,7 +75,7 @@ Deno.serve(async (req) => {
     // 品目は番号（index）で指定する。名前が同じ品目が複数あっても取り違えないため
     const items: any[] = Array.isArray(order.items) ? JSON.parse(JSON.stringify(order.items)) : [];
     const changes: any[] = [];
-    for (const p of prices) {
+    for (const p of (Array.isArray(prices) ? prices : [])) {
       const i = Number(p.index);
       if (!Number.isInteger(i) || i < 0 || i >= items.length) continue;
       const after = Math.round(num(p.price));
@@ -78,6 +88,29 @@ Deno.serve(async (req) => {
       items[i].price = after;
       changes.push({ name: String(items[i].name || ""), qty: num(items[i].qty), before, after });
     }
+    // ── ②' 送料を足す・直す・消す ──
+    // 発注のあとで送料が分かることが多いので、発注先が自分で入れられるようにしてある。
+    // 品目を自由に増やせると発注の中身を変えられてしまうため、足せるのは送料の1行だけ。
+    let shippingChange: any = null;
+    if (wantShipping) {
+      const at = items.findIndex(isShippingItem);
+      const before = at >= 0 ? Math.round(num(items[at].cost ?? items[at].price)) : 0;
+      const after = Math.round(shipping);
+      if (before !== after) {
+        if (after === 0 && at >= 0) {
+          items.splice(at, 1);                    // 0円にしたら行ごと消す
+        } else if (at >= 0) {
+          items[at].cost = after;
+          items[at].price = after;
+          if (items[at].origPrice === undefined || items[at].origPrice === null) items[at].origPrice = before;
+        } else if (after > 0) {
+          items.push({ name: SHIPPING_NAME, qty: 1, unit: "式", cost: after, price: after, isShipping: true });
+        }
+        shippingChange = { name: SHIPPING_NAME, qty: 1, before, after, added: at < 0, removed: after === 0 };
+        changes.push({ name: SHIPPING_NAME, qty: 1, before, after });
+      }
+    }
+
     if (!changes.length) return json({ error: "単価が変わっていません" }, 400);
 
     const subtotal = items.reduce((s, it) => s + num(it.cost) * num(it.qty), 0);
@@ -117,6 +150,20 @@ Deno.serve(async (req) => {
       if (!error) costUpdated.push({ name: row.name, before: num(row.amount), after: want });
     }
 
+    // 送料は発注のあとで足した行なので、原価の行も無ければ作り、消したなら消す
+    if (shippingChange) {
+      const shipRow = (costRows || []).find((r: any) => String(r.name) === SHIPPING_NAME);
+      if (shippingChange.removed) {
+        if (shipRow) await admin.from("cost_entries").delete().eq("id", shipRow.id);
+      } else if (!shipRow) {
+        await admin.from("cost_entries").insert({
+          date: order.date, project: order.project, name: SHIPPING_NAME, qty: 1, unit: "式",
+          amount: shippingChange.after, supplier_id: order.supplier_id, order_no: orderNo,
+          cost_type: order.cost_type, status: order.status === "received" ? "received" : "pending",
+        });
+      }
+    }
+
     // ── ⑤ 発注書PDFを新しい単価で作り直す ──
     // 失敗しても単価の変更そのものは成立させる（フォントの取得に失敗することがあるため）。
     // PDFは発注番号ごとに同じ場所へ上書きするので、古いリンクを開いても新しい中身が出る。
@@ -151,6 +198,7 @@ Deno.serve(async (req) => {
       costUpdated: costUpdated.length,
       // 原価の行が見つからなかった品目があれば知らせる（発注後に原価を消した場合など）
       costMissing: items.length - used.size,
+      shipping: shippingChange,
       pdfUrl, pdfError,
       edit,
     });

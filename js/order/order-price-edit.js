@@ -10,7 +10,11 @@
 // きよかわの社員も同じ画面から直せる（発注先に代わって入れる場合）。
 
 let opeOrderNo = '';    // いま直している発注番号
-let opeItems = [];      // {index, name, qty, unit, before, after}
+let opeItems = [];      // {index, name, qty, unit, before, after}（送料は含めない）
+let opeShip = null;     // 送料 {before, after}。発注のあとで足せる唯一の品目
+
+const OPE_SHIPPING_NAME = '送料';
+function isShippingItem(it){ return it?.isShipping === true || String(it?.name || '') === OPE_SHIPPING_NAME; }
 
 // その発注に単価変更があったか
 function orderHasPriceEdit(o){ return Array.isArray(o?.priceEdits) && o.priceEdits.length > 0; }
@@ -33,6 +37,7 @@ function openOrderPriceEdit(orderNo){
   if(!canEdit){ showToast('単価を直せるのは発注先ときよかわの管理者だけです'); return; }
 
   opeOrderNo = orderNo;
+  // 送料は品目の一覧ではなく、下の専用の欄で扱う（足す・直す・消すを1か所にまとめるため）
   opeItems = (o.items || []).map((it, index) => ({
     index,
     name: it.name || '',
@@ -41,8 +46,12 @@ function openOrderPriceEdit(orderNo){
     orig: itemOrigPrice(it),
     before: itemNowPrice(it),
     after: itemNowPrice(it),
-  }));
-  document.getElementById('ope-title').textContent = `単価を直す（${orderNo}）`;
+    shipping: isShippingItem(it),
+  })).filter(it => !it.shipping);
+  const ship = (o.items || []).find(isShippingItem);
+  const shipNow = ship ? itemNowPrice(ship) : 0;
+  opeShip = { before: shipNow, after: shipNow };
+  document.getElementById('ope-title').textContent = `単価・送料を直す（${orderNo}）`;
   document.getElementById('ope-meta').textContent = `${o.date}　${o.project}　${o.suppliers}`;
   document.getElementById('ope-note').value = '';
   renderOrderPriceEdit();
@@ -69,20 +78,54 @@ function opeAmtHtml(it){
     : `<b>¥${fmt(it.after * it.qty)}</b>`;
 }
 
+// 送料を入れたとき。品目と同じく、入力欄は作り直さない
+function setOpeShipping(v){
+  const s = String(v).replace(/[^\d.]/g,'');
+  opeShip.after = s === '' ? 0 : Math.max(0, Math.round(parseFloat(s) || 0));
+  renderOpeTotal();
+}
+
+function renderOpeShipping(){
+  const wrap = document.getElementById('ope-ship');
+  if(!wrap) return;
+  const had = opeShip.before > 0;
+  wrap.innerHTML = `
+    <div class="ope-ship-row">
+      <div class="ope-ship-lbl">送料${had?'':'<span>発注のあとから足せます</span>'}</div>
+      <div class="ope-ship-in">
+        ${had ? `<span class="ope-ship-was">いま ¥${fmt(opeShip.before)}</span>` : ''}
+        <span class="ope-ship-yen">¥</span>
+        <input type="text" inputmode="numeric" id="ope-ship-input"
+               value="${opeShip.after || ''}" placeholder="0"
+               onfocus="this.select()" oninput="setOpeShipping(this.value)">
+      </div>
+    </div>
+    <div class="ope-ship-note">${had
+      ? '0にすると、送料の行を消します。'
+      : '送料がかかる場合はここに金額を入れてください。発注書にも原価にも「送料」として1行足します。'}</div>`;
+}
+
 function renderOpeTotal(){
-  const subBefore = opeItems.reduce((s,it)=>s + it.before*it.qty, 0);
-  const subAfter  = opeItems.reduce((s,it)=>s + it.after*it.qty, 0);
+  const shipChanged = opeShip && opeShip.after !== opeShip.before;
+  const subBefore = opeItems.reduce((s,it)=>s + it.before*it.qty, 0) + (opeShip?.before||0);
+  const subAfter  = opeItems.reduce((s,it)=>s + it.after*it.qty, 0)  + (opeShip?.after||0);
   const totBefore = subBefore + Math.round(subBefore*0.1);
   const totAfter  = subAfter  + Math.round(subAfter*0.1);
   const n = opeItems.filter(it=>it.after!==it.before).length;
-  document.getElementById('ope-total').innerHTML = n
+  const what = [
+    n ? `${n}品目の単価を直します` : '',
+    shipChanged ? (opeShip.after === 0 ? '送料の行を消します'
+                  : opeShip.before === 0 ? `送料 ¥${fmt(opeShip.after)} を足します`
+                  : `送料を ¥${fmt(opeShip.before)} → ¥${fmt(opeShip.after)} に直します`) : '',
+  ].filter(Boolean).join('／');
+  document.getElementById('ope-total').innerHTML = what
     ? `<div class="ope-sum-line">小計 <span class="old">¥${fmt(subBefore)}</span> → <b>¥${fmt(subAfter)}</b></div>
        <div class="ope-sum-line big">合計 <span class="old">¥${fmt(totBefore)}</span> → <b>¥${fmt(totAfter)}</b></div>
-       <div class="ope-sum-note">${n}品目の単価を直します</div>`
+       <div class="ope-sum-note">${what}</div>`
     : `<div class="ope-sum-line big">合計 <b>¥${fmt(totAfter)}</b></div>
-       <div class="ope-sum-note">単価を直すと、ここに変更後の金額が出ます</div>`;
+       <div class="ope-sum-note">単価や送料を入れると、ここに変更後の金額が出ます</div>`;
   const btn = document.getElementById('ope-save-btn');
-  if(btn) btn.disabled = !n;
+  if(btn) btn.disabled = !what;
 }
 
 function renderOrderPriceEdit(){
@@ -105,36 +148,46 @@ function renderOrderPriceEdit(){
       </div>
       <div class="ope-amt" id="ope-amt-${i}">${opeAmtHtml(it)}</div>
     </div>`).join('');
+  renderOpeShipping();
   renderOpeTotal();
 }
 
 // ── 保存 ──
 async function saveOrderPriceEdit(){
   const changed = opeItems.filter(it => it.after !== it.before);
-  if(!changed.length){ showToast('単価が変わっていません'); return; }
+  const shipChanged = opeShip && opeShip.after !== opeShip.before;
+  if(!changed.length && !shipChanged){ showToast('単価も送料も変わっていません'); return; }
   const o = orderByNo(opeOrderNo);
   const note = document.getElementById('ope-note').value.trim();
 
-  const lines = changed.map(it => `${it.name}　¥${fmt(it.before)} → ¥${fmt(it.after)}`).join('\n');
-  if(!confirm(`次の単価を直します。\n\n${lines}\n\nきよかわの社員に通知され、原価管理の金額も変わります。よろしいですか？`)) return;
+  const lines = changed.map(it => `${it.name}　¥${fmt(it.before)} → ¥${fmt(it.after)}`);
+  if(shipChanged){
+    lines.push(opeShip.after === 0
+      ? `${OPE_SHIPPING_NAME}　¥${fmt(opeShip.before)} → 行を消す`
+      : `${OPE_SHIPPING_NAME}　${opeShip.before === 0 ? '（新しく足す）' : `¥${fmt(opeShip.before)} → `}¥${fmt(opeShip.after)}`);
+  }
+  if(!confirm(`次のとおり直します。\n\n${lines.join('\n')}\n\nきよかわの社員に通知され、原価管理の金額も変わります。よろしいですか？`)) return;
 
   const btn = document.getElementById('ope-save-btn');
   if(btn){ btn.disabled = true; btn.textContent = '保存中…'; }
   try{
-    const { data, error } = await sb.functions.invoke('update-order-price', {
-      body: { orderNo: opeOrderNo, note, prices: changed.map(it=>({ index: it.index, price: it.after })) }
-    });
+    const body = { orderNo: opeOrderNo, note, prices: changed.map(it=>({ index: it.index, price: it.after })) };
+    if(shipChanged) body.shipping = opeShip.after;
+    const { data, error } = await sb.functions.invoke('update-order-price', { body });
     if(error || data?.error) throw new Error(await opeErrorText(error, data));
 
+    // あとで通知に使うので、画面を閉じる前に控えておく
+    const notifyLines = (data?.edit?.changes || []).map(c => ({ name:c.name, before:c.before, after:c.after }));
+    const done = [changed.length ? `${changed.length}品目の単価` : '', shipChanged ? '送料' : ''].filter(Boolean).join('と');
     closeOrderPriceEdit();
     showToast(data?.pdfError
-      ? `${changed.length}品目の単価を直しました（発注書PDFの作り直しに失敗）`
-      : `${changed.length}品目の単価を直しました。発注書PDFも直りました`);
-    // 通知とチャットへの記録（失敗しても単価の変更自体は成立している）
-    notifyOrderPriceEdit(o, changed, data).catch(()=>{});
+      ? `${done}を直しました（発注書PDFの作り直しに失敗）`
+      : `${done}を直しました。発注書PDFも直りました`);
+    // 通知とチャットへの記録（失敗しても変更自体は成立している）
+    notifyOrderPriceEdit(o, notifyLines.length ? notifyLines : changed, data, note).catch(()=>{});
     await refetchOrdersAndCost();
   }catch(e){
-    showToast('単価の変更に失敗しました：' + e.message);
+    showToast('変更に失敗しました：' + e.message);
   }finally{
     if(btn){ btn.disabled = false; btn.textContent = 'この内容で直す'; }
   }
@@ -149,20 +202,22 @@ async function opeErrorText(error, data){
 }
 
 // きよかわの社員へ通知し、その発注先とのチャットにも記録を残す
-async function notifyOrderPriceEdit(order, changed, data){
-  const who = currentUserDisplayName || '';
-  const lines = changed.map(it => `・${it.name}　¥${fmt(it.before)} → ¥${fmt(it.after)}`).join('\n');
-  const body = `${order.no}（${order.project}）の単価が変わりました\n${lines}\n合計 ¥${fmt(order.total)} → ¥${fmt(data.total)}`;
+async function notifyOrderPriceEdit(order, changed, data, note){
+  const hasShip = changed.some(c => c.name === OPE_SHIPPING_NAME);
+  const label = hasShip && changed.length === 1 ? '送料' : hasShip ? '単価・送料' : '単価';
+  const lines = changed.map(c => c.name === OPE_SHIPPING_NAME && !c.before
+    ? `・${c.name}　¥${fmt(c.after)}（新しく追加）`
+    : `・${c.name}　¥${fmt(c.before)} → ¥${fmt(c.after)}`).join('\n');
+  const body = `${order.no}（${order.project}）の${label}が変わりました\n${lines}\n合計 ¥${fmt(order.total)} → ¥${fmt(data.total)}`;
 
   // 社員全員（管理者＋一般社員）へ。自分が社員の場合は自分を除く
-  await dbSendPush('employee', null, `単価の変更：${order.suppliers}`, body, currentUserId, 'order/history')
+  await dbSendPush('employee', null, `${label}の変更：${order.suppliers}`, body, currentUserId, 'order/history')
     .catch(()=>{});
   // その発注先とのチャットにも残す（通知はもう送ったので silent）
   await dbAddChatMessage(order.suppliers, {
     role: currentUserRole === 'supplier' ? 'them' : 'me',
     type: 'text', silent: true,
-    text: `【単価の変更】${order.no}\n${lines}\n合計 ¥${fmt(order.total)} → ¥${fmt(data.total)}${
-      document.getElementById('ope-note')?.value ? '\n' + document.getElementById('ope-note').value : ''}`
+    text: `【${label}の変更】${order.no}\n${lines}\n合計 ¥${fmt(order.total)} → ¥${fmt(data.total)}${note ? '\n' + note : ''}`
   }).catch(()=>{});
 }
 

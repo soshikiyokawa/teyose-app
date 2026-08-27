@@ -12,7 +12,7 @@ function renderOrders(){
       <div class="order-actions">
         <button class="btn sm" onclick="reShowOrder(${i})"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 発注書</button>
         ${o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`:''}
-        <button class="btn sm" onclick="openOrderPriceEdit('${esc(o.no)}')">単価を直す</button>
+        <button class="btn sm" onclick="openOrderPriceEdit('${esc(o.no)}')">単価・送料を直す</button>
         <button class="btn sm danger" onclick="deleteOrderFromHistory(${i})">削除</button>
       </div>
     </div>`).join(''):'<div class="empty">発注履歴はありません</div>';

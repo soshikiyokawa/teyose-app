@@ -140,6 +140,18 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .badge.price-edited{background:var(--accent-bg);color:var(--accent-t);border:0.5px solid var(--accent)}
 .ocb-row .ope-old{color:var(--text-muted);text-decoration:line-through;font-size:10px}
 /* 単価の欄は数字を直接入れる（上下ボタンは出さない） */
-.ope-after input{-moz-appearance:textfield}
+.ope-after input,.ope-ship-in input{-moz-appearance:textfield}
 .ope-after input::-webkit-outer-spin-button,
-.ope-after input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ope-after input::-webkit-inner-spin-button,
+.ope-ship-in input::-webkit-outer-spin-button,
+.ope-ship-in input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+/* 送料（発注のあとから足せる唯一の品目） */
+.ope-ship{margin-top:8px;border:0.5px dashed var(--accent);border-radius:8px;padding:8px 10px;background:var(--accent-bg)}
+.ope-ship-row{display:flex;align-items:center;gap:8px}
+.ope-ship-lbl{flex:1;font-size:12.5px;font-weight:700}
+.ope-ship-lbl span{display:block;font-weight:400;font-size:10px;color:var(--text-muted)}
+.ope-ship-in{display:flex;align-items:center;gap:5px}
+.ope-ship-was{font-size:10px;color:var(--text-muted)}
+.ope-ship-yen{font-size:13px;color:var(--text-sub)}
+.ope-ship-in input{width:100px;text-align:right;font-size:13px}
+.ope-ship-note{font-size:10px;color:var(--text-muted);margin-top:5px;line-height:1.6}

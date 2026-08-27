@@ -74,7 +74,8 @@ function renderAccountPerms(){
       <select onchange="acctSetRole('${p.id}',this.value)"${isSelf?' disabled':''} style="font-size:12px;padding:4px 6px">
         ${PERM_OPTIONS.map(([r,l])=>`<option value="${r}"${p.role===r?' selected':''}>${l}</option>`).join('')}
       </select>
-      ${isSelf?'':`<button class="btn sm" onclick="openSetPassword('${p.id}')" style="font-size:11px">パスワード</button>`}
+      ${isSelf?'':`<button class="btn sm" onclick="openSetPassword('${p.id}')" style="font-size:11px">パスワード</button>
+      <button class="btn sm danger" onclick="acctDelete('${p.id}')" style="font-size:11px">削除</button>`}
       ${supSel}
     </div>`;
   }).join('');
@@ -88,6 +89,42 @@ async function acctSetRole(userId, role){
   p.role=role; p.supplierId=supplierId;
   showToast('権限を保存しました（本人の次回ログインで反映）');
   renderAccountPerms();
+}
+
+// ── アカウントを削除する（管理者のみ） ──
+//
+// 日報などが一緒に消えるアカウントは、サーバー側がいったん止めて件数を返す。
+// その件数を見せたうえで、もう一度だけ確認して消す。
+async function acctDelete(userId){
+  if(currentUserRole!=='staff'){ showToast('アカウントの削除は管理者のみです'); return; }
+  if(userId===currentUserId){ showToast('自分のアカウントは削除できません'); return; }
+  const p=allProfiles.find(x=>x.id===userId); if(!p) return;
+  const name=p.displayName||'（名前未設定）';
+  if(!confirm(`${name}さんのアカウントを削除します。\nこの人はログインできなくなります。よろしいですか？`)) return;
+
+  try{
+    let res = await acctCallDelete(userId, false);
+    // 一緒に消えるものがある場合は、その中身を見せてもう一度確認する
+    if(res?.needsConfirm){
+      const list=(res.related||[]).map(r=>`・${r.label}　${r.count}件`).join('\n');
+      if(!confirm(
+        `${name}さんには次のデータがあります。アカウントを消すと、これらも元に戻せない形で一緒に消えます。\n\n${list}\n\n`+
+        `日報を消すと、出面表と現場別の労務費も変わります。\n本当に削除しますか？`)) return;
+      res = await acctCallDelete(userId, true);
+    }
+    if(!res?.ok) throw new Error('削除できませんでした');
+    showToast(`${name}さんのアカウントを削除しました`);
+    try{ await fetchProfiles(); }catch(e){}
+    renderAccountPerms();
+  }catch(e){
+    showToast('削除に失敗しました：'+e.message);
+  }
+}
+
+async function acctCallDelete(userId, confirmed){
+  const { data, error } = await sb.functions.invoke('delete-user', { body:{ userId, confirmed } });
+  if(error || data?.error) throw new Error(await setpwErrorText(error, data));
+  return data;
 }
 
 // ── 管理者が、他の人のパスワードを決める ──

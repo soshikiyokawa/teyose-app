@@ -128,7 +128,7 @@ function orderPriceEditBtnHtml(orderNo){
   if(typeof orderByNo==='function' && !orderByNo(orderNo)) return '';   // 発注が見つからないときは出さない
   return `<button class="btn sm" onclick="openOrderPriceEdit('${esc(orderNo)}')" style="flex:1;justify-content:center">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>
-    単価を直す
+    単価・送料
   </button>`;
 }
 
