@@ -446,6 +446,10 @@ async function fetchInvoices(){
 
 // 請求書を送る（ファイルを保管して、一覧に1件足す）
 async function dbAddInvoice({supplierId, supplierName, month, file, amount, note}){
+  // 請求月は保管場所の一部にもなるので、形が違うものは受け付けない
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(month||''))){
+    showToast('請求月が正しくありません'); throw new Error('bad month');
+  }
   const ext=(file.name.match(/\.[a-zA-Z0-9]+$/)||[''])[0];
   const [y,m]=month.split('-');
   const title=`${supplierName}_${y}年${m}月`;

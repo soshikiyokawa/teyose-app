@@ -12,6 +12,18 @@ function invMonthLabel(m){
   const [y,mo]=String(m||'').split('-');
   return y&&mo ? `${y}年${mo}月` : (m||'');
 }
+// 請求月として正しい形か（YYYY-MM）
+const invMonthOk = m => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(m||''));
+// 請求月の選択肢。今月から1年3か月ぶんさかのぼる＋翌月（先に送る場合）
+// ＜input type="month"＞はSafariでただの文字入力になってしまうため、選ぶ形にしている
+function invMonthOptions(){
+  const d=new Date(), out=[];
+  for(let k=-1;k<=15;k++){          // -1＝翌月、0＝今月、15＝15か月前
+    const t=new Date(d.getFullYear(), d.getMonth()-k, 1);
+    out.push(`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`);
+  }
+  return out;                        // 新しい月から順
+}
 function invTitle(supplierName, month){
   const [y,mo]=String(month||'').split('-');
   return `${supplierName}_${y}年${mo}月`;
@@ -94,18 +106,22 @@ function renderInvoiceForm(){
   // 入力中の内容を消さないよう、作り直すのは初回と権限が変わったときだけ
   if(!canSend || wrap.dataset.built===currentUserRole) return;
   wrap.dataset.built=currentUserRole;
+  // 発注先の人には、保存名に使われる「会社の名前」を出す（担当者名ではない）
+  const myName = (suppliers||[]).find(s=>s.id===currentUserSupplierId)?.name || currentUserDisplayName || '';
   const supOpts = invIsStaff()
     ? `<select id="invc-supplier" style="width:auto;font-size:12px;padding:4px 8px">
-         ${(suppliers||[]).map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}
+         ${(suppliers||[]).filter(s=>s.name!=='在庫分').map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}
        </select>`
-    : `<span style="font-size:12px;font-weight:700">${esc(currentUserDisplayName||'')}</span>`;
+    : `<span style="font-size:12px;font-weight:700">${esc(myName)}</span>`;
   wrap.innerHTML=`
     <div class="card" style="padding:12px">
       <div style="font-size:12px;font-weight:700;margin-bottom:8px">請求書を送る</div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
         <span style="font-size:11px;color:var(--text-sub)">発注先</span>${supOpts}
         <span style="font-size:11px;color:var(--text-sub)">請求月</span>
-        <input type="month" id="invc-month" value="${invMonthNow()}" style="width:auto;font-size:12px;padding:3px 6px">
+        <select id="invc-month" style="width:auto;font-size:12px;padding:4px 8px">
+          ${invMonthOptions().map(m=>`<option value="${m}"${m===invMonthNow()?' selected':''}>${invMonthLabel(m)}</option>`).join('')}
+        </select>
         <span style="font-size:11px;color:var(--text-sub)">請求額（任意）</span>
         <input type="number" id="invc-amount" placeholder="0" style="width:110px;font-size:12px;padding:3px 6px;text-align:right">
       </div>
@@ -124,7 +140,8 @@ async function sendInvoice(){
   const file=fileEl.files?.[0];
   const month=document.getElementById('invc-month').value;
   if(!file){ showToast('請求書のファイルを選んでください'); return; }
-  if(!month){ showToast('請求月を選んでください'); return; }
+  // 請求月は保存名と保管場所に使うので、形が正しいことを必ず確かめる
+  if(!invMonthOk(month)){ showToast('請求月を選んでください'); return; }
   if(file.size > 25*1024*1024){ showToast('ファイルが大きすぎます（25MBまで）'); return; }
 
   let supplierId, supplierName;
