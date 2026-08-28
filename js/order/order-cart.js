@@ -109,8 +109,20 @@ function renderItemSelectList(){
     return true;
   });
   const el=document.getElementById('item-select-list');
-  if(!items.length){el.innerHTML='<div class="empty">この発注先の品目がありません。<br>品目マスタで発注先を設定してください。</div>';return;}
-  el.innerHTML=items.map(m=>{
+  // 大林製材は、造作材をその場で作って入れられるようにする
+  const zosakuCard = isZosakuSupplier(selectedSupplier) ? `
+    <div class="item-pick-card zosaku-add" onclick="openZosakuModal()">
+      <div class="ipc-info">
+        <div class="ipc-row"><span class="ipc-name">＋ 造作材を作って入れる</span></div>
+        <div class="ipc-meta">材種・等級・寸法を決めて、その場でカートに入れられます</div>
+      </div>
+    </div>` : '';
+  if(!items.length){
+    el.innerHTML = zosakuCard ||
+      '<div class="empty">この発注先の品目がありません。<br>品目マスタで発注先を設定してください。</div>';
+    return;
+  }
+  el.innerHTML=zosakuCard+items.map(m=>{
     const inCart=cart.find(c=>c.id===m.id);
     const {n, s} = splitNameSpec(m.name);
     return `<div class="item-pick-card${inCart?' in-cart':''}" onclick="openQtyModal(${m.id})">
@@ -181,6 +193,72 @@ function confirmQty(){
   closeQtyModal();
   renderItemSelectList();
   renderCart();
+}
+
+// ════ 造作材をその場で作ってカートに入れる（大林製材） ════
+//
+// 造作材は材種・等級・寸法の組み合わせが多すぎて品目マスタに持てないので、
+// 発注のときに作れるようにする。単価は分からないことが多いので空でもよく、
+// あとから大林製材が「単価・送料を直す」から入れられる。
+const ZOSAKU_SUPPLIER = /大林製材/;
+const ZOSAKU_CAT = '造作材';
+const ZOSAKU_UNIT = '本';
+function isZosakuSupplier(s){ return ZOSAKU_SUPPLIER.test(s?.name || ''); }
+
+function openZosakuModal(){
+  ['zs-kind','zs-t','zs-w','zs-l','zs-cost'].forEach(i=>{ const el=document.getElementById(i); if(el) el.value=''; });
+  document.getElementById('zs-grade').value='化粧';
+  zosakuSync();
+  document.getElementById('zosaku-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('zs-kind')?.focus(),100);
+}
+function closeZosakuModal(){ document.getElementById('zosaku-modal').classList.remove('open'); }
+
+const zsVal = id => String(document.getElementById(id)?.value || '').trim();
+function zosakuSize(){
+  const p=['zs-t','zs-w','zs-l'].map(id=>zsVal(id).replace(/[^\d.]/g,''));
+  return p.every(Boolean) ? p.join('×') : '';
+}
+function zosakuCost(){
+  return Math.max(0, parseInt(zsVal('zs-cost').replace(/[^\d]/g,''))||0);
+}
+function zosakuName(){
+  const size=zosakuSize();
+  return [zsVal('zs-kind'), zsVal('zs-grade')||document.getElementById('zs-grade')?.value, size]
+    .filter(Boolean).join(' ');
+}
+function zosakuSync(){
+  const kind=zsVal('zs-kind'), size=zosakuSize(), cost=zosakuCost();
+  const ok=!!(kind && size);
+  const pv=document.getElementById('zs-preview');
+  if(pv) pv.innerHTML = ok
+    ? `<b>${esc(zosakuName())}</b><br>
+       <span style="color:var(--text-sub)">${ZOSAKU_CAT}／${ZOSAKU_UNIT}／単価 ${cost?'¥'+fmt(cost):'未定'}</span>`
+    : `<span style="color:var(--text-muted)">材種と寸法（3つとも）を入れてください</span>`;
+  const btn=document.getElementById('zs-next-btn');
+  if(btn) btn.disabled=!ok;
+}
+
+// 内容が決まったら、いつもの数量モーダル（クイック選択・直接入力）へ渡す
+function zosakuToQty(){
+  const name=zosakuName();
+  if(!zsVal('zs-kind') || !zosakuSize()){ showToast('材種と寸法を入れてください'); return; }
+  const cost=zosakuCost();
+  // 同じ内容をもう一度作ったときは、カートの同じ行の本数を変える
+  pendingItem={ id:'zosaku:'+name, cat:ZOSAKU_CAT, name, unit:ZOSAKU_UNIT,
+    cost, price:cost, supplier:selectedSupplier?.name||'', shipping:0, shippingPer:'order' };
+  closeZosakuModal();
+  const inCart=cart.find(c=>c.id===pendingItem.id);
+  document.getElementById('qty-modal-title').textContent=inCart?'本数を変更':'本数を入力';
+  document.getElementById('qty-item-name').textContent=name;
+  document.getElementById('qty-item-meta').textContent=
+    `${ZOSAKU_CAT}　単価 ${cost?'¥'+fmt(cost):'未定'}/${ZOSAKU_UNIT}　発注先：${pendingItem.supplier}`;
+  document.getElementById('qty-unit-label').textContent=ZOSAKU_UNIT;
+  document.getElementById('qty-input').value=inCart?inCart.qty:1;
+  document.getElementById('qty-quick-btns').innerHTML=[1,2,3,5,10,20].map(n=>`
+    <button class="btn sm" onclick="document.getElementById('qty-input').value=${n}" style="min-width:44px;justify-content:center">${n}${ZOSAKU_UNIT}</button>`).join('');
+  document.getElementById('qty-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('qty-input').focus(),100);
 }
 
 // ── メーカー送料 ──

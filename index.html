@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=348">
-<link rel="stylesheet" href="css/schedule.css?v=348">
+<link rel="stylesheet" href="css/main.css?v=349">
+<link rel="stylesheet" href="css/schedule.css?v=349">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2365,6 +2365,49 @@
     </div>
   </div>
 </div>
+<!-- 造作材をその場で作ってカートに入れる（大林製材） -->
+<div class="modal-overlay" id="zosaku-modal" onclick="if(event.target.id==='zosaku-modal')closeZosakuModal()">
+  <div class="modal-sheet" style="max-width:400px">
+    <h3>造作材を入れる</h3>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:12px">
+      品目マスタに無いものを、その場で作って発注できます。カテゴリは「造作材」、単位は「本」です。
+    </div>
+    <div class="fg"><label>材種</label>
+      <input id="zs-kind" list="zs-kind-list" placeholder="例：桧・杉・米松" autocomplete="off" oninput="zosakuSync()">
+      <datalist id="zs-kind-list">
+        <option value="桧"><option value="杉"><option value="米松"><option value="米ヒバ"><option value="タモ"><option value="ナラ">
+      </datalist>
+    </div>
+    <div class="fg" style="margin-top:10px"><label>等級</label>
+      <select id="zs-grade" onchange="zosakuSync()">
+        <option value="化粧">化粧</option>
+        <option value="上小">上小</option>
+        <option value="特一">特一</option>
+      </select>
+    </div>
+    <div class="fg" style="margin-top:10px"><label>寸法（厚み × 幅 × 長さ）</label>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input id="zs-t" inputmode="numeric" placeholder="30" style="flex:1;text-align:center" oninput="zosakuSync()">
+        <span style="color:var(--text-muted)">×</span>
+        <input id="zs-w" inputmode="numeric" placeholder="120" style="flex:1;text-align:center" oninput="zosakuSync()">
+        <span style="color:var(--text-muted)">×</span>
+        <input id="zs-l" inputmode="numeric" placeholder="4000" style="flex:1;text-align:center" oninput="zosakuSync()">
+      </div>
+    </div>
+    <div class="fg" style="margin-top:10px"><label>単価（円・分かれば）</label>
+      <input id="zs-cost" type="text" inputmode="numeric" placeholder="0" onfocus="this.select()" oninput="zosakuSync()">
+      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">
+        空のままでも発注できます。あとから大林製材が単価を入れられます
+      </div>
+    </div>
+    <div id="zs-preview" style="background:var(--surface2);border-radius:8px;padding:9px 11px;margin-top:12px;font-size:12px;line-height:1.7"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeZosakuModal()">やめる</button>
+      <button class="btn primary" id="zs-next-btn" onclick="zosakuToQty()">本数を入れる</button>
+    </div>
+  </div>
+</div>
+
 <!-- 業者の見積（PDF・写真）を読み取って明細に入れる -->
 <div class="modal-overlay" id="quote-import-modal" onclick="if(event.target.id==='quote-import-modal')closeQuoteImport()">
   <div class="modal-sheet">
@@ -2765,89 +2808,89 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=348"></script>
+<script src="js/supabase-client.js?v=349"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=348"></script>
+<script src="js/utils.js?v=349"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=348"></script>
+<script src="js/state.js?v=349"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=348"></script>
+<script src="js/data/db.js?v=349"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=348"></script>
+<script src="js/nav.js?v=349"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=348"></script>
+<script src="js/talk.js?v=349"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=348"></script>
+<script src="js/push.js?v=349"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=348"></script>
-<script src="js/estimate/estimate-items.js?v=348"></script>
-<script src="js/estimate/quote-import.js?v=348"></script>
-<script src="js/estimate/estimate-master.js?v=348"></script>
-<script src="js/estimate/estimate-summary.js?v=348"></script>
-<script src="js/estimate/estimate-crud.js?v=348"></script>
-<script src="js/estimate/parking.js?v=348"></script>
-<script src="js/estimate/estimate-pdf.js?v=348"></script>
-<script src="js/estimate/estimate-invoice.js?v=348"></script>
+<script src="js/estimate/estimate-tabs.js?v=349"></script>
+<script src="js/estimate/estimate-items.js?v=349"></script>
+<script src="js/estimate/quote-import.js?v=349"></script>
+<script src="js/estimate/estimate-master.js?v=349"></script>
+<script src="js/estimate/estimate-summary.js?v=349"></script>
+<script src="js/estimate/estimate-crud.js?v=349"></script>
+<script src="js/estimate/parking.js?v=349"></script>
+<script src="js/estimate/estimate-pdf.js?v=349"></script>
+<script src="js/estimate/estimate-invoice.js?v=349"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=348"></script>
-<script src="js/payment-schedule.js?v=348"></script>
-<script src="js/inspection.js?v=348"></script>
+<script src="js/orders-list.js?v=349"></script>
+<script src="js/payment-schedule.js?v=349"></script>
+<script src="js/inspection.js?v=349"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=348"></script>
+<script src="js/chusho.js?v=349"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=348"></script>
+<script src="js/schedule.js?v=349"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=348"></script>
-<script src="js/order/item-price.js?v=348"></script>
-<script src="js/order/item-master.js?v=348"></script>
-<script src="js/order/invoice.js?v=348"></script>
-<script src="js/order/ekrea-price.js?v=348"></script>
-<script src="js/order/order-cart.js?v=348"></script>
-<script src="js/order/order-confirm.js?v=348"></script>
-<script src="js/order/order-price-edit.js?v=348"></script>
-<script src="js/order/order-history.js?v=348"></script>
-<script src="js/cost-budget.js?v=348"></script>
-<script src="js/order/card-match.js?v=348"></script>
-<script src="js/receipt.js?v=348"></script>
+<script src="js/order/supplier-master.js?v=349"></script>
+<script src="js/order/item-price.js?v=349"></script>
+<script src="js/order/item-master.js?v=349"></script>
+<script src="js/order/invoice.js?v=349"></script>
+<script src="js/order/ekrea-price.js?v=349"></script>
+<script src="js/order/order-cart.js?v=349"></script>
+<script src="js/order/order-confirm.js?v=349"></script>
+<script src="js/order/order-price-edit.js?v=349"></script>
+<script src="js/order/order-history.js?v=349"></script>
+<script src="js/cost-budget.js?v=349"></script>
+<script src="js/order/card-match.js?v=349"></script>
+<script src="js/receipt.js?v=349"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=348"></script>
-<script src="js/genba/supplier-view.js?v=348"></script>
-<script src="js/genba/genba-files.js?v=348"></script>
-<script src="js/genba/genba-photos.js?v=348"></script>
-<script src="js/genba/genba-drawings.js?v=348"></script>
-<script src="js/genba/genba-nippo.js?v=348"></script>
-<script src="js/genba/genba-dezura.js?v=348"></script>
-<script src="js/genba/payroll.js?v=348"></script>
-<script src="js/genba/overtime-pay.js?v=348"></script>
-<script src="js/genba/leave-balance.js?v=348"></script>
-<script src="js/genba/genba-leave.js?v=348"></script>
-<script src="js/genba/genba-holiday.js?v=348"></script>
-<script src="js/genba/license.js?v=348"></script>
-<script src="js/genba/vehicle.js?v=348"></script>
-<script src="js/genba/work-calendar.js?v=348"></script>
-<script src="js/genba/account-perms.js?v=348"></script>
+<script src="js/genba/genba-tabs.js?v=349"></script>
+<script src="js/genba/supplier-view.js?v=349"></script>
+<script src="js/genba/genba-files.js?v=349"></script>
+<script src="js/genba/genba-photos.js?v=349"></script>
+<script src="js/genba/genba-drawings.js?v=349"></script>
+<script src="js/genba/genba-nippo.js?v=349"></script>
+<script src="js/genba/genba-dezura.js?v=349"></script>
+<script src="js/genba/payroll.js?v=349"></script>
+<script src="js/genba/overtime-pay.js?v=349"></script>
+<script src="js/genba/leave-balance.js?v=349"></script>
+<script src="js/genba/genba-leave.js?v=349"></script>
+<script src="js/genba/genba-holiday.js?v=349"></script>
+<script src="js/genba/license.js?v=349"></script>
+<script src="js/genba/vehicle.js?v=349"></script>
+<script src="js/genba/work-calendar.js?v=349"></script>
+<script src="js/genba/account-perms.js?v=349"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=348"></script>
+<script src="js/init.js?v=349"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=348"></script>
-<script src="js/tasks.js?v=348"></script>
-<script src="js/task-templates.js?v=348"></script>
-<script src="js/auth.js?v=348"></script>
-<script src="js/account.js?v=348"></script>
+<script src="js/notifications.js?v=349"></script>
+<script src="js/tasks.js?v=349"></script>
+<script src="js/task-templates.js?v=349"></script>
+<script src="js/auth.js?v=349"></script>
+<script src="js/account.js?v=349"></script>
 </body>
 </html>
