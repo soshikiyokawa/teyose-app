@@ -113,7 +113,7 @@ function renderItemSelectList(){
   const zosakuCard = isZosakuSupplier(selectedSupplier) ? `
     <div class="item-pick-card zosaku-add" onclick="openZosakuModal()">
       <div class="ipc-info">
-        <div class="ipc-row"><span class="ipc-name">＋ 造作材を作って入れる</span></div>
+        <div class="ipc-row"><span class="ipc-name">造作材発注</span></div>
         <div class="ipc-meta">材種・等級・寸法を決めて、その場でカートに入れられます</div>
       </div>
     </div>` : '';
