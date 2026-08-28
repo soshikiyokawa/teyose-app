@@ -25,6 +25,12 @@ function myMemberNames(){
   }
   return names;
 }
+// 管理者（staff）の表示名。案件を作ったとき、はじめから参加メンバーに入れる
+function staffMemberNames(){
+  return (typeof allProfiles!=='undefined' ? allProfiles : [])
+    .filter(p=>p.role==='staff' && p.displayName)
+    .map(p=>p.displayName);
+}
 function isMyProjectMember(members){
   const mine = myMemberNames();
   return (members||[]).some(n=>mine.includes(n));

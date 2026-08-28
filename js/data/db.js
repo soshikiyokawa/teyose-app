@@ -122,6 +122,11 @@ function rowToEstimate(r){
 
 // ── 案件マスタ ──
 async function dbSaveProject(proj){
+  // 新しく作る案件は、指定が無ければ管理者を参加メンバーに入れる。
+  // 案件モーダルからの作成にもかけたいので、保存の入口でまとめて面倒を見る
+  if(!proj.id && !(proj.members||[]).length && typeof staffMemberNames==='function'){
+    proj={...proj, members:staffMemberNames()};
+  }
   const row={name:proj.name,client_name:proj.clientName,type:proj.type,address:proj.address,note:proj.note,
     start_date:proj.startDate||null,end_date:proj.endDate||null,
     actual_start_date:proj.actualStartDate||null,handover_date:proj.handoverDate||null,map_lat:proj.mapLat??null,map_lng:proj.mapLng??null,

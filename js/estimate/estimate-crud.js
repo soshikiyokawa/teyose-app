@@ -500,7 +500,8 @@ function fillProjectInfoTab(p){
   renderParkingDocs && renderParkingDocs();
   // 案件チャットの参加メンバー
   if(typeof projectMembers!=='undefined'){
-    projectMembers = [...(p?.members||[])];
+    // 新しい案件は、はじめから管理者を参加メンバーに入れておく（外すこともできる）
+    projectMembers = p ? [...(p.members||[])] : staffMemberNames();
     renderProjectMembers && renderProjectMembers();
   }
 }
