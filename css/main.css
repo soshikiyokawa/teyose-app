@@ -101,3 +101,6 @@
   color: var(--text);
   font-family: inherit;
 }
+
+.ol-row.status-lost      { background: #f2f0ee; color: var(--text-sub); }
+.ol-row.status-lost:hover{ background: #e4e0db; }

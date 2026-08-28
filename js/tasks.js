@@ -238,7 +238,7 @@ function closeTaskModal(){ document.getElementById('task-modal').classList.remov
 // （案件一覧の「完工」バッジと同じ判定を使う）
 function taskProjectOptions(){
   return (projects||[])
-    .filter(p=>!(typeof isProjectCompleted==='function' && isProjectCompleted(p)))
+    .filter(p=>!(typeof isProjectClosed==='function' && isProjectClosed(p)))
     .sort((a,b)=>String(a.name).localeCompare(String(b.name),'ja'));
 }
 

@@ -148,7 +148,8 @@ const OL_STATUS = {
   sent:        {label:'提出済', cls:'sent'},
   approved:    {label:'受注',   cls:'approved'},
   construction:{label:'工事中', cls:'construction'},
-  completed:   {label:'完工',   cls:'completed'}
+  completed:   {label:'完工',   cls:'completed'},
+  lost:        {label:'失注',   cls:'lost'}
 };
 
 // 絞り込みの選択肢を作る（チェックを入れた分だけ表示する形）

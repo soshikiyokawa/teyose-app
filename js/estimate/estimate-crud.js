@@ -386,16 +386,16 @@ function calcEstTotal(e){
 let _sidebarStatusFilter='';
 function setSidebarStatusFilter(s){
   _sidebarStatusFilter=s;
-  const label={'':'全て','draft':'下書き','sent':'提出済み','approved':'受注','construction':'工事中','completed':'完工'}[s]||'全て';
+  const label={'':'全て','draft':'下書き','sent':'提出済み','approved':'受注','construction':'工事中','completed':'完工','lost':'失注'}[s]||'全て';
   document.querySelectorAll('.sf-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===label));
   renderProjectSidebar();
 }
 
 // 案件の並び：工事中 → 受注 → 提出済み → 下書き → 完工。同じステータスの中は新しい順
-const PROJ_STATUS_ORDER = ['construction','approved','sent','draft','completed'];
+const PROJ_STATUS_ORDER = ['construction','approved','sent','draft','completed','lost'];
 
 // ステータスの表示名（下書き・提出済み・受注・工事中・完工）
-const EST_STATUS_LABEL = {draft:'下書き', sent:'提出済み', approved:'受注', construction:'工事中', completed:'完工'};
+const EST_STATUS_LABEL = {draft:'下書き', sent:'提出済み', approved:'受注', construction:'工事中', completed:'完工', lost:'失注'};
 function estStatusLabel(s){ return EST_STATUS_LABEL[s] || '完工'; }
 function projStatusOf(p){
   const list=(estimates||[]).filter(e=>e.projectName===p.name);

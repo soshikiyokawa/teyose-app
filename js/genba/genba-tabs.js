@@ -35,14 +35,28 @@ function isProjectCompleted(p){
         .sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];
   return est?.status === 'completed';
 }
+// 案件のステータス（見積に入っている）
+function projectStatusOf(p){
+  if(!p) return '';
+  const est = (typeof olEstimateOf==='function')
+    ? olEstimateOf(p)
+    : [...(estimates||[]).filter(e=>e.projectName===p.name)]
+        .sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0))[0];
+  return est?.status || '';
+}
+// もう動かない案件（完工・失注）。選択肢から外すのに使う
+function isProjectClosed(p){
+  const s=projectStatusOf(p);
+  return s==='completed' || s==='lost';
+}
 
 // 写真・図面・日報の工事選択プルダウンを最新の案件一覧で埋める
 function renderGenbaProjectSelects(){
   const optHtml = list => '<option value="">工事を選択...</option>' +
     list.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
   const opts = optHtml(projects);
-  // 日報・休日出勤は、もう終わった工事を選ばないよう完工済みを外す
-  const optsActive = optHtml(projects.filter(p=>!isProjectCompleted(p)));
+  // 日報・休日出勤は、もう終わった工事（完工・失注）を選ばないよう外す
+  const optsActive = optHtml(projects.filter(p=>!isProjectClosed(p)));
   ['photo-project-select','drawing-project-select','nippo-project','holiday-project'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
@@ -80,7 +94,8 @@ function genbaSelectProject(el, val){
     if(p){
       const o = document.createElement('option');
       o.value = v;
-      o.textContent = p.name + (isProjectCompleted(p) ? '（完工）' : '');
+      const st = projectStatusOf(p);
+      o.textContent = p.name + (st==='completed' ? '（完工）' : st==='lost' ? '（失注）' : '');
       const tail = Array.from(el.options).find(x=>x.value==='school'||x.value==='other');
       el.insertBefore(o, tail || null);
     }
