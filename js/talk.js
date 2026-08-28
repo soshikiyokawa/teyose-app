@@ -372,7 +372,17 @@ function openTalkPanelThread(supName){
   resetChatRenderSignature();   // スレッドを開いたら必ず描き直す
   if(!talkThreads[supName]) talkThreads[supName]=[];
   const sup=suppliers.find(s=>s.name===supName);
-  document.getElementById('talk-panel-title').textContent=supName;
+  // 発注先の名前をタップすると、登録してある電話番号にかけられる。
+  // 全角で登録されていることがあるので、半角に直してから数字だけ取り出す
+  const tel=String(sup?.tel||'')
+    .replace(/[０-９＋]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/[^\d+]/g,'');
+  const titleEl=document.getElementById('talk-panel-title');
+  if(tel){
+    titleEl.innerHTML=`<a href="tel:${tel}" class="talk-tel" title="${esc(sup.tel)}に電話をかける">${esc(supName)}<span>📞</span></a>`;
+  } else {
+    titleEl.textContent=supName;
+  }
   document.getElementById('talk-panel-meta').textContent=
     supName===INTERNAL_THREAD ? '社員メンバーのみ表示されます'
     : isProjectThread(supName) ? (()=>{ const p=projects.find(x=>x.id===projectThreadIds[supName]);
