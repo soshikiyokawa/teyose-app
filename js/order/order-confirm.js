@@ -48,9 +48,19 @@ function openOrderPreview(){
   const date=now.toISOString().slice(0,10);
   const no=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
   const sup=selectedSupplier||{name:'—',tel:'',email:''};
-  const subtotal=cart.reduce((s,c)=>s+c.cost*c.qty,0);
+  // メーカー送料を含めた形にする。
+  //   1つごとの送料 … 単価に足し込む
+  //   1回の発注につきの送料 … 「送料」の行としてまとめて足す
+  const orderItems=cart.map(c=>{
+    const {shipping, shippingPer, ...rest}=c;
+    const add=cartUnitShipping(c);
+    return add ? {...rest, cost:c.cost+add, price:c.cost+add, shippingIncluded:add} : {...rest};
+  });
+  const ship=cartOrderShipping();
+  if(ship) orderItems.push({name:'送料',qty:1,unit:'式',cost:ship,price:ship,isShipping:true,supplier:sup.name});
+  const subtotal=orderItems.reduce((s,c)=>s+c.cost*c.qty,0);
   const tax=Math.round(subtotal*.1);
-  currentOrder={no,project,date,dueDate,costType,paymentMethod:payment,suppliers:sup.name,supplierObj:sup,items:[...cart.map(c=>({...c}))],subtotal,tax,total:subtotal+tax};
+  currentOrder={no,project,date,dueDate,costType,paymentMethod:payment,suppliers:sup.name,supplierObj:sup,items:orderItems,subtotal,tax,total:subtotal+tax};
 
   document.getElementById('order-pdf-body').innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
@@ -71,8 +81,9 @@ function openOrderPreview(){
       <div style="flex:1.2;padding:6px 8px;text-align:right">単価</div>
       <div style="flex:1.2;padding:6px 8px;text-align:right">金額</div>
     </div>
-    ${cart.map(c=>`<div style="display:flex;font-size:12px;border-bottom:0.5px solid #e8e0d0">
-      <div style="flex:3;min-width:0;padding:6px 8px;word-break:break-word;overflow-wrap:anywhere">${c.name}</div>
+    ${orderItems.map(c=>`<div style="display:flex;font-size:12px;border-bottom:0.5px solid #e8e0d0">
+      <div style="flex:3;min-width:0;padding:6px 8px;word-break:break-word;overflow-wrap:anywhere">${c.name}${
+        c.shippingIncluded?`<span style="font-size:10px;color:#888">（送料 ¥${fmt(c.shippingIncluded)} 込み）</span>`:''}</div>
       <div style="flex:1;padding:6px 8px;text-align:center">${c.unit}</div>
       <div style="flex:1;padding:6px 8px;text-align:right">${c.qty}</div>
       <div style="flex:1.2;padding:6px 8px;text-align:right">¥${fmt(c.cost)}</div>

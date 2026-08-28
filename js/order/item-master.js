@@ -110,7 +110,8 @@ function openMasterEdit(id){
   document.getElementById('master-modal-title').textContent=editingMasterId===-1?'品目を追加':'品目を編集';
   renderMasterCatList();
   if(editingMasterId===-1){
-    ['m-name','m-unit','m-maker-code'].forEach(i=>document.getElementById(i).value='');
+    ['m-name','m-unit','m-maker-code','m-shipping'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('m-shipping-per').value='order';
     ['m-price','m-cost'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('m-cat').value='木材';
     document.getElementById('m-supplier-sel').value=suppliers[0]?.name||'';
@@ -123,7 +124,10 @@ function openMasterEdit(id){
     document.getElementById('m-cost').value=m.cost;
     document.getElementById('m-supplier-sel').value=m.supplier;
     document.getElementById('m-maker-code').value=m.makerCode||'';
+    document.getElementById('m-shipping').value=m.shipping||'';
+    document.getElementById('m-shipping-per').value=m.shippingPer||'order';
   }
+  masterShippingSync();
   masterMakerCodeSync();
   const askBox=document.getElementById('m-ask-price');
   if(askBox) delete askBox.dataset.touched;   // 開くたびに自動判定に戻す
@@ -263,7 +267,9 @@ async function saveMasterItem(){
     cost: parseInt(document.getElementById('m-cost').value)||0,
     price: parseInt(document.getElementById('m-cost').value)||0,
     supplier: document.getElementById('m-supplier-sel').value,
-    makerCode: document.getElementById('m-maker-code').value.trim()
+    makerCode: document.getElementById('m-maker-code').value.trim(),
+    shipping: masterShippingValue(),
+    shippingPer: document.getElementById('m-shipping-per').value==='unit' ? 'unit' : 'order'
   };
   if(!item.name){alert('品目名を入力してください');return;}
 
@@ -310,4 +316,26 @@ async function saveMasterItem(){
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>保存して反映';
   }
+}
+
+
+// ── メーカー送料 ──
+//
+// 発注のときは「品目の原価＋送料」で出す。
+//   1回の発注につき … 何本頼んでも送料は1回ぶん。発注書には送料の行が別に出る
+//   1つごとに      … 単価に足し込む（5本なら送料も5回ぶん）
+function masterShippingValue(){
+  const v=String(document.getElementById('m-shipping')?.value||'').replace(/[^d]/g,'');
+  return Math.max(0, Math.min(9999999, parseInt(v)||0));
+}
+function masterShippingSync(){
+  const note=document.getElementById('m-shipping-note');
+  if(!note) return;
+  const s=masterShippingValue();
+  const per=document.getElementById('m-shipping-per')?.value;
+  const cost=parseInt(document.getElementById('m-cost')?.value)||0;
+  if(!s){ note.textContent='メーカー送料がかかる品目だけ入れてください。発注のときに自動で足します'; return; }
+  note.innerHTML = per==='unit'
+    ? `5つ発注すると、送料は ¥${fmt(s*5)}（1つあたり ¥${fmt(s)}）。発注書の単価は ¥${fmt(cost)}＋¥${fmt(s)}＝<b>¥${fmt(cost+s)}</b> で出ます`
+    : `何個発注しても送料は ¥${fmt(s)}。発注書には「送料」の行として別に出ます`;
 }

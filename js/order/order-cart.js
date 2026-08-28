@@ -183,6 +183,21 @@ function confirmQty(){
   renderCart();
 }
 
+// ── メーカー送料 ──
+//
+// 品目に登録したメーカー送料を、発注のときに足す。
+//   1つごとに（unit）… 単価に足し込む
+//   1回の発注につき（order）… 「送料」の行としてまとめて1行にする
+function cartUnitShipping(c){ return c.shippingPer==='unit' ? (Number(c.shipping)||0) : 0; }
+function cartItemCost(c){ return (Number(c.cost)||0) + cartUnitShipping(c); }
+// 「1回の発注につき」の送料の合計（品目ごとに1回ずつ）
+function cartOrderShipping(){
+  return (cart||[]).reduce((s,c)=> s + (c.shippingPer==='unit' ? 0 : (Number(c.shipping)||0)), 0);
+}
+function cartGrandTotal(){
+  return (cart||[]).reduce((s,c)=>s+cartItemCost(c)*c.qty, 0) + cartOrderShipping();
+}
+
 // ── カート ──
 function renderCart(){
   const card=document.getElementById('cart-card');
@@ -193,7 +208,9 @@ function renderCart(){
     <div class="cart-item">
       <div class="cart-name">
         <div style="font-size:13px;font-weight:500">${c.name}</div>
-        <div style="font-size:11px;color:var(--text-muted)">¥${fmt(c.cost)}/${c.unit}</div>
+        <div style="font-size:11px;color:var(--text-muted)">¥${fmt(c.cost)}/${c.unit}${
+          cartUnitShipping(c) ? `　＋送料 ¥${fmt(cartUnitShipping(c))}/${c.unit}` : ''}${
+          (c.shipping && c.shippingPer!=='unit') ? `　＋送料 ¥${fmt(c.shipping)}（1回）` : ''}</div>
       </div>
       <div class="qty-ctrl">
         <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>
@@ -201,10 +218,19 @@ function renderCart(){
         <button class="qty-btn" onclick="changeQty(${i},1)">＋</button>
         <span style="font-size:12px;color:var(--text-sub);margin-left:2px">${c.unit}</span>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--wood-t);min-width:62px;text-align:right">¥${fmt(c.cost*c.qty)}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--wood-t);min-width:62px;text-align:right">¥${fmt(cartItemCost(c)*c.qty)}</div>
       <button class="btn danger xs" onclick="removeCartItem(${i})" style="margin-left:4px">×</button>
     </div>`).join('');
-  document.getElementById('cart-total').textContent=fmt(cart.reduce((s,c)=>s+c.cost*c.qty,0));
+  // メーカー送料（1回の発注につき）は、まとめて1行として出す
+  const ship=cartOrderShipping();
+  if(ship){
+    ci.innerHTML+=`<div class="cart-item" style="background:var(--surface2)">
+      <div class="cart-name"><div style="font-size:13px;font-weight:500">送料（メーカー）</div>
+        <div style="font-size:11px;color:var(--text-muted)">発注1回につき</div></div>
+      <div style="font-size:12px;font-weight:600;color:var(--wood-t);min-width:62px;text-align:right">¥${fmt(ship)}</div>
+    </div>`;
+  }
+  document.getElementById('cart-total').textContent=fmt(cartGrandTotal());
   updateOrderPreviewBtnState();
 }
 function changeQty(i,d){
