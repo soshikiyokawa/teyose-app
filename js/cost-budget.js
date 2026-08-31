@@ -117,8 +117,8 @@ function renderCostBudget(){
 
 function estVsOrderRows(projectName){
   const est=budgetEstimateOf(projectName);
-  const byName=new Map();   // 発注先名 → {est, actual}
-  const pick=n=>{ if(!byName.has(n)) byName.set(n,{name:n, est:0, actual:0}); return byName.get(n); };
+  const byName=new Map();   // 発注先名 → {est, actual, billed}
+  const pick=n=>{ if(!byName.has(n)) byName.set(n,{name:n, est:0, actual:0, billed:0}); return byName.get(n); };
 
   // 見積の側：明細1行ごとの原価を、その行の発注先へ足す。
   // 行に入っていなければ工種の設定を使う（古い見積との互換）
@@ -139,6 +139,14 @@ function estVsOrderRows(projectName){
     pick(e.supplier||'（発注先なし）').actual+=Number(e.amount)||0;
   }
 
+  // 請求の側：割り当てた請求書の明細を発注先ごとに足す
+  const invById=new Map((invoices||[]).map(v=>[v.id,v]));
+  for(const l of (typeof invoiceLines!=='undefined' ? invoiceLines : [])){
+    if(l.project!==projectName) continue;
+    const v=invById.get(l.invoiceId);
+    pick(v?.supplierName || '（発注先なし）').billed += Number(l.amount)||0;
+  }
+
   // 自社（労務）は日報から
   const d=costBudgetData(projectName);
   if(byName.has(EST_SELF_LABOR) || d.labor){
@@ -152,13 +160,14 @@ function estVsOrderRows(projectName){
   const rows=[...byName.values()]
     .map(r=>({...r, diff:r.actual-r.est}))
     .sort((a,b)=> Math.abs(b.diff)-Math.abs(a.diff));
+  const billedTotal=rows.reduce((s,r)=>s+r.billed,0);
 
   // 予備費を除いた見積と実績を比べ、超過が予備費の範囲に収まっているかを見る
   const estExReserve = rows.reduce((s,r)=>s+r.est,0) + unassigned;
   const actual = rows.reduce((s,r)=>s+r.actual,0);
   const over = actual - estExReserve;
 
-  return {est, rows, unassigned, reserve, estExReserve, actual, over,
+  return {est, rows, unassigned, reserve, estExReserve, actual, over, billedTotal,
     labor:d.labor, ninku:d.ninku, rate:d.rate};
 }
 
@@ -191,6 +200,7 @@ function renderEstVsOrder(){
       <td>${esc(estVsOrderLabel(r.name))}${r.est===0?'<span class="evo-tag">見積に無し</span>':''}</td>
       <td class="r">${r.est?'¥'+fmt(r.est):'—'}</td>
       <td class="r">${r.actual?'¥'+fmt(r.actual):'—'}</td>
+      <td class="r">${r.billed?'¥'+fmt(r.billed):'—'}</td>
       <td class="r">${r.est===0?'—':r.diff===0?'一致':(r.diff>0?'＋':'−')+'¥'+fmt(Math.abs(r.diff))}</td>
     </tr>`;
   }).join('');
@@ -203,12 +213,13 @@ function renderEstVsOrder(){
     <div class="section-lbl">見積と実績（発注先ごと）</div>
     <div class="card" style="padding:0;overflow-x:auto">
       ${assigned ? `<table class="cost-type-table evo-table">
-        <thead><tr><th>発注先</th><th class="r">見積の原価</th><th class="r">実績</th><th class="r">差額</th></tr></thead>
+        <thead><tr><th>発注先</th><th class="r">見積の原価</th><th class="r">発注</th><th class="r">請求</th><th class="r">差額</th></tr></thead>
         <tbody>${rows}
-          ${d.unassigned?`<tr class="evo-un"><td>（明細に発注先が未設定）</td><td class="r">¥${fmt(d.unassigned)}</td><td class="r">—</td><td class="r">—</td></tr>`:''}
+          ${d.unassigned?`<tr class="evo-un"><td>（明細に発注先が未設定）</td><td class="r">¥${fmt(d.unassigned)}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`:''}
           ${d.reserve?`<tr class="evo-res"><td>予備費<span class="evo-tag">超過に備えるぶん</span></td>
-            <td class="r">¥${fmt(d.reserve)}</td><td class="r">—</td><td class="r">—</td></tr>`:''}
+            <td class="r">¥${fmt(d.reserve)}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td></tr>`:''}
           <tr class="total"><td>合計</td><td class="r">¥${fmt(tEst)}</td><td class="r">¥${fmt(tAct)}</td>
+            <td class="r">${d.billedTotal?'¥'+fmt(d.billedTotal):'—'}</td>
             <td class="r">${tAct-tEst===0?'一致':(tAct-tEst>0?'＋':'−')+'¥'+fmt(Math.abs(tAct-tEst))}</td></tr>
         </tbody>
       </table>
@@ -219,8 +230,10 @@ function renderEstVsOrder(){
         </div>`}
     </div>
     ${assigned?`<div style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.7">
-      実績＝その発注先へのこの現場の発注（原価）。自社（労務）は日報の${fmtNinku(d.ninku)}人工${
-        d.rate?` × ¥${fmt(d.rate)}`:'（1人工あたりの労務費が未設定）'}。
+      発注＝この現場でその発注先へ出した金額。自社（労務）は日報の${fmtNinku(d.ninku)}人工${
+        d.rate?` × ¥${fmt(d.rate)}`:'（1人工あたりの労務費が未設定）'}。<br>
+      請求＝届いた請求書の明細のうち、この現場に割り当てたぶん（税抜）。差額は見積と発注の差です。
+      ${invoiceUnassignedTotal&&invoiceUnassignedTotal()?`<b style="color:var(--warn-t)">まだ現場を割り当てていない請求明細が${invoiceUnassignedTotal()}行あります（請求書の画面で割り当てられます）</b>`:''}
     </div>`:''}`;
 }
 

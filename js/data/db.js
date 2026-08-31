@@ -66,6 +66,10 @@ async function fetchAllData(){
   }
   // 請求書は社内も発注先も見る（RLSで自社分に絞られる。テーブルが無くても落とさない）
   try{ await fetchInvoices(); }catch(_){ invoicesReady=false; }
+  // 請求書の明細（現場ごとの請求原価）。社員だけが見る
+  if(currentUserRole==='staff'||currentUserRole==='carpenter'){
+    try{ await fetchInvoiceLines(); }catch(_){ invoiceLinesReady=false; }
+  }
   // 単価の変更履歴（表がまだ無くても落とさない）
   try{ await fetchItemPriceChanges(); }catch(_){ priceHistoryReady=false; }
   // 通知履歴（表がまだ無くても落とさない）
@@ -504,6 +508,47 @@ async function dbAddInvoice({supplierId, supplierName, month, file, amount, note
     throw error;
   }
   return data;
+}
+
+// ── 請求書の明細（現場ごとの請求原価。migration-genba58.sql） ──
+let invoiceLines = [];
+let invoiceLinesReady = true;
+
+async function fetchInvoiceLines(){
+  const { data, error } = await sb.from('invoice_lines').select('*')
+    .order('invoice_id',{ascending:false}).order('line_no');
+  invoiceLinesReady = !error;
+  invoiceLines = (data||[]).map(r=>({id:r.id, invoiceId:r.invoice_id, lineNo:r.line_no,
+    rawProject:r.raw_project||'', project:r.project||'', workDate:r.work_date||'',
+    name:r.name||'', qty:(r.qty==null?null:Number(r.qty)), unit:r.unit||'',
+    amount:Number(r.amount)||0, costType:r.cost_type||'材料費', note:r.note||''}));
+}
+
+// 読み取った明細を入れ直す（同じ請求書の分は一度消してから入れる）
+async function dbReplaceInvoiceLines(invoiceId, lines){
+  const { error: delErr } = await sb.from('invoice_lines').delete().eq('invoice_id', invoiceId);
+  if(delErr){ showToast('明細の入れ替えに失敗しました：'+delErr.message); throw delErr; }
+  if(!lines.length) return;
+  const rows = lines.map((l,i)=>({
+    invoice_id:invoiceId, line_no:i,
+    raw_project:l.rawProject||'', project:l.project||'',
+    work_date:l.workDate||null, name:l.name||'',
+    qty:(l.qty==null?null:l.qty), unit:l.unit||'',
+    amount:Math.round(l.amount)||0, cost_type:l.costType||'材料費', note:l.note||''
+  }));
+  const { error } = await sb.from('invoice_lines').insert(rows);
+  if(error){
+    showToast(/invoice_lines/.test(error.message||'') && error.code==='42P01'
+      ? 'データベースの準備が必要です。supabase/migration-genba58.sql を実行してください'
+      : '明細の保存に失敗しました：'+error.message);
+    throw error;
+  }
+}
+
+// 1行の割り当て先（現場）を変える
+async function dbSetInvoiceLineProject(id, project){
+  const { error } = await sb.from('invoice_lines').update({ project:project||'' }).eq('id', id);
+  if(error){ showToast('割り当ての保存に失敗しました：'+error.message); throw error; }
 }
 
 // 支払の記録を書き換える（管理者のみ。DB側のトリガーでも発注先を止めている）

@@ -1,8 +1,9 @@
 // 届いた請求書（PDF・写真）を読み取って、請求額などを取り出すEdge Function。
 //
-// 発注先が金額を入れ忘れても合計が出るように、また登録番号（インボイス）の
-// 確認ができるようにするためのもの。読み取るのは要点だけで、明細の行は読まない
-// （原価は発注のときに登録済みのため）。
+// 読み取るのは2つ。
+//   ・要点（請求金額・登録番号・支払期限など）… 合計の確認とインボイスの照合に使う
+//   ・明細の行（日付・現場名・品名・金額）    … 現場ごとの請求原価として使う
+// 現場名は請求書に書かれているまま返し、どの案件に当てるかは画面側で決める。
 //
 // 呼び出し方は他と違い、ファイルの中身ではなく「保管場所の場所（filePath）」を受ける。
 // 請求書はすでに invoices バケットに入っているので、そこから読み出したほうが
@@ -22,9 +23,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const PROMPT = `これは取引先から届いた請求書です。要点だけを save_invoice の道具で返してください。
+const PROMPT = `これは取引先から届いた請求書です。要点と明細を save_invoice の道具で返してください。
 
-読み取り方:
+明細（lines）の読み取り方:
+- 請求書に並んでいる1行を、そのまま1つとして返す
+- project には、その行の「現場名」「納品先」「物件名」を書かれているまま入れる。
+  行に無くても、その上の見出し行やまとまりの見出しに現場名があれば、それを引き継いで入れる。
+  どこにも無ければ空文字にする（勝手に推測しない）
+- name は品名。qty は数量、unit は単位。書かれていなければ省く
+- amount はその行の金額。税抜で書かれていればそのまま。金額の無い見出し行は返さない
+- date は納品日など行の日付（2026-08-05 の形）。無ければ空文字
+- 小計・消費税・合計・繰越・前月請求額・入金額の行は明細に含めない
+- 行が多いときは、金額のある行をすべて返す
+
+要点の読み取り方:
 - total は「ご請求金額」「合計」など、実際に支払う税込の総額（1つだけ）
 - subtotal は税抜の小計、tax は消費税額。書かれていなければ省く
 - regNo は適格請求書発行事業者の登録番号。「T」＋数字13桁の形。
@@ -49,6 +61,22 @@ const TOOL = {
       month: { type: "string", description: "請求の対象月（YYYY-MM）。無ければ空文字" },
       issuer: { type: "string", description: "請求書を出した会社名" },
       dueOn: { type: "string", description: "支払期限（YYYY-MM-DD）。無ければ空文字" },
+      lines: {
+        type: "array",
+        description: "請求書の明細。金額のある行をすべて",
+        items: {
+          type: "object",
+          properties: {
+            project: { type: "string", description: "その行の現場名・納品先。無ければ空文字" },
+            date: { type: "string", description: "行の日付（YYYY-MM-DD）。無ければ空文字" },
+            name: { type: "string", description: "品名" },
+            qty: { type: "number", description: "数量" },
+            unit: { type: "string", description: "単位" },
+            amount: { type: "number", description: "その行の金額" },
+          },
+          required: ["amount"],
+        },
+      },
     },
     required: ["total"],
   },
@@ -101,7 +129,7 @@ Deno.serve(async (req) => {
 
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 2000,
+      max_tokens: 12000,   // 明細が多い請求書でも途中で切れないように
       tools: [TOOL],
       tool_choice: { type: "tool", name: "save_invoice" },
       messages: [{
@@ -130,10 +158,27 @@ Deno.serve(async (req) => {
     const month = String(use.input?.month || "").trim();
     const dueOn = String(use.input?.dueOn || "").trim();
 
+    // 明細。現場名は書かれているまま返し、どの案件に当てるかは画面側で決める
+    const lines = ((use.input?.lines) || [])
+      .map((l: any) => {
+        const d = String(l.date || "").trim();
+        return {
+          project: String(l.project || "").trim(),
+          date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : "",
+          name: String(l.name || "").trim(),
+          qty: l.qty === null || l.qty === undefined ? null : Number(l.qty),
+          unit: String(l.unit || "").trim(),
+          amount: num(l.amount) ?? 0,
+        };
+      })
+      .filter((l: any) => l.amount || l.name);
+
     return json({
       total: num(use.input?.total),
       subtotal: num(use.input?.subtotal),
       tax: num(use.input?.tax),
+      lines,
+      linesTruncated: message.stop_reason === "max_tokens",
       regNo: /^T\d{13}$/.test(regNo) ? regNo : "",
       month: /^\d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : "",
       dueOn: /^\d{4}-\d{2}-\d{2}$/.test(dueOn) ? dueOn : "",

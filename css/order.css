@@ -193,3 +193,25 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .item-pick-card.zosaku-add{background:var(--accent-bg);border-bottom:0.5px dashed var(--accent)}
 .item-pick-card.zosaku-add .ipc-name{color:var(--accent-t);font-weight:800}
 .item-pick-card.zosaku-add:hover{background:var(--accent-bg);filter:brightness(.97)}
+
+/* ── 請求書の明細を現場に割り当てる ── */
+.il-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:0.5px solid var(--border)}
+.il-row:last-child{border-bottom:none}
+.il-row.need{background:var(--warn-bg)}
+.il-main{flex:1;min-width:0}
+.il-name{font-size:12.5px;font-weight:600;overflow-wrap:anywhere}
+.il-meta{font-size:11px;color:var(--text-sub);margin-top:2px}
+.il-raw{color:var(--text-muted)}
+.il-raw.none{color:var(--warn-t);font-weight:700}
+.il-row select{width:150px;flex:none;font-size:11px;padding:3px 5px}
+.il-sum{margin-top:8px;padding:9px 11px;background:var(--surface2);border-radius:8px;font-size:12px}
+.il-sum-row{display:flex;justify-content:space-between;gap:10px;line-height:1.9}
+.il-sum-row.total{border-top:0.5px solid var(--border);margin-top:4px;padding-top:4px;font-weight:700}
+.il-sum-note{font-size:10px;color:var(--text-muted);margin-top:3px;line-height:1.6}
+.il-need{color:var(--warn-t);font-weight:700;margin-bottom:4px}
+.il-ok{color:var(--ok-t);font-weight:700;margin-bottom:4px}
+@media(max-width:599px){
+  .il-row{flex-wrap:wrap}
+  .il-main{width:100%}
+  .il-row select{width:100%}
+}

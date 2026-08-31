@@ -181,7 +181,10 @@ function invRowHtml(v){
         ${v.note?`<div style="font-size:11px;color:var(--text-muted)">${esc(v.note)}</div>`:''}
       </div>
       <button class="btn xs primary" onclick="openInvoice(${v.id})">開く</button>
-      ${invIsStaff()?`<button class="btn xs" onclick="readInvoiceWithAi(${v.id})">AIで読む</button>
+      ${invIsStaff()?`<button class="btn xs" onclick="openInvoiceLines(${v.id})">明細を現場に${
+        ilLineCount(v.id) ? (ilUnassignedCount(v.id)
+          ? `（<b style="color:var(--danger)">残${ilUnassignedCount(v.id)}</b>）` : '（済）') : ''}</button>
+      <button class="btn xs" onclick="readInvoiceWithAi(${v.id})">AIで読む</button>
       <button class="btn xs" onclick="openInvoicePay(${v.id})">支払</button>
       <button class="btn xs danger" onclick="deleteInvoice(${v.id})">削除</button>`:''}
     </div>
