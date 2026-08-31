@@ -31,6 +31,12 @@ async function gbCompressImage(file){
 async function onFbPhotoInput(input){
   const files = [...(input.files||[])];
   input.value = '';
+  await fbUploadPhotos(files);
+}
+
+// 写真を登録する。「＋ 写真」からも、ドラッグして落としたときも、ここを通る
+async function fbUploadPhotos(files){
+  files = [...(files||[])];
   if(!files.length) return;
   if(!fbProjectId){ showToast('先に工事（案件）を選択してください'); return; }
   const projectId = fbProjectId, folderId = fbFolderId;

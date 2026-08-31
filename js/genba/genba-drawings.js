@@ -4,6 +4,12 @@
 async function onFbDrawingInput(input){
   const files = [...(input.files||[])];
   input.value = '';
+  await fbUploadDrawings(files);
+}
+
+// 図面・書類を登録する。「＋ 図面」からも、ドラッグして落としたときも、ここを通る
+async function fbUploadDrawings(files){
+  files = [...(files||[])];
   if(!files.length) return;
   if(!fbProjectId){ showToast('先に工事（案件）を選択してください'); return; }
   const projectId = fbProjectId, folderId = fbFolderId;

@@ -195,3 +195,17 @@ table.otpay-tbl td.minus{color:#8a2018}
 .labor-rate{margin-top:12px;border:0.5px solid var(--border);border-radius:8px;padding:9px 11px}
 .labor-rate-head{font-size:12px;font-weight:700;margin-bottom:4px}
 .labor-rate-note{font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:7px}
+
+/* ── 現場資料：ドラッグして落として登録する ── */
+.fb-can-drop{position:relative}
+.fb-drop-hint{font-size:10px;color:var(--text-muted);margin:-4px 0 8px 2px}
+/* 指で操作する端末には出さない（落とせないため） */
+@media(hover:none){ .fb-drop-hint{display:none} }
+.fb-dragover{outline:2px dashed var(--accent);outline-offset:4px;border-radius:10px;background:var(--accent-bg)}
+.fb-dragover::after{
+  content:'ここに落として登録';
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:800;color:var(--accent-t);
+  background:color-mix(in srgb, var(--accent-bg) 88%, transparent);
+  border-radius:10px;pointer-events:none;z-index:5
+}

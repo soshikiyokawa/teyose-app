@@ -106,7 +106,8 @@ function renderFB(){
         ${supplierReadOnly ? '' : `<button class="btn xs" onclick="fbNewFolder()">＋ フォルダ</button>`}
         ${canAdd ? `<button class="btn xs primary" id="fb-add-btn" onclick="document.getElementById('${inputId}').click()">${addLabel}</button>` : ''}
       </div>
-    </div>`;
+    </div>
+    ${canAdd ? `<div class="fb-drop-hint">${addLabel.replace('＋ ','')}はここにドラッグしても登録できます（いま開いているフォルダに入ります）</div>` : ''}`;
 
   if(missingDocs.length){
     html += `<div class="fb-doc-hint">
@@ -137,6 +138,41 @@ function renderFB(){
   // ファイル一覧（現在のフォルダ直下）
   html += fbKind==='photo' ? fbPhotoGridHtml() : fbDrawingListHtml();
   wrap.innerHTML = html;
+  fbSetupDrop(wrap, canAdd);
+}
+
+// ── ドラッグして落として登録する ──
+//
+// パソコンでは、図面や写真をこの枠に落とすだけで、いま開いているフォルダに入る。
+// 「＋ 図面」を押したときと同じ登録の道を通る。
+// 登録できない立場（発注先の図面など）のときは受け付けない。
+function fbSetupDrop(wrap, canAdd){
+  wrap.classList.toggle('fb-can-drop', !!canAdd);
+  if(wrap.dataset.dropReady) return;    // 付けるのは1回だけ（描き直しても外れない）
+  wrap.dataset.dropReady = '1';
+
+  let depth = 0;   // 中の要素をまたぐたびに leave が飛ぶので、数えて判断する
+  const hasFiles = e => [...(e.dataTransfer?.types||[])].includes('Files');
+  const off = () => { depth = 0; wrap.classList.remove('fb-dragover'); };
+
+  wrap.addEventListener('dragenter', e=>{
+    if(!hasFiles(e) || !wrap.classList.contains('fb-can-drop')) return;
+    e.preventDefault(); depth++; wrap.classList.add('fb-dragover');
+  });
+  wrap.addEventListener('dragover', e=>{
+    if(!hasFiles(e) || !wrap.classList.contains('fb-can-drop')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  wrap.addEventListener('dragleave', ()=>{ if(--depth <= 0) off(); });
+  wrap.addEventListener('drop', e=>{
+    if(!hasFiles(e) || !wrap.classList.contains('fb-can-drop')) return;
+    e.preventDefault(); off();
+    const files = [...(e.dataTransfer?.files||[])];
+    if(!files.length) return;
+    if(fbKind==='photo') fbUploadPhotos(files);
+    else fbUploadDrawings(files);
+  });
 }
 
 // ── フォルダ操作 ──
