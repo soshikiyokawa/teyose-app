@@ -131,7 +131,8 @@ function renderItemSelectList(){
           <span class="ipc-name">${n}</span>
           <span class="ipc-spec">${s}</span>
         </div>
-        <div class="ipc-meta">${m.cat}${inCart?` · カート: ${inCart.qty}${m.unit}`:'　／　タップして追加'}</div>
+        <div class="ipc-meta">${m.cat}${m.perBundle?` · 1束=${m.perBundle}${m.unit}`:''}${
+          inCart?` · カート: ${inCart.qty}${m.unit}${bundleNote(m, inCart.qty)}`:'　／　タップして追加'}</div>
       </div>
       <div class="ipc-price">原価 ¥${fmt(itemCurrentCost(m))}/${m.unit}</div>
     </div>`;
@@ -147,13 +148,19 @@ function openQtyModal(itemId){
   const inCart=cart.find(c=>c.id===itemId);
   document.getElementById('qty-modal-title').textContent=inCart?'数量を変更':'数量を入力';
   document.getElementById('qty-item-name').textContent=pendingItem.name;
-  document.getElementById('qty-item-meta').textContent=`原価 ¥${fmt(pendingItem.cost)}/${pendingItem.unit}　発注先：${pendingItem.supplier}`;
+  document.getElementById('qty-item-meta').textContent=`原価 ¥${fmt(pendingItem.cost)}/${pendingItem.unit}　発注先：${pendingItem.supplier}`
+    + (pendingItem.perBundle?`　1束=${pendingItem.perBundle}${pendingItem.unit}`:'');
   document.getElementById('qty-unit-label').textContent=pendingItem.unit;
   document.getElementById('qty-input').value=inCart?inCart.qty:1;
   // クイック選択ボタン
   const quicks=[1,2,3,5,10,20];
-  document.getElementById('qty-quick-btns').innerHTML=quicks.map(n=>`
-    <button class="btn sm" onclick="document.getElementById('qty-input').value=${n}" style="min-width:44px;justify-content:center">${n}${pendingItem.unit}</button>`).join('');
+  const per=Number(pendingItem.perBundle)||0;
+  document.getElementById('qty-quick-btns').innerHTML=
+    quicks.map(n=>`
+    <button class="btn sm" onclick="document.getElementById('qty-input').value=${n}" style="min-width:44px;justify-content:center">${n}${pendingItem.unit}</button>`).join('')
+    // 束で届く品目は、束のボタンも出す（1束=何本かはマスタで決めてある）
+    + (per ? [1,2,3,5].map(b=>`
+    <button class="btn sm wood" onclick="document.getElementById('qty-input').value=${b*per}" style="min-width:52px;justify-content:center">${b}束<span style="font-size:10px;opacity:.8">(${b*per})</span></button>`).join('') : '');
   document.getElementById('qty-modal').classList.add('open');
   setTimeout(()=>document.getElementById('qty-input').focus(),100);
 }
@@ -261,6 +268,19 @@ function zosakuToQty(){
   setTimeout(()=>document.getElementById('qty-input').focus(),100);
 }
 
+// ── 1束あたりの本数 ──
+//
+// 木材は束で届くので、本数を入れたときに「＝何束か」を添える。
+// ちょうど割り切れないときは「2束＋3本」のように出す。
+function bundleNote(item, qty){
+  const per=Number(item?.perBundle)||0;
+  const n=Number(qty)||0;
+  if(!per || !n) return '';
+  const b=Math.floor(n/per), r=Math.round((n-b*per)*100)/100;
+  if(!b) return '';
+  return `（${b}束${r?`＋${r}${item.unit||'本'}`:''}）`;
+}
+
 // ── メーカー送料 ──
 //
 // 品目に登録したメーカー送料を、発注のときに足す。
@@ -288,7 +308,8 @@ function renderCart(){
         <div style="font-size:13px;font-weight:500">${c.name}</div>
         <div style="font-size:11px;color:var(--text-muted)">¥${fmt(c.cost)}/${c.unit}${
           cartUnitShipping(c) ? `　＋送料 ¥${fmt(cartUnitShipping(c))}/${c.unit}` : ''}${
-          (c.shipping && c.shippingPer!=='unit') ? `　＋送料 ¥${fmt(c.shipping)}（1回）` : ''}</div>
+          (c.shipping && c.shippingPer!=='unit') ? `　＋送料 ¥${fmt(c.shipping)}（1回）` : ''}${
+          bundleNote(c, c.qty)}</div>
       </div>
       <div class="qty-ctrl">
         <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>

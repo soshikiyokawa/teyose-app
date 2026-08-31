@@ -110,7 +110,7 @@ function openMasterEdit(id){
   document.getElementById('master-modal-title').textContent=editingMasterId===-1?'品目を追加':'品目を編集';
   renderMasterCatList();
   if(editingMasterId===-1){
-    ['m-name','m-unit','m-maker-code','m-shipping'].forEach(i=>document.getElementById(i).value='');
+    ['m-name','m-unit','m-maker-code','m-shipping','m-bundle'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('m-shipping-per').value='order';
     ['m-price','m-cost'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('m-cat').value='木材';
@@ -126,8 +126,10 @@ function openMasterEdit(id){
     document.getElementById('m-maker-code').value=m.makerCode||'';
     document.getElementById('m-shipping').value=m.shipping||'';
     document.getElementById('m-shipping-per').value=m.shippingPer||'order';
+    document.getElementById('m-bundle').value=m.perBundle||'';
   }
   masterShippingSync();
+  masterBundleSync();
   masterMakerCodeSync();
   const askBox=document.getElementById('m-ask-price');
   if(askBox) delete askBox.dataset.touched;   // 開くたびに自動判定に戻す
@@ -269,7 +271,8 @@ async function saveMasterItem(){
     supplier: document.getElementById('m-supplier-sel').value,
     makerCode: document.getElementById('m-maker-code').value.trim(),
     shipping: masterShippingValue(),
-    shippingPer: document.getElementById('m-shipping-per').value==='unit' ? 'unit' : 'order'
+    shippingPer: document.getElementById('m-shipping-per').value==='unit' ? 'unit' : 'order',
+    perBundle: masterBundleValue()
   };
   if(!item.name){alert('品目名を入力してください');return;}
 
@@ -325,7 +328,7 @@ async function saveMasterItem(){
 //   1回の発注につき … 何本頼んでも送料は1回ぶん。発注書には送料の行が別に出る
 //   1つごとに      … 単価に足し込む（5本なら送料も5回ぶん）
 function masterShippingValue(){
-  const v=String(document.getElementById('m-shipping')?.value||'').replace(/[^d]/g,'');
+  const v=String(document.getElementById('m-shipping')?.value||'').replace(/[^0-9]/g,'');
   return Math.max(0, Math.min(9999999, parseInt(v)||0));
 }
 function masterShippingSync(){
@@ -338,4 +341,28 @@ function masterShippingSync(){
   note.innerHTML = per==='unit'
     ? `5つ発注すると、送料は ¥${fmt(s*5)}（1つあたり ¥${fmt(s)}）。発注書の単価は ¥${fmt(cost)}＋¥${fmt(s)}＝<b>¥${fmt(cost+s)}</b> で出ます`
     : `何個発注しても送料は ¥${fmt(s)}。発注書には「送料」の行として別に出ます`;
+}
+
+
+// ── 1束あたりの本数（大林製材の木材など） ──
+//
+// 木材は束で届くので、本数と束数を行き来できるようにする。
+// 束の考え方がある発注先のときだけ欄を出す（造作材発注と同じ判定）。
+function masterBundleValue(){
+  const v=String(document.getElementById('m-bundle')?.value||'').replace(/[^0-9]/g,'');
+  return Math.max(0, Math.min(9999, parseInt(v)||0));
+}
+function masterBundleSync(){
+  const wrap=document.getElementById('m-bundle-wrap');
+  if(!wrap) return;
+  const supName=document.getElementById('m-supplier-sel')?.value||'';
+  const show = (typeof ZOSAKU_SUPPLIER!=='undefined') && ZOSAKU_SUPPLIER.test(supName);
+  wrap.style.display = show ? '' : 'none';
+  if(!show) return;
+  const n=masterBundleValue();
+  const unit=document.getElementById('m-unit')?.value.trim()||'本';
+  const note=document.getElementById('m-bundle-note');
+  if(note) note.textContent = n
+    ? `1束 = ${n}${unit}。発注のときに束でも数えられます（例：3束＝${n*3}${unit}）`
+    : '束で届く木材だけ入れてください。0や空のままなら束では扱いません';
 }

@@ -30,7 +30,8 @@ async function fetchAllData(){
   if(itemErr) throw itemErr;
   master = itemRows.map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,price:Number(r.price),cost:Number(r.cost),supplier:supplierNameById(r.supplier_id),sortOrder:r.sort_order,
     makerCode:r.maker_code||'', webPrice:(r.web_price==null?null:Number(r.web_price)), webPriceAt:r.web_price_at||'',
-    shipping:Number(r.shipping)||0, shippingPer:(r.shipping_per==='unit'?'unit':'order')}));
+    shipping:Number(r.shipping)||0, shippingPer:(r.shipping_per==='unit'?'unit':'order'),
+    perBundle:Number(r.per_bundle)||0}));
   masterIdSeq = Math.max(0,...master.map(m=>m.id))+1;
 
   await fetchChatData();
@@ -263,7 +264,7 @@ function stripMakerCode(payload){
 async function dbAddMasterItem(item){
   const supplier_id = supplierIdByName(item.supplier);
   const row = {cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id,maker_code:item.makerCode||'',
-    shipping:item.shipping||0, shipping_per:item.shippingPer||'order'};
+    shipping:item.shipping||0, shipping_per:item.shippingPer||'order', per_bundle:item.perBundle||0};
   let { data, error } = await sb.from('master_items').insert(row).select().single();
   if(error && /maker_code/.test(error.message||'')){
     makerCodeColumnReady = false;
@@ -276,9 +277,10 @@ async function dbUpdateMasterItem(id,item){
   const supplier_id = supplierIdByName(item.supplier);
   const payload = currentUserRole!=='supplier'
     ? {cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id,maker_code:item.makerCode||'',
-       shipping:item.shipping||0, shipping_per:item.shippingPer||'order'}
+       shipping:item.shipping||0, shipping_per:item.shippingPer||'order', per_bundle:item.perBundle||0}
     // 発注先は原価とメーカー送料だけ更新できる（品目名などはDB側のトリガーでも止めている）
-    : {price:item.price,cost:item.cost, shipping:item.shipping||0, shipping_per:item.shippingPer||'order'};
+    : {price:item.price,cost:item.cost, shipping:item.shipping||0, shipping_per:item.shippingPer||'order',
+       per_bundle:item.perBundle||0};
   let { error } = await sb.from('master_items').update(payload).eq('id',id);
   if(error && /maker_code/.test(error.message||'')){
     makerCodeColumnReady = false;
