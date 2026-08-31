@@ -45,7 +45,10 @@ function drawingViewsLabel(id){
 
 // 表示中フォルダ直下の図面一覧
 function fbDrawingListHtml(){
-  const list = drawings.filter(d=>d.projectId===fbProjectId && (d.kind||'drawing')===fbKind && (d.folderId||null)===(fbFolderId||null));
+  // 名前の昇順で並べる。数字は数として比べるので A-2 が A-10 より前に来る
+  const list = drawings
+    .filter(d=>d.projectId===fbProjectId && (d.kind||'drawing')===fbKind && (d.folderId||null)===(fbFolderId||null))
+    .sort((a,b)=>String(a.fileName||'').localeCompare(String(b.fileName||''),'ja',{numeric:true}));
   const label = FB_LABEL[fbKind] || '図面';
   if(!list.length) return currentUserRole==='supplier'
     ? `<div class="empty">このフォルダに${label}はありません</div>`
