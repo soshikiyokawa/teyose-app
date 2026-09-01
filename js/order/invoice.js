@@ -233,6 +233,7 @@ function renderInvoiceForm(){
         <input type="number" id="invc-amount" placeholder="0" style="width:110px;font-size:12px;padding:3px 6px;text-align:right">
       </div>
       <input type="file" id="invc-file" accept="application/pdf,image/*" style="font-size:12px;width:100%">
+      <div class="invc-drop-hint">PDFや写真は、この枠にドラッグしても入ります</div>
       <input id="invc-note" placeholder="備考（任意）" style="font-size:12px;margin-top:8px">
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
         <span style="font-size:11px;color:var(--text-muted);flex:1" id="invc-hint">
@@ -240,6 +241,48 @@ function renderInvoiceForm(){
         <button class="btn primary" id="invc-send" onclick="sendInvoice()">送信</button>
       </div>
     </div>`;
+  invSetupDrop(wrap);
+}
+
+// ── ドラッグして落として選ぶ ──
+//
+// 落としたファイルは「ファイルを選ぶ」で選んだのと同じ扱いにする。
+// 請求月や請求額を入れてもらうため、送信まではせず、選んだ状態にするだけ。
+function invSetupDrop(wrap){
+  if(wrap.dataset.dropReady) return;   // 付けるのは1回だけ
+  wrap.dataset.dropReady='1';
+
+  let depth=0;
+  const hasFiles = e => [...(e.dataTransfer?.types||[])].includes('Files');
+  const off = () => { depth=0; wrap.classList.remove('invc-dragover'); };
+
+  wrap.addEventListener('dragenter', e=>{
+    if(!hasFiles(e)) return;
+    e.preventDefault(); depth++; wrap.classList.add('invc-dragover');
+  });
+  wrap.addEventListener('dragover', e=>{
+    if(!hasFiles(e)) return;
+    e.preventDefault(); e.dataTransfer.dropEffect='copy';
+  });
+  wrap.addEventListener('dragleave', ()=>{ if(--depth<=0) off(); });
+  wrap.addEventListener('drop', e=>{
+    if(!hasFiles(e)) return;
+    e.preventDefault(); off();
+    const files=[...(e.dataTransfer?.files||[])];
+    if(!files.length) return;
+    const f=files[0];
+    const ok = /pdf/i.test(f.type) || (f.type||'').startsWith('image/') || /\.(pdf|jpe?g|png|heic|webp)$/i.test(f.name);
+    if(!ok){ showToast('PDFか写真を落としてください'); return; }
+    // ファイル選択の欄に入れる（送信の処理はこれまでどおりそこを見る）
+    const dt=new DataTransfer();
+    dt.items.add(f);
+    const el=document.getElementById('invc-file');
+    if(!el) return;
+    el.files=dt.files;
+    showToast(files.length>1
+      ? `${f.name} を選びました（請求書は1件ずつ送ってください）`
+      : `${f.name} を選びました`);
+  });
 }
 
 async function sendInvoice(){

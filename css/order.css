@@ -215,3 +215,16 @@ body.drag-sorting .drag-handle{cursor:grabbing}
   .il-main{width:100%}
   .il-row select{width:100%}
 }
+
+/* 請求書：ドラッグして落として選ぶ */
+#invoice-form{position:relative}
+.invc-drop-hint{font-size:10px;color:var(--text-muted);margin-top:4px}
+@media(hover:none){ .invc-drop-hint{display:none} }
+.invc-dragover{outline:2px dashed var(--accent);outline-offset:3px;border-radius:10px}
+.invc-dragover::after{
+  content:'ここに落として選ぶ';
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:800;color:var(--accent-t);
+  background:color-mix(in srgb, var(--accent-bg) 90%, transparent);
+  border-radius:10px;pointer-events:none;z-index:5
+}
