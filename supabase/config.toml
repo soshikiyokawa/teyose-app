@@ -35,3 +35,7 @@ verify_jwt = true
 # pg_cron から呼ぶので verify_jwt は false（x-remind-secret で守る）
 [functions.invoice-remind]
 verify_jwt = false
+
+# pg_cron から呼ぶので verify_jwt は false（x-remind-secret で守る）
+[functions.flush-notifications]
+verify_jwt = false

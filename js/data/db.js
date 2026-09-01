@@ -1297,20 +1297,19 @@ async function dbSendPush(targetRole, targetSupplierId, title, body, excludeUser
 async function dbSendPushToUser(targetUserId, title, body, tab){
   await sb.functions.invoke('send-push', { body: { targetRole:'user', targetUserId, title, body, tab } });
 }
-// 表示名で宛先を指定して送信（残業承認者への通知用）。21時〜翌7時は送らない（cronのリマインドに任せる）
+// 表示名で宛先を指定して送信（残業承認者・タスクの引き継ぎなど）。
+// 21時〜翌7時のぶんは鳴らさず、サーバー側でいったん預かって翌朝7時に届く
+// （以前はここで捨てていたため、夜の連絡が消えていた。migration-genba60.sql）
 async function dbSendPushToNames(targetNames, title, body, tab){
-  if(isQuietHoursJST()) return;
   await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body, tab } });
 }
-// 表示名で宛先を指定して、時間帯にかかわらず送る。
-// 発注先チャットの宛先指定に使う（発注先への通知はもともと夜でも送っているので、
-// 宛先を選んだときだけ届かなくなると分かりにくいため）
+// 上と同じ。以前は「夜でも鳴らす」ために分けていたが、いまは夜のぶんも
+// 捨てずに翌朝届くので、呼び分ける必要はない（呼び出し側はそのまま残してある）
 async function dbSendPushToNamesNow(targetNames, title, body, tab){
   await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body, tab } });
 }
 // 役割（staff など）でまとめて通知する
 async function dbSendPushToRole(targetRole, title, body, tab){
-  if(isQuietHoursJST()) return;
   await sb.functions.invoke('send-push', { body: { targetRole, title, body, tab } });
 }
 

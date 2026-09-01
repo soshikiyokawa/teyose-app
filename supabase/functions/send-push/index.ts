@@ -65,6 +65,26 @@ Deno.serve(async (req) => {
 
     if (!targetUserIds.length) return json({ sent: 0 });
 
+    // ── 夜のあいだは預かって、翌朝7時に届ける ──
+    //
+    // 21時〜翌7時に鳴らさないのはこれまでどおり。ただし以前はその場で捨てていたため、
+    // タスクの引き継ぎのような「相手に手を動かしてもらう連絡」が消えていた。
+    // 預かったものは flush-notifications（毎朝7時）が届ける。
+    // 通知履歴もそのときに残すので、履歴と実際に届いたものが食い違わない。
+    if (isQuietHoursJST()) {
+      const rows = targetUserIds.map((id: string) => ({
+        user_id: id, title: title || "手寄", body: body || "", tab: tab || null,
+        kind: String(targetRole || ""),
+      }));
+      const { error } = await admin.from("pending_notifications").insert(rows);
+      if (error) {
+        // 預かれないときは、捨てずにそのまま送る（届かないよりは鳴るほうがよい）
+        console.warn("夜間の通知を預かれませんでした。そのまま送ります", error.message);
+      } else {
+        return json({ sent: 0, queued: rows.length, reason: "quiet-hours" });
+      }
+    }
+
     // 後から読み返せるように、送る相手ぶんの通知履歴を残す
     await logNotifications(admin, targetUserIds, { title, body, tab }, String(targetRole || ""));
 
@@ -93,6 +113,12 @@ Deno.serve(async (req) => {
     return json({ error: String((e as any)?.message || e) }, 500);
   }
 });
+
+// 日本時間で21時〜翌7時かどうか（画面側の isQuietHoursJST と同じ区切り）
+function isQuietHoursJST() {
+  const h = new Date(Date.now() + 9 * 3600 * 1000).getUTCHours();
+  return h >= 21 || h < 7;
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
