@@ -42,6 +42,7 @@ function selectSupplier(id){
   renderCatFilter();
   renderItemSelectList();
   renderCart();
+  renderOrderDueNote();
 }
 
 // 発注の紐づけ先（案件 or 在庫分）の選択肢。サイドバーで選択中の案件を初期値にする
@@ -55,6 +56,37 @@ function renderOrderProjectSelect(){
   el.value = prev || selectedProjectName || '';
   if(el.selectedIndex<0) el.selectedIndex=0;
   updateOrderPreviewBtnState();
+}
+
+// ── 納品希望日の「最短」 ──
+//
+// いちばん早い納品日は翌日。ただし日曜は建材屋が動かないので月曜にする。
+// あくまで初期値なので、入れたあとから直せる。
+function orderSoonestDue(){
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  if(d.getDay() === 0) d.setDate(d.getDate() + 1);   // 日曜は飛ばす
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function setOrderDueSoonest(){
+  const el = document.getElementById('order-due-date');
+  if(!el) return;
+  el.value = orderSoonestDue();
+  updateOrderPreviewBtnState();
+  renderOrderDueNote();
+}
+// 入れた日が何曜日か、今日から何日後かを小さく添える
+function renderOrderDueNote(){
+  const note = document.getElementById('order-due-note');
+  const v = document.getElementById('order-due-date')?.value;
+  if(!note) return;
+  if(!v){ note.textContent = ''; return; }
+  const [y,m,d] = v.split('-').map(Number);
+  const t = new Date(y, m-1, d);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = Math.round((t - today) / 86400000);
+  const w = ['日','月','火','水','木','金','土'][t.getDay()];
+  note.textContent = `${m}/${d}（${w}）　${days===0?'本日':days===1?'明日':days>0?`${days}日後`:`${-days}日前`}`;
 }
 
 function backToStep1(){
