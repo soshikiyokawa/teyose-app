@@ -42,6 +42,7 @@ function selectSupplier(id){
   renderCatFilter();
   renderItemSelectList();
   renderCart();
+  orderDueAsap = false;
   renderOrderDueNote();
 }
 
@@ -62,6 +63,15 @@ function renderOrderProjectSelect(){
 //
 // いちばん早い納品日は翌日。ただし日曜は建材屋が動かないので月曜にする。
 // あくまで初期値なので、入れたあとから直せる。
+//
+// 「最短」で出した発注は、発注書にも日付ではなく「最短」と書いて渡す。
+// 日付そのものは社内の納期の目安として持っておく。
+let orderDueAsap = false;
+// 発注書に出す納品希望日の書き方
+function orderDueLabel(o){
+  if(o?.dueAsap) return '最短';
+  return o?.dueDate || '未指定';
+}
 function orderSoonestDue(){
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -72,6 +82,13 @@ function setOrderDueSoonest(){
   const el = document.getElementById('order-due-date');
   if(!el) return;
   el.value = orderSoonestDue();
+  orderDueAsap = true;
+  updateOrderPreviewBtnState();
+  renderOrderDueNote();
+}
+// 手で日付を選んだら「最短」ではなくなる
+function orderDueChanged(){
+  orderDueAsap = false;
   updateOrderPreviewBtnState();
   renderOrderDueNote();
 }
@@ -86,7 +103,10 @@ function renderOrderDueNote(){
   const today = new Date(); today.setHours(0,0,0,0);
   const days = Math.round((t - today) / 86400000);
   const w = ['日','月','火','水','木','金','土'][t.getDay()];
-  note.textContent = `${m}/${d}（${w}）　${days===0?'本日':days===1?'明日':days>0?`${days}日後`:`${-days}日前`}`;
+  const when = days===0?'本日':days===1?'明日':days>0?`${days}日後`:`${-days}日前`;
+  note.innerHTML = orderDueAsap
+    ? `<b style="color:var(--accent-t)">「最短」で伝えます</b>（目安 ${m}/${d}（${w}）・${when}）`
+    : `${m}/${d}（${w}）　${when}`;
 }
 
 function backToStep1(){

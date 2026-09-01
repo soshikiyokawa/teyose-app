@@ -30,24 +30,33 @@ const origPrice = (it: any) =>
 
 // 数字が間延びするのを防ぐ。
 //
-// pdf-lib は「文字コードから引ける字形」の幅しかPDFに書き込まない。
-// ところがフォントは、英字と数字が並ぶ型番（SUS410 など）のとき、数字を別の字形に
-// 置き換える。その字形の幅がPDFに無いため、閲覧ソフトが既定の全角幅で描いてしまい、
+// フォントは、英字と数字が並ぶ型番（SUS410 など）のとき、数字を別の字形に置き換える。
+// その字形の幅はPDFに書かれないため、閲覧ソフトが既定の全角幅で描いてしまい、
 // 「SUS4 1 0」のように数字だけ間延びしていた（電話番号も同じ）。
-// フォントに入っている全ての字形の幅を書き込むことで、どの字形でも正しい幅になる。
-function embedAllGlyphWidths(pdfFont: any) {
-  try {
-    const emb = pdfFont?.embedder;
-    const fk = emb?.font;
-    if (!emb || !fk?.numGlyphs) return;
-    const scale = 1000 / fk.unitsPerEm;
-    const widths: number[] = [];
-    for (let id = 0; id < fk.numGlyphs; id++) {
-      widths.push(Math.round((fk.getGlyph(id)?.advanceWidth || 0) * scale));
-    }
-    emb.computeWidths = () => [0, widths];   // 0番の字形から順に全ての幅
-  } catch (e) {
-    console.warn("字形の幅の書き込みに失敗しました（数字が間延びする可能性）", e);
+//
+// 英字と数字の境目で分けて描くと、数字だけの並びには置き換えが起きないので、
+// 幅も、PDFからの文字の取り出し（検索・コピー）も正しくなる。
+function splitRuns(text: string): string[] {
+  const out: string[] = [];
+  let cur = "", curKind = "";
+  for (const ch of Array.from(text)) {
+    const kind = /[0-9]/.test(ch) ? "d" : /[A-Za-z]/.test(ch) ? "a" : "o";
+    if (cur && kind !== curKind && (kind === "d" || curKind === "d")) { out.push(cur); cur = ""; }
+    cur += ch;
+    curKind = kind;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+function textWidth(font: any, text: string, size: number): number {
+  return splitRuns(text).reduce((w, r) => w + font.widthOfTextAtSize(r, size), 0);
+}
+// 分けた並びを、続けて見えるように順に置いていく
+function drawRuns(page: any, text: string, opts: any) {
+  let x = opts.x;
+  for (const r of splitRuns(text)) {
+    page.drawText(r, { ...opts, x });
+    x += opts.font.widthOfTextAtSize(r, opts.size);
   }
 }
 
@@ -58,7 +67,7 @@ function wrapByWidth(text: string, font: any, size: number, maxWidth: number): s
   const lines: string[] = [];
   let cur = "";
   const width = (s: string) => {
-    try { return font.widthOfTextAtSize(s, size); } catch { return s.length * size; }
+    try { return textWidth(font, s, size); } catch { return s.length * size; }
   };
   const isWordChar = (c: string) => /[0-9A-Za-z._\-/#()]/.test(c);
   for (const ch of Array.from(text)) {
@@ -111,8 +120,6 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   // サブセット化せずフォント全体をそのまま埋め込む
   const font = await pdfDoc.embedFont(regularBytes, { subset: false });
   const fontBold = await pdfDoc.embedFont(boldBytes, { subset: false });
-  embedAllGlyphWidths(font);
-  embedAllGlyphWidths(fontBold);
 
   const PAGE_W = 595.28, PAGE_H = 841.89; // A4 (pt)
   const marginX = 42;
@@ -131,8 +138,8 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   let y = 800;
 
   const drawRight = (text: string, yy: number, size = 9, f = font, color = gray) => {
-    const w = f.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: rightX - w, y: yy, size, font: f, color });
+    const w = textWidth(f, text, size);
+    drawRuns(page, text, { x: rightX - w, y: yy, size, font: f, color });
   };
   const newPageIfNeeded = (need: number) => {
     if (y - need < 50) {
@@ -146,10 +153,10 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const lastEdit = edits.length ? edits[edits.length - 1] : null;
   const editedOn = lastEdit ? String(lastEdit.at || "").slice(0, 10) : "";
 
-  page.drawText("発 注 書", { x: marginX, y, size: 20, font: fontBold, color: black });
-  page.drawText("Purchase Order", { x: marginX, y: y - 16, size: 9, font, color: gray });
+  drawRuns(page, "発 注 書", { x: marginX, y, size: 20, font: fontBold, color: black });
+  drawRuns(page, "Purchase Order", { x: marginX, y: y - 16, size: 9, font, color: gray });
   if (lastEdit) {
-    page.drawText(`単価変更あり（${editedOn} 改定・${edits.length}回目）`, {
+    drawRuns(page, `単価変更あり（${editedOn} 改定・${edits.length}回目）`, {
       x: marginX + 92, y: y + 4, size: 9, font: fontBold, color: green,
     });
   }
@@ -162,15 +169,17 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const boxH = 86;
   page.drawRectangle({ x: marginX, y: y - boxH, width: tableW, height: boxH, color: lightBg });
   let iy = y - 16;
-  page.drawText(`発注先：${o.suppliers || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
+  drawRuns(page, `発注先：${o.suppliers || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   iy -= 16;
-  page.drawText(`発注番号：${o.no || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
-  page.drawText(`発注日：${o.date || ""}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
+  drawRuns(page, `発注番号：${o.no || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
+  drawRuns(page, `発注日：${o.date || ""}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
   iy -= 16;
-  page.drawText(`費目区分：${o.costType || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
+  drawRuns(page, `費目区分：${o.costType || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   iy -= 16;
-  page.drawText(`物件名：${o.project || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
-  page.drawText(`納品希望日：${o.dueDate || "未指定"}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
+  drawRuns(page, `物件名：${o.project || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
+  // 「最短」で出した発注は、日付ではなく「最短」と書いて渡す
+  const dueLabel = o.dueAsap ? "最短" : (o.dueDate || "未指定");
+  drawRuns(page, `納品希望日：${dueLabel}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
 
   y -= boxH + 16;
   const colX = [marginX, marginX + 260, marginX + 320, marginX + 380, marginX + 440];
@@ -183,11 +192,11 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const drawTableHead = () => {
     page.drawRectangle({ x: marginX, y: y - 20, width: tableW, height: 20, color: darkBrown });
     const hy = y - 14;
-    page.drawText("品目名", { x: colX[0] + PAD, y: hy, size: 9, font, color: gold });
-    page.drawText("単位", { x: colX[1] + PAD, y: hy, size: 9, font, color: gold });
-    page.drawText("数量", { x: colX[2] + PAD, y: hy, size: 9, font, color: gold });
-    page.drawText("単価", { x: colX[3] + PAD, y: hy, size: 9, font, color: gold });
-    page.drawText("金額", { x: colX[4] + PAD, y: hy, size: 9, font, color: gold });
+    drawRuns(page, "品目名", { x: colX[0] + PAD, y: hy, size: 9, font, color: gold });
+    drawRuns(page, "単位", { x: colX[1] + PAD, y: hy, size: 9, font, color: gold });
+    drawRuns(page, "数量", { x: colX[2] + PAD, y: hy, size: 9, font, color: gold });
+    drawRuns(page, "単価", { x: colX[3] + PAD, y: hy, size: 9, font, color: gold });
+    drawRuns(page, "金額", { x: colX[4] + PAD, y: hy, size: 9, font, color: gold });
     y -= 20;
   };
   drawTableHead();
@@ -208,16 +217,16 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
     page.drawLine({ start: { x: marginX, y }, end: { x: marginX + tableW, y }, thickness: 0.5, color: lineColor });
     const rowY = y - 14;
     nameLines.forEach((line, i) => {
-      page.drawText(line, { x: colX[0] + PAD, y: rowY - i * LINE_H, size: ROW_SIZE, font, color: black });
+      drawRuns(page, line, { x: colX[0] + PAD, y: rowY - i * LINE_H, size: ROW_SIZE, font, color: black });
     });
-    page.drawText(String(it.unit || ""), { x: colX[1] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
-    page.drawText(String(qty), { x: colX[2] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
-    page.drawText("¥" + fmt(price), { x: colX[3] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
-    page.drawText("¥" + fmt(price * qty), { x: colX[4] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    drawRuns(page, String(it.unit || ""), { x: colX[1] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    drawRuns(page, String(qty), { x: colX[2] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    drawRuns(page, "¥" + fmt(price), { x: colX[3] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    drawRuns(page, "¥" + fmt(price * qty), { x: colX[4] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
     y -= rowH;
     // 直した品目は、当初いくらだったかを小さく添える
     if (changed) {
-      page.drawText(`（当初 ¥${fmt(orig)} → ¥${fmt(price)}）`, {
+      drawRuns(page, `（当初 ¥${fmt(orig)} → ¥${fmt(price)}）`, {
         x: colX[0] + PAD, y: y - 2, size: 7.5, font, color: gray,
       });
       y -= LINE_H;
@@ -242,13 +251,13 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   y -= 24;
   page.drawLine({ start: { x: marginX, y }, end: { x: marginX + tableW, y }, thickness: 0.5, color: lineColor });
   y -= 14;
-  page.drawText(`納品場所：${o.project || ""} 現場　／　ご納品の際は現場担当者へご連絡ください。`, {
+  drawRuns(page, `納品場所：${o.project || ""} 現場　／　ご納品の際は現場担当者へご連絡ください。`, {
     x: marginX, y, size: 8, font, color: gray,
   });
   if (lastEdit) {
     y -= 12;
     const by = String(lastEdit.byName || "");
-    page.drawText(`この発注書は ${editedOn} に単価変更のため作り直したものです${by ? `（変更：${by}）` : ""}。`, {
+    drawRuns(page, `この発注書は ${editedOn} に単価変更のため作り直したものです${by ? `（変更：${by}）` : ""}。`, {
       x: marginX, y, size: 8, font, color: gray,
     });
   }

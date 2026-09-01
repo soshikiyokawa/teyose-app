@@ -581,7 +581,9 @@ function renderTalkPanelMessages(forceBottom){
             <div><div class="ocb-title">発 注 書</div><div class="ocb-no">${o.no}</div></div>
           </div>
           <div class="ocb-body">
-            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">📅 ${o.date}　📦 ${o.project}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">📅 ${o.date}　📦 ${o.project}${
+              (liveOrder||o).dueAsap ? '　🚚 <b style="color:var(--accent-t)">最短</b>'
+              : (liveOrder||o).dueDate ? '　🚚 '+(liveOrder||o).dueDate : ''}</div>
             ${itemRows}
             <div class="ocb-total">合計 ¥${fmt(showTotal)}</div>
             ${(typeof orderPriceEditHtml==='function' && liveOrder) ? orderPriceEditHtml(liveOrder) : ''}

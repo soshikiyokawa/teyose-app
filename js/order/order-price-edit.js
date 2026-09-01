@@ -326,7 +326,7 @@ async function notifyOrderPriceEdit(order, changed, data, note){
 async function refetchOrdersAndCost(){
   try{
     const { data: rows } = await sb.from('orders').select('*').order('created_at',{ascending:false});
-    if(rows) orders = rows.map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,
+    if(rows) orders = rows.map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,dueAsap:!!r.due_asap,
       costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),
       items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),
       status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[]}));

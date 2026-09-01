@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
         no: order.no,
         date: order.date,
         dueDate: order.due_date || "",
+        dueAsap: !!order.due_asap,
         costType: order.cost_type || "",
         project: order.project || "",
         suppliers: sup?.name || "",

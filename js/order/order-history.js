@@ -8,7 +8,8 @@ function renderOrders(){
         <span class="badge ${o.status==='received'?'received':'pending'}">${o.status==='received'?'受領済み':'発注済み'}</span>
         ${orderHasPriceEdit(o)?'<span class="badge price-edited">単価変更あり</span>':''}
       </div>
-      <div class="order-meta"><span>📅 ${o.date}</span><span>🏪 ${o.suppliers}</span><span>📦 ${o.items.length}品目</span>${o.costType?`<span>🏷️ ${o.costType}</span>`:''}<span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
+      <div class="order-meta"><span>📅 ${o.date}</span><span>🏪 ${o.suppliers}</span><span>📦 ${o.items.length}品目</span>${o.costType?`<span>🏷️ ${o.costType}</span>`:''}${
+        o.dueAsap?'<span style="color:var(--accent-t);font-weight:700">🚚 最短</span>':(o.dueDate?`<span>🚚 ${o.dueDate}</span>`:'')}<span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
       <div class="order-actions">
         <button class="btn sm" onclick="reShowOrder(${i})"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 発注書</button>
         ${o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`:''}
@@ -37,7 +38,7 @@ function reShowOrder(i){
     return `・${esc(it.name)} × ${q}${esc(it.unit||'')}　${
       orig!==now ? `<span style="color:#999;text-decoration:line-through">¥${fmt(orig*q)}</span> ` : ''}¥${fmt(now*q)}`;
   }).join('<br>');
-  document.getElementById('order-pdf-body').innerHTML=`<div style="padding:20px;font-size:13px;color:#555;line-height:2"><strong>${o.no}</strong><br>発注日：${o.date}<br>物件：${o.project}<br>発注先：${o.suppliers}<br>合計：¥${fmt(o.total)}<br><br>${rows}${orderPriceEditHtml(o)}</div>`;
+  document.getElementById('order-pdf-body').innerHTML=`<div style="padding:20px;font-size:13px;color:#555;line-height:2"><strong>${o.no}</strong><br>発注日：${o.date}<br>納品希望日：${orderDueLabel(o)}<br>物件：${o.project}<br>発注先：${o.suppliers}<br>合計：¥${fmt(o.total)}<br><br>${rows}${orderPriceEditHtml(o)}</div>`;
   document.getElementById('order-pdf-foot').style.display='none';
   document.getElementById('order-pdf-overlay').classList.add('open');
 }
