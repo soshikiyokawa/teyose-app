@@ -27,6 +27,7 @@ function _supplierNames(supName){
 //     発注先の人が見られる名簿は chat_directory に絞ってある（migration-genba54.sql）
 function notifyGroups(){
   const t = activeTalkPanelSupplier;
+  if(isDirectThread(t)) return [];   // 相手は1人なので選ぶ必要がない
   if(t===INTERNAL_THREAD) return [{label:'', names:_staffNames()}];
   if(isProjectThread(t)){
     const p = projects.find(x=>x.id===projectThreadIds[t]);
@@ -200,7 +201,8 @@ function findMsg(mid){ return (talkThreads[activeTalkPanelSupplier]||[]).find(m=
 function openMsgMenu(mid){
   const m=findMsg(mid); if(!m) return;
   menuMsgId=mid;
-  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD || isProjectThread(activeTalkPanelSupplier);
+  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD
+    || isProjectThread(activeTalkPanelSupplier) || isDirectThread(activeTalkPanelSupplier);
   const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';
   const isMine = m.senderName===currentUserDisplayName; // 自分が送信した本人か
   const canEdit = isMine && m.type==='text';
@@ -334,7 +336,7 @@ window.addEventListener('resize', fitTalkPage);
 // 案件が増えると発注先が下に押し出されて探しにくいので、種類で分けて出す。
 let talkListTab = 'project';
 function talkThreadKind(name){
-  if(name===INTERNAL_THREAD) return 'internal';
+  if(name===INTERNAL_THREAD || isDirectThread(name)) return 'internal';
   return isProjectThread(name) ? 'project' : 'supplier';
 }
 function setTalkListTab(tab){
@@ -345,7 +347,7 @@ function renderTalkListTabs(names){
   const el=document.getElementById('talk-list-tabs');
   if(!el) return;
   const defs=[
-    {key:'internal', label:'社内'},
+    {key:'internal', label:'社内・個別'},
     {key:'project',  label:'案件'},
     {key:'supplier', label:'業者'},
   ].filter(d=>names.some(n=>talkThreadKind(n)===d.key));
@@ -359,6 +361,51 @@ function renderTalkListTabs(names){
       ${d.label}<span class="talk-tab-n">${mine.length}</span>${unread?`<span class="talk-tab-unread">${unread}</span>`:''}
     </button>`;
   }).join('');
+}
+
+// ── 個別チャットを始める ──
+//
+// 管理者・社員・発注先の誰でも、相手を1人選んで直接やりとりできる。
+// 見られるのはその2人だけ（migration-genba62.sql）。
+// 相手の候補は chat_directory と同じ考え方で、その人が名前を知ってよい相手だけ出す。
+function directCandidates(){
+  return (allProfiles||[])
+    .filter(p=>p.id && p.id!==currentUserId && p.displayName)
+    .map(p=>({
+      id:p.id, name:p.displayName,
+      kind: p.role==='supplier'
+        ? ((suppliers||[]).find(s=>s.id===p.supplierId)?.name || '発注先')
+        : (p.role==='staff' ? 'きよかわ（管理者）' : 'きよかわ（社員）'),
+    }))
+    .sort((a,b)=> a.kind.localeCompare(b.kind,'ja') || a.name.localeCompare(b.name,'ja'));
+}
+
+function openDirectPicker(){
+  const cands=directCandidates();
+  const el=document.getElementById('direct-picker');
+  if(!cands.length){
+    el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:12px">相手の候補がいません</div>';
+  } else {
+    let html='', lastKind='';
+    for(const c of cands){
+      if(c.kind!==lastKind){ html+=`<div class="section-lbl" style="margin:10px 0 4px">${esc(c.kind)}</div>`; lastKind=c.kind; }
+      const has=!!talkThreads[DIRECT_THREAD_PREFIX+c.name];
+      html+=`<button type="button" class="member-row" onclick="startDirectChat('${String(c.id).replace(/'/g,"\\'")}')">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>
+        ${has?'<span style="font-size:11px;color:var(--text-muted)">やりとり中</span>':''}
+      </button>`;
+    }
+    el.innerHTML=html;
+  }
+  document.getElementById('direct-modal').classList.add('open');
+}
+function closeDirectPicker(){ document.getElementById('direct-modal').classList.remove('open'); }
+
+function startDirectChat(userId){
+  const name=directThreadName(userId);
+  if(!talkThreads[name]) talkThreads[name]=[];   // まだやりとりが無くても一覧に出す
+  closeDirectPicker();
+  openTalkPanelThread(name);
 }
 
 function renderTalkPanelList(){
@@ -380,22 +427,32 @@ function renderTalkPanelList(){
     .filter(x=>talkThreadKind(x.n)===talkListTab)
     .sort((a,b)=> b.ts-a.ts || a.i-b.i)
     .map(x=>x.n);
+  // 「社内・個別」タブでは、個別チャットを始められるようにする
+  const startBtn = talkListTab==='internal'
+    ? `<div style="padding:8px 12px 4px">
+        <button class="btn sm" style="width:100%;justify-content:center" onclick="openDirectPicker()">
+          ＋ 個別チャットを始める
+        </button>
+      </div>` : '';
   if(!allSups.length){
-    el.innerHTML=`<div class="empty" style="padding:24px">${
-      talkListTab==='project'?'参加している案件がありません':'発注先が登録されていません'}</div>`;
+    el.innerHTML=startBtn+`<div class="empty" style="padding:24px">${
+      talkListTab==='project'?'参加している案件がありません'
+      :talkListTab==='internal'?'まだやりとりがありません'
+      :'発注先が登録されていません'}</div>`;
     return;
   }
-  el.innerHTML=allSups.map(name=>{
+  el.innerHTML=startBtn+allSups.map(name=>{
     const isInternal=name===INTERNAL_THREAD;
     const isProject=isProjectThread(name);
+    const isDirect=isDirectThread(name);
     const msgs=talkThreads[name]||[];
     const last=msgs[msgs.length-1];
     const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text)
-      :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':'タップしてトークを開始');
+      :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':isDirect?'この2人だけのやりとり':'タップしてトークを開始');
     const sup=suppliers.find(s=>s.name===name);
     const unread=chatUnreadFor(name);
     return `<div class="sup-thread-row" onclick="openTalkPanelThread('${name.replace(/'/g,"\\'")}')">
-      <div class="sup-thread-icon">${isInternal?'🏡':isProject?'🏗':'🏪'}</div>
+      <div class="sup-thread-icon">${isInternal?'🏡':isProject?'🏗':isDirect?'👤':'🏪'}</div>
       <div class="sup-thread-info">
         <div class="sup-thread-name">${name}</div>
         <div class="sup-thread-preview">${preview}</div>
@@ -428,7 +485,8 @@ function openTalkPanelThread(supName){
     titleEl.textContent=supName;
   }
   document.getElementById('talk-panel-meta').textContent=
-    supName===INTERNAL_THREAD ? '社員メンバーのみ表示されます'
+    isDirectThread(supName) ? 'この2人だけのやりとりです'
+    : supName===INTERNAL_THREAD ? '社員メンバーのみ表示されます'
     : isProjectThread(supName) ? (()=>{ const p=projects.find(x=>x.id===projectThreadIds[supName]);
         const ms=(p?.members||[]); return ms.length?('参加：'+ms.join('、')):'参加メンバー未設定（案件情報で選択できます）'; })()
     : (sup?.tel?'📞 '+sup.tel+(sup.email?' · ✉ '+sup.email:''):'');
@@ -450,6 +508,7 @@ function openTalkPanelThread(supName){
 // スレッド名 → 既読管理のキー
 function threadKeyOf(name){
   if(name===INTERNAL_THREAD) return 'internal';
+  if(isDirectThread(name)) return 'direct:'+(directThreadIds[name]||'?');
   if(isProjectThread(name)) return 'project:'+(projectThreadIds[name]||'?');
   return 'supplier:'+(supplierIdByName(name)||'?');
 }
@@ -474,8 +533,10 @@ function visibleThreadNames(){
     .filter(p=>currentUserRole==='staff' || isMyProjectMember(p.members))
     .map(p=>projectThreadName(p.id));
   const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])]
-    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n));
-  return [...(isEmployee?[INTERNAL_THREAD]:[]), ...projNames, ...supNames];
+    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n) && !isDirectThread(n));
+  // 個別チャットは、やりとりがあるものだけ出す（作った時点で talkThreads に入る）
+  const directNames=Object.keys(talkThreads).filter(isDirectThread);
+  return [...(isEmployee?[INTERNAL_THREAD]:[]), ...directNames, ...projNames, ...supNames];
 }
 
 function chatUnreadTotal(){
@@ -575,7 +636,8 @@ function chatRenderSignature(supplier, msgs){
 function resetChatRenderSignature(){ _chatRenderSig = ''; }
 
 function renderTalkPanelMessages(forceBottom){
-  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD || isProjectThread(activeTalkPanelSupplier);
+  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD
+    || isProjectThread(activeTalkPanelSupplier) || isDirectThread(activeTalkPanelSupplier);
   let msgs=talkThreads[activeTalkPanelSupplier]||[];
   if(chatBookmarkFilter) msgs=msgs.filter(m=>Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName));
   document.getElementById('talk-bm-filter')?.classList.toggle('active',chatBookmarkFilter);

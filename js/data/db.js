@@ -9,6 +9,23 @@ function projectThreadName(projectId){
 }
 function isProjectThread(threadName){ return String(threadName||'').startsWith(PROJECT_THREAD_PREFIX); }
 
+// ── 個別チャット（1対1） ──
+//
+// スレッド名は「個別：<相手の名前>」。相手のIDとの対応は directThreadIds に持つ。
+// 見られるのはその2人だけ（migration-genba62.sql）。
+function directThreadName(userId){
+  const p = (allProfiles||[]).find(x=>x.id===userId);
+  const name = DIRECT_THREAD_PREFIX + (p?.displayName || '（不明な相手）');
+  directThreadIds[name] = userId;
+  return name;
+}
+function isDirectThread(threadName){ return String(threadName||'').startsWith(DIRECT_THREAD_PREFIX); }
+// 自分と相手のIDを、小さいほう・大きいほうの順で返す
+function directPair(otherId){
+  const a = String(currentUserId||''), b = String(otherId||'');
+  return a < b ? [a, b] : [b, a];
+}
+
 function supplierIdByName(name){
   const s = suppliers.find(x=>x.name===name);
   return s ? s.id : null;
@@ -649,13 +666,18 @@ async function dbMarkThreadRead(thread){
 
 // ── チャット ──
 async function dbAddChatMessage(supplierName, msg){
-  const isProject = isProjectThread(supplierName);
+  const isDirect = isDirectThread(supplierName);
+  const otherId = isDirect ? (directThreadIds[supplierName]||null) : null;
+  if(isDirect && !otherId) return;
+  const [direct_a, direct_b] = isDirect ? directPair(otherId) : [null, null];
+  const isProject = !isDirect && isProjectThread(supplierName);
   const project_id = isProject ? (projectThreadIds[supplierName]||null) : null;
   const isInternal = supplierName===INTERNAL_THREAD;
-  const supplier_id = (isInternal||isProject) ? null : supplierIdByName(supplierName);
-  if(!isInternal && !isProject && !supplier_id) return;
+  const supplier_id = (isInternal||isProject||isDirect) ? null : supplierIdByName(supplierName);
+  if(!isInternal && !isProject && !isDirect && !supplier_id) return;
   const { data, error } = await sb.from('chat_messages').insert({
-    supplier_id, project_id, is_internal:isInternal, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
+    supplier_id, project_id, direct_a, direct_b,
+    is_internal:isInternal, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
     file_url:msg.fileUrl||null, file_name:msg.fileName||null, file_mime:msg.fileMime||null, unread:false,
     sender_name: currentUserDisplayName||'',
     reply_to_id:msg.replyToId||null, reply_to_text:msg.replyToText||null, reply_to_sender:msg.replyToSender||null
@@ -675,7 +697,13 @@ async function dbAddChatMessage(supplierName, msg){
   const picked = Array.isArray(msg.notifyNames)
     ? msg.notifyNames.filter(n=>n && n!==currentUserDisplayName) : [];
 
-  if(isProject){
+  if(isDirect){
+    // 個別チャット：相手ひとりに知らせる
+    const other=(allProfiles||[]).find(p=>p.id===otherId);
+    if(other?.displayName){
+      dbSendPushToNames([other.displayName], `個別 ${currentUserDisplayName||''}`, preview, null).catch(()=>{});
+    }
+  } else if(isProject){
     // 案件チャット：指定があればその人、無ければ参加メンバー（自分以外）へ
     const proj = projects.find(p=>p.id===project_id);
     const names = picked.length ? picked : otherMemberNames(proj?.members);
@@ -1529,7 +1557,8 @@ async function fetchChatData(){
   if(chatErr) throw chatErr;
   talkThreads = {};
   chatRows.forEach(r=>{
-    const name = r.project_id ? projectThreadName(r.project_id)
+    const name = r.direct_a ? directThreadName(r.direct_a===currentUserId ? r.direct_b : r.direct_a)
+               : r.project_id ? projectThreadName(r.project_id)
                : r.is_internal ? INTERNAL_THREAD
                : supplierNameById(r.supplier_id);
     if(!talkThreads[name]) talkThreads[name]=[];
