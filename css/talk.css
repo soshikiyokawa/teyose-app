@@ -99,3 +99,16 @@
 .talk-tel{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:5px;max-width:100%}
 .talk-tel span{font-size:11px;opacity:.65;flex-shrink:0}
 .talk-tel:active{opacity:.6}
+
+/* ── スレッド一覧のタブ（社内・案件・業者） ── */
+.talk-tabs{display:flex;gap:4px;padding:6px 10px 0;border-bottom:0.5px solid var(--border);flex-shrink:0}
+.talk-tab{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px;
+  white-space:nowrap;border:none;background:none;cursor:pointer;padding:8px 2px 7px;
+  font-size:12.5px;font-weight:700;color:var(--text-muted);
+  border-bottom:2px solid transparent;margin-bottom:-0.5px}
+.talk-tab:hover{color:var(--text-sub)}
+.talk-tab.active{color:var(--wood-t);border-bottom-color:var(--wood)}
+.talk-tab-n{font-size:10px;font-weight:600;color:var(--text-muted)}
+.talk-tab.active .talk-tab-n{color:var(--wood-t)}
+.talk-tab-unread{background:var(--danger);color:#fff;font-size:9.5px;font-weight:800;flex-shrink:0;
+  min-width:15px;height:15px;border-radius:99px;display:inline-flex;align-items:center;justify-content:center;padding:0 3px}

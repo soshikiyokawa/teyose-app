@@ -329,19 +329,62 @@ function fitTalkPage(){
 }
 window.addEventListener('resize', fitTalkPage);
 
+// ── スレッド一覧のタブ（社内・案件・業者） ──
+//
+// 案件が増えると発注先が下に押し出されて探しにくいので、種類で分けて出す。
+let talkListTab = 'project';
+function talkThreadKind(name){
+  if(name===INTERNAL_THREAD) return 'internal';
+  return isProjectThread(name) ? 'project' : 'supplier';
+}
+function setTalkListTab(tab){
+  talkListTab = tab;
+  renderTalkPanelList();
+}
+function renderTalkListTabs(names){
+  const el=document.getElementById('talk-list-tabs');
+  if(!el) return;
+  const defs=[
+    {key:'internal', label:'社内'},
+    {key:'project',  label:'案件'},
+    {key:'supplier', label:'業者'},
+  ].filter(d=>names.some(n=>talkThreadKind(n)===d.key));
+  // 選んでいたタブが無くなったら、残っているいちばん左に寄せる
+  if(defs.length && !defs.some(d=>d.key===talkListTab)) talkListTab=defs[0].key;
+  el.style.display = defs.length>1 ? '' : 'none';
+  el.innerHTML=defs.map(d=>{
+    const mine=names.filter(n=>talkThreadKind(n)===d.key);
+    const unread=mine.reduce((s,n)=>s+chatUnreadFor(n),0);
+    return `<button class="talk-tab${d.key===talkListTab?' active':''}" onclick="setTalkListTab('${d.key}')">
+      ${d.label}<span class="talk-tab-n">${mine.length}</span>${unread?`<span class="talk-tab-unread">${unread}</span>`:''}
+    </button>`;
+  }).join('');
+}
+
 function renderTalkPanelList(){
   document.getElementById('talk-panel-list').style.display='flex';
   document.getElementById('talk-panel-detail').style.display='none';
   // 案件チャット：管理者は全案件、それ以外（一般社員・業者）は参加している案件のみ
   const names=visibleThreadNames();
   const el=document.getElementById('talk-panel-thread-list');
-  if(!names.length){el.innerHTML='<div class="empty">発注先が登録されていません</div>';return;}
+  if(!names.length){
+    document.getElementById('talk-list-tabs').style.display='none';
+    el.innerHTML='<div class="empty">発注先が登録されていません</div>';
+    return;
+  }
   updateChatBadge();
+  renderTalkListTabs(names);
   // 最新の書き込みがあるスレッドを上に。書き込みが無いスレッドは下に元の順で並べる
   const lastTs=n=>{ const l=(talkThreads[n]||[]); return l.length ? l[l.length-1].ts : 0; };
   const allSups=names.map((n,i)=>({n,i,ts:lastTs(n)}))
+    .filter(x=>talkThreadKind(x.n)===talkListTab)
     .sort((a,b)=> b.ts-a.ts || a.i-b.i)
     .map(x=>x.n);
+  if(!allSups.length){
+    el.innerHTML=`<div class="empty" style="padding:24px">${
+      talkListTab==='project'?'参加している案件がありません':'発注先が登録されていません'}</div>`;
+    return;
+  }
   el.innerHTML=allSups.map(name=>{
     const isInternal=name===INTERNAL_THREAD;
     const isProject=isProjectThread(name);
@@ -369,6 +412,7 @@ function renderTalkPanelList(){
 
 function openTalkPanelThread(supName){
   activeTalkPanelSupplier=supName;
+  talkListTab=talkThreadKind(supName);   // 戻ったときに同じ種類の一覧が出るように
   resetChatRenderSignature();   // スレッドを開いたら必ず描き直す
   if(!talkThreads[supName]) talkThreads[supName]=[];
   const sup=suppliers.find(s=>s.name===supName);
