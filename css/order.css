@@ -210,6 +210,19 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .il-raw{color:var(--text-muted)}
 .il-raw.none{color:var(--warn-t);font-weight:700}
 .il-row select{width:150px;flex:none;font-size:11px;padding:3px 5px}
+.il-row.editing{background:var(--surface2)}
+/* 品名・数量・金額の入力欄 */
+.il-edit{display:flex;flex-direction:column;gap:5px}
+.il-edit input{font-size:12px;padding:4px 7px;margin:0}
+.il-e-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.il-e-qty{width:64px;text-align:right}
+.il-e-unit{width:52px}
+.il-e-amt{width:96px;text-align:right;font-weight:700}
+.il-e-yen{font-size:11px;color:var(--text-sub);margin-right:2px}
+/* AIが読んだ内容から変えた行の印 */
+.il-fix{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;
+  margin-left:6px;vertical-align:middle;background:var(--warn-bg);color:var(--warn-t)}
+.il-fix.add{background:var(--accent-bg);color:var(--accent-t)}
 .il-sum{margin-top:8px;padding:9px 11px;background:var(--surface2);border-radius:8px;font-size:12px}
 .il-sum-row{display:flex;justify-content:space-between;gap:10px;line-height:1.9}
 .il-sum-row.total{border-top:0.5px solid var(--border);margin-top:4px;padding-top:4px;font-weight:700}

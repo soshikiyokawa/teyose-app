@@ -29,12 +29,14 @@ const corsHeaders = {
 };
 
 // 発注先ごとの「読み取りのコツ」を、読ませる前に添える文にする。
-// 人が金額を手で直したときに1文ずつ溜めたもの（invoice_read_hints）。
-function hintBlock(hints: string[]): string {
-  if (!hints.length) return "";
-  return `\n\nこの取引先の請求書について、これまでに分かっていること（前に人が金額を直したときの覚え書き）:
-${hints.map((h) => "- " + h).join("\n")}
-まずこれを踏まえて探してください。ただし請求書に書かれている内容と食い違うときは、書かれているほうを優先します。`;
+// 人が金額や明細を直したときに1文ずつ溜めたもの（invoice_read_hints）。
+function hintBlock(total: string[], lines: string[]): string {
+  if (!total.length && !lines.length) return "";
+  const part = (label: string, hs: string[]) =>
+    hs.length ? `\n【${label}】\n${hs.map((h) => "- " + h).join("\n")}` : "";
+  return `\n\nこの取引先の請求書について、これまでに分かっていること（前に人が直したときの覚え書き）:${
+    part("請求金額の見つけ方", total)}${part("明細の読み方", lines)}
+まずこれを踏まえて読んでください。ただし請求書に書かれている内容と食い違うときは、書かれているほうを優先します。`;
 }
 
 const PROMPT = `これは取引先から届いた請求書です。要点と明細を save_invoice の道具で返してください。
@@ -127,6 +129,53 @@ ${aiTotal != null ? `先ほど自動で読んだときは ${aiTotal} 円と取�
 - 正解の金額にたどりつく道筋が分からなければ、hint を空文字にする（無理に書かない）`;
 }
 
+// ── 明細の直しから覚える ──
+// 人が明細を直した内容（足した行・消した行・品名や金額を変えた行）を見せて、
+// 次に同じ取引先の請求書を読むときの手がかりを書かせる。
+type LineFix = {
+  added?: { name?: string; qty?: number | null; unit?: string; amount?: number }[];
+  removed?: { name?: string; amount?: number }[];
+  edited?: { was?: EditedSide; now?: EditedSide }[];
+};
+type EditedSide = { name?: string; amount?: number; qty?: number | null; unit?: string };
+
+function learnLinesPrompt(fix: LineFix): string {
+  const yen = (n: unknown) => (n == null || n === "" ? "（なし）" : `${n}円`);
+  const block = (label: string, body: string[]) =>
+    body.length ? `\n\n${label}\n${body.map((b) => "- " + b).join("\n")}` : "";
+
+  const added = (fix.added || []).slice(0, 12)
+    .map((l) => `${l.name || "（品名なし）"}　${yen(l.amount)}${l.qty != null ? `　${l.qty}${l.unit || ""}` : ""}`);
+  const removed = (fix.removed || []).slice(0, 12)
+    .map((l) => `${l.name || "（品名なし）"}　${yen(l.amount)}`);
+  const qu = (s: EditedSide) => (s.qty == null ? "（なし）" : `${s.qty}${s.unit || ""}`);
+  const edited = (fix.edited || []).slice(0, 12).map((e) => {
+    const w = e.was || {}, n = e.now || {};
+    const bits: string[] = [];
+    if ((w.name || "") !== (n.name || "")) bits.push(`品名「${w.name || ""}」→「${n.name || ""}」`);
+    if (w.amount !== n.amount) bits.push(`金額 ${yen(w.amount)}→${yen(n.amount)}`);
+    if (String(w.qty ?? "") !== String(n.qty ?? "") || (w.unit || "") !== (n.unit || "")) {
+      bits.push(`数量 ${qu(w)}→${qu(n)}`);
+    }
+    return `${w.name || n.name || "（品名なし）"}：${bits.join("／")}`;
+  });
+
+  return `これは取引先から届いた請求書です。
+先ほどこの請求書の明細を自動で読み取りましたが、人が請求書を見ながら次のように直しました。人が直したほうが正解です。${
+    block("【読み落としていて、人が足した行】", added)}${
+    block("【明細ではないのに拾ってしまい、人が消した行】", removed)}${
+    block("【品名・金額・数量が違っていて、人が直した行】", edited)}
+
+次に同じ取引先から届いた請求書の明細を読むときに同じ間違いをしないよう、手がかりを日本語1文（80字以内）で書いてください。
+
+守ること:
+- この請求書だけの数字や品名（金額そのもの・日付・伝票番号）は書かない。次の月の請求書でも通じる言い方にする
+- 「どの行を拾うか」「どの列を金額として取るか」「どの行は明細に含めないか」を書く
+  例：「品名は左から2列目の『商品名』を使い、その右の『規格』は品名に混ぜない」
+  例：「値引きの行は金額がマイナスでも明細に含める」
+- 直された内容から次に使える決まりが読み取れなければ、hint を空文字にする（無理に書かない）`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -152,20 +201,27 @@ Deno.serve(async (req) => {
     const filePath = body?.filePath;
     if (!filePath || typeof filePath !== "string") return json({ error: "請求書が指定されていません" }, 400);
     const supplierId = Number(body?.supplierId) || null;
-    // learnTotal が入っていれば「読み方を覚える」呼び出し。人が入れた正しい金額
+    // learnTotal が入っていれば「請求金額の読み方を覚える」呼び出し。人が入れた正しい金額
     const learnTotal = body?.learnTotal == null ? null : Math.round(Number(body.learnTotal));
     const prevAiTotal = body?.aiTotal == null ? null : Math.round(Number(body.aiTotal));
     if (learnTotal !== null && !Number.isFinite(learnTotal)) {
       return json({ error: "覚えさせる金額が正しくありません" }, 400);
     }
+    // learnLines が入っていれば「明細の読み方を覚える」呼び出し。人が直した内容
+    const learnLines: LineFix | null = body?.learnLines && typeof body.learnLines === "object"
+      ? body.learnLines : null;
+    const learning = learnTotal !== null || learnLines !== null;
 
-    // この発注先について、これまでに覚えた読み取りのコツ（新しいものから5つまで）
-    let hints: string[] = [];
-    if (supplierId && learnTotal === null) {
-      const { data: hintRows } = await admin.from("invoice_read_hints")
-        .select("hint").eq("supplier_id", supplierId)
-        .order("created_at", { ascending: false }).limit(5);
-      hints = (hintRows || []).map((h: any) => String(h.hint || "").trim()).filter(Boolean);
+    // この発注先について、これまでに覚えた読み取りのコツ（種類ごとに新しいものから5つまで）
+    let totalHints: string[] = [], lineHints: string[] = [];
+    if (supplierId && !learning) {
+      const pick = async (kind: string) => {
+        const { data } = await admin.from("invoice_read_hints")
+          .select("hint").eq("supplier_id", supplierId).eq("kind", kind)
+          .order("created_at", { ascending: false }).limit(5);
+        return (data || []).map((h: any) => String(h.hint || "").trim()).filter(Boolean);
+      };
+      [totalHints, lineHints] = await Promise.all([pick("total"), pick("lines")]);
     }
 
     // 保管場所から読み出す（社員は全社分を見られるので、そのまま取り出してよい）
@@ -193,8 +249,8 @@ Deno.serve(async (req) => {
       ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: file } }
       : { type: "image", source: { type: "base64", media_type: imageType, data: file } };
 
-    // ── 読み方を覚える（人が入れた正しい金額から、次に使える1文を作る） ──
-    if (learnTotal !== null) {
+    // ── 読み方を覚える（人が直した内容から、次に使える1文を作る） ──
+    if (learning) {
       const learn = await client.messages.create({
         model: "claude-haiku-4-5-20251001",
         max_tokens: 1000,
@@ -202,7 +258,10 @@ Deno.serve(async (req) => {
         tool_choice: { type: "tool", name: "save_read_hint" },
         messages: [{
           role: "user",
-          content: [doc as any, { type: "text", text: learnPrompt(learnTotal, prevAiTotal) }],
+          content: [doc as any, {
+            type: "text",
+            text: learnLines ? learnLinesPrompt(learnLines) : learnPrompt(learnTotal!, prevAiTotal),
+          }],
         }],
       });
       const lu: any = learn.content.find((c: any) => c.type === "tool_use");
@@ -217,7 +276,7 @@ Deno.serve(async (req) => {
       tool_choice: { type: "tool", name: "save_invoice" },
       messages: [{
         role: "user",
-        content: [doc as any, { type: "text", text: PROMPT + hintBlock(hints) }],
+        content: [doc as any, { type: "text", text: PROMPT + hintBlock(totalHints, lineHints) }],
       }],
     });
 
@@ -262,7 +321,7 @@ Deno.serve(async (req) => {
       dueOn: /^\d{4}-\d{2}-\d{2}$/.test(dueOn) ? dueOn : "",
       issuer: String(use.input?.issuer || "").trim(),
       kind: isPdf ? "pdf" : "image",
-      hintsUsed: hints.length,   // 覚えたコツを何件使ったか（画面に出す）
+      hintsUsed: totalHints.length + lineHints.length,   // 覚えたコツを何件使ったか（画面に出す）
     });
   } catch (err) {
     const raw = String((err as any)?.message || err);

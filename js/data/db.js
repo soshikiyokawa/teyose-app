@@ -594,6 +594,12 @@ async function dbLearnInvoiceRead(filePath, supplierId, rightTotal, aiTotal){
   return String(r?.hint||'').trim();
 }
 
+// 人が直した明細（足した行・消した行・品名や金額を変えた行）から1文つくらせる
+async function dbLearnInvoiceLines(filePath, supplierId, fix){
+  const r = await invokeReadInvoice({ filePath, supplierId: supplierId||null, learnLines: fix });
+  return String(r?.hint||'').trim();
+}
+
 async function invokeReadInvoice(body){
   const { data, error } = await sb.functions.invoke('read-invoice', { body });
   if(error || data?.error){
@@ -613,17 +619,19 @@ async function fetchInvoiceHints(){
     .order('created_at',{ascending:false});
   if(error){ invoiceHints=[]; return; }
   invoiceHints = (data||[]).map(r=>({id:r.id, supplierId:r.supplier_id, hint:r.hint||'',
+    kind:r.kind||'total',
     aiTotal:(r.ai_total==null?null:Number(r.ai_total)),
     rightTotal:(r.right_total==null?null:Number(r.right_total)),
     sourceMonth:r.source_month||'', createdBy:r.created_by||'', createdAt:r.created_at}));
 }
-async function dbAddInvoiceHint({supplierId, hint, aiTotal, rightTotal, sourceMonth}){
+async function dbAddInvoiceHint({supplierId, hint, kind, aiTotal, rightTotal, sourceMonth}){
   const { error } = await sb.from('invoice_read_hints').insert({
-    supplier_id:supplierId, hint, ai_total:(aiTotal??null), right_total:(rightTotal??null),
+    supplier_id:supplierId, hint, kind:kind||'total',
+    ai_total:(aiTotal??null), right_total:(rightTotal??null),
     source_month:sourceMonth||'', created_by:currentUserDisplayName||''});
   if(error){
-    showToast(error.code==='42P01'
-      ? 'データベースの準備が必要です。supabase/migration-genba63.sql を実行してください'
+    showToast(error.code==='42P01' || /kind/.test(error.message||'')
+      ? 'データベースの準備が必要です。supabase/migration-genba63.sql と 64 を実行してください'
       : '読み取りのコツを覚えられませんでした：'+error.message);
     throw error;
   }

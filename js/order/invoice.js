@@ -502,7 +502,7 @@ async function invLearnFromHand({filePath, supplierId, month, rightTotal, aiTota
   const supName=(suppliers||[]).find(s=>s.id===supplierId)?.name||'';
   if(!confirm(`次のことを覚えます。よろしいですか？\n\n【${supName}】\n${hint}\n\n次からこの発注先の請求書を読むときに、これを一緒に渡します。`)) return;
   try{
-    await dbAddInvoiceHint({supplierId, hint, aiTotal, rightTotal, sourceMonth:month});
+    await dbAddInvoiceHint({supplierId, hint, kind:'total', aiTotal, rightTotal, sourceMonth:month});
     await fetchInvoiceHints();
     showToast('覚えました。次の読み取りから使います');
   }catch(_){}
@@ -527,24 +527,32 @@ function renderInvoiceHints(){
       <span style="font-size:11px">AIが読み違えた請求書で「金額を入力」して保存すると、そこから覚えられます</span></div>`;
     return;
   }
+  const KIND={total:['請求金額の見つけ方','inv-ok'], lines:['明細の読み方','inv-warn']};
   const by={};
   list.forEach(h=>{ (by[h.supplierId] = by[h.supplierId] || []).push(h); });
   el.innerHTML=Object.entries(by).map(([sid,hs])=>{
     const name=(suppliers||[]).find(s=>s.id===Number(sid))?.name||'（削除された発注先）';
+    // 読み取りに渡すのは、種類ごとに新しい5件まで（Edge Function側と合わせる）
+    const used={}, over=[];
+    hs.forEach(h=>{ const k=h.kind||'total'; used[k]=(used[k]||0)+1; over.push(used[k]>5); });
     return `<div style="margin-bottom:12px">
       <div style="font-size:12px;font-weight:700;margin-bottom:4px">${esc(name)}
         <span style="font-size:10px;color:var(--text-muted);font-weight:400">${hs.length}件${
-          hs.length>5?'（新しい5件を使います）':''}</span></div>
-      ${hs.map((h,i)=>`<div class="invhint-row${i>=5?' old':''}">
+          over.some(Boolean)?'（薄い行は使いません）':''}</span></div>
+      ${hs.map((h,i)=>{
+        const k=KIND[h.kind||'total']||KIND.total;
+        return `<div class="invhint-row${over[i]?' old':''}">
         <div style="flex:1;min-width:0">
-          <div style="font-size:12px;line-height:1.6">${esc(h.hint)}</div>
+          <div style="font-size:12px;line-height:1.6"><span class="inv-tag ${k[1]}" style="margin:0 5px 0 0">${k[0]}</span>${esc(h.hint)}</div>
           <div style="font-size:10px;color:var(--text-muted)">${
             h.sourceMonth?invMonthLabel(h.sourceMonth)+'の請求書から　':''}${
-            h.aiTotal!=null?`AI ¥${fmt(h.aiTotal)} → `:'AIは見つけられず → '}正しくは ¥${fmt(h.rightTotal)}${
+            (h.kind||'total')==='total'
+              ? `${h.aiTotal!=null?`AI ¥${fmt(h.aiTotal)} → `:'AIは見つけられず → '}正しくは ¥${fmt(h.rightTotal)}`
+              : '明細を直したときに覚えました'}${
             h.createdBy?'　'+esc(h.createdBy):''}</div>
         </div>
         <button class="btn xs danger" onclick="deleteInvoiceHint(${h.id})">消す</button>
-      </div>`).join('')}
+      </div>`;}).join('')}
     </div>`;
   }).join('');
 }
