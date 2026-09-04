@@ -35,15 +35,17 @@
 /* ── チャットページ（他のタブと同じく画面を切り替えて表示する） ── */
 #page-talk{padding:0}
 #page-talk.active{display:flex;flex-direction:column}
-/* 入力欄を最下部に固定するため、残りの画面いっぱいの高さにする（高さはJSで調整） */
+/* 入力欄を最下部に固定するため、残りの画面いっぱいの高さにする。
+   ここの数字はJSが動くまでの仮の値で、実際の高さは fitTalkPage() が測って入れる。
+   min-height はキーボードが出て画面が狭くなったときに邪魔をしない値にしておく */
 #talk-page-wrap{
   display:flex;flex-direction:column;
-  height:calc(100dvh - 190px);min-height:320px;
+  height:calc(100dvh - 165px);min-height:200px;
   background:var(--surface);border-top:0.5px solid var(--border);
   overflow:hidden;
 }
 @media(min-width:600px){
-  #talk-page-wrap{border:0.5px solid var(--border);border-radius:12px;margin:12px 16px;height:calc(100dvh - 210px)}
+  #talk-page-wrap{border:0.5px solid var(--border);border-radius:12px;margin:12px 16px;height:calc(100dvh - 190px)}
 }
 #ai-chat-header{padding:12px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--surface)}
 

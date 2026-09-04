@@ -314,22 +314,53 @@ function renderTalkPage(){
   fitTalkPage();
 }
 
-// 入力欄が画面下に収まるよう、チャット領域の高さを実際の位置から計算する
+// ── チャット領域の高さ ──
+//
+// 入力欄がいつも画面のいちばん下に来るように、チャット領域の高さを実際に測って決める。
+// スマホは「見えている高さ」がころころ変わる（URLバーの出入り・文字を打つときのキーボード）ので、
+// window.innerHeight ではなく visualViewport（＝いま実際に見えている範囲）を基準にする。
+
+// 文字を打つキーボードが出ているか
+function talkKeyboardOpen(){
+  const vv = window.visualViewport;
+  return !!vv && (window.innerHeight - vv.height > 120);
+}
+
 function fitTalkPage(){
   const wrap = document.getElementById('talk-page-wrap');
   if(!wrap || !document.getElementById('page-talk')?.classList.contains('active')) return;
-  window.scrollTo(0,0);   // ページ先頭を基準に測る
+  const msgs = document.getElementById('talk-panel-messages');
+  const stick = msgs ? chatAtBottom(msgs) : false;   // いちばん下を見ていたか
+
+  const vv = window.visualViewport;
+  const viewH  = vv ? vv.height    : window.innerHeight;  // いま見えている高さ
+  const viewTop = vv ? vv.offsetTop : 0;                  // 見えている範囲の上端
+  if(!talkKeyboardOpen()) window.scrollTo(0,0);           // ページ先頭を基準に測る
+
+  // 下のメニューは画面下に貼り付いている。キーボードで隠れているときは差し引かない。
+  // メニューの分の余白は app-shell の padding-bottom で既に取ってあるので、
+  // 大きいほうだけを空ける（両方引くと、その分だけ入力欄が浮いてしまう）
   const nav = document.getElementById('app-nav');
-  const navH = nav && nav.style.display!=='none' ? nav.offsetHeight : 0;
-  const top = wrap.getBoundingClientRect().top;   // 画面上端からの位置
-  const margin = parseFloat(getComputedStyle(wrap).marginBottom)||0;
-  let h = Math.max(320, window.innerHeight - top - navH - margin - 4);
-  wrap.style.height = h + 'px';
-  // 余白の分だけページがスクロールしてしまう場合は、その分だけ縮める
-  const excess = document.documentElement.scrollHeight - window.innerHeight;
-  if(excess > 0 && h - excess >= 320) wrap.style.height = (h - excess) + 'px';
+  const navShown = nav && getComputedStyle(nav).display !== 'none'
+    && nav.getBoundingClientRect().bottom <= viewTop + viewH + 1;
+  const shell = document.getElementById('app-shell');
+  const shellPad = shell ? parseFloat(getComputedStyle(shell).paddingBottom) || 0 : 0;
+  const reserve = navShown ? Math.max(nav.offsetHeight, shellPad) : 0;
+
+  const top = wrap.getBoundingClientRect().top - viewTop;  // 見えている範囲の上端からの位置
+  const margin = parseFloat(getComputedStyle(wrap).marginBottom) || 0;
+  wrap.style.height = Math.max(200, viewH - top - reserve - margin) + 'px';
+
+  // 高さが変わると見えている位置がずれるので、下を見ていたなら下に戻す
+  if(stick && msgs) msgs.scrollTop = msgs.scrollHeight;
 }
 window.addEventListener('resize', fitTalkPage);
+window.addEventListener('orientationchange', ()=>setTimeout(fitTalkPage, 300));
+// URLバーの出入り・キーボードの開閉に合わせて測り直す
+if(window.visualViewport){
+  visualViewport.addEventListener('resize', fitTalkPage);
+  visualViewport.addEventListener('scroll', fitTalkPage);
+}
 
 // ── スレッド一覧のタブ（社内・案件・業者） ──
 //
