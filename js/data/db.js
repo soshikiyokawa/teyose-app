@@ -87,6 +87,8 @@ async function fetchAllData(){
   // 請求書の明細（現場ごとの請求原価）。社員だけが見る
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
     try{ await fetchInvoiceLines(); }catch(_){ invoiceLinesReady=false; }
+    // 請求書の読み取りのコツ（表がまだ無くても落とさない）
+    try{ await fetchInvoiceHints(); }catch(_){ invoiceHints=[]; }
   }
   // 単価の変更履歴（表がまだ無くても落とさない）
   try{ await fetchItemPriceChanges(); }catch(_){ priceHistoryReady=false; }
@@ -476,7 +478,8 @@ async function fetchInvoices(){
     title:r.title||'', filePath:r.file_path, fileName:r.file_name||'', fileMime:r.file_mime||'',
     amount:(r.amount==null?null:Number(r.amount)), note:r.note||'', uploadedBy:r.uploaded_by||'', createdAt:r.created_at,
     regNo:r.reg_no||'', dueOn:r.due_on||'', paidOn:r.paid_on||'',
-    paidAmount:(r.paid_amount==null?null:Number(r.paid_amount)), readByAi:!!r.read_by_ai}));
+    paidAmount:(r.paid_amount==null?null:Number(r.paid_amount)), readByAi:!!r.read_by_ai,
+    aiTotal:(r.ai_total==null?null:Number(r.ai_total)), amountByHand:!!r.amount_by_hand}));
 }
 
 // 請求書を送る（ファイルを保管して、一覧に1件足す）
@@ -578,9 +581,21 @@ async function dbSetInvoicePayment(id, {dueOn, paidOn, paidAmount}){
   if(error){ showToast('支払の記録に失敗しました：'+error.message); throw error; }
 }
 
-// 請求書のPDF・写真をAIに読ませて、請求額などを取り出す
-async function dbReadInvoice(filePath){
-  const { data, error } = await sb.functions.invoke('read-invoice', { body:{ filePath } });
+// 請求書のPDF・写真をAIに読ませて、請求額などを取り出す。
+// supplierId を渡すと、その発注先について覚えた「読み取りのコツ」も一緒に使う
+async function dbReadInvoice(filePath, supplierId){
+  return invokeReadInvoice({ filePath, supplierId: supplierId||null });
+}
+
+// 人が入れた正しい金額から「次に使える手がかり」を1文つくらせる
+async function dbLearnInvoiceRead(filePath, supplierId, rightTotal, aiTotal){
+  const r = await invokeReadInvoice({ filePath, supplierId: supplierId||null,
+    learnTotal: rightTotal, aiTotal: (aiTotal==null?null:aiTotal) });
+  return String(r?.hint||'').trim();
+}
+
+async function invokeReadInvoice(body){
+  const { data, error } = await sb.functions.invoke('read-invoice', { body });
   if(error || data?.error){
     let msg = data?.error;
     if(!msg && error?.context && typeof error.context.json==='function'){
@@ -589,6 +604,50 @@ async function dbReadInvoice(filePath){
     throw new Error(msg || error?.message || '読み取りに失敗しました');
   }
   return data;
+}
+
+// ── 請求書の読み取りのコツ（発注先ごと。migration-genba63.sql） ──
+let invoiceHints = [];
+async function fetchInvoiceHints(){
+  const { data, error } = await sb.from('invoice_read_hints').select('*')
+    .order('created_at',{ascending:false});
+  if(error){ invoiceHints=[]; return; }
+  invoiceHints = (data||[]).map(r=>({id:r.id, supplierId:r.supplier_id, hint:r.hint||'',
+    aiTotal:(r.ai_total==null?null:Number(r.ai_total)),
+    rightTotal:(r.right_total==null?null:Number(r.right_total)),
+    sourceMonth:r.source_month||'', createdBy:r.created_by||'', createdAt:r.created_at}));
+}
+async function dbAddInvoiceHint({supplierId, hint, aiTotal, rightTotal, sourceMonth}){
+  const { error } = await sb.from('invoice_read_hints').insert({
+    supplier_id:supplierId, hint, ai_total:(aiTotal??null), right_total:(rightTotal??null),
+    source_month:sourceMonth||'', created_by:currentUserDisplayName||''});
+  if(error){
+    showToast(error.code==='42P01'
+      ? 'データベースの準備が必要です。supabase/migration-genba63.sql を実行してください'
+      : '読み取りのコツを覚えられませんでした：'+error.message);
+    throw error;
+  }
+}
+async function dbDeleteInvoiceHint(id){
+  const { error } = await sb.from('invoice_read_hints').delete().eq('id', id);
+  if(error){ showToast('削除に失敗しました：'+error.message); throw error; }
+}
+
+// 請求額を書き換える（手入力・AIの読み取り、どちらからも通る）
+async function dbSetInvoiceAmount(id, {amount, regNo, dueOn, aiTotal, byHand, readByAi}){
+  const patch = { amount:(amount??null) };
+  if(regNo   !== undefined) patch.reg_no  = regNo||'';
+  if(dueOn   !== undefined) patch.due_on  = dueOn||null;
+  if(aiTotal !== undefined) patch.ai_total = (aiTotal??null);
+  if(byHand  !== undefined) patch.amount_by_hand = !!byHand;
+  if(readByAi!== undefined) patch.read_by_ai = !!readByAi;
+  const { error } = await sb.from('invoices').update(patch).eq('id', id);
+  if(error){
+    showToast(/ai_total|amount_by_hand/.test(error.message||'')
+      ? 'データベースの準備が必要です。supabase/migration-genba63.sql を実行してください'
+      : '請求額の保存に失敗しました：'+error.message);
+    throw error;
+  }
 }
 
 // 請求書を開く（1時間だけ有効なリンクを作る）

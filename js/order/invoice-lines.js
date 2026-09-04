@@ -73,7 +73,7 @@ async function ilReadWithAi(){
   const body=document.getElementById('il-body');
   body.innerHTML='<div class="empty" style="padding:24px">請求書を読み取っています…<br><span style="font-size:11px">明細が多いと1分ほどかかります</span></div>';
   let r;
-  try{ r=await dbReadInvoice(v.filePath); }
+  try{ r=await dbReadInvoice(v.filePath, v.supplierId); }
   catch(e){ body.innerHTML=`<div class="empty" style="padding:24px;color:var(--danger)">読み取りに失敗しました<br>${esc(e.message)}</div>`; return; }
   if(r.error){ body.innerHTML=`<div class="empty" style="padding:24px;color:var(--danger)">${esc(r.error)}</div>`; return; }
 

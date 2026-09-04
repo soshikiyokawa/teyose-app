@@ -10,6 +10,11 @@
 // 大きなファイルを送り直さずに済む。
 //
 // 読み取り結果は「道具（tool）」の形で受け取る（read-receipt と同じ作り）。
+//
+// もうひとつの役目として「読み方を覚える」呼び出しも受ける（learnTotal 付き）。
+// AIが金額を読み違えた／見つけられなかったとき、人が正しい金額を入れる。
+// その金額を渡して「どこを見ればこの額になるか」を1文で書かせ、発注先ごとに溜める。
+// 次に同じ発注先の請求書を読むときは、その1文を一緒に渡す（invoice_read_hints）。
 
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -22,6 +27,15 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// 発注先ごとの「読み取りのコツ」を、読ませる前に添える文にする。
+// 人が金額を手で直したときに1文ずつ溜めたもの（invoice_read_hints）。
+function hintBlock(hints: string[]): string {
+  if (!hints.length) return "";
+  return `\n\nこの取引先の請求書について、これまでに分かっていること（前に人が金額を直したときの覚え書き）:
+${hints.map((h) => "- " + h).join("\n")}
+まずこれを踏まえて探してください。ただし請求書に書かれている内容と食い違うときは、書かれているほうを優先します。`;
+}
 
 const PROMPT = `これは取引先から届いた請求書です。要点と明細を save_invoice の道具で返してください。
 
@@ -82,6 +96,37 @@ const TOOL = {
   },
 };
 
+// ── 読み方を覚える（人が入れた正しい金額から、次に使える1文を作らせる） ──
+const LEARN_TOOL = {
+  name: "save_read_hint",
+  description: "次に同じ取引先の請求書を読むときの手がかりを保存する",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      hint: {
+        type: "string",
+        description: "次も使える言い方の1文。見当がつかなければ空文字",
+      },
+      where: { type: "string", description: "その金額が書かれていた場所（欄の名前など）" },
+    },
+    required: ["hint"],
+  },
+};
+
+function learnPrompt(rightTotal: number, aiTotal: number | null): string {
+  return `これは取引先から届いた請求書です。
+この請求書の正しい「請求金額（税込の総額）」は ${rightTotal} 円です。人が確認して入れた金額なので、これが正解です。
+${aiTotal != null ? `先ほど自動で読んだときは ${aiTotal} 円と取ってしまい、間違っていました。` : "先ほど自動で読んだときは、金額を見つけられませんでした。"}
+
+次に同じ取引先から届いた請求書を読むときに同じ間違いをしないよう、手がかりを日本語1文（60字以内）で書いてください。
+
+守ること:
+- この請求書だけの数字（金額そのもの・日付・伝票番号・会社名）は書かない。次の月の請求書でも通じる言い方にする
+- 「どの欄を見るか」「どの欄は使わないか」を書く。例：「合計欄ではなく、右下の『今回御請求額』を見る」
+- 表の作りや位置の特徴が手がかりになるなら、それを書く。例：「2ページ目の最後に総合計がある」
+- 正解の金額にたどりつく道筋が分からなければ、hint を空文字にする（無理に書かない）`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -103,8 +148,25 @@ Deno.serve(async (req) => {
       return json({ error: "この機能を使えるのは社員だけです" }, 403);
     }
 
-    const { filePath } = await req.json();
+    const body = await req.json();
+    const filePath = body?.filePath;
     if (!filePath || typeof filePath !== "string") return json({ error: "請求書が指定されていません" }, 400);
+    const supplierId = Number(body?.supplierId) || null;
+    // learnTotal が入っていれば「読み方を覚える」呼び出し。人が入れた正しい金額
+    const learnTotal = body?.learnTotal == null ? null : Math.round(Number(body.learnTotal));
+    const prevAiTotal = body?.aiTotal == null ? null : Math.round(Number(body.aiTotal));
+    if (learnTotal !== null && !Number.isFinite(learnTotal)) {
+      return json({ error: "覚えさせる金額が正しくありません" }, 400);
+    }
+
+    // この発注先について、これまでに覚えた読み取りのコツ（新しいものから5つまで）
+    let hints: string[] = [];
+    if (supplierId && learnTotal === null) {
+      const { data: hintRows } = await admin.from("invoice_read_hints")
+        .select("hint").eq("supplier_id", supplierId)
+        .order("created_at", { ascending: false }).limit(5);
+      hints = (hintRows || []).map((h: any) => String(h.hint || "").trim()).filter(Boolean);
+    }
 
     // 保管場所から読み出す（社員は全社分を見られるので、そのまま取り出してよい）
     const { data: blob, error: dlErr } = await admin.storage.from("invoices").download(filePath);
@@ -127,6 +189,27 @@ Deno.serve(async (req) => {
       (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46);   // %PDF
     const imageType = ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mt) ? mt : "image/jpeg";
 
+    const doc = isPdf
+      ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: file } }
+      : { type: "image", source: { type: "base64", media_type: imageType, data: file } };
+
+    // ── 読み方を覚える（人が入れた正しい金額から、次に使える1文を作る） ──
+    if (learnTotal !== null) {
+      const learn = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1000,
+        tools: [LEARN_TOOL],
+        tool_choice: { type: "tool", name: "save_read_hint" },
+        messages: [{
+          role: "user",
+          content: [doc as any, { type: "text", text: learnPrompt(learnTotal, prevAiTotal) }],
+        }],
+      });
+      const lu: any = learn.content.find((c: any) => c.type === "tool_use");
+      const hint = String(lu?.input?.hint || "").trim().replace(/\s+/g, " ").slice(0, 200);
+      return json({ hint, where: String(lu?.input?.where || "").trim().slice(0, 100) });
+    }
+
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 12000,   // 明細が多い請求書でも途中で切れないように
@@ -134,12 +217,7 @@ Deno.serve(async (req) => {
       tool_choice: { type: "tool", name: "save_invoice" },
       messages: [{
         role: "user",
-        content: [
-          isPdf
-            ? { type: "document", source: { type: "base64", media_type: "application/pdf", data: file } }
-            : { type: "image", source: { type: "base64", media_type: imageType, data: file } },
-          { type: "text", text: PROMPT },
-        ],
+        content: [doc as any, { type: "text", text: PROMPT + hintBlock(hints) }],
       }],
     });
 
@@ -184,6 +262,7 @@ Deno.serve(async (req) => {
       dueOn: /^\d{4}-\d{2}-\d{2}$/.test(dueOn) ? dueOn : "",
       issuer: String(use.input?.issuer || "").trim(),
       kind: isPdf ? "pdf" : "image",
+      hintsUsed: hints.length,   // 覚えたコツを何件使ったか（画面に出す）
     });
   } catch (err) {
     const raw = String((err as any)?.message || err);

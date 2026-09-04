@@ -31,6 +31,17 @@ function invTitle(supplierName, month){
 const invIsStaff = () => currentUserRole==='staff';
 const invIsSupplier = () => currentUserRole==='supplier';
 
+// 日本語入力のまま打つと「９５０００」「Ｔ１２３…」のように全角で入ることがある。
+// 半角に直してから数字・英字を取り出す（そのままだと全部捨てて0になってしまう）
+function invToHalf(s){
+  return String(s||'').replace(/[！-～]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+}
+// 金額として読み取る。空なら null
+function invParseAmount(raw){
+  const s=invToHalf(raw).replace(/[^0-9]/g,'');
+  return s==='' ? null : Math.round(Number(s));
+}
+
 // 絞り込み（社内のみ使う）
 let invFilterSupplier = '';
 let invFilterMonth = '';
@@ -136,6 +147,8 @@ function renderInvoices(){
           <option value="diff"${invFilterState==='diff'?' selected':''}>差額があるもの</option>
         </select>
         <button class="btn sm" onclick="printInvoiceList()">支払一覧を印刷</button>
+        <button class="btn sm" onclick="openInvoiceHints()" title="手で入れた金額から覚えた、請求書の読み取りのコツ">AIの読み取りメモ${
+          (invoiceHints||[]).length?`（${(invoiceHints||[]).length}）`:''}</button>
         <span style="font-size:11px;color:var(--text-sub)">${list.length}件　請求 ¥${fmt(sum)}${
           unpaid?`　<b style="color:var(--warn-t)">未払い ¥${fmt(unpaid)}</b>`:''}${
           diffN?`　<b style="color:var(--danger)">差額あり ${diffN}件</b>`:''}</span>`;
@@ -161,7 +174,8 @@ function invRowHtml(v){
     <div class="inv-cmp">
       <span>発注 ¥${fmt(ord.total)}<i>（${ord.list.length}件・${invPeriodLabel(ord.period)}）</i></span>
       <span>請求 ${v.amount!=null?`¥${fmt(v.amount)}`:'—'}</span>
-      ${diff===null ? '<span class="inv-warn">請求額が未入力</span>'
+      ${diff===null ? `<span class="inv-warn">請求額が未入力</span>
+            <button class="btn xs primary" onclick="openInvoiceAmount(${v.id})">金額を入力</button>`
         : diff===0  ? '<span class="inv-ok">一致</span>'
         : `<span class="inv-ng">差額 ${diff>0?'＋':'−'}¥${fmt(Math.abs(diff))}</span>`}
       ${ord.list.length?`<button class="btn xs" onclick="showInvoiceOrders(${v.id})">発注の内訳</button>`:''}
@@ -175,7 +189,8 @@ function invRowHtml(v){
           ${reg?`<span class="inv-tag ${REG[reg][1]}">${REG[reg][0]}</span>`:''}
         </div>
         <div style="font-size:11px;color:var(--text-sub)">
-          ${esc(v.fileName||'ファイル')}${v.amount!=null?`　<b>¥${fmt(v.amount)}</b>`:''}
+          ${esc(v.fileName||'ファイル')}${v.amount!=null?`　<b>¥${fmt(v.amount)}</b>${
+            v.amountByHand?'<span style="color:var(--text-muted)">（手入力）</span>':''}`:''}
           <span style="color:var(--text-muted)">　送信 ${(v.createdAt||'').slice(0,10).replace(/-/g,'/')}${v.uploadedBy?'（'+esc(v.uploadedBy)+'）':''}</span>
         </div>
         ${v.note?`<div style="font-size:11px;color:var(--text-muted)">${esc(v.note)}</div>`:''}
@@ -185,6 +200,7 @@ function invRowHtml(v){
         ilLineCount(v.id) ? (ilUnassignedCount(v.id)
           ? `（<b style="color:var(--danger)">残${ilUnassignedCount(v.id)}</b>）` : '（済）') : ''}</button>
       <button class="btn xs" onclick="readInvoiceWithAi(${v.id})">AIで読む</button>
+      <button class="btn xs" onclick="openInvoiceAmount(${v.id})">金額を入力</button>
       <button class="btn xs" onclick="openInvoicePay(${v.id})">支払</button>
       <button class="btn xs danger" onclick="deleteInvoice(${v.id})">削除</button>`:''}
     </div>
@@ -341,14 +357,29 @@ async function openInvoice(id){
 }
 
 // ── ②AIで読み取る（請求額・登録番号・支払期限を埋める） ──
+//
+// 読めなかったとき・金額が違うときは、そのまま手入力に進めるようにしている。
+// 手入力した金額は「読み取りのコツ」として覚えさせられる（invLearnFromHand）。
 async function readInvoiceWithAi(id){
   const v=(invoices||[]).find(x=>x.id===id); if(!v) return;
   showToast('請求書を読み取っています…');
   let r;
-  try{ r=await dbReadInvoice(v.filePath); }
-  catch(e){ showToast('読み取りに失敗しました：'+e.message); return; }
-  if(r.error){ showToast('読み取れませんでした：'+r.error); return; }
-  if(r.total==null){ showToast('請求金額を見つけられませんでした'); return; }
+  try{ r=await dbReadInvoice(v.filePath, v.supplierId); }
+  catch(e){
+    if(confirm(`読み取りに失敗しました。\n${e.message}\n\n金額を手で入力しますか？`)) openInvoiceAmount(id);
+    return;
+  }
+  if(r.error){
+    if(confirm(`読み取れませんでした。\n${r.error}\n\n金額を手で入力しますか？`)) openInvoiceAmount(id);
+    return;
+  }
+  if(r.total==null){
+    // 読めなかったことを覚えておく（あとで手入力したときに「読み違い」と分かるように）
+    try{ await dbSetInvoiceAmount(id, {amount:v.amount, aiTotal:null, readByAi:true}); }catch(_){}
+    Object.assign(v, { aiTotal:null, readByAi:true });
+    if(confirm('請求金額を見つけられませんでした。\n\n金額を手で入力しますか？\n（入力した金額から、次に正しく読めるようAIに覚えさせられます）')) openInvoiceAmount(id);
+    return;
+  }
 
   const want=(suppliers||[]).find(s=>s.name===v.supplierName)?.invoiceRegNo || '';
   const lines=[
@@ -357,23 +388,175 @@ async function readInvoiceWithAi(id){
     r.dueOn?`支払期限　${r.dueOn.replace(/-/g,'/')}`:'',
     r.month&&r.month!==v.month?`請求書の対象月は ${invMonthLabel(r.month)} と読めました（登録は ${invMonthLabel(v.month)}）`:'',
     r.issuer?`発行元　${r.issuer}`:'',
+    r.hintsUsed?`（この発注先について覚えた読み取りのコツ ${r.hintsUsed}件を使いました）`:'',
   ].filter(Boolean).join('\n');
-  if(!confirm(`次のとおり読み取りました。この内容で登録しますか？\n\n${lines}`)) return;
+  if(!confirm(`次のとおり読み取りました。この内容で登録しますか？\n\n${lines}\n\n違っていれば「キャンセル」→「金額を入力」で直せます。`)){
+    // 断ったということは読み違えている見込みが高い。AIが読んだ額だけ覚えておく
+    try{ await dbSetInvoiceAmount(id, {amount:v.amount, aiTotal:r.total, readByAi:true}); }catch(_){}
+    Object.assign(v, { aiTotal:r.total, readByAi:true });
+    return;
+  }
 
   try{
-    const { error } = await sb.from('invoices')
-      .update({ amount:r.total, reg_no:r.regNo||'', read_by_ai:true,
-                due_on: v.dueOn || r.dueOn || null })
-      .eq('id', id);
-    if(error) throw error;
-  }catch(e){ showToast('登録に失敗しました：'+(e.message||'')); return; }
+    await dbSetInvoiceAmount(id, { amount:r.total, regNo:r.regNo||'', dueOn:v.dueOn||r.dueOn||'',
+      aiTotal:r.total, byHand:false, readByAi:true });
+  }catch(_){ return; }
 
-  Object.assign(v, { amount:r.total, regNo:r.regNo||'', readByAi:true, dueOn:v.dueOn||r.dueOn||'' });
+  Object.assign(v, { amount:r.total, regNo:r.regNo||'', readByAi:true,
+    dueOn:v.dueOn||r.dueOn||'', aiTotal:r.total, amountByHand:false });
   renderInvoices();
   const st=invRegState(v);
   showToast(st==='ng' ? '読み取りました。登録番号が発注先マスタと違います'
           : st==='none' ? '読み取りました。請求書に登録番号が見つかりません'
           : '読み取って登録しました');
+}
+
+// ════ 金額を手で入れる（AIで読めなかったとき・読み違えたとき） ════
+let invAmountId = null;
+function openInvoiceAmount(id){
+  if(!invIsStaff()){ showToast('請求額の入力は管理者のみです'); return; }
+  const v=(invoices||[]).find(x=>x.id===id); if(!v) return;
+  invAmountId=id;
+  document.getElementById('invamt-title').textContent=v.title||invTitle(v.supplierName,v.month);
+  const ord=invOrdersOf(v);
+  document.getElementById('invamt-sub').innerHTML=
+    `発注額 ¥${fmt(ord.total)}（${ord.list.length}件・${invPeriodLabel(ord.period)}）`
+    + (v.aiTotal!=null ? `　／　AIの読み取り <b>¥${fmt(v.aiTotal)}</b>`
+       : v.readByAi ? '　／　AIは金額を見つけられませんでした' : '');
+  document.getElementById('invamt-amount').value = v.amount!=null ? v.amount : '';
+  document.getElementById('invamt-reg').value = v.regNo||'';
+  document.getElementById('invamt-due').value = v.dueOn||'';
+  // 「発注額を入れる」のボタンは、突き合わせる相手があるときだけ意味がある
+  const cp=document.getElementById('invamt-copy');
+  if(cp){ cp.style.display = ord.total ? '' : 'none'; cp.textContent = `発注額 ¥${fmt(ord.total)} を入れる`; }
+  invAmountLearnSync();
+  document.getElementById('invamt-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('invamt-amount')?.focus(),100);
+}
+function closeInvoiceAmount(){
+  document.getElementById('invamt-modal').classList.remove('open');
+  invAmountId=null;
+}
+function invAmountValue(){
+  return invParseAmount(document.getElementById('invamt-amount')?.value);
+}
+function invAmountCopyOrders(){
+  const v=(invoices||[]).find(x=>x.id===invAmountId); if(!v) return;
+  document.getElementById('invamt-amount').value = invOrdersOf(v).total || '';
+  invAmountLearnSync();
+}
+// 「AIに覚えさせる」を出すかどうか。AIが読んだ額と違うとき／読めなかったときだけ意味がある
+function invAmountLearnSync(){
+  const v=(invoices||[]).find(x=>x.id===invAmountId);
+  const wrap=document.getElementById('invamt-learn-wrap');
+  const note=document.getElementById('invamt-learn-note');
+  if(!v||!wrap) return;
+  const amt=invAmountValue();
+  const show = !!v.readByAi && amt!=null && amt!==v.aiTotal;
+  wrap.style.display = show ? '' : 'none';
+  if(show && note){
+    note.textContent = v.aiTotal==null
+      ? 'AIは金額を見つけられませんでした。この請求書のどこを見ればよいかを覚えさせます'
+      : `AIは ¥${fmt(v.aiTotal)} と読みました。どこを見れば ¥${fmt(amt)} になるかを覚えさせます`;
+  }
+}
+
+async function saveInvoiceAmount(){
+  const v=(invoices||[]).find(x=>x.id===invAmountId); if(!v) return;
+  const amount=invAmountValue();
+  if(amount===null){ showToast('請求額を入れてください'); return; }
+  const regNo=invToHalf(document.getElementById('invamt-reg').value).toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(regNo && !/^T\d{13}$/.test(regNo)){ showToast('登録番号は T＋数字13桁で入れてください'); return; }
+  const dueOn=document.getElementById('invamt-due').value||'';
+  const learn = document.getElementById('invamt-learn')?.checked
+    && document.getElementById('invamt-learn-wrap')?.style.display!=='none';
+  const aiTotal=v.aiTotal, filePath=v.filePath, supplierId=v.supplierId, month=v.month;
+
+  const btn=document.getElementById('invamt-save');
+  btn.disabled=true; btn.textContent='保存中…';
+  try{
+    await dbSetInvoiceAmount(v.id, { amount, regNo, dueOn, byHand:true });
+  }catch(_){
+    btn.disabled=false; btn.textContent='この金額で登録'; return;
+  }finally{
+    btn.disabled=false; btn.textContent='この金額で登録';
+  }
+  Object.assign(v, { amount, regNo, dueOn, amountByHand:true });
+  closeInvoiceAmount();
+  renderInvoices();
+  showToast('請求額を登録しました');
+
+  if(learn) invLearnFromHand({filePath, supplierId, month, rightTotal:amount, aiTotal});
+}
+
+// ── 入れた金額から「次に使える手がかり」を覚える ──
+//
+// 正しい金額を渡して、AIに「この請求書のどこを見ればその額になるか」を1文で書かせる。
+// 発注先ごとに溜めて、次に同じ発注先の請求書を読むときに一緒に渡す。
+async function invLearnFromHand({filePath, supplierId, month, rightTotal, aiTotal}){
+  showToast('次から正しく読めるように、AIに覚えさせています…');
+  let hint='';
+  try{ hint=await dbLearnInvoiceRead(filePath, supplierId, rightTotal, aiTotal); }
+  catch(e){ showToast('覚えさせられませんでした：'+e.message); return; }
+  if(!hint){ showToast('AIも見分け方を見つけられませんでした。今回は覚えていません'); return; }
+  const supName=(suppliers||[]).find(s=>s.id===supplierId)?.name||'';
+  if(!confirm(`次のことを覚えます。よろしいですか？\n\n【${supName}】\n${hint}\n\n次からこの発注先の請求書を読むときに、これを一緒に渡します。`)) return;
+  try{
+    await dbAddInvoiceHint({supplierId, hint, aiTotal, rightTotal, sourceMonth:month});
+    await fetchInvoiceHints();
+    showToast('覚えました。次の読み取りから使います');
+  }catch(_){}
+}
+
+// ── 覚えた読み取りのコツを見る・消す ──
+function invHintsOf(supplierId){
+  return (invoiceHints||[]).filter(h=>h.supplierId===supplierId);
+}
+function openInvoiceHints(){
+  if(!invIsStaff()){ showToast('管理者のみです'); return; }
+  renderInvoiceHints();
+  document.getElementById('invhint-modal').classList.add('open');
+}
+function closeInvoiceHints(){ document.getElementById('invhint-modal').classList.remove('open'); }
+function renderInvoiceHints(){
+  const el=document.getElementById('invhint-body');
+  if(!el) return;
+  const list=(invoiceHints||[]).slice();
+  if(!list.length){
+    el.innerHTML=`<div class="empty" style="padding:20px;line-height:1.8">まだ何も覚えていません。<br>
+      <span style="font-size:11px">AIが読み違えた請求書で「金額を入力」して保存すると、そこから覚えられます</span></div>`;
+    return;
+  }
+  const by={};
+  list.forEach(h=>{ (by[h.supplierId] = by[h.supplierId] || []).push(h); });
+  el.innerHTML=Object.entries(by).map(([sid,hs])=>{
+    const name=(suppliers||[]).find(s=>s.id===Number(sid))?.name||'（削除された発注先）';
+    return `<div style="margin-bottom:12px">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px">${esc(name)}
+        <span style="font-size:10px;color:var(--text-muted);font-weight:400">${hs.length}件${
+          hs.length>5?'（新しい5件を使います）':''}</span></div>
+      ${hs.map((h,i)=>`<div class="invhint-row${i>=5?' old':''}">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;line-height:1.6">${esc(h.hint)}</div>
+          <div style="font-size:10px;color:var(--text-muted)">${
+            h.sourceMonth?invMonthLabel(h.sourceMonth)+'の請求書から　':''}${
+            h.aiTotal!=null?`AI ¥${fmt(h.aiTotal)} → `:'AIは見つけられず → '}正しくは ¥${fmt(h.rightTotal)}${
+            h.createdBy?'　'+esc(h.createdBy):''}</div>
+        </div>
+        <button class="btn xs danger" onclick="deleteInvoiceHint(${h.id})">消す</button>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+async function deleteInvoiceHint(id){
+  const h=(invoiceHints||[]).find(x=>x.id===id); if(!h) return;
+  if(!confirm(`このコツを消しますか？\n\n${h.hint}`)) return;
+  try{
+    await dbDeleteInvoiceHint(id);
+    invoiceHints=invoiceHints.filter(x=>x.id!==id);
+    renderInvoiceHints();
+    showToast('消しました');
+  }catch(_){}
 }
 
 // ── ③支払の記録 ──
@@ -398,8 +581,7 @@ async function saveInvoicePay(){
   const v=(invoices||[]).find(x=>x.id===invPayId); if(!v) return;
   const dueOn=document.getElementById('invpay-due').value||'';
   const paidOn=document.getElementById('invpay-on').value||'';
-  const raw=document.getElementById('invpay-amount').value;
-  const paidAmount=raw===''?null:Math.max(0, Math.round(Number(String(raw).replace(/[^\d.]/g,''))||0));
+  const paidAmount=invParseAmount(document.getElementById('invpay-amount').value);
   if(paidOn && paidAmount===null){ showToast('支払った金額を入れてください'); return; }
   try{ await dbSetInvoicePayment(v.id, {dueOn, paidOn, paidAmount}); }catch(e){ return; }
   Object.assign(v, {dueOn, paidOn, paidAmount});

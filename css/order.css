@@ -178,6 +178,12 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .inv-cmp .inv-warn{color:var(--warn-t);font-weight:700}
 .inv-paid{font-size:11px;color:var(--text-sub);margin-top:4px}
 
+/* 覚えた読み取りのコツ（AIの読み取りメモ） */
+.invhint-row{display:flex;align-items:flex-start;gap:8px;padding:7px 9px;border-radius:7px;
+  background:var(--surface2);border:0.5px solid var(--border);margin-bottom:5px}
+/* 6件目より下は使われない（新しい5件だけを渡すため）ので、薄く出す */
+.invhint-row.old{opacity:.5}
+
 /* ── 見積と実績（発注先ごと） ── */
 .evo-table td:first-child{white-space:normal}
 .evo-table tr.evo-over td:last-child{color:var(--danger);font-weight:700}
