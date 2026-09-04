@@ -347,6 +347,8 @@ function masterShippingSync(){
 // ── 1束あたりの本数（大林製材の木材など） ──
 //
 // 木材は束で届くので、本数と束数を行き来できるようにする。
+// 束の中身は必ず「本」で数える。品目そのものの単位（束・枚など）とは別なので、
+// ここの説明では品目の単位を使わない。
 // 束の考え方がある発注先のときだけ欄を出す（造作材発注と同じ判定）。
 function masterBundleValue(){
   const v=String(document.getElementById('m-bundle')?.value||'').replace(/[^0-9]/g,'');
@@ -362,7 +364,10 @@ function masterBundleSync(){
   const n=masterBundleValue();
   const unit=document.getElementById('m-unit')?.value.trim()||'本';
   const note=document.getElementById('m-bundle-note');
-  if(note) note.textContent = n
-    ? `1束 = ${n}${unit}。発注のときに束でも数えられます（例：3束＝${n*3}${unit}）`
-    : '束で届く木材だけ入れてください。0や空のままなら束では扱いません';
+  if(!note) return;
+  if(!n){ note.textContent='束で届く木材だけ入れてください。0や空のままなら束では扱いません'; return; }
+  // 単位が「束」の品目は束の数で発注するので、本数は目安として添える
+  note.textContent = unit==='束'
+    ? `1束 = ${n}本。発注は束の数で数えます（例：3束＝${n*3}本）`
+    : `1束 = ${n}本。発注のときに束でも数えられます（例：3束＝${n*3}${unit}）`;
 }
