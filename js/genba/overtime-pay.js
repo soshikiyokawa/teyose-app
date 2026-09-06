@@ -284,30 +284,22 @@ function otSplitInt(total, weights){
   return outv;
 }
 
-// その月度の社員ごとの割増賃金
-function otPayAllocation(month){
+// ════ その月度の、社員ごとの労働時間の切り分け ════
+//
+// 給与は使わない。出面表・日報の集計（残業時間の表示）と、
+// 割増賃金の計算の両方がここを見る。二か所で違う数え方にならないようにするため。
+//
+// 給与（employee_salaries）は清川創史・清川優香しか読めないので、
+// 時間の計算だけを分けてある。
+function otHoursByUser(month){
   const st = otPaySettings();
   const {start, end} = nippoPeriod(month);
   const users = {};
 
   nippoEmployees().forEach(p=>{
-    const cal = p.workGroup==='訓練校生' ? 'trainee' : 'regular';
-    const salary = salaryFor(p.id, month);
-    const mh = otMonthlyHours(cal, month, st);
-    const md = otMonthlyDays(cal, month, st);
-    const base = otBaseWage(salary, st);
-    const dw = otDeductWage(salary, st);
     users[p.id] = {
-      id:p.id, name:p.displayName, cal, salary,
-      // 役員（管理監督者）は時間外・休日の割増の対象外。深夜割増だけ計算する
-      exempt: typeof isLeaveExempt==='function' && isLeaveExempt(p.displayName),
-      monthlyHours: mh.hours, monthlyHoursSource: mh.source, yearly: mh.yearly,
-      baseWage: base,
-      rate: base ? Math.round(base / mh.hours) : 0,
-      // 欠勤控除
-      monthlyDays: md.days, deductWage: dw,
-      dailyWage: dw ? Math.round(dw / md.days) : 0,
-      absenceDays: otAbsenceDays(p.id, month),
+      id:p.id, name:p.displayName,
+      cal: p.workGroup==='訓練校生' ? 'trainee' : 'regular',
       otMin:0, naibuMin:0, holMin:0, furiMin:0, nightMin:0
     };
   });
@@ -367,11 +359,81 @@ function otPayAllocation(month){
     const u = users[id];
     const s = otSplitHours(u.cal, start, end, dayMin[id]||{}, prem[id], st, schedOv[id]);
     u.otMin = s.otMin; u.naibuMin = s.naibuMin; u.workedMin = s.actualMin;
+    u.otByDate = s.otByDate; u.naibuByDate = s.naibuByDate;
     // 日ごとの時間外・所定外を、その日に出た現場へ実働時間の割合で配る
     u.otSite = otSpreadToSites(s.otByDate,    daySite[id]||{}, start, end);
     u.naibuSite = otSpreadToSites(s.naibuByDate, daySite[id]||{}, start, end);
     u.holSite = holSite[id] || {};
     u.nightSite = nightSite[id] || {};
+  });
+
+  return {month, start, end, st, users};
+}
+
+// ── 出面表・日報の集計で使う、月度ごとの残業時間 ──
+//
+// 同じ月度で何度も描き直すので、一度出した結果は覚えておく。
+// データが変わったら otForgetHours() で捨てる。
+let _otHoursCache = {};
+function otHoursOf(month){
+  if(!_otHoursCache[month]) _otHoursCache[month] = otHoursByUser(month);
+  return _otHoursCache[month];
+}
+function otForgetHours(){ _otHoursCache = {}; }
+
+// その月度の残業時間を、新しい数え方（週の上限まで見る）で出すか。
+//
+// 2026年9月度から切り替えた。それより前は、そのときに見せていた数（日報の残業＝
+// 1日8時間を超えた分だけ）のまま出す。過去の集計や印刷したものと食い違わないようにするため。
+const OT_NEW_COUNT_FROM = '2026-09';
+function otUseNewCount(month){ return String(month||'') >= OT_NEW_COUNT_FROM; }
+
+// その人のその月度の残業（分）。新しい数え方を使わない月度なら null を返す
+function otCountedMin(userId, month){
+  if(!otUseNewCount(month)) return null;
+  const u = otHoursOf(month).users[userId];
+  return u ? u.otMin : 0;
+}
+// その人のその月度の「所定外だが法定内」（分）。割増は要らないが賃金は要る分
+function otNaibuMin(userId, month){
+  if(!otUseNewCount(month)) return null;
+  const u = otHoursOf(month).users[userId];
+  return u ? u.naibuMin : 0;
+}
+// その日に時間外があったか（出面表の「＊」に使う）
+function otHasOtOnDate(userId, month, dateStr){
+  if(!otUseNewCount(month)) return null;
+  const u = otHoursOf(month).users[userId];
+  return !!(u && u.otByDate && u.otByDate[dateStr] > 0);
+}
+
+// その月度の社員ごとの割増賃金
+function otPayAllocation(month){
+  const h = otHoursByUser(month);
+  const st = h.st;
+  const {start, end} = h;
+  const users = h.users;
+
+  nippoEmployees().forEach(p=>{
+    const u = users[p.id];
+    if(!u) return;
+    const salary = salaryFor(p.id, month);
+    const mh = otMonthlyHours(u.cal, month, st);
+    const md = otMonthlyDays(u.cal, month, st);
+    const base = otBaseWage(salary, st);
+    const dw = otDeductWage(salary, st);
+    Object.assign(u, {
+      salary,
+      // 役員（管理監督者）は時間外・休日の割増の対象外。深夜割増だけ計算する
+      exempt: typeof isLeaveExempt==='function' && isLeaveExempt(p.displayName),
+      monthlyHours: mh.hours, monthlyHoursSource: mh.source, yearly: mh.yearly,
+      baseWage: base,
+      rate: base ? Math.round(base / mh.hours) : 0,
+      // 欠勤控除
+      monthlyDays: md.days, deductWage: dw,
+      dailyWage: dw ? Math.round(dw / md.days) : 0,
+      absenceDays: otAbsenceDays(p.id, month)
+    });
   });
 
   const yen = (rate, mult, min) => Math.round(rate * mult * min / 60);

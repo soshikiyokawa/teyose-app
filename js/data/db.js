@@ -103,7 +103,10 @@ async function fetchAllData(){
 
   // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
-    if(currentUserRole==='staff') await fetchWorkCalendar(); // 勤務カレンダー・社員区分は管理者のみ
+    // 勤務カレンダーと会社共通の設定は、残業時間の数え方（所定労働時間・週の上限）に要る。
+    // 一般社員も自分の残業時間を見るので、社員なら誰でも読む（RLSも app_is_employee()）
+    await fetchWorkCalendar();
+    if(currentUserRole!=='staff') try{ await fetchAppSettings(); }catch(_){}
 
     const { data: typeRows } = await sb.from('estimate_types').select('*').order('sort_order').order('id');
     estimateTypes = (typeRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
@@ -934,6 +937,8 @@ async function fetchSupplierGenbaData(){
 }
 
 async function fetchGenbaData(){
+  // 残業時間の集計は覚えてあるので、元になる日報を取り直したら捨てる
+  if(typeof otForgetHours==='function') otForgetHours();
   const { data: photoRows } = await sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false});
   sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
 
@@ -1456,6 +1461,8 @@ async function refetchAndRerender(table){
   try{
     await fetchAllData();
   }catch(e){console.warn('再取得に失敗しました',e);return;}
+  // 残業時間の集計は覚えてあるので、元のデータが変わったら捨てる
+  if(typeof otForgetHours==='function') otForgetHours();
   if(table==='suppliers'){
     renderSupplierSelectList();
     if(document.getElementById('ordersub-supplier')?.classList.contains('active')) renderSupplierMaster();
