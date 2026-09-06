@@ -59,8 +59,9 @@
 .ol-th {
   padding: 5px 6px;
   text-align: center;
-  background: #dae3f3;
-  border: 1px solid #b0bfd4;
+  background: var(--table-head);
+  color: var(--table-head-t);
+  border: 1px solid var(--border);
   font-weight: 600;
   font-size: 10px;
   white-space: nowrap;
@@ -70,7 +71,7 @@
 }
 .ol-row { border-bottom: 1px solid var(--border); }
 .ol-row:nth-child(even) { background: var(--surface2); }
-.ol-row:hover { background: var(--wood-lt, #f5ede0); }
+.ol-row:hover { background: var(--surface2); }
 .ol-no  { padding: 4px 6px; text-align: center; color: var(--text-muted); font-size: 10px; }
 .ol-c   { padding: 4px 6px; }
 .ol-r   { padding: 4px 8px; text-align: right; white-space: nowrap; }
@@ -82,17 +83,17 @@
   border: 1px solid var(--border-s); background: var(--surface2);
   color: var(--text-muted); cursor: pointer; white-space: nowrap;
 }
-.sf-btn.active { background: var(--wood); color: #fff; border-color: var(--wood); }
+.sf-btn.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 /* 受注一覧 行色分け */
-.ol-row.status-approved { background: #f0faf3; }
-.ol-row.status-sent     { background: #f0f5ff; }
-.ol-row.status-construction{ background: #eaf6fa; }
-.ol-row.status-completed{ background: #f5f0ff; }
-.ol-row.status-approved:hover  { background: #d8f5e0; }
-.ol-row.status-sent:hover      { background: #dceaff; }
-.ol-row.status-construction:hover { background: #d3ecf5; }
-.ol-row.status-completed:hover { background: #ead8ff; }
+.ol-row.status-approved { background: var(--row-approved); }
+.ol-row.status-sent     { background: var(--row-sent); }
+.ol-row.status-construction{ background: var(--row-construction); }
+.ol-row.status-completed{ background: var(--row-completed); }
+.ol-row.status-approved:hover  { background: var(--surface2); }
+.ol-row.status-sent:hover      { background: var(--surface2); }
+.ol-row.status-construction:hover { background: var(--surface2); }
+.ol-row.status-completed:hover { background: var(--surface2); }
 
 #orders-table input[type="text"] {
   border: 1px solid var(--border-s);
@@ -102,5 +103,5 @@
   font-family: inherit;
 }
 
-.ol-row.status-lost      { background: #f2f0ee; color: var(--text-sub); }
-.ol-row.status-lost:hover{ background: #e4e0db; }
+.ol-row.status-lost      { background: var(--row-lost); color: var(--text-sub); }
+.ol-row.status-lost:hover{ background: var(--surface2); }

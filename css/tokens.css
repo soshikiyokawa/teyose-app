@@ -22,14 +22,21 @@
   --text-muted:#8a8a93;  /* ラベル・注記。読み飛ばしてよい文字 */
 
   /* ── アクセント（1色だけ） ── */
-  --accent:#415e2e;      /* 押せる／選ばれている／今ここ */
-  --accent-t:#33491f;    /* 明るい面の上に置く文字 */
+  --accent:#415e2e;      /* 押せる／選ばれている／今ここ（面として使う） */
+  --accent-t:#33491f;    /* 文字として使うとき */
   --accent-bg:#eff3ea;   /* うっすら敷く面 */
+  --on-accent:#ffffff;   /* アクセントの面の上に置く文字 */
+  --on-text:#ffffff;     /* 文字色（濃い面）の上に置く文字 */
 
   /* ── 状態の色。意味があるときだけ使う ── */
   --danger:#b3261e;   --danger-bg:#fdeceb;
   --warn-t:#8a5b00;   --warn-bg:#fdf4e5;
   --ok-t:#2b6b46;     --ok-bg:#eaf4ee;
+
+  /* ── 表 ── */
+  --table-head:#eceef2;   --table-head-t:#3c4655;
+  --row-approved:#f1f8f3; --row-sent:#f1f4fb; --row-construction:#eef6fa;
+  --row-completed:#f5f2fb; --row-lost:#f2f2f3;
 
   /* ── 以前の「木の色」。アクセント1色にまとめたので、同じ色を指す ──
      （古い指定が残っていても色が増えないようにするため） */
@@ -49,6 +56,44 @@
   --fs3:15px;   /* 本文 */
   --fs4:17px;   /* 見出し */
   --fs5:20px;   /* 画面の題 */
+}
+
+/* ════ 暗い画面 ════
+ *
+ * 色を入れ替えるだけ。かたち・余白・文字の大きさは明るい画面と同じ。
+ * 真っ黒にはせず少し浮かせた黒にして、面の重なりが分かるようにする。
+ *
+ * ・data-theme="dark" … 本人が「ダーク」を選んだとき
+ * ・端末の設定に合わせるとき（既定）は、prefers-color-scheme を見る。
+ *   ただし本人が「ライト」を選んでいたら、そちらを優先する。
+ */
+:root[data-theme="dark"]{ color-scheme:dark;
+  --bg:#121216; --surface:#1b1b20; --surface2:#26262d;
+  --border:#33333b; --border-s:#50505a;
+  --text:#f0f0f3; --text-sub:#a6a6b0; --text-muted:#7e7e88;
+  --accent:#6d9a52; --accent-t:#9ac47f; --accent-bg:#232e1d;
+  --on-accent:#0f150b; --on-text:#16161a;
+  --danger:#d1483e; --danger-bg:#2e1b19;
+  --warn-t:#d0a044; --warn-bg:#2b2416;
+  --ok-t:#5fb98a;   --ok-bg:#17281f;
+  --table-head:#2a2f38; --table-head-t:#c3cbd8;
+  --row-approved:#1a251d; --row-sent:#1a1f2b; --row-construction:#182530;
+  --row-completed:#231d2e; --row-lost:#232326;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){ color-scheme:dark;
+    --bg:#121216; --surface:#1b1b20; --surface2:#26262d;
+    --border:#33333b; --border-s:#50505a;
+    --text:#f0f0f3; --text-sub:#a6a6b0; --text-muted:#7e7e88;
+    --accent:#6d9a52; --accent-t:#9ac47f; --accent-bg:#232e1d;
+    --on-accent:#0f150b; --on-text:#16161a;
+    --danger:#d1483e; --danger-bg:#2e1b19;
+    --warn-t:#d0a044; --warn-bg:#2b2416;
+    --ok-t:#5fb98a;   --ok-bg:#17281f;
+    --table-head:#2a2f38; --table-head-t:#c3cbd8;
+    --row-approved:#1a251d; --row-sent:#1a1f2b; --row-construction:#182530;
+    --row-completed:#231d2e; --row-lost:#232326;
+  }
 }
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}

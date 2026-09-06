@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v375';
+const CACHE_NAME = 'teyose-v376';
 const ASSETS = [
   './',
   './index.html',
@@ -27,6 +27,14 @@ const ASSETS = [
   './js/task-templates.js',
   './js/init.js',
   './js/auth.js',
+  './js/account.js',
+  './js/cost-budget.js',
+  './js/payment-schedule.js',
+  './js/estimate/quote-import.js',
+  './js/genba/supplier-view.js',
+  './js/order/ekrea-price.js',
+  './js/order/invoice.js',
+  './js/order/item-price.js',
   './js/estimate/estimate-tabs.js',
   './js/estimate/estimate-items.js',
   './js/estimate/estimate-master.js',

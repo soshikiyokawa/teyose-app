@@ -14,7 +14,11 @@
   width:30px;height:30px;background:var(--text);border-radius:var(--radius);
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
 }
-.logo svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:1.75}
+.logo svg{width:17px;height:17px;stroke:var(--on-text);fill:none;stroke-width:1.75}
+/* ロゴの絵は濃い地の上に置くので、明るい画面のときだけ白く反転させる */
+.logo img{filter:invert(1)}
+:root[data-theme="dark"] .logo img{filter:none}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo img{filter:none}}
 .topbar-title{flex:1;min-width:0}
 .topbar-title h1{font-size:var(--fs4);font-weight:600;letter-spacing:-.01em;line-height:1.25;white-space:nowrap}
 .topbar-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}

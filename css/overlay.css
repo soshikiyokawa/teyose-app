@@ -2,11 +2,15 @@
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:200;align-items:flex-end;justify-content:center}
 .overlay.open{display:flex}
 @media(min-width:640px){.overlay{align-items:center}.sheet{border-radius:12px;max-width:680px;max-height:90vh}}
-.sheet{background:#fff;color:var(--text);width:100%;max-height:92vh;overflow-y:auto;border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-family:inherit}
-.sheet-toolbar{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
-.sheet-toolbar span{font-size:var(--fs4);font-weight:600;color:var(--text)}
+/* 見積書・発注書のプレビューは「紙」なので、暗い画面でも白いまま出す */
+.sheet{background:#fff;color:#16161a;width:100%;max-height:92vh;overflow-y:auto;border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-family:inherit}
+.sheet-toolbar{position:sticky;top:0;background:#f4f4f6;border-bottom:1px solid #dcdce1;padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.sheet-toolbar span{font-size:var(--fs4);font-weight:600;color:#16161a}
 .sheet-body{padding:24px 20px 20px}
-.sheet-foot{padding:12px 16px;display:flex;gap:var(--sp2);justify-content:flex-end;border-top:1px solid var(--border);background:var(--surface)}
+.sheet-foot{padding:12px 16px;display:flex;gap:var(--sp2);justify-content:flex-end;border-top:1px solid #dcdce1;background:#f4f4f6}
+/* 紙の上に置くボタンは、暗い画面でも明るい見た目のまま */
+.sheet .btn:not(.primary):not(.wood){background:#fff;color:#16161a;border-color:#adadb6}
+.sheet .btn:not(.primary):not(.wood):hover{background:#f4f4f6}
 
 /* ── modal（編集フォーム） ──
    下から出す。決めるボタンは指の届く下に置き、Primaryは右に1つだけ。 */

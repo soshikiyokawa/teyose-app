@@ -24,7 +24,7 @@
 
 /* Primary */
 .btn.primary,.btn.wood{
-  background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600;
+  background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:600;
 }
 .btn.primary:hover,.btn.wood:hover{background:var(--accent-t);border-color:var(--accent-t)}
 .btn.primary:active,.btn.wood:active{background:var(--accent-t)}
@@ -48,7 +48,7 @@
 .btn.btn-incomplete{opacity:.4}
 
 .btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.75;flex-shrink:0}
-.btn.primary svg,.btn.wood svg{stroke:#fff}
+.btn.primary svg,.btn.wood svg{stroke:var(--on-accent)}
 
 /* ── 一覧に行を足す（見出しではなく操作だと分かる程度に） ── */
 .add-row-btn{
@@ -73,7 +73,19 @@
   cursor:pointer;display:inline-flex;align-items:center;
 }
 .cat-pill:hover{background:var(--surface2)}
-.cat-pill.active{background:var(--text);color:#fff;border-color:var(--text)}
+.cat-pill.active{background:var(--text);color:var(--on-text);border-color:var(--text)}
+
+/* ── 3つから1つ選ぶ（画面の明るさなど）。押した1つだけが濃くなる ── */
+.seg{display:flex;border:1px solid var(--border-s);border-radius:var(--radius);overflow:hidden}
+.seg button{
+  flex:1;min-height:38px;padding:0 8px;
+  border:none;border-left:1px solid var(--border-s);
+  background:var(--surface);color:var(--text-sub);
+  font-size:var(--fs2);font-family:inherit;cursor:pointer;white-space:nowrap;
+}
+.seg button:first-child{border-left:none}
+.seg button:hover{background:var(--surface2)}
+.seg button.active{background:var(--accent);color:var(--on-accent);font-weight:600}
 
 /* ── 数量の増減 ── */
 .qty-btn{

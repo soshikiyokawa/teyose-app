@@ -7,13 +7,26 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
-<meta name="theme-color" content="#2a1e0e">
+<meta name="theme-color" content="#ffffff">
+<!-- 画面の明るさは、絵が出る前に決めておく（あとから切り替わってチカッとしないように）。
+     'light' | 'dark' | 'system'（既定・端末の設定に合わせる） -->
+<script>
+(function(){
+  try{
+    var m = localStorage.getItem('teyose-theme') || 'system';
+    if(m==='light'||m==='dark') document.documentElement.setAttribute('data-theme', m);
+    var dark = m==='dark' || (m==='system' && matchMedia('(prefers-color-scheme:dark)').matches);
+    var mt = document.querySelector('meta[name=theme-color]');
+    if(mt) mt.setAttribute('content', dark ? '#1b1b20' : '#ffffff');
+  }catch(_){}
+})();
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=375">
-<link rel="stylesheet" href="css/schedule.css?v=375">
+<link rel="stylesheet" href="css/main.css?v=376">
+<link rel="stylesheet" href="css/schedule.css?v=376">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -2742,9 +2755,19 @@
 <div class="modal-overlay" id="account-modal" onclick="if(event.target.id==='account-modal')closeAccountSettings()">
   <div class="modal-sheet">
     <h3>アカウント設定</h3>
-    <div id="acct-info" style="font-size:12px;color:var(--text-sub);line-height:1.9;margin-bottom:12px"></div>
+    <div id="acct-info" style="font-size:var(--fs2);color:var(--text-sub);line-height:1.9;margin-bottom:12px"></div>
 
-    <div class="section-lbl" style="margin-top:0">パスワードの変更</div>
+    <div class="section-lbl" style="margin-top:0">画面の明るさ</div>
+    <div class="seg" id="theme-seg">
+      <button type="button" onclick="setTheme('light')">ライト</button>
+      <button type="button" onclick="setTheme('dark')">ダーク</button>
+      <button type="button" onclick="setTheme('system')">端末に合わせる</button>
+    </div>
+    <div style="font-size:var(--fs1);color:var(--text-muted);line-height:1.7;margin-top:6px">
+      この端末だけの設定です。他の端末には影響しません。
+    </div>
+
+    <div class="section-lbl">パスワードの変更</div>
     <div class="fg" style="margin-bottom:8px"><label>いまのパスワード</label>
       <input type="password" id="acct-pass-now" autocomplete="current-password"></div>
     <div class="fg" style="margin-bottom:8px"><label>新しいパスワード（8文字以上）</label>
@@ -2917,90 +2940,90 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=375"></script>
+<script src="js/supabase-client.js?v=376"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=375"></script>
+<script src="js/utils.js?v=376"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=375"></script>
+<script src="js/state.js?v=376"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=375"></script>
+<script src="js/data/db.js?v=376"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=375"></script>
+<script src="js/nav.js?v=376"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=375"></script>
+<script src="js/talk.js?v=376"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=375"></script>
+<script src="js/push.js?v=376"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=375"></script>
-<script src="js/estimate/estimate-items.js?v=375"></script>
-<script src="js/estimate/quote-import.js?v=375"></script>
-<script src="js/estimate/estimate-master.js?v=375"></script>
-<script src="js/estimate/estimate-summary.js?v=375"></script>
-<script src="js/estimate/estimate-crud.js?v=375"></script>
-<script src="js/estimate/parking.js?v=375"></script>
-<script src="js/estimate/estimate-pdf.js?v=375"></script>
-<script src="js/estimate/estimate-invoice.js?v=375"></script>
+<script src="js/estimate/estimate-tabs.js?v=376"></script>
+<script src="js/estimate/estimate-items.js?v=376"></script>
+<script src="js/estimate/quote-import.js?v=376"></script>
+<script src="js/estimate/estimate-master.js?v=376"></script>
+<script src="js/estimate/estimate-summary.js?v=376"></script>
+<script src="js/estimate/estimate-crud.js?v=376"></script>
+<script src="js/estimate/parking.js?v=376"></script>
+<script src="js/estimate/estimate-pdf.js?v=376"></script>
+<script src="js/estimate/estimate-invoice.js?v=376"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=375"></script>
-<script src="js/payment-schedule.js?v=375"></script>
-<script src="js/inspection.js?v=375"></script>
+<script src="js/orders-list.js?v=376"></script>
+<script src="js/payment-schedule.js?v=376"></script>
+<script src="js/inspection.js?v=376"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=375"></script>
+<script src="js/chusho.js?v=376"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=375"></script>
+<script src="js/schedule.js?v=376"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=375"></script>
-<script src="js/order/item-price.js?v=375"></script>
-<script src="js/order/item-master.js?v=375"></script>
-<script src="js/order/invoice.js?v=375"></script>
-<script src="js/order/invoice-lines.js?v=375"></script>
-<script src="js/order/ekrea-price.js?v=375"></script>
-<script src="js/order/order-cart.js?v=375"></script>
-<script src="js/order/order-confirm.js?v=375"></script>
-<script src="js/order/order-price-edit.js?v=375"></script>
-<script src="js/order/order-history.js?v=375"></script>
-<script src="js/cost-budget.js?v=375"></script>
-<script src="js/order/card-match.js?v=375"></script>
-<script src="js/receipt.js?v=375"></script>
+<script src="js/order/supplier-master.js?v=376"></script>
+<script src="js/order/item-price.js?v=376"></script>
+<script src="js/order/item-master.js?v=376"></script>
+<script src="js/order/invoice.js?v=376"></script>
+<script src="js/order/invoice-lines.js?v=376"></script>
+<script src="js/order/ekrea-price.js?v=376"></script>
+<script src="js/order/order-cart.js?v=376"></script>
+<script src="js/order/order-confirm.js?v=376"></script>
+<script src="js/order/order-price-edit.js?v=376"></script>
+<script src="js/order/order-history.js?v=376"></script>
+<script src="js/cost-budget.js?v=376"></script>
+<script src="js/order/card-match.js?v=376"></script>
+<script src="js/receipt.js?v=376"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=375"></script>
-<script src="js/genba/supplier-view.js?v=375"></script>
-<script src="js/genba/genba-files.js?v=375"></script>
-<script src="js/genba/genba-photos.js?v=375"></script>
-<script src="js/genba/genba-drawings.js?v=375"></script>
-<script src="js/genba/genba-nippo.js?v=375"></script>
-<script src="js/genba/genba-dezura.js?v=375"></script>
-<script src="js/genba/payroll.js?v=375"></script>
-<script src="js/genba/overtime-pay.js?v=375"></script>
-<script src="js/genba/leave-balance.js?v=375"></script>
-<script src="js/genba/genba-leave.js?v=375"></script>
-<script src="js/genba/genba-holiday.js?v=375"></script>
-<script src="js/genba/license.js?v=375"></script>
-<script src="js/genba/vehicle.js?v=375"></script>
-<script src="js/genba/work-calendar.js?v=375"></script>
-<script src="js/genba/account-perms.js?v=375"></script>
+<script src="js/genba/genba-tabs.js?v=376"></script>
+<script src="js/genba/supplier-view.js?v=376"></script>
+<script src="js/genba/genba-files.js?v=376"></script>
+<script src="js/genba/genba-photos.js?v=376"></script>
+<script src="js/genba/genba-drawings.js?v=376"></script>
+<script src="js/genba/genba-nippo.js?v=376"></script>
+<script src="js/genba/genba-dezura.js?v=376"></script>
+<script src="js/genba/payroll.js?v=376"></script>
+<script src="js/genba/overtime-pay.js?v=376"></script>
+<script src="js/genba/leave-balance.js?v=376"></script>
+<script src="js/genba/genba-leave.js?v=376"></script>
+<script src="js/genba/genba-holiday.js?v=376"></script>
+<script src="js/genba/license.js?v=376"></script>
+<script src="js/genba/vehicle.js?v=376"></script>
+<script src="js/genba/work-calendar.js?v=376"></script>
+<script src="js/genba/account-perms.js?v=376"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=375"></script>
+<script src="js/init.js?v=376"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=375"></script>
-<script src="js/tasks.js?v=375"></script>
-<script src="js/task-templates.js?v=375"></script>
-<script src="js/auth.js?v=375"></script>
-<script src="js/account.js?v=375"></script>
+<script src="js/notifications.js?v=376"></script>
+<script src="js/tasks.js?v=376"></script>
+<script src="js/task-templates.js?v=376"></script>
+<script src="js/auth.js?v=376"></script>
+<script src="js/account.js?v=376"></script>
 </body>
 </html>

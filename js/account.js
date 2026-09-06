@@ -19,8 +19,49 @@ function openAccountSettings(){
       <div><span style="color:var(--text-muted)">区分　　</span>${roleLabel}</div>`;
   }).catch(()=>{ info.textContent=''; });
   ['acct-pass-now','acct-pass1','acct-pass2'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+  renderThemeSeg();
   document.getElementById('account-modal').classList.add('open');
 }
+
+// ════ 画面の明るさ（ライト／ダーク／端末に合わせる） ════
+//
+// この端末だけの設定なので、サーバーではなく端末の中に覚えておく。
+// 絵が出る前に当てる分は index.html の先頭で読んでいる（切り替わってチカッとしないように）。
+const THEME_KEY = 'teyose-theme';
+const THEMES = ['light','dark','system'];
+
+function currentTheme(){
+  try{ const v = localStorage.getItem(THEME_KEY); return THEMES.includes(v) ? v : 'system'; }
+  catch(_){ return 'system'; }
+}
+function themeIsDark(mode){
+  return mode==='dark' || (mode==='system' && window.matchMedia('(prefers-color-scheme:dark)').matches);
+}
+function applyTheme(mode){
+  const root = document.documentElement;
+  if(mode==='system') root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', mode);
+  // スマホの上下のふち（アドレスバーなど）の色も合わせる
+  const mt = document.querySelector('meta[name=theme-color]');
+  if(mt) mt.setAttribute('content', themeIsDark(mode) ? '#1b1b20' : '#ffffff');
+}
+function setTheme(mode){
+  if(!THEMES.includes(mode)) return;
+  try{ localStorage.setItem(THEME_KEY, mode); }catch(_){}
+  applyTheme(mode);
+  renderThemeSeg();
+}
+function renderThemeSeg(){
+  const seg = document.getElementById('theme-seg');
+  if(!seg) return;
+  const now = currentTheme();
+  [...seg.children].forEach((b,i)=> b.classList.toggle('active', THEMES[i]===now));
+}
+// 「端末に合わせる」のときは、端末の設定が変わったらその場で合わせる
+try{
+  window.matchMedia('(prefers-color-scheme:dark)')
+    .addEventListener('change', ()=>{ if(currentTheme()==='system') applyTheme('system'); });
+}catch(_){}
 function closeAccountSettings(){
   document.getElementById('account-modal').classList.remove('open');
   ['acct-pass-now','acct-pass1','acct-pass2'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
