@@ -295,10 +295,19 @@ function renderNippoPhotoDays(){
   if(currentUserRole!=='staff' && currentUserRole!=='carpenter'){ el.style.display='none'; return; }
   el.style.display='';
 
+  // 集まった写真そのものを見に行くボタン。この欄から辿れるようにしてある
+  const total = (nippoPhotos||[]).length;
+  const galleryBtn = `<button class="btn sm" onclick="openNippoGallery()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      日報写真を見る${total?`（${total}）`:''}
+    </button>`;
+
   const byUser = nippoPhotoDays();
   const ids = Object.keys(byUser).filter(id=>byUser[id].workDays.size || byUser[id].days.size);
   if(!ids.length){
-    el.innerHTML = `<div class="card-head"><span class="card-head-title">写真をあげた日数</span></div>
+    el.innerHTML = `<div class="card-head">
+        <span class="card-head-title">写真をあげた日数</span>${galleryBtn}
+      </div>
       <div class="empty" style="padding:20px">この月度の日報はまだありません</div>`;
     return;
   }
@@ -309,8 +318,11 @@ function renderNippoPhotoDays(){
 
   el.innerHTML = `
     <div class="card-head">
-      <span class="card-head-title">写真をあげた日数</span>
-      <span style="font-size:var(--fs1);color:var(--text-muted)">${(nippoMonth||'').replace(/^(\d{4})-(\d{2})$/,(_,y,m)=>`${y}年${Number(m)}月度`)}</span>
+      <div style="flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+        <span class="card-head-title">写真をあげた日数</span>
+        <span style="font-size:var(--fs1);color:var(--text-muted);white-space:nowrap">${(nippoMonth||'').replace(/^(\d{4})-(\d{2})$/,(_,y,m)=>`${y}年${Number(m)}月度`)}</span>
+      </div>
+      ${galleryBtn}
     </div>
     <div class="pd-list">
       ${ids.map(id=>{
@@ -440,6 +452,58 @@ function renderNippoGallery(){
 function ngScoreClass(s){
   if(s==null) return 'none';
   return s>=85 ? 'hi' : s>=70 ? 'mid' : 'low';
+}
+
+// ── 採点基準 ──
+//
+// 画面に書き写さず、採点している当人（score-photo）から取ってくる。
+// そうしておけば、見せている基準と実際の採点が食い違わない。
+// 一度読んだら覚えておく（開くたびに聞きに行かない）。
+let _scoreCriteria = null;
+
+async function openScoreCriteria(){
+  const modal = document.getElementById('sc-modal');
+  const body = document.getElementById('sc-body');
+  modal.classList.add('open');
+  if(_scoreCriteria){ renderScoreCriteria(_scoreCriteria); return; }
+  body.innerHTML = '<div class="empty" style="padding:24px">読み込んでいます…</div>';
+  try{
+    _scoreCriteria = await dbPhotoScoreCriteria();
+  }catch(e){
+    body.innerHTML = `<div class="empty" style="padding:24px;color:var(--danger);line-height:1.8">
+      採点基準を読み出せませんでした<br><span style="font-size:var(--fs1)">${esc(e.message)}</span><br>
+      <button class="btn sm" style="margin-top:10px" onclick="openScoreCriteria()">もう一度</button></div>`;
+    return;
+  }
+  renderScoreCriteria(_scoreCriteria);
+}
+function closeScoreCriteria(){ document.getElementById('sc-modal').classList.remove('open'); }
+
+function renderScoreCriteria(c){
+  const body = document.getElementById('sc-body');
+  if(!body) return;
+  if(!c){ body.innerHTML = '<div class="empty" style="padding:24px">採点基準がありません</div>'; return; }
+  body.innerHTML = `
+    <div style="font-size:var(--fs2);color:var(--text-sub);line-height:1.8;margin-bottom:var(--sp5)">${esc(c.intro||'')}</div>
+
+    <div class="section-lbl" style="margin-top:0">見るところ（上から重い順）</div>
+    <ol class="sc-points">
+      ${(c.points||[]).map(p=>`<li>
+        <b>${esc(p.title||'')}</b>
+        ${p.detail?`<span>${esc(p.detail)}</span>`:''}
+      </li>`).join('')}
+    </ol>
+
+    <div class="section-lbl">点数の目安</div>
+    <div class="sc-bands">
+      ${(c.bands||[]).map(b=>`<div class="sc-band">
+        <span class="sc-range">${b.from}〜${b.to}</span>
+        <span class="sc-label">${esc(b.label||'')}</span>
+      </div>`).join('')}
+    </div>
+
+    ${(c.notes||[]).length?`<div class="section-lbl">そのほか</div>
+      <ul class="sc-notes">${c.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`:''}`;
 }
 
 async function scoreNippoGallery(){

@@ -1204,6 +1204,20 @@ async function dbScoreNippoPhotos(photoIds){
   return data?.results || [];
 }
 
+// 採点の基準を、採点している当人（Edge Function）から取ってくる。
+// 画面に書き写さないので、見せている基準と実際の採点が食い違わない
+async function dbPhotoScoreCriteria(){
+  const { data, error } = await sb.functions.invoke('score-photo', { body:{ criteria:true } });
+  if(error || data?.error){
+    let msg = data?.error;
+    if(!msg && error?.context && typeof error.context.json==='function'){
+      try{ const j = await error.context.json(); msg = j?.error; }catch(_){}
+    }
+    throw new Error(msg || error?.message || '採点基準を読み出せませんでした');
+  }
+  return data?.criteria || null;
+}
+
 async function dbDeleteNippoPhoto(id){
   const { error } = await sb.from('nippo_photos').delete().eq('id', id);
   if(error){ showToast('写真の削除に失敗しました：'+error.message); throw error; }
