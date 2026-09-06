@@ -246,7 +246,7 @@ function nippoRenderPhotos(){
   const saved = editingNippoId ? nippoPhotosOf(editingNippoId) : [];
   el.innerHTML =
     saved.map(p=>`<div class="np-thumb">
-        <img src="${esc(p.url)}" alt="" onclick="openNippoPhoto('${esc(p.url)}')">
+        <img src="${esc(p.url)}" alt="" onclick="openNippoPhoto('${esc(p.url)}',${p.id})">
         <button type="button" class="np-x" title="消す" onclick="nippoRemoveSavedPhoto(${p.id})">×</button>
       </div>`).join('')
     + nippoNewPhotos.map((p,i)=>`<div class="np-thumb new">
@@ -336,20 +336,137 @@ function nippoMiniPhotos(reportId){
   if(!ps.length) return '';
   const shown = ps.slice(0,3);
   return `<div class="np-mini" onclick="event.stopPropagation()">
-    ${shown.map(p=>`<img src="${esc(p.url)}" alt="" loading="lazy" onclick="openNippoPhoto('${esc(p.url)}')">`).join('')}
+    ${shown.map(p=>`<img src="${esc(p.url)}" alt="" loading="lazy" onclick="openNippoPhoto('${esc(p.url)}',${p.id})">`).join('')}
     ${ps.length>3?`<span>ほか${ps.length-3}枚</span>`:''}
   </div>`;
 }
 
-// 大きく見る
-function openNippoPhoto(url){
+// 大きく見る。写真のIDを渡すと、日付・撮った人・点数も一緒に出す
+function openNippoPhoto(url, photoId){
   const v = document.getElementById('np-viewer');
   document.getElementById('np-viewer-img').src = url;
+  const info = document.getElementById('np-viewer-info');
+  const p = photoId!=null ? (nippoPhotos||[]).find(x=>x.id===photoId) : null;
+  if(info){
+    if(!p){ info.textContent=''; }
+    else {
+      const n = (dailyReports||[]).find(r=>r.id===p.reportId);
+      info.innerHTML = `${n?`${gbDateLabel(n.workDate)}　${esc(n.projectName||'')}<br>`:''}`
+        + `${esc(p.uploaderName||'')}`
+        + (p.igScore!=null
+            ? `<br><b style="font-size:var(--fs4)">${p.igScore}点</b>　${esc(p.igComment||'')}`
+            : '<br><span style="opacity:.7">まだ採点していません</span>');
+    }
+  }
   v.classList.add('open');
 }
 function closeNippoPhoto(){
   document.getElementById('np-viewer').classList.remove('open');
   document.getElementById('np-viewer-img').src = '';
+  const info = document.getElementById('np-viewer-info');
+  if(info) info.innerHTML = '';
+}
+
+// ════ 日報写真の一覧 ════
+//
+// 日報に付いた写真を、日報とは別にまとめて見るところ。
+// 「Instagramに載せるならどれがよいか」をAIに100点満点で採点させて並べ替えられる。
+// 採点は頼んだときだけ動く（枚数ぶん料金がかかるので、勝手には採点しない）。
+let ngUser = '';   // 絞り込み中の社員（空＝全員）
+
+function openNippoGallery(){
+  if(currentUserRole!=='staff' && currentUserRole!=='carpenter'){ showToast('社内の方のみです'); return; }
+  if(!nippoPhotosReady){ showToast('データベースの準備が必要です。supabase/migration-genba65.sql を実行してください'); return; }
+  const sel = document.getElementById('ng-user');
+  const names = [...new Set((nippoPhotos||[]).map(p=>p.uploaderName).filter(Boolean))]
+    .sort((a,b)=>cmpEmployee(a,b));
+  sel.innerHTML = '<option value="">撮った人：全員</option>'
+    + names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value = names.includes(ngUser) ? ngUser : (ngUser='');
+  renderNippoGallery();
+  document.getElementById('ng-modal').classList.add('open');
+}
+function closeNippoGallery(){ document.getElementById('ng-modal').classList.remove('open'); }
+
+// いま出している写真（絞り込み・並び替えを反映したもの）
+function ngList(){
+  ngUser = document.getElementById('ng-user')?.value || '';
+  const sort = document.getElementById('ng-sort')?.value || 'score';
+  let list = (nippoPhotos||[]).slice();
+  if(ngUser) list = list.filter(p=>p.uploaderName===ngUser);
+  const dateOf = p => (dailyReports||[]).find(r=>r.id===p.reportId)?.workDate || '';
+  if(sort==='score'){
+    // まだ採点していないものは後ろへ
+    list.sort((a,b)=> (b.igScore??-1) - (a.igScore??-1) || dateOf(b).localeCompare(dateOf(a)) || b.id-a.id);
+  } else {
+    list.sort((a,b)=> dateOf(b).localeCompare(dateOf(a)) || b.id-a.id);
+  }
+  return list;
+}
+
+function renderNippoGallery(){
+  const grid = document.getElementById('ng-grid');
+  if(!grid) return;
+  const list = ngList();
+  const unscored = list.filter(p=>p.igScore==null).length;
+
+  const cnt = document.getElementById('ng-count');
+  if(cnt) cnt.textContent = `${list.length}枚${unscored?`（未採点 ${unscored}枚）`:''}`;
+  const btn = document.getElementById('ng-score-btn');
+  if(btn){
+    btn.disabled = !unscored;
+    btn.textContent = unscored ? `未採点の${Math.min(unscored,12)}枚をAIで採点` : 'すべて採点済み';
+  }
+
+  if(!list.length){
+    grid.innerHTML = '<div class="empty" style="padding:28px">まだ写真がありません。<br><span style="font-size:var(--fs1)">日報に写真を付けると、ここに集まります</span></div>';
+    return;
+  }
+  grid.innerHTML = `<div class="ng-grid">${list.map(p=>{
+    const n = (dailyReports||[]).find(r=>r.id===p.reportId);
+    return `<figure class="ng-cell" onclick="openNippoPhoto('${esc(p.url)}',${p.id})">
+      <img src="${esc(p.url)}" alt="" loading="lazy">
+      <span class="ng-score ${ngScoreClass(p.igScore)}">${p.igScore!=null?p.igScore:'—'}</span>
+      <figcaption>
+        <span class="ng-who">${esc(p.uploaderName||'')}</span>
+        <span class="ng-when">${n?gbDateLabel(n.workDate):''}</span>
+        ${p.igComment?`<span class="ng-note">${esc(p.igComment)}</span>`:''}
+      </figcaption>
+    </figure>`;
+  }).join('')}</div>`;
+}
+
+// 点数の帯。85以上・70以上・それ未満の3段だけにして、色を増やさない
+function ngScoreClass(s){
+  if(s==null) return 'none';
+  return s>=85 ? 'hi' : s>=70 ? 'mid' : 'low';
+}
+
+async function scoreNippoGallery(){
+  const targets = ngList().filter(p=>p.igScore==null).slice(0,12);
+  if(!targets.length){ showToast('未採点の写真はありません'); return; }
+  const btn = document.getElementById('ng-score-btn');
+  btn.disabled = true; btn.textContent = `${targets.length}枚を採点中…`;
+  let results = [];
+  try{
+    results = await dbScoreNippoPhotos(targets.map(p=>p.id));
+  }catch(e){
+    showToast('採点に失敗しました：'+e.message);
+    renderNippoGallery();
+    return;
+  }
+  // 返ってきた点数を手元にも反映する（取り直さずに済むように）
+  let ok=0, ng=0;
+  results.forEach(r=>{
+    const p = (nippoPhotos||[]).find(x=>x.id===r.id);
+    if(!p) return;
+    if(r.error){ ng++; return; }
+    p.igScore = r.score; p.igComment = r.comment||''; p.igScoredAt = new Date().toISOString();
+    ok++;
+  });
+  renderNippoGallery();
+  renderNippo();
+  showToast(ng ? `${ok}枚を採点しました（${ng}枚は読めませんでした）` : `${ok}枚を採点しました`);
 }
 
 // 写真の枠にドラッグして落としても入るようにする

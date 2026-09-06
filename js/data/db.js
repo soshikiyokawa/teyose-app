@@ -962,7 +962,9 @@ async function fetchGenbaData(){
     nippoPhotosReady = !npErr;
     nippoPhotos = (npRows||[]).map(r=>({id:r.id, reportId:r.report_id, url:r.url,
       caption:r.caption||'', sortOrder:r.sort_order||0,
-      uploadedBy:r.uploaded_by, uploaderName:r.uploader_name||'', createdAt:r.created_at}));
+      uploadedBy:r.uploaded_by, uploaderName:r.uploader_name||'', createdAt:r.created_at,
+      igScore:(r.ig_score==null?null:Number(r.ig_score)),
+      igComment:r.ig_comment||'', igScoredAt:r.ig_scored_at||''}));
   }catch(_){ nippoPhotos=[]; nippoPhotosReady=false; }
 
   const { data: leaveRows } = await sb.from('leave_requests').select('*').order('created_at',{ascending:false});
@@ -1189,6 +1191,19 @@ async function dbAddNippoPhotos(reportId, urls){
     throw error;
   }
 }
+// 写真を「Instagramに載せるのに向いているか」でAIに採点させる（一度に12枚まで）
+async function dbScoreNippoPhotos(photoIds){
+  const { data, error } = await sb.functions.invoke('score-photo', { body:{ photoIds } });
+  if(error || data?.error){
+    let msg = data?.error;
+    if(!msg && error?.context && typeof error.context.json==='function'){
+      try{ const j = await error.context.json(); msg = j?.error; }catch(_){}
+    }
+    throw new Error(msg || error?.message || '採点に失敗しました');
+  }
+  return data?.results || [];
+}
+
 async function dbDeleteNippoPhoto(id){
   const { error } = await sb.from('nippo_photos').delete().eq('id', id);
   if(error){ showToast('写真の削除に失敗しました：'+error.message); throw error; }

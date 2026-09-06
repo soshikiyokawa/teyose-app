@@ -86,6 +86,24 @@
 .np-mini img{width:34px;height:34px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:pointer}
 .np-mini span{font-size:var(--fs1);color:var(--text-muted);align-self:center;margin-left:2px}
 
+/* ── 日報写真の一覧 ── */
+.ng-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:var(--sp3)}
+.ng-cell{position:relative;margin:0;cursor:pointer}
+.ng-cell img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;
+  border-radius:var(--radius);border:1px solid var(--border);background:var(--surface2)}
+.ng-cell figcaption{display:flex;flex-wrap:wrap;gap:0 6px;margin-top:5px;line-height:1.5}
+.ng-who{font-size:var(--fs2);color:var(--text)}
+.ng-when{font-size:var(--fs1);color:var(--text-muted)}
+.ng-note{flex-basis:100%;font-size:var(--fs1);color:var(--text-sub)}
+/* 点数。3段だけで、色は使わず濃さで表す */
+.ng-score{position:absolute;top:6px;left:6px;min-width:30px;padding:2px 7px;border-radius:var(--radius);
+  font-size:var(--fs2);font-weight:600;font-variant-numeric:tabular-nums;text-align:center;
+  background:rgba(20,20,24,.72);color:#fff}
+.ng-score.hi{background:var(--accent);color:var(--on-accent)}
+.ng-score.mid{background:rgba(20,20,24,.72);color:#fff}
+.ng-score.low{background:rgba(20,20,24,.45);color:#fff}
+.ng-score.none{background:rgba(20,20,24,.3);color:#fff;font-weight:400}
+
 /* ── 写真をあげた日数 ── */
 .pd-list{border-top:1px solid var(--border)}
 .pd-row{display:flex;align-items:center;gap:var(--sp3);padding:9px 16px;border-bottom:1px solid var(--border)}

@@ -1,0 +1,176 @@
+// 日報で集まった写真を「Instagramに載せるのに向いているか」で採点するEdge Function。
+//
+// 写真そのものはすでに site-files（公開バケット）にあるので、URLから読み出して見せる。
+// 点数と一言コメントを nippo_photos に書き戻す。
+//
+// 書き戻しはサービスロールで行う。誰の写真でも社員なら採点を頼めるが、
+// 写真の追加・削除は日報を直せる人だけ、という決まりは変えないため。
+//
+// 一度に頼めるのは12枚まで。多いときは画面側で分けて呼ぶ。
+
+import Anthropic from "npm:@anthropic-ai/sdk";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const MAX_AT_ONCE = 12;
+
+const PROMPT = `これは工務店（新築・リフォームの木工事）の職人が現場で撮った写真です。
+この会社のInstagramに載せる写真としてどのくらい向いているかを、100点満点で採点してください。
+
+見るところ（上から重い順）:
+1. 何の写真か一目で分かるか。主役がはっきりしているか
+2. 明るさ。暗すぎ・白飛び・逆光で見えなくなっていないか
+3. 構図。水平・垂直が取れているか、余計なものが写り込んでいないか
+4. 仕事のよさが伝わるか（木の質感、納まり、手仕事のあと、現場の空気）
+5. 載せて困らないか（人の顔がはっきり写っている、表札・車のナンバー・図面の個人情報、
+   散らかった様子、安全上まずい状態が写っていないか）
+
+点数の目安:
+- 85〜100 … そのまま載せられる。人に見てもらう価値がある
+- 70〜84  … 少し切り取れば載せられる
+- 50〜69  … 記録としては十分だが、載せるには弱い
+- 30〜49  … 載せるには向かない
+- 0〜29   … 手ぶれ・真っ暗など、写真として成立していない／載せてはいけないものが写っている
+
+comment には、その点数にした理由をひとつだけ、日本語30字以内で書いてください。
+よければ何がよいか、惜しければ何を直せばよいかを書く。
+「良い写真です」のような当たり障りのない言い方はしない。
+載せてはいけないものが写っている場合は、必ずそれを書く。`;
+
+const TOOL = {
+  name: "save_score",
+  description: "写真の採点を保存する",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      score: { type: "integer", description: "0〜100の点数" },
+      comment: { type: "string", description: "その点数にした理由。日本語30字以内" },
+    },
+    required: ["score", "comment"],
+  },
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  try {
+    // 呼び出し元が、ログイン済みの社員であることを確認する
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) return json({ error: "ログインが必要です" }, 401);
+
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const { data: profile } = await admin.from("profiles").select("role")
+      .eq("id", userData.user.id).single();
+    if (!profile || (profile.role !== "staff" && profile.role !== "carpenter")) {
+      return json({ error: "この機能を使えるのは社員だけです" }, 403);
+    }
+
+    const body = await req.json();
+    const ids: number[] = Array.isArray(body?.photoIds)
+      ? body.photoIds.map((n: unknown) => Number(n)).filter(Number.isFinite).slice(0, MAX_AT_ONCE)
+      : [];
+    if (!ids.length) return json({ error: "採点する写真が指定されていません" }, 400);
+
+    const { data: rows, error: rowErr } = await admin.from("nippo_photos")
+      .select("id, url").in("id", ids);
+    if (rowErr) return json({ error: "写真を読み出せませんでした：" + rowErr.message }, 500);
+    if (!rows?.length) return json({ error: "指定された写真が見つかりません" }, 404);
+
+    const key = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!key) return json({ error: "ANTHROPIC_API_KEY が設定されていません" }, 500);
+    const client = new Anthropic({ apiKey: key });
+
+    const results: { id: number; score?: number; comment?: string; error?: string }[] = [];
+
+    for (const row of rows) {
+      try {
+        const res = await fetch(row.url);
+        if (!res.ok) throw new Error("写真を読み出せませんでした（" + res.status + "）");
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (!bytes.length) throw new Error("写真の中身が空です");
+        if (bytes.length > 5 * 1024 * 1024) throw new Error("写真が大きすぎます");
+
+        const message = await client.messages.create({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 500,
+          tools: [TOOL],
+          tool_choice: { type: "tool", name: "save_score" },
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mediaType(res, bytes), data: base64(bytes) } },
+              { type: "text", text: PROMPT },
+            ],
+          }],
+        });
+
+        const use: any = message.content.find((c: any) => c.type === "tool_use");
+        if (!use) throw new Error("採点できませんでした");
+        const score = Math.max(0, Math.min(100, Math.round(Number(use.input?.score))));
+        if (!Number.isFinite(score)) throw new Error("点数を読み取れませんでした");
+        const comment = String(use.input?.comment || "").trim().replace(/\s+/g, " ").slice(0, 120);
+
+        const { error: upErr } = await admin.from("nippo_photos")
+          .update({ ig_score: score, ig_comment: comment, ig_scored_at: new Date().toISOString() })
+          .eq("id", row.id);
+        if (upErr) throw new Error("点数の保存に失敗しました：" + upErr.message);
+
+        results.push({ id: row.id, score, comment });
+      } catch (e) {
+        results.push({ id: row.id, error: String((e as any)?.message || e).slice(0, 200) });
+      }
+    }
+
+    return json({ results });
+  } catch (err) {
+    const raw = String((err as any)?.message || err);
+    let msg = raw;
+    if (/authentication_error|API key is invalid|401/.test(raw)) {
+      msg = "ANTHROPIC_API_KEY が無効です。Supabase の Edge Functions の設定でキーを入れ直してください";
+    } else if (/rate_limit|429/.test(raw)) {
+      msg = "採点の利用が混み合っています。少し待ってからもう一度お試しください";
+    } else if (/credit balance|billing/.test(raw)) {
+      msg = "Anthropic の残高が不足しています。請求設定をご確認ください";
+    }
+    return json({ error: msg, detail: raw.slice(0, 300) }, 500);
+  }
+});
+
+// 種類は応答のヘッダーから。分からなければ中身の先頭で見分ける
+function mediaType(res: Response, bytes: Uint8Array): "image/jpeg" | "image/png" | "image/gif" | "image/webp" {
+  const ct = (res.headers.get("content-type") || "").split(";")[0].trim();
+  if (ct === "image/png" || ct === "image/gif" || ct === "image/webp" || ct === "image/jpeg") return ct;
+  if (bytes[0] === 0x89 && bytes[1] === 0x50) return "image/png";
+  if (bytes[0] === 0x47 && bytes[1] === 0x49) return "image/gif";
+  if (bytes[8] === 0x57 && bytes[9] === 0x45) return "image/webp";
+  return "image/jpeg";
+}
+
+// 大きなファイルでも積み上がらないよう、少しずつ変換する
+function base64(bytes: Uint8Array): string {
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
