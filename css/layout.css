@@ -21,9 +21,13 @@
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo img{filter:none}}
 .topbar-title{flex:1;min-width:0}
 .topbar-title h1{font-size:var(--fs4);font-weight:600;letter-spacing:-.01em;line-height:1.25;white-space:nowrap}
-.topbar-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+/* 狭いときに削るのは会社名のほう。バージョン番号は問い合わせで読み上げるので切らない */
+.topbar-sub{display:flex;align-items:baseline;gap:6px;line-height:1.3;white-space:nowrap}
 .topbar-sub small,.topbar-sub span{font-size:var(--fs1);color:var(--text-muted);font-weight:400}
-.topbar-sub span{margin-left:6px}
+.topbar-sub small{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.topbar-sub span{flex-shrink:0}
+/* 幅の狭い端末では、読みだけの「てよせ｜きよかわ」は落として番号を残す */
+@media(max-width:359px){.topbar-sub small{display:none}}
 
 /* ── 下のメニュー。片手で届く位置に置く ── */
 .main-nav{

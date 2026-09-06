@@ -23,7 +23,9 @@ if('serviceWorker' in navigator){
       ch.port1.onmessage = e=>{
         if(e.data?.version){
           const el = document.getElementById('app-version');
-          if(el) el.textContent = e.data.version;
+          // 上のバーは狭いので「v376」だけ出す（'teyose-' は付けない）。
+          // 問い合わせのときに読み上げてもらう番号なので、切れないことを優先する
+          if(el) el.textContent = String(e.data.version).replace(/^teyose-/, '');
         }
       };
       reg.active?.postMessage({type:'GET_VERSION'}, [ch.port2]);
