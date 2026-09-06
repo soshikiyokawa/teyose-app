@@ -404,6 +404,10 @@ function nippoUseNewOtCount(month){
     && typeof otHoursOf==='function'
     && otUseNewCount(month || nippoMonth);
 }
+// 役員（管理監督者）は時間外・休日の割増の対象外。残業の数字は出さない
+function nippoOtExempt(name){
+  return typeof isLeaveExempt==='function' && isLeaveExempt(name);
+}
 // その人のその月度の残業（分）。新しい数え方でなければ fallback（日報の合計）を返す
 function nippoOtMin(userId, fallback, month){
   if(!nippoUseNewOtCount(month)) return fallback;
@@ -478,6 +482,14 @@ function renderNippo(){
             <th style="text-align:right">残業</th>${newCount?'<th style="text-align:right">所定外</th>':''}</tr>
           ${userIds.map(uid=>{
             const u = byUser[uid];
+            // 役員（管理監督者）は時間外・休日の割増の対象外。数字を出すと紛らわしいので出さない
+            if(nippoOtExempt(u.name)) return `<tr>
+              <td>${esc(u.name)}</td>
+              <td style="text-align:right">${u.dates.size}日</td>
+              <td style="text-align:right">${gbMinLabel(u.work)}</td>
+              <td style="text-align:right;color:var(--text-muted)">—</td>
+              ${newCount?'<td style="text-align:right;color:var(--text-muted)">—</td>':''}
+            </tr>`;
             const ot = nippoOtMin(uid, u.overtime);
             const nb = newCount ? (otNaibuMin(uid, nippoMonth)||0) : 0;
             return `<tr>
@@ -491,7 +503,8 @@ function renderNippo(){
         </table>
         ${newCount?`<div style="font-size:10px;color:var(--text-muted);line-height:1.6;margin-top:5px">
           残業＝割増（1.25倍）が要る時間。1日8時間を超えた分に加えて、その週の所定労働時間（40時間に満たない週は40時間）を超えた分も入ります。<br>
-          所定外＝所定労働時間は超えたが法定内の時間。割増は要りませんが賃金は要ります。</div>`:''}`
+          所定外＝所定労働時間は超えたが法定内の時間。割増は要りませんが賃金は要ります。<br>
+          役員は時間外・休日の割増の対象外なので「—」です。</div>`:''}`
       : '<div class="empty" style="padding:14px">この期間の日報はありません</div>';
 
     // 社員絞り込みプルダウン
@@ -507,10 +520,13 @@ function renderNippo(){
     const worked = list.filter(n=>!isNippoStateName(n.projectName));   // 「休み」「欠勤」は除く
     const work = worked.reduce((s,n)=>s+n.workMinutes,0);
     const days = new Set(worked.map(n=>n.workDate)).size;
-    const overtime = nippoOtMin(currentUserId, worked.reduce((s,n)=>s+n.overtimeMinutes,0));
-    const naibu = nippoUseNewOtCount() ? (otNaibuMin(currentUserId, nippoMonth)||0) : 0;
+    // 役員（管理監督者）は時間外・休日の割増の対象外なので、残業の数字は出さない
+    const exempt = nippoOtExempt(currentUserDisplayName);
+    const overtime = exempt ? 0 : nippoOtMin(currentUserId, worked.reduce((s,n)=>s+n.overtimeMinutes,0));
+    const naibu = (!exempt && nippoUseNewOtCount()) ? (otNaibuMin(currentUserId, nippoMonth)||0) : 0;
     document.getElementById('nippo-my-total').innerHTML =
-      `出勤 <b>${days}日</b>　実働 <b>${gbMinLabel(work)}</b>　残業 <b style="${overtime>0?'color:var(--danger)':''}">${overtime>0?gbMinLabel(overtime):'なし'}</b>`
+      `出勤 <b>${days}日</b>　実働 <b>${gbMinLabel(work)}</b>`
+      + (exempt ? '' : `　残業 <b style="${overtime>0?'color:var(--danger)':''}">${overtime>0?gbMinLabel(overtime):'なし'}</b>`)
       + (naibu>0?`　<span style="color:var(--text-sub)">所定外 ${gbMinLabel(naibu)}</span>`:'');
   }
 
@@ -523,6 +539,8 @@ function renderNippo(){
   wrap.innerHTML = list.map(n=>{
     const rest = isNippoStateName(n.projectName);   // 休み・欠勤：作業内容も時刻も出さない
     const absent = n.projectName===NIPPO_ABSENT;
+    // 役員（管理監督者）は時間外の割増の対象外。残業の数字は出さず、実働だけ出す
+    const otMin = nippoOtExempt(n.userName) ? 0 : n.overtimeMinutes;
     return `
     <div class="nippo-row" onclick="editNippo(${n.id})" style="${(n.userId===currentUserId||canEditOthersNippo())?'':'cursor:default'}">
       <div style="flex-shrink:0;width:64px">
@@ -536,8 +554,8 @@ function renderNippo(){
       <div style="flex-shrink:0;text-align:right">
         ${rest ? '<div style="font-size:11px;color:var(--text-muted)">－</div>' : `
         <div style="font-size:11px">${n.startTime}〜${n.endTime}</div>
-        <div style="font-size:10px;${n.overtimeMinutes>0?'color:var(--danger);font-weight:700':'color:var(--text-muted)'}">${n.overtimeMinutes>0?'残業 '+gbMinLabel(n.overtimeMinutes):gbMinLabel(n.workMinutes)}</div>
-        ${n.overtimeMinutes>0 && OT_STATUS[n.otStatus] ? `<span class="status-badge ${OT_STATUS[n.otStatus].cls}" style="margin-top:2px">${OT_STATUS[n.otStatus].label}：${esc(n.otStatus==='pending' ? (n.otApproverName||'承認者未設定') : n.otReviewerName)}</span>` : ''}`}
+        <div style="font-size:10px;${otMin>0?'color:var(--danger);font-weight:700':'color:var(--text-muted)'}">${otMin>0?'残業 '+gbMinLabel(otMin):gbMinLabel(n.workMinutes)}</div>
+        ${otMin>0 && OT_STATUS[n.otStatus] ? `<span class="status-badge ${OT_STATUS[n.otStatus].cls}" style="margin-top:2px">${OT_STATUS[n.otStatus].label}：${esc(n.otStatus==='pending' ? (n.otApproverName||'承認者未設定') : n.otReviewerName)}</span>` : ''}`}
       </div>
     </div>`;
   }).join('');
@@ -660,14 +678,15 @@ function printDezura(month){
     if(n.overtimeMinutes>0) cell.ot = true;
   });
   // 新しい数え方の月度は、週の上限で時間外になった日にも「＊」を付ける。
-  // 逆に、その日だけ見ると8時間超でも週で見ると時間外にならない日からは外す
-  if(dzNewCount){
-    Object.keys(users).forEach(uid=>{
-      Object.keys(users[uid].siteByDate).forEach(s=>{
-        users[uid].siteByDate[s].ot = !!otHasOtOnDate(uid, mo, s);
-      });
+  // 逆に、その日だけ見ると8時間超でも週で見ると時間外にならない日からは外す。
+  // 役員（管理監督者）は時間外割増の対象外なので「＊」も付けない
+  Object.keys(users).forEach(uid=>{
+    const exempt = nippoOtExempt(users[uid].name);
+    if(!dzNewCount && !exempt) return;
+    Object.keys(users[uid].siteByDate).forEach(s=>{
+      users[uid].siteByDate[s].ot = exempt ? false : !!otHasOtOnDate(uid, mo, s);
     });
-  }
+  });
   holidayRequests.filter(hr=>hr.status==='approved').forEach(hr=>{
     const u = getU(hr.userId, hr.userName);
     const furikae = isFurikaeHoliday(hr);   // 事前の振替＝労働日の振替なので割増しない
@@ -773,8 +792,9 @@ function printDezura(month){
       ${cells}
       <td class="sum sum-first" style="text-align:right">${u.days.size}</td>
       <td class="sum" style="text-align:right">${fmtH(u.work)}</td>
-      ${noPremium && dzNewCount
-        ? '<td class="sum" style="text-align:right;color:#bbb">—</td><td class="sum" style="text-align:right;color:#bbb">—</td>'
+      ${noPremium
+        ? `<td class="sum" style="text-align:right;color:#bbb">—</td>${
+            dzNewCount?'<td class="sum" style="text-align:right;color:#bbb">—</td>':''}`
         : `<td class="sum" style="text-align:right;${otMin>0?'font-weight:700':''}">${otMin>0?fmtH(otMin):''}</td>
            ${dzNewCount?`<td class="sum" style="text-align:right">${naibuMin>0?fmtH(naibuMin):''}</td>`:''}`}
       <td class="sum" style="text-align:right">${u.holidayDays||''}</td>
@@ -862,8 +882,8 @@ function printDezura(month){
   <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px;flex-wrap:wrap">
     <h2 style="font-size:16px;margin:0">出面表　${y}年${m}月度</h2>
     <span style="font-size:11px">対象期間：${start.getFullYear()}/${periodLabel}（20日締め）</span>
-    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　<span style="color:#b5302a;font-weight:700">休</span>=休日労働（割増対象）　<span style="color:#1f6f8b;font-weight:700">替</span>=振替出勤（事前に振替休日を指定＝労働日の振替のため割増なし）　休・替の下段は日報の実働時間　有=有給　半=半休　<span style="color:#b5302a;font-weight:700">欠</span>=欠勤（有給の残日数が足りなかった日、または欠勤として登録した日）　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　<span style="background:#ffcdd2;padding:0 4px">■</span>＝休日出勤の日報が未提出（時間数を計算できません）　※休日出勤・有給・振替は承認済みのみ　※役員は休日労働割増の対象外のため「休日労働(h)割増」は—</span>
-    ${dzNewCount?`<span style="font-size:10px;color:#555">※「残業(h)」＝割増（1.25倍）が要る時間。1日8時間を超えた分に加えて、その週の所定労働時間（40時間に満たない週は40時間）を超えた分も入ります。※「所定外(h)法内」＝所定労働時間は超えたが8時間・週40時間の内側の時間。割増は要りませんが賃金は要ります。※「＊」も同じ数え方です　※残業は週で数えるため、月度の初めの週は20日以前の日も含みます（その週は翌月度では数えません）　※役員は時間外割増の対象外のため「残業(h)」「所定外(h)法内」は—</span>`:''}
+    <span style="font-size:10px;color:#555">セルの数字＝出た現場の番号（下表参照）　＊＝残業あり　<span style="color:#b5302a;font-weight:700">休</span>=休日労働（割増対象）　<span style="color:#1f6f8b;font-weight:700">替</span>=振替出勤（事前に振替休日を指定＝労働日の振替のため割増なし）　休・替の下段は日報の実働時間　有=有給　半=半休　<span style="color:#b5302a;font-weight:700">欠</span>=欠勤（有給の残日数が足りなかった日、または欠勤として登録した日）　振=振替休日　－=休日（公休）　<span style="background:#ffe0b2;padding:0 4px">■</span>＝未入力（要確認）　<span style="background:#ffcdd2;padding:0 4px">■</span>＝休日出勤の日報が未提出（時間数を計算できません）　※休日出勤・有給・振替は承認済みのみ　※役員は時間外・休日の割増の対象外のため「残業(h)」「休日労働(h)割増」は—</span>
+    ${dzNewCount?`<span style="font-size:10px;color:#555">※「残業(h)」＝割増（1.25倍）が要る時間。1日8時間を超えた分に加えて、その週の所定労働時間（40時間に満たない週は40時間）を超えた分も入ります。※「所定外(h)法内」＝所定労働時間は超えたが8時間・週40時間の内側の時間。割増は要りませんが賃金は要ります。※「＊」も同じ数え方です　※残業は週で数えるため、月度の初めの週は20日以前の日も含みます（その週は翌月度では数えません）</span>`:''}
   </div>
   ${(function(){
     const dup = nippoDuplicates(dzDateStr(start), dzDateStr(end));
