@@ -12,8 +12,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=373">
-<link rel="stylesheet" href="css/schedule.css?v=373">
+<link rel="stylesheet" href="css/main.css?v=374">
+<link rel="stylesheet" href="css/schedule.css?v=374">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -37,18 +37,21 @@
 <!-- topbar -->
 <div class="topbar">
   <div class="logo"><img src="logo.png" width="30" height="30" style="display:block;filter:invert(1);" alt="きよかわ"></div>
-  <div class="topbar-title"><h1>手寄</h1><small>てよせ | きよかわ</small><span id="app-version" style="font-size:9px;color:var(--text-muted);margin-left:6px;letter-spacing:0.03em"></span></div>
-<button class="btn sm staff-only" onclick="openPdfBackupList()" title="PDFバックアップ一覧" style="padding:5px 8px">
+  <div class="topbar-title">
+    <h1>手寄</h1>
+    <div class="topbar-sub"><small>てよせ｜きよかわ</small><span id="app-version"></span></div>
+  </div>
+<button class="btn icon staff-only" onclick="openPdfBackupList()" title="PDFバックアップ一覧">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
   </button>
-<button class="btn sm" onclick="hardUpdate()" title="強制更新" style="padding:5px 8px">
+<button class="btn icon" onclick="hardUpdate()" title="更新">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
   </button>
-  <button class="btn sm" onclick="openNotifications()" title="通知履歴" style="padding:5px 8px;position:relative">
+  <button class="btn icon" onclick="openNotifications()" title="通知履歴" style="position:relative">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
     <span id="notif-badge" style="display:none;position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;align-items:center;justify-content:center;background:var(--danger);color:#fff;border-radius:99px;font-size:9px;font-weight:800;line-height:1">0</span>
   </button>
-  <button class="btn sm" onclick="openAccountSettings()" title="アカウント設定" style="padding:5px 8px">
+  <button class="btn icon" onclick="openAccountSettings()" title="アカウント設定">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
   </button>
 </div>
@@ -1211,7 +1214,7 @@
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:4px">
-          <button onclick="openNotifySettings()" title="通知の設定（バナー・サウンド・バッジ）" style="border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:16px;line-height:1;padding:2px">🔔</button>
+          <button class="btn icon" onclick="openNotifySettings()" title="通知の設定（バナー・サウンド・バッジ）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
         </div>
       </div>
       <div id="talk-list-tabs" class="talk-tabs"></div>
@@ -1226,7 +1229,7 @@
           <div style="font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="talk-panel-title">—</div>
           <div style="font-size:10px;color:var(--text-muted)" id="talk-panel-meta"></div>
         </div>
-        <button id="talk-bm-filter" onclick="chatBookmarkFilter=!chatBookmarkFilter;renderTalkPanelMessages()" title="ブックマークしたメッセージのみ表示" style="border:none;background:none;cursor:pointer;font-size:16px;line-height:1;padding:2px;opacity:.5">🔖</button>
+        <button id="talk-bm-filter" class="btn icon" onclick="chatBookmarkFilter=!chatBookmarkFilter;renderTalkPanelMessages()" title="ブックマークしたメッセージのみ表示"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
       </div>
       <!-- メッセージ一覧。上に戻して読んでいる間は、描き直しても位置を保つ -->
       <div style="position:relative;flex:1;min-height:0;display:flex;flex-direction:column">
@@ -2914,90 +2917,90 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=373"></script>
+<script src="js/supabase-client.js?v=374"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=373"></script>
+<script src="js/utils.js?v=374"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=373"></script>
+<script src="js/state.js?v=374"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=373"></script>
+<script src="js/data/db.js?v=374"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=373"></script>
+<script src="js/nav.js?v=374"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=373"></script>
+<script src="js/talk.js?v=374"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=373"></script>
+<script src="js/push.js?v=374"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=373"></script>
-<script src="js/estimate/estimate-items.js?v=373"></script>
-<script src="js/estimate/quote-import.js?v=373"></script>
-<script src="js/estimate/estimate-master.js?v=373"></script>
-<script src="js/estimate/estimate-summary.js?v=373"></script>
-<script src="js/estimate/estimate-crud.js?v=373"></script>
-<script src="js/estimate/parking.js?v=373"></script>
-<script src="js/estimate/estimate-pdf.js?v=373"></script>
-<script src="js/estimate/estimate-invoice.js?v=373"></script>
+<script src="js/estimate/estimate-tabs.js?v=374"></script>
+<script src="js/estimate/estimate-items.js?v=374"></script>
+<script src="js/estimate/quote-import.js?v=374"></script>
+<script src="js/estimate/estimate-master.js?v=374"></script>
+<script src="js/estimate/estimate-summary.js?v=374"></script>
+<script src="js/estimate/estimate-crud.js?v=374"></script>
+<script src="js/estimate/parking.js?v=374"></script>
+<script src="js/estimate/estimate-pdf.js?v=374"></script>
+<script src="js/estimate/estimate-invoice.js?v=374"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=373"></script>
-<script src="js/payment-schedule.js?v=373"></script>
-<script src="js/inspection.js?v=373"></script>
+<script src="js/orders-list.js?v=374"></script>
+<script src="js/payment-schedule.js?v=374"></script>
+<script src="js/inspection.js?v=374"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=373"></script>
+<script src="js/chusho.js?v=374"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=373"></script>
+<script src="js/schedule.js?v=374"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=373"></script>
-<script src="js/order/item-price.js?v=373"></script>
-<script src="js/order/item-master.js?v=373"></script>
-<script src="js/order/invoice.js?v=373"></script>
-<script src="js/order/invoice-lines.js?v=373"></script>
-<script src="js/order/ekrea-price.js?v=373"></script>
-<script src="js/order/order-cart.js?v=373"></script>
-<script src="js/order/order-confirm.js?v=373"></script>
-<script src="js/order/order-price-edit.js?v=373"></script>
-<script src="js/order/order-history.js?v=373"></script>
-<script src="js/cost-budget.js?v=373"></script>
-<script src="js/order/card-match.js?v=373"></script>
-<script src="js/receipt.js?v=373"></script>
+<script src="js/order/supplier-master.js?v=374"></script>
+<script src="js/order/item-price.js?v=374"></script>
+<script src="js/order/item-master.js?v=374"></script>
+<script src="js/order/invoice.js?v=374"></script>
+<script src="js/order/invoice-lines.js?v=374"></script>
+<script src="js/order/ekrea-price.js?v=374"></script>
+<script src="js/order/order-cart.js?v=374"></script>
+<script src="js/order/order-confirm.js?v=374"></script>
+<script src="js/order/order-price-edit.js?v=374"></script>
+<script src="js/order/order-history.js?v=374"></script>
+<script src="js/cost-budget.js?v=374"></script>
+<script src="js/order/card-match.js?v=374"></script>
+<script src="js/receipt.js?v=374"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=373"></script>
-<script src="js/genba/supplier-view.js?v=373"></script>
-<script src="js/genba/genba-files.js?v=373"></script>
-<script src="js/genba/genba-photos.js?v=373"></script>
-<script src="js/genba/genba-drawings.js?v=373"></script>
-<script src="js/genba/genba-nippo.js?v=373"></script>
-<script src="js/genba/genba-dezura.js?v=373"></script>
-<script src="js/genba/payroll.js?v=373"></script>
-<script src="js/genba/overtime-pay.js?v=373"></script>
-<script src="js/genba/leave-balance.js?v=373"></script>
-<script src="js/genba/genba-leave.js?v=373"></script>
-<script src="js/genba/genba-holiday.js?v=373"></script>
-<script src="js/genba/license.js?v=373"></script>
-<script src="js/genba/vehicle.js?v=373"></script>
-<script src="js/genba/work-calendar.js?v=373"></script>
-<script src="js/genba/account-perms.js?v=373"></script>
+<script src="js/genba/genba-tabs.js?v=374"></script>
+<script src="js/genba/supplier-view.js?v=374"></script>
+<script src="js/genba/genba-files.js?v=374"></script>
+<script src="js/genba/genba-photos.js?v=374"></script>
+<script src="js/genba/genba-drawings.js?v=374"></script>
+<script src="js/genba/genba-nippo.js?v=374"></script>
+<script src="js/genba/genba-dezura.js?v=374"></script>
+<script src="js/genba/payroll.js?v=374"></script>
+<script src="js/genba/overtime-pay.js?v=374"></script>
+<script src="js/genba/leave-balance.js?v=374"></script>
+<script src="js/genba/genba-leave.js?v=374"></script>
+<script src="js/genba/genba-holiday.js?v=374"></script>
+<script src="js/genba/license.js?v=374"></script>
+<script src="js/genba/vehicle.js?v=374"></script>
+<script src="js/genba/work-calendar.js?v=374"></script>
+<script src="js/genba/account-perms.js?v=374"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=373"></script>
+<script src="js/init.js?v=374"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=373"></script>
-<script src="js/tasks.js?v=373"></script>
-<script src="js/task-templates.js?v=373"></script>
-<script src="js/auth.js?v=373"></script>
-<script src="js/account.js?v=373"></script>
+<script src="js/notifications.js?v=374"></script>
+<script src="js/tasks.js?v=374"></script>
+<script src="js/task-templates.js?v=374"></script>
+<script src="js/auth.js?v=374"></script>
+<script src="js/account.js?v=374"></script>
 </body>
 </html>

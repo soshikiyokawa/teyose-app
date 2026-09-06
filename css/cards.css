@@ -1,29 +1,84 @@
-.card{background:var(--surface);border-radius:10px;box-shadow:var(--sh);margin-bottom:12px}
-.card-head{padding:11px 14px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.card-head-title{font-size:12px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+/* ════ 面・一覧・見出し ════
+ *
+ * 「何でもカードで囲う」のをやめ、面は白地＋上下の細い線だけで表す。
+ * 面と面のあいだは余白で切る。影と角丸は使わない。
+ */
+.card{
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  margin:0 -16px var(--sp5);      /* 画面の左右いっぱいに面を伸ばす */
+  padding:0;
+}
+/* 中に直接文字を書いているカードのための余白 */
+.card > *:not(.card-head):not(table):not(.list-item):not(.add-row-btn){padding-left:16px;padding-right:16px}
+@media(min-width:600px){
+  .card{margin-left:0;margin-right:0;border:1px solid var(--border);border-radius:var(--radius)}
+}
 
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
-.badge.draft{background:var(--warn-bg);color:var(--warn-t)}
-.badge.sent{background:var(--accent-bg);color:var(--accent-t)}
-.badge.approved{background:var(--ok-bg);color:var(--ok-t)}
-.badge.construction{background:#e0f0f6;color:#1f6f8b}
-.badge.completed{background:#e8e0f5;color:#6b3fa0}
-.badge.pending{background:var(--warn-bg);color:var(--warn-t)}
-.badge.received{background:var(--ok-bg);color:var(--ok-t)}
+.card-head{
+  padding:14px 16px 10px;
+  display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp2);flex-wrap:wrap;
+}
+.card-head-title{
+  font-size:var(--fs4);font-weight:600;color:var(--text);
+  text-transform:none;letter-spacing:0;white-space:nowrap;
+}
 
-.list-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:0.5px solid var(--border);cursor:pointer}
+/* 一覧の上に置く小さな見出し */
+.section-lbl{
+  font-size:var(--fs1);font-weight:600;color:var(--text-muted);
+  text-transform:none;letter-spacing:.02em;margin:var(--sp5) 0 var(--sp2);
+}
+
+/* ── 状態のしるし。色は意味があるときだけ。地は敷かず文字色で表す ── */
+.badge{
+  display:inline-block;padding:0;border-radius:0;
+  font-size:var(--fs1);font-weight:600;color:var(--text-sub);
+}
+.badge::before{content:"";display:inline-block;width:6px;height:6px;border-radius:99px;
+  background:currentColor;margin-right:5px;vertical-align:1px}
+.badge.draft{color:var(--warn-t)}
+.badge.sent{color:var(--accent-t)}
+.badge.approved{color:var(--ok-t)}
+.badge.construction{color:var(--text)}
+.badge.completed{color:var(--text-muted)}
+.badge.pending{color:var(--warn-t)}
+.badge.received{color:var(--ok-t)}
+
+/* ── 一覧の1行 ── */
+.list-item{
+  display:flex;align-items:center;gap:var(--sp3);
+  padding:14px 16px;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;background:var(--surface);
+}
 .list-item:last-child{border-bottom:none}
 .list-item:hover{background:var(--surface2)}
 .li-info{flex:1;min-width:0}
-.li-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.li-meta{font-size:11px;color:var(--text-muted);margin-top:2px}
-.li-amt{font-size:14px;font-weight:700;color:var(--wood-t);flex-shrink:0}
+.li-name{font-size:var(--fs3);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li-meta{font-size:var(--fs2);color:var(--text-muted);margin-top:2px}
+.li-amt{font-size:var(--fs3);font-weight:600;color:var(--text);flex-shrink:0}
 
-.metric-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
-.metric{background:var(--surface);border-radius:var(--radius);box-shadow:var(--sh);padding:12px 14px}
-.metric .lbl{font-size:11px;color:var(--text-muted);margin-bottom:4px}
-.metric .val{font-size:18px;font-weight:800}
-.metric .val.g{color:var(--accent-t)}
-.metric .val.w{color:var(--wood-t)}
+/* ── 数字を並べるところ。囲わず、罫線で仕切る ── */
+.metric-grid{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  background:var(--surface);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  margin:0 -16px var(--sp5);
+}
+@media(min-width:600px){
+  .metric-grid{margin-left:0;margin-right:0;border:1px solid var(--border);border-radius:var(--radius)}
+}
+.metric{padding:14px 16px;border-left:1px solid var(--border)}
+.metric:first-child{border-left:none}
+.metric .lbl{font-size:var(--fs1);color:var(--text-muted);margin-bottom:4px}
+.metric .val{font-size:var(--fs5);font-weight:600;letter-spacing:-.01em}
+.metric .val.g{color:var(--text)}
+.metric .val.w{color:var(--text)}
 .metric .val.warn{color:var(--warn-t)}
-@media(max-width:600px){.metric-grid{grid-template-columns:1fr 1fr}.metric-grid .metric:last-child{grid-column:1/-1}}
+@media(max-width:600px){
+  .metric-grid{grid-template-columns:1fr 1fr}
+  .metric-grid .metric:last-child{grid-column:1/-1;border-left:none;border-top:1px solid var(--border)}
+  .metric-grid .metric:nth-child(3){border-left:none}
+}

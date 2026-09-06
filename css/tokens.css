@@ -1,13 +1,69 @@
+/* ════ 手寄 デザインの土台 ════
+ *
+ * 考え方
+ *   ・色はニュートラル（白・黒・グレー）が基本。アクセントは1色だけ。
+ *   ・面の区切りは影ではなく1本の細い線で表す。
+ *   ・情報の順位は「文字の大きさ・太さ・余白」で表す。色や枠では表さない。
+ *   ・角丸・影・枠線・アイコンは、必要なところにだけ。
+ *
+ * ここの値を変えると、アプリ全体に効く。個別の画面で色を直接書かないこと。
+ */
 :root{
-  --bg:#f5f0e8;--surface:#fffdf9;--surface2:#f7f2e8;
-  --border:#e0d9cc;--border-s:#c8bfae;
-  --text:#2a2218;--text-sub:#6b5f4e;--text-muted:#9e9080;
-  --accent:#5c7a3e;--accent-bg:#eaf2e3;--accent-t:#3a5828;
-  --wood:#8b6340;--wood-bg:#f5ede3;--wood-t:#5c3d1e;
-  --danger:#b5302a;--danger-bg:#fdecea;
-  --warn-bg:#fef7e6;--warn-t:#8a6000;
-  --ok-bg:#e6f4ed;--ok-t:#2e7d52;
-  --radius:8px;--sh:0 1px 4px rgba(60,40,10,.08),0 0 0 0.5px rgba(60,40,10,.07);
+  /* ── 面と線 ── */
+  --bg:#f6f6f7;          /* 画面の地 */
+  --surface:#ffffff;     /* 面（一覧・カード・バー） */
+  --surface2:#f2f2f4;    /* 面の中のもう一段（入力欄・選択中） */
+  --border:#e6e6e9;      /* 区切りの線。ほとんどの罫線はこれ */
+  --border-s:#d4d4d9;    /* 入力欄など、囲いとして見せる線 */
+
+  /* ── 文字 ── */
+  --text:#16161a;        /* 本文・見出し */
+  --text-sub:#5a5a63;    /* 補足。読ませる気のある文字はここまで */
+  --text-muted:#8a8a93;  /* ラベル・注記。読み飛ばしてよい文字 */
+
+  /* ── アクセント（1色だけ） ── */
+  --accent:#415e2e;      /* 押せる／選ばれている／今ここ */
+  --accent-t:#33491f;    /* 明るい面の上に置く文字 */
+  --accent-bg:#eff3ea;   /* うっすら敷く面 */
+
+  /* ── 状態の色。意味があるときだけ使う ── */
+  --danger:#b3261e;   --danger-bg:#fdeceb;
+  --warn-t:#8a5b00;   --warn-bg:#fdf4e5;
+  --ok-t:#2b6b46;     --ok-bg:#eaf4ee;
+
+  /* ── 以前の「木の色」。アクセント1色にまとめたので、同じ色を指す ──
+     （古い指定が残っていても色が増えないようにするため） */
+  --wood:var(--accent); --wood-t:var(--text); --wood-bg:var(--surface2);
+
+  /* ── かたち ── */
+  --radius:6px;          /* ボタン・入力欄・小さな面 */
+  --radius-lg:12px;      /* シート・モーダル */
+  --sh:none;             /* 影は使わない。区切りは線で表す */
+
+  /* ── 余白（4の倍数）── */
+  --sp1:4px; --sp2:8px; --sp3:12px; --sp4:16px; --sp5:24px; --sp6:32px;
+
+  /* ── 文字の大きさ。これより小さくしない（--fs1 が下限）── */
+  --fs1:11px;   /* 注記 */
+  --fs2:13px;   /* 補足 */
+  --fs3:15px;   /* 本文 */
+  --fs4:17px;   /* 見出し */
+  --fs5:20px;   /* 画面の題 */
 }
+
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,'Hiragino Sans','Yu Gothic UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;padding-bottom:env(safe-area-inset-bottom)}
+
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Yu Gothic UI',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  font-size:var(--fs3);
+  line-height:1.6;
+  min-height:100vh;
+  padding-bottom:env(safe-area-inset-bottom);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* 数字は等幅にして、金額・時間が縦に揃うようにする */
+b,strong{font-weight:600}
+.num,.li-amt,.metric .val{font-variant-numeric:tabular-nums}

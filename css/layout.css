@@ -1,41 +1,86 @@
-/* ── shell ── */
-.shell{width:100%;padding-bottom:70px}
-.topbar{background:var(--surface);border-bottom:0.5px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50;box-shadow:var(--sh)}
-.logo{width:32px;height:32px;background:#2a1e0e;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.logo svg{width:18px;height:18px;stroke:#d4a96a;fill:none;stroke-width:2}
-.topbar-title{flex:1}
-.topbar-title h1{font-size:15px;font-weight:800;letter-spacing:-.3px}
-.topbar-title small{font-size:10px;color:var(--text-muted);font-weight:400}
+/* ════ 画面の骨組み ════ */
 
-/* ── main nav (bottom) ── */
-.main-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:0.5px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom)}
-.main-nav-btn{position:relative;flex:1;border:none;background:none;cursor:pointer;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--text-muted);font-size:10px;font-family:inherit;border-top:2px solid transparent;transition:all .15s}
-.main-nav-btn.active{color:var(--accent);border-top-color:var(--accent)}
-.main-nav-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+.shell{width:100%;padding-bottom:76px}
 
-/* ── page / subpage / tabs ── */
-.page{display:none;padding:14px 16px 0}.page.active{display:block}
-.sub-tab-bar{display:flex;background:var(--surface);border-bottom:0.5px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -16px;padding:0 16px}
-.sub-tab-btn{flex-shrink:0;padding:9px 16px;font-size:13px;font-family:inherit;border:none;background:none;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
-.sub-tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
-.sub-page{display:none;padding-top:14px}.sub-page.active{display:block}
+/* ── 上のバー ── */
+.topbar{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:10px 16px;
+  display:flex;align-items:center;gap:var(--sp3);
+  position:sticky;top:0;z-index:50;
+}
+.logo{
+  width:30px;height:30px;background:var(--text);border-radius:var(--radius);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.logo svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:1.75}
+.topbar-title{flex:1;min-width:0}
+.topbar-title h1{font-size:var(--fs4);font-weight:600;letter-spacing:-.01em;line-height:1.25;white-space:nowrap}
+.topbar-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.topbar-sub small,.topbar-sub span{font-size:var(--fs1);color:var(--text-muted);font-weight:400}
+.topbar-sub span{margin-left:6px}
 
-.empty{text-align:center;color:var(--text-muted);padding:32px 16px;font-size:13px}
-.section-lbl{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 7px}
+/* ── 下のメニュー。片手で届く位置に置く ── */
+.main-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--surface);border-top:1px solid var(--border);
+  display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom);
+}
+.main-nav-btn{
+  position:relative;flex:1;border:none;background:none;cursor:pointer;
+  padding:9px 4px 7px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  color:var(--text-muted);font-size:var(--fs1);font-family:inherit;
+  transition:color .12s;
+}
+.main-nav-btn.active{color:var(--text);font-weight:600}
+.main-nav-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6}
+.main-nav-btn.active svg{stroke-width:2}
 
-/* 発注先（supplier）ロールでは社内専用UIを隠す */
+/* ── ページ ── */
+.page{display:none;padding:var(--sp4) 16px 0}
+.page.active{display:block}
+
+/* ── タブ ── */
+.sub-tab-bar{
+  display:flex;background:var(--surface);
+  border-bottom:1px solid var(--border);
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+  margin:0 -16px;padding:0 16px;
+  scrollbar-width:none;
+}
+.sub-tab-bar::-webkit-scrollbar{display:none}
+.sub-tab-btn{
+  flex-shrink:0;padding:11px 14px;
+  font-size:var(--fs2);font-family:inherit;
+  border:none;background:none;color:var(--text-muted);cursor:pointer;
+  border-bottom:2px solid transparent;white-space:nowrap;margin-bottom:-1px;
+}
+.sub-tab-btn:hover{color:var(--text-sub)}
+.sub-tab-btn.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.sub-page{display:none;padding-top:var(--sp4)}
+.sub-page.active{display:block}
+
+/* ── 中身が無いとき ── */
+.empty{text-align:center;color:var(--text-muted);padding:var(--sp6) 16px;font-size:var(--fs2);line-height:1.8}
+
+/* ── 役割ごとに隠すもの ── */
 .role-supplier .staff-only{display:none !important}
 .role-carpenter .carpenter-hidden{display:none !important}
-/* 管理者専用UI（アカウント権限・勤務カレンダー・出面表など）は管理者=staffのみ。
-   一般社員=carpenterは staff-only は見えるが admin-only は見えない */
+/* 管理者専用（アカウント権限・勤務カレンダー・出面表など）。
+   一般社員は staff-only は見えるが admin-only は見えない */
 .role-carpenter .admin-only,.role-supplier .admin-only{display:none !important}
-/* 現場ページ（写真・図面・日報・有給）は社内全員（staff＋carpenter）のみ */
+/* 現場（写真・図面・日報・有給）は社内だけ */
 .role-supplier .employee-only{display:none !important}
-/* 大工専用UI（staffの現場写真・図面は案件情報タブに集約） */
 .role-staff .carpenter-only{display:none !important}
 
-/* ── モバイル案件選択バー（スマートフォンでサイドバーの代わりに表示） ── */
-#est-project-mobile-bar{display:none;padding:7px 12px;border-bottom:0.5px solid var(--border);background:var(--surface);gap:8px;align-items:center}
+/* ── スマホの案件選択バー（サイドバーの代わり） ── */
+#est-project-mobile-bar{
+  display:none;padding:8px 16px;
+  border-bottom:1px solid var(--border);background:var(--surface);
+  gap:var(--sp2);align-items:center;
+}
 @media(max-width:599px){
   #est-project-sidebar{display:none !important}
   #est-project-mobile-bar{display:flex !important}
