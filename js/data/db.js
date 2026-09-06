@@ -955,6 +955,16 @@ async function fetchGenbaData(){
   const { data: nippoRows } = await sb.from('daily_reports').select('*').order('work_date',{ascending:false}).order('id',{ascending:false});
   dailyReports = (nippoRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',workKind:r.work_kind||'',content:r.content||'',startTime:r.start_time||'08:00',endTime:r.end_time||'18:00',breakMinutes:r.break_minutes,workMinutes:r.work_minutes,overtimeMinutes:r.overtime_minutes,otStatus:r.ot_status||'none',otApproverName:r.ot_approver_name||'',otReviewerName:r.ot_reviewer_name||'',otReviewNote:r.ot_review_note||''}));
 
+  // 日報に付けた写真（表がまだ無くても落とさない）
+  try{
+    const { data: npRows, error: npErr } = await sb.from('nippo_photos').select('*')
+      .order('report_id',{ascending:false}).order('sort_order').order('id');
+    nippoPhotosReady = !npErr;
+    nippoPhotos = (npRows||[]).map(r=>({id:r.id, reportId:r.report_id, url:r.url,
+      caption:r.caption||'', sortOrder:r.sort_order||0,
+      uploadedBy:r.uploaded_by, uploaderName:r.uploader_name||'', createdAt:r.created_at}));
+  }catch(_){ nippoPhotos=[]; nippoPhotosReady=false; }
+
   const { data: leaveRows } = await sb.from('leave_requests').select('*').order('created_at',{ascending:false});
   leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,absenceDates:r.absence_dates||[],createdAt:r.created_at}));
 
@@ -1160,6 +1170,28 @@ async function dbUploadSiteFile(folder, projectId, blob, ext){
   }
   const { data } = sb.storage.from('site-files').getPublicUrl(res.path);
   return data.publicUrl;
+}
+
+// ── 日報に付ける写真（migration-genba65.sql） ──
+//
+// ファイルは現場写真と同じ site-files バケットの nippo/ に置く。
+// 表の行だけ別にして、日報を消したら写真も消えるようにしてある。
+async function dbAddNippoPhotos(reportId, urls){
+  if(!urls.length) return;
+  const base = (nippoPhotos||[]).filter(p=>p.reportId===reportId).length;
+  const rows = urls.map((url,i)=>({ report_id:reportId, url, caption:'', sort_order:base+i,
+    uploaded_by:currentUserId, uploader_name:currentUserDisplayName||'' }));
+  const { error } = await sb.from('nippo_photos').insert(rows);
+  if(error){
+    showToast(error.code==='42P01'
+      ? 'データベースの準備が必要です。supabase/migration-genba65.sql を実行してください'
+      : '写真の登録に失敗しました：'+error.message);
+    throw error;
+  }
+}
+async function dbDeleteNippoPhoto(id){
+  const { error } = await sb.from('nippo_photos').delete().eq('id', id);
+  if(error){ showToast('写真の削除に失敗しました：'+error.message); throw error; }
 }
 
 async function dbAddSitePhoto(photo){

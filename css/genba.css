@@ -68,6 +68,24 @@
 .drawing-row:last-child{border-bottom:none}
 .drawing-icon{width:34px;height:34px;border-radius:7px;background:var(--wood-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--wood-t);font-size:15px}
 
+/* ── 日報に付ける写真 ── */
+.np-strip{display:flex;gap:var(--sp2);flex-wrap:wrap;margin-bottom:var(--sp2)}
+.np-strip:empty{display:none}
+.np-thumb{position:relative;width:72px;height:72px;border-radius:var(--radius);overflow:hidden;
+  border:1px solid var(--border);background:var(--surface2);flex-shrink:0}
+.np-thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:pointer}
+.np-thumb .np-x{position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:99px;
+  border:none;background:rgba(10,10,12,.7);color:#fff;font-size:14px;line-height:1;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;padding:0}
+/* まだ保存していない写真は、保存済みと見分けが付くようにする */
+.np-thumb.new::after{content:"未保存";position:absolute;left:0;right:0;bottom:0;
+  background:rgba(10,10,12,.62);color:#fff;font-size:10px;text-align:center;padding:1px 0}
+#nippo-photo-wrap.np-drag{outline:2px dashed var(--accent);outline-offset:4px;border-radius:var(--radius)}
+/* 一覧の行に出す小さな写真 */
+.np-mini{display:flex;gap:4px;margin-top:5px}
+.np-mini img{width:34px;height:34px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:pointer}
+.np-mini span{font-size:var(--fs1);color:var(--text-muted);align-self:center;margin-left:2px}
+
 /* ── 日報 ── */
 .nippo-row{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:0.5px solid var(--border);cursor:pointer}
 .nippo-row:last-child{border-bottom:none}

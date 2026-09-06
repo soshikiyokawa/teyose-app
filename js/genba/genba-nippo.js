@@ -187,6 +187,127 @@ function nippoRecalc(){
   document.getElementById('nippo-ot-approver-wrap').style.display = overtime>0 ? '' : 'none';
 }
 
+// ════ 日報の写真（任意） ════
+//
+// その日の作業の記録として日報に付ける。現場写真（案件の記録）とは別枠。
+// 選んだ時点では上げず、日報を保存するときにまとめて上げる。
+// 日報が保存できなかったのに写真だけ残る、という形にしないため。
+
+let nippoNewPhotos = [];   // まだ上げていない写真 {file, url(プレビュー用)}
+
+// この日報に付いている、保存済みの写真
+function nippoPhotosOf(reportId){
+  return (nippoPhotos||[]).filter(p=>p.reportId===reportId);
+}
+
+function nippoPickPhotos(input){
+  nippoAddPhotoFiles([...(input.files||[])]);
+  input.value = '';
+}
+function nippoAddPhotoFiles(files){
+  const imgs = files.filter(f=>(f.type||'').startsWith('image/') || /\.(jpe?g|png|heic|webp)$/i.test(f.name||''));
+  if(!imgs.length){ showToast('写真を選んでください'); return; }
+  const saved = editingNippoId ? nippoPhotosOf(editingNippoId).length : 0;
+  const room = 10 - saved - nippoNewPhotos.length;      // 1件の日報に10枚まで
+  if(room <= 0){ showToast('写真は1つの日報に10枚までです'); return; }
+  if(imgs.length > room) showToast(`写真は10枚までなので、${room}枚だけ入れました`);
+  imgs.slice(0, room).forEach(f=>nippoNewPhotos.push({file:f, url:URL.createObjectURL(f)}));
+  nippoRenderPhotos();
+}
+// プレビュー用のURLは、画面から消えたあとで捨てる。
+// 先に捨てると、まだ残っている <img> が読みに行って失敗する
+function nippoDropPreviews(urls){
+  setTimeout(()=>urls.forEach(u=>{ try{ URL.revokeObjectURL(u); }catch(_){} }), 0);
+}
+function nippoRemoveNewPhoto(i){
+  const p = nippoNewPhotos[i];
+  if(!p) return;
+  nippoNewPhotos.splice(i,1);
+  nippoRenderPhotos();
+  nippoDropPreviews([p.url]);
+}
+async function nippoRemoveSavedPhoto(id){
+  if(!confirm('この写真を消しますか？')) return;
+  try{ await dbDeleteNippoPhoto(id); }catch(_){ return; }
+  nippoPhotos = nippoPhotos.filter(p=>p.id!==id);
+  nippoRenderPhotos();
+  renderNippo();
+  showToast('写真を消しました');
+}
+function nippoClearNewPhotos(){
+  const urls = nippoNewPhotos.map(p=>p.url);
+  nippoNewPhotos = [];
+  nippoDropPreviews(urls);
+}
+
+function nippoRenderPhotos(){
+  const el = document.getElementById('nippo-photo-strip');
+  if(!el) return;
+  const saved = editingNippoId ? nippoPhotosOf(editingNippoId) : [];
+  el.innerHTML =
+    saved.map(p=>`<div class="np-thumb">
+        <img src="${esc(p.url)}" alt="" onclick="openNippoPhoto('${esc(p.url)}')">
+        <button type="button" class="np-x" title="消す" onclick="nippoRemoveSavedPhoto(${p.id})">×</button>
+      </div>`).join('')
+    + nippoNewPhotos.map((p,i)=>`<div class="np-thumb new">
+        <img src="${p.url}" alt="" onclick="openNippoPhoto('${p.url}')">
+        <button type="button" class="np-x" title="やめる" onclick="nippoRemoveNewPhoto(${i})">×</button>
+      </div>`).join('');
+}
+
+// 保存のときに、まとめて上げて日報に結び付ける
+async function nippoUploadPhotos(reportId){
+  if(!nippoNewPhotos.length) return;
+  const n = nippoNewPhotos.length;
+  showToast(`写真を${n}枚アップロードしています…`);
+  const urls = [];
+  for(const p of nippoNewPhotos){
+    const blob = await gbCompressImage(p.file);        // 長辺1600pxのJPEGにしてから上げる
+    urls.push(await dbUploadSiteFile('nippo', reportId, blob, '.jpg'));
+  }
+  await dbAddNippoPhotos(reportId, urls);
+  nippoClearNewPhotos();
+}
+
+// 一覧の行に出す小さな写真（3枚まで。残りは枚数で出す）
+function nippoMiniPhotos(reportId){
+  const ps = nippoPhotosOf(reportId);
+  if(!ps.length) return '';
+  const shown = ps.slice(0,3);
+  return `<div class="np-mini" onclick="event.stopPropagation()">
+    ${shown.map(p=>`<img src="${esc(p.url)}" alt="" loading="lazy" onclick="openNippoPhoto('${esc(p.url)}')">`).join('')}
+    ${ps.length>3?`<span>ほか${ps.length-3}枚</span>`:''}
+  </div>`;
+}
+
+// 大きく見る
+function openNippoPhoto(url){
+  const v = document.getElementById('np-viewer');
+  document.getElementById('np-viewer-img').src = url;
+  v.classList.add('open');
+}
+function closeNippoPhoto(){
+  document.getElementById('np-viewer').classList.remove('open');
+  document.getElementById('np-viewer-img').src = '';
+}
+
+// 写真の枠にドラッグして落としても入るようにする
+document.addEventListener('DOMContentLoaded', ()=>{
+  const wrap = document.getElementById('nippo-photo-wrap');
+  if(!wrap) return;
+  let depth = 0;
+  const hasFiles = e => [...(e.dataTransfer?.types||[])].includes('Files');
+  const off = ()=>{ depth=0; wrap.classList.remove('np-drag'); };
+  wrap.addEventListener('dragenter', e=>{ if(!hasFiles(e)) return; e.preventDefault(); depth++; wrap.classList.add('np-drag'); });
+  wrap.addEventListener('dragover',  e=>{ if(!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+  wrap.addEventListener('dragleave', ()=>{ if(--depth<=0) off(); });
+  wrap.addEventListener('drop', e=>{
+    if(!hasFiles(e)) return;
+    e.preventDefault(); off();
+    nippoAddPhotoFiles([...(e.dataTransfer?.files||[])]);
+  });
+});
+
 function resetNippoForm(){
   editingNippoId = null;
   nippoOwnerId = currentUserId;   // 誰の分かは「自分」に戻す
@@ -202,6 +323,8 @@ function resetNippoForm(){
   document.getElementById('nippo-form-title').textContent = '日報を書く';
   document.getElementById('nippo-cancel-btn').style.display = 'none';
   document.getElementById('nippo-delete-btn').style.display = 'none';
+  nippoClearNewPhotos();
+  nippoRenderPhotos();
   nippoRecalc();
 }
 
@@ -278,11 +401,17 @@ async function saveNippo(){
     !(prev && prev.otStatus==='pending' && prev.overtimeMinutes===overtime && prev.otApproverName===otApproverName);
 
   const reportUserName = ownerName;
-  await dbSaveNippo({
+  const reportId = await dbSaveNippo({
     id: editingNippoId, workDate, projectId, projectName, workKind,
     content, startTime, endTime, breakMinutes, workMinutes: work, overtimeMinutes: overtime,
     otStatus, otApproverName, userId: ownerId, userName: ownerName
   });
+
+  // 写真は日報が保存できてから上げる。ここで失敗しても日報は残す
+  if(nippoNewPhotos.length){
+    try{ await nippoUploadPhotos(reportId); }
+    catch(_){ showToast('日報は保存しましたが、写真を上げられませんでした。開き直してもう一度お試しください'); }
+  }
 
   if(otStatus==='pending'){
     showToast(`日報を保存し、${otApproverName}さんに残業を申請しました（承認待ち）`);
@@ -364,6 +493,8 @@ function editNippo(id){
     (n.userId!==currentUserId ? `日報を編集（${n.userName}）` : '日報を編集');
   document.getElementById('nippo-cancel-btn').style.display = '';
   document.getElementById('nippo-delete-btn').style.display = '';
+  nippoClearNewPhotos();
+  nippoRenderPhotos();          // この日報に付いている写真を出す
   nippoRecalc();
   document.getElementById('nippo-form-card').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -550,6 +681,7 @@ function renderNippo(){
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${absent?'color:var(--danger)':rest?'color:var(--text-muted)':''}">${esc(n.projectName||'（工事未設定）')}${n.workKind?`<span style="font-weight:400;color:var(--accent-t)">｜${esc(n.workKind)}</span>`:''}</div>
         ${rest?'':`<div style="font-size:11px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.content)||'　'}</div>`}
+        ${nippoMiniPhotos(n.id)}
       </div>
       <div style="flex-shrink:0;text-align:right">
         ${rest ? '<div style="font-size:11px;color:var(--text-muted)">－</div>' : `

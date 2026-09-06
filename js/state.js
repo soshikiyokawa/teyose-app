@@ -20,6 +20,8 @@ let fbFolderId = null;      // 表示中のフォルダID（null=ルート）
 let fbContainerId = null;   // 描画先のコンテナ要素ID（モーダル or 現場ページ内）
 let fbMoving = null;        // 移動中のアイテム {kind:'photo'|'drawing', id}
 let dailyReports = [];      // 日報（carpenterは自分の分のみ・staffは全員分。RLSが自動で絞る）
+let nippoPhotos = [];       // 日報に付けた写真（migration-genba65.sql）
+let nippoPhotosReady = true;
 let leaveRequests = [];     // 有給申請（同上）
 let holidayRequests = [];   // 休日出勤申請（同上）
 let licenses = [];              // 免許・自動車保険（本人と管理者の分のみ。RLSが自動で絞る）
