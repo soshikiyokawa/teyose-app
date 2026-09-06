@@ -429,6 +429,8 @@ function renderNippoGallery(){
     btn.disabled = !unscored;
     btn.textContent = unscored ? `未採点の${Math.min(unscored,12)}枚をAIで採点` : 'すべて採点済み';
   }
+  const re = document.getElementById('ng-rescore-btn');
+  if(re){ re.disabled = !list.length; re.textContent = '採点をやり直す'; }
 
   if(!list.length){
     grid.innerHTML = '<div class="empty" style="padding:28px">まだ写真がありません。<br><span style="font-size:var(--fs1)">日報に写真を付けると、ここに集まります</span></div>';
@@ -483,16 +485,45 @@ function renderScoreCriteria(c){
   const body = document.getElementById('sc-body');
   if(!body) return;
   if(!c){ body.innerHTML = '<div class="empty" style="padding:24px">採点基準がありません</div>'; return; }
+  const star = n => '★'.repeat(n) + '☆'.repeat(5-n);
+  // 「見るところ」は、写真としての出来（quality）。古い形（points）でも出せるようにしておく
+  const qual = c.quality || (c.points ? {points:c.points} : null);
+
   body.innerHTML = `
     <div style="font-size:var(--fs2);color:var(--text-sub);line-height:1.8;margin-bottom:var(--sp5)">${esc(c.intro||'')}</div>
 
-    <div class="section-lbl" style="margin-top:0">見るところ（上から重い順）</div>
+    ${(c.subjects||[]).length?`
+    <div class="section-lbl" style="margin-top:0">① 何が写っているか（いちばん効きます）</div>
+    <div class="sc-subjects">
+      ${c.subjects.map(s=>`<div class="sc-subj">
+        <span class="sc-stars" title="優先度">${star(s.stars||0)}</span>
+        <span class="sc-subj-t">${esc(s.title||'')}</span>
+        <span class="sc-subj-r">${esc(s.reason||'')}</span>
+        ${s.base!=null?`<span class="sc-subj-b">${s.base}点あたり</span>`:''}
+      </div>`).join('')}
+      ${c.subjectOther?`<div class="sc-subj other">
+        <span class="sc-stars">${star(0)}</span>
+        <span class="sc-subj-t">${esc(c.subjectOther.label||'')}</span>
+        <span class="sc-subj-r"></span>
+        <span class="sc-subj-b">${c.subjectOther.base}点あたり</span>
+      </div>`:''}
+    </div>`:''}
+
+    ${qual?`
+    <div class="section-lbl">${c.subjects?'② ':''}写真としての出来${qual.swing!=null?`（ここで最大±${qual.swing}点）`:''}</div>
     <ol class="sc-points">
-      ${(c.points||[]).map(p=>`<li>
+      ${(qual.points||[]).map(p=>`<li>
         <b>${esc(p.title||'')}</b>
         ${p.detail?`<span>${esc(p.detail)}</span>`:''}
       </li>`).join('')}
-    </ol>
+    </ol>`:''}
+
+    ${c.gate?`
+    <div class="section-lbl">${c.subjects?'③ ':''}${esc(c.gate.title||'')}</div>
+    <div style="font-size:var(--fs2);color:var(--text-sub);line-height:1.8">
+      次のものが写っていたら、何が写っていても29点以下になります。
+      <ul class="sc-notes" style="margin-top:4px">${(c.gate.items||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul>
+    </div>`:''}
 
     <div class="section-lbl">点数の目安</div>
     <div class="sc-bands">
@@ -506,16 +537,21 @@ function renderScoreCriteria(c){
       <ul class="sc-notes">${c.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`:''}`;
 }
 
-async function scoreNippoGallery(){
-  const targets = ngList().filter(p=>p.igScore==null).slice(0,12);
-  if(!targets.length){ showToast('未採点の写真はありません'); return; }
-  const btn = document.getElementById('ng-score-btn');
+// again＝true なら、採点済みのものも今の基準で採点し直す
+async function scoreNippoGallery(again){
+  const list = ngList();
+  const targets = (again ? list : list.filter(p=>p.igScore==null)).slice(0,12);
+  if(!targets.length){ showToast(again?'採点する写真がありません':'未採点の写真はありません'); return; }
+  if(again && !confirm(`いま出ている${list.length}枚のうち、先頭の${targets.length}枚を、今の基準で採点し直します。\n前の点数は上書きされます。よろしいですか？`)) return;
+  const btn = document.getElementById(again ? 'ng-rescore-btn' : 'ng-score-btn');
+  const label = btn.textContent;
   btn.disabled = true; btn.textContent = `${targets.length}枚を採点中…`;
   let results = [];
   try{
     results = await dbScoreNippoPhotos(targets.map(p=>p.id));
   }catch(e){
     showToast('採点に失敗しました：'+e.message);
+    btn.disabled = false; btn.textContent = label;
     renderNippoGallery();
     return;
   }
