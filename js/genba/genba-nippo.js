@@ -269,6 +269,67 @@ async function nippoUploadPhotos(reportId){
   nippoClearNewPhotos();
 }
 
+// ════ 写真をあげた日数（社内は全員が全員分を見られる） ════
+//
+// 枚数ではなく「あげた日が何日あったか」で数える。
+// 1日に何枚あげても1日。同じ日に現場をまたいで日報が2件あっても1日。
+// たくさん撮った人ではなく、続けて記録している人が分かるようにするため。
+function nippoPhotoDays(month){
+  const {start, end} = nippoPeriod(month || nippoMonth);
+  const hasPhoto = new Set((nippoPhotos||[]).map(p=>p.reportId));
+  const byUser = {};
+  (dailyReports||[]).forEach(n=>{
+    if(n.workDate < start || n.workDate > end) return;
+    const u = byUser[n.userId] = byUser[n.userId]
+      || {name:n.userName||'（名前未設定）', days:new Set(), workDays:new Set()};
+    if(!isNippoStateName(n.projectName)) u.workDays.add(n.workDate);   // 休み・欠勤は出た日に数えない
+    if(hasPhoto.has(n.id)) u.days.add(n.workDate);
+  });
+  return byUser;
+}
+
+function renderNippoPhotoDays(){
+  const el = document.getElementById('nippo-photo-days');
+  if(!el) return;
+  // 発注先には出さない（社内の記録なので）
+  if(currentUserRole!=='staff' && currentUserRole!=='carpenter'){ el.style.display='none'; return; }
+  el.style.display='';
+
+  const byUser = nippoPhotoDays();
+  const ids = Object.keys(byUser).filter(id=>byUser[id].workDays.size || byUser[id].days.size);
+  if(!ids.length){
+    el.innerHTML = `<div class="card-head"><span class="card-head-title">写真をあげた日数</span></div>
+      <div class="empty" style="padding:20px">この月度の日報はまだありません</div>`;
+    return;
+  }
+  // 多い順。同じなら決まった並び順で
+  ids.sort((a,b)=> byUser[b].days.size - byUser[a].days.size
+                 || cmpEmployee(byUser[a].name, byUser[b].name));
+  const max = byUser[ids[0]].days.size;
+
+  el.innerHTML = `
+    <div class="card-head">
+      <span class="card-head-title">写真をあげた日数</span>
+      <span style="font-size:var(--fs1);color:var(--text-muted)">${(nippoMonth||'').replace(/^(\d{4})-(\d{2})$/,(_,y,m)=>`${y}年${Number(m)}月度`)}</span>
+    </div>
+    <div class="pd-list">
+      ${ids.map(id=>{
+        const u = byUser[id];
+        const d = u.days.size, w = u.workDays.size;
+        const pct = w ? Math.round(d/w*100) : 0;
+        const me = id===currentUserId;
+        return `<div class="pd-row${me?' me':''}">
+          <div class="pd-name">${esc(u.name)}${me?'<span class="pd-me">じぶん</span>':''}</div>
+          <div class="pd-bar"><i style="width:${max?Math.round(d/max*100):0}%"></i></div>
+          <div class="pd-num"><b>${d}</b>日<span>／出勤${w}日</span></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="padding:8px 16px 12px;font-size:var(--fs1);color:var(--text-muted);line-height:1.7">
+      日報に写真を付けた日を数えています。1日に何枚あげても1日です。
+    </div>`;
+}
+
 // 一覧の行に出す小さな写真（3枚まで。残りは枚数で出す）
 function nippoMiniPhotos(reportId){
   const ps = nippoPhotosOf(reportId);
@@ -660,6 +721,8 @@ function renderNippo(){
       + (exempt ? '' : `　残業 <b style="${overtime>0?'color:var(--danger)':''}">${overtime>0?gbMinLabel(overtime):'なし'}</b>`)
       + (naibu>0?`　<span style="color:var(--text-sub)">所定外 ${gbMinLabel(naibu)}</span>`:'');
   }
+
+  renderNippoPhotoDays();
 
   // ── 日報一覧 ──
   const wrap = document.getElementById('nippo-list');

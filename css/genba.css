@@ -86,6 +86,21 @@
 .np-mini img{width:34px;height:34px;object-fit:cover;border-radius:4px;border:1px solid var(--border);cursor:pointer}
 .np-mini span{font-size:var(--fs1);color:var(--text-muted);align-self:center;margin-left:2px}
 
+/* ── 写真をあげた日数 ── */
+.pd-list{border-top:1px solid var(--border)}
+.pd-row{display:flex;align-items:center;gap:var(--sp3);padding:9px 16px;border-bottom:1px solid var(--border)}
+.pd-row:last-child{border-bottom:none}
+.pd-row.me{background:var(--accent-bg)}
+.pd-name{width:6.5em;flex-shrink:0;font-size:var(--fs2);font-weight:500;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pd-me{font-size:var(--fs1);color:var(--accent-t);margin-left:5px;font-weight:400}
+/* 棒は「多い人と比べてどのくらいか」だけを表す。目盛りは出さない */
+.pd-bar{flex:1;min-width:24px;height:6px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.pd-bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.pd-num{flex-shrink:0;font-size:var(--fs2);color:var(--text-sub);font-variant-numeric:tabular-nums;text-align:right}
+.pd-num b{font-size:var(--fs4);font-weight:600;color:var(--text)}
+.pd-num span{font-size:var(--fs1);color:var(--text-muted);margin-left:5px}
+
 /* ── 日報 ── */
 .nippo-row{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:0.5px solid var(--border);cursor:pointer}
 .nippo-row:last-child{border-bottom:none}
