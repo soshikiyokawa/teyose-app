@@ -17,6 +17,9 @@
 .talk-bubble .bbl{padding:10px 13px;font-size:var(--fs3);line-height:1.6;border-radius:var(--radius-lg);overflow-wrap:anywhere}
 .talk-bubble.me .bbl{background:var(--accent);color:var(--on-accent);border-radius:var(--radius-lg) 4px var(--radius-lg) var(--radius-lg)}
 .talk-bubble.them .bbl{background:var(--surface2);border-radius:4px var(--radius-lg) var(--radius-lg) var(--radius-lg)}
+/* 貼り付けられたURL。相手の吹き出し（薄い地）と自分の吹き出し（緑地）で色を変える */
+.talk-link{color:var(--accent-t);text-decoration:underline;overflow-wrap:anywhere}
+.talk-bubble.me .talk-link{color:inherit}
 .talk-bubble .ts{font-size:var(--fs1);color:var(--text-muted);padding:0 4px}
 .talk-date-sep{text-align:center;font-size:var(--fs1);color:var(--text-muted);margin:var(--sp3) 0;display:flex;align-items:center;gap:var(--sp3)}
 .talk-date-sep::before,.talk-date-sep::after{content:'';flex:1;height:1px;background:var(--border)}

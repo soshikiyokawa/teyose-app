@@ -594,6 +594,24 @@ function closeTalkPanelThread(){
   renderTalkPanelList();
 }
 
+// ── メッセージの本文を組み立てる ──
+//
+// 貼り付けられたURLは、そのままタップで開けるようにする。
+// 先に記号を打ち消してから（&・< を実体参照に）、そのあとでリンクにする。
+// 順番を逆にすると、本文に書かれたタグがそのまま効いてしまう。
+function talkTextHtml(text){
+  const safe = String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  // http:// https:// で始まるひとかたまり。日本語や空白、閉じ括弧の手前で切る
+  const linked = safe.replace(/https?:\/\/[^\s<>"'）」』、。]+/g, (u)=>{
+    // 文末の記号はURLに含めない（「…app/。」のような書き方に備える）
+    const m = u.match(/[.,!?:;]+$/);
+    const tail = m ? m[0] : '';
+    const url = tail ? u.slice(0, -tail.length) : u;
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="talk-link">${url}</a>${tail}`;
+  });
+  return linked.replace(/\n/g,'<br>');
+}
+
 // 引用（返信元）・編集済み・ブックマークの補助表示
 function replyRefHtml(m){
   if(!m.replyToText) return '';
@@ -762,7 +780,7 @@ function renderTalkPanelMessages(forceBottom){
                    : m.sending ? '<span class="talk-sending">送信中…</span>' : '';
     return `${sep}<div class="talk-bubble ${isMe?'me':'them'}${m.sending?' sending':''}" data-mid="${m.id}">
       ${replyRefHtml(m)}
-      <div class="bbl">${m.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>
+      <div class="bbl">${talkTextHtml(m.text)}</div>
       <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}${sendMark}${msgMarks(m)}</div>
       ${reactionsHtml(m,isMe)}
     </div>`;
