@@ -6,18 +6,41 @@
 
 // 絞り込みの状態。それぞれ複数えらべる（空の配列＝すべて）
 //
-// 開いたときは必ず「絞り込みなし（全件）」から始める。
-// 以前は選んだ内容を端末に覚えさせていたが、前に絞ったことを忘れたまま開いて
-// 「案件が消えた」と見えてしまうため、覚えないことにした。
-// アプリを開いている間は保たれるので、他のタブへ行って戻ってもそのまま。
+// 選んだ内容は端末に覚えさせるので、アプリを開き直しても元に戻らない。
+// ただし覚えるのは「アカウントごと」。作ったばかりのアカウントで初めて入ったときは
+// 何も覚えていないので、全件から始まる。
+// 1台の端末を何人かで使っても、他の人の絞り込みを引き継がない。
 let olFilterStatus = [];   // draft / sent / approved / completed
 let olFilterType   = [];   // 新築 / リフォーム …
 let olFilterFY     = [];   // '2026'（2026年度＝2026/3/1〜2027/2/末）
 let olFilterPay   = [];   // overdue（期日超過）／unpaid（未入金あり）／done（入金済み）
 const OL_FILTER_KEY = 'teyose-ol-filter';
-// 前に覚えさせていた内容が端末に残っているので、一度だけ捨てる
+
+// いま読み込んである設定の持ち主。ログインした人が変われば読み直す
+let _olFilterUser = null;
+const olFilterKey = () => OL_FILTER_KEY + ':' + (currentUserId || 'anon');
+
+// ログインが済んでから読む（読み込みの順番に左右されないよう、描くときに毎回確かめる）
+function olLoadFilter(){
+  const who = currentUserId || 'anon';
+  if(_olFilterUser === who) return;
+  _olFilterUser = who;
+  const arr = v => Array.isArray(v) ? v.map(String) : (v ? [String(v)] : []);
+  let s = {};
+  try{ s = JSON.parse(localStorage.getItem(olFilterKey()) || '{}'); }catch(_){}
+  olFilterStatus = arr(s.status); olFilterType = arr(s.type);
+  olFilterFY = arr(s.fy);         olFilterPay = arr(s.pay);
+}
+function olSaveFilter(){
+  if(!currentUserId) return;          // 誰の設定か決まらないうちは書かない
+  _olFilterUser = currentUserId;
+  try{
+    localStorage.setItem(olFilterKey(), JSON.stringify(
+      {status:olFilterStatus, type:olFilterType, fy:olFilterFY, pay:olFilterPay}));
+  }catch(_){}
+}
+// 昔の「みんな共通」の設定が端末に残っていれば捨てる（アカウントごとに持ち直すため）
 (()=>{ try{ localStorage.removeItem(OL_FILTER_KEY); }catch(_){} })();
-function olSaveFilter(){ /* 覚えない（開くたびに絞り込みなしへ戻す） */ }
 // 表示：カード（写真つき一覧）／表（金額・入金まで見る一覧。A3印刷もこちら）
 let olView = (()=>{ try{ return localStorage.getItem('teyose-ol-view')||'card'; }catch(_){ return 'card'; } })();
 
@@ -55,6 +78,7 @@ function olRowData(p){
 
 // 絞り込み後の一覧（契約日順）
 function olVisibleRows(){
+  olLoadFilter();          // ログインした人の設定を（まだなら）読む
   return (projects||[]).map(olRowData)
     .filter(r=>{
       if(olFilterStatus.length && !olFilterStatus.includes(r.status)) return false;
@@ -151,6 +175,7 @@ const OL_STATUS = {
 
 // 絞り込みの選択肢を作る（チェックを入れた分だけ表示する形）
 function renderOlFilters(){
+  olLoadFilter();
   const rows=(projects||[]).map(olRowData);
   const types=[...new Set(rows.map(r=>r.type).filter(Boolean))];
   const fys=[...new Set(rows.map(r=>r.fy).filter(v=>v!=null))].sort((a,b)=>b-a);
