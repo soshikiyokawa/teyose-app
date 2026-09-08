@@ -106,8 +106,14 @@ Deno.serve(async (req) => {
       const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
       if (invErr) return json({ error: inviteErrorMessage(invErr.message) });
       userId = invited.user.id;
-      mailNote = "メール送信の設定（RESEND_API_KEY・INVITE_MAIL_FROM）がまだなので、"
-               + "登録マニュアルは添付されていません。";
+      // 何が足りないのかを名指しで伝える（両方の名前を並べると探しにくいため）
+      const missing = [
+        !RESEND_API_KEY ? "RESEND_API_KEY" : "",
+        !MAIL_FROM ? "INVITE_MAIL_FROM（送信元。例：株式会社きよかわ <info@example.com>）" : "",
+      ].filter(Boolean);
+      mailNote = `Supabaseの標準メールで送りました。登録マニュアルは添付されていません。\n\n`
+               + `添付するには、Supabase → Edge Functions → Secrets に次を登録してください。\n`
+               + missing.map((m) => "・" + m).join("\n");
     }
 
     // ── プロフィール（権限・表示名・所属・勤怠区分）を作成 ──
