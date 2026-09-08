@@ -5,22 +5,19 @@
 // 行をタップするとその案件を開き、案件タブで詳細を編集できる。
 
 // 絞り込みの状態。それぞれ複数えらべる（空の配列＝すべて）
-// 選んだ内容は端末に覚えさせるので、アプリを開き直しても元に戻らない
+//
+// 開いたときは必ず「絞り込みなし（全件）」から始める。
+// 以前は選んだ内容を端末に覚えさせていたが、前に絞ったことを忘れたまま開いて
+// 「案件が消えた」と見えてしまうため、覚えないことにした。
+// アプリを開いている間は保たれるので、他のタブへ行って戻ってもそのまま。
 let olFilterStatus = [];   // draft / sent / approved / completed
 let olFilterType   = [];   // 新築 / リフォーム …
 let olFilterFY     = [];   // '2026'（2026年度＝2026/3/1〜2027/2/末）
 let olFilterPay   = [];   // overdue（期日超過）／unpaid（未入金あり）／done（入金済み）
 const OL_FILTER_KEY = 'teyose-ol-filter';
-(()=>{
-  try{
-    const s=JSON.parse(localStorage.getItem(OL_FILTER_KEY)||'{}');
-    const arr=v=>Array.isArray(v)?v.map(String):(v?[String(v)]:[]);
-    olFilterStatus=arr(s.status); olFilterType=arr(s.type); olFilterFY=arr(s.fy); olFilterPay=arr(s.pay);
-  }catch(_){}
-})();
-function olSaveFilter(){
-  try{ localStorage.setItem(OL_FILTER_KEY, JSON.stringify({status:olFilterStatus, type:olFilterType, fy:olFilterFY, pay:olFilterPay})); }catch(_){}
-}
+// 前に覚えさせていた内容が端末に残っているので、一度だけ捨てる
+(()=>{ try{ localStorage.removeItem(OL_FILTER_KEY); }catch(_){} })();
+function olSaveFilter(){ /* 覚えない（開くたびに絞り込みなしへ戻す） */ }
 // 表示：カード（写真つき一覧）／表（金額・入金まで見る一覧。A3印刷もこちら）
 let olView = (()=>{ try{ return localStorage.getItem('teyose-ol-view')||'card'; }catch(_){ return 'card'; } })();
 
