@@ -35,8 +35,9 @@ async function inviteAccount(){
   if(role==='supplier' && !supplierId){ showToast('発注先を選択してください'); return; }
   const btn=document.getElementById('inv-btn');
   btn.disabled=true; btn.textContent='送信中…';
+  let res=null;
   try{
-    await dbInviteUser({email, displayName, role, supplierId, workGroup});
+    res = await dbInviteUser({email, displayName, role, supplierId, workGroup});
   }catch(e){
     btn.disabled=false; btn.textContent='招待メールを送信';
     return;
@@ -44,7 +45,10 @@ async function inviteAccount(){
   btn.disabled=false; btn.textContent='招待メールを送信';
   document.getElementById('inv-email').value='';
   document.getElementById('inv-name').value='';
-  showToast(`${displayName}さんに招待メールを送信しました`);
+  showToast(res?.attached
+    ? `${displayName}さんに招待メールを送信しました（登録マニュアルを添付）`
+    : `${displayName}さんに招待メールを送信しました`);
+  if(res?.note) setTimeout(()=>alert(res.note), 400);
   try{ await fetchProfiles(); }catch(e){} // allProfilesを取り直して一覧に反映
   renderAccountPerms();
 }

@@ -906,6 +906,8 @@ async function dbInviteUser(payload){
   const { data, error } = await sb.functions.invoke('invite-user', { body: {...payload, redirectTo} });
   if(error){showToast('招待に失敗しました：'+error.message);throw error;}
   if(data?.error){showToast(data.error);throw new Error(data.error);}
+  // マニュアルを添えられたか、送れなかったかを画面に伝える
+  return { attached: !!data?.attached, note: data?.note || '' };
 }
 async function dbAddHoliday(cal, date){
   const { error } = await sb.from('work_holidays').insert({cal, holiday_date:date});
