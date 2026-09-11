@@ -16,7 +16,10 @@ import { logNotifications } from "../_shared/notify-log.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CHATWORK_TOKEN = Deno.env.get("CHATWORK_TOKEN") ?? "";
-const WEBHOOK_TOKEN = Deno.env.get("CHATWORK_WEBHOOK_TOKEN") ?? "";
+// ChatWorkのWebhookは1つごとに別のトークンで署名される。
+// ルームごとにWebhookを作る場合は、トークンをカンマ区切りで並べて登録しておく
+const WEBHOOK_TOKENS = (Deno.env.get("CHATWORK_WEBHOOK_TOKEN") ?? "")
+  .split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 
@@ -72,20 +75,36 @@ async function chatworkMyAccountId(): Promise<number | null> {
   return myAccountId;
 }
 
+// 本文の署名が、登録されているトークンのどれかで作られたものか確かめる
+async function signatureOk(raw: string, sig: string): Promise<boolean> {
+  if (!sig) return false;
+  const data = new TextEncoder().encode(raw);
+  for (const token of WEBHOOK_TOKENS) {
+    try {
+      const key = await crypto.subtle.importKey("raw", b64ToBytes(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const mac = await crypto.subtle.sign("HMAC", key, data);
+      if (bytesToB64(mac) === sig) return true;
+    } catch (_) { /* 形が違うトークンは飛ばす */ }
+  }
+  return false;
+}
+
 Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return new Response("ok", { status: 200 });
     const raw = await req.text();
 
-    // 署名検証（未設定なら拒否＝fail-closed。なりすまし投稿を防ぐ）
-    if (!WEBHOOK_TOKEN) return new Response("webhook未設定", { status: 401 });
+    // 署名検証（未設定なら拒否＝fail-closed。なりすまし投稿を防ぐ）。
+    // 登録されているトークンのどれかと合えば通す（Webhookを複数作れるようにするため）
+    if (!WEBHOOK_TOKENS.length) return new Response("webhook未設定", { status: 401 });
     const sig = req.headers.get("X-ChatWorkWebhookSignature") || "";
-    const key = await crypto.subtle.importKey("raw", b64ToBytes(WEBHOOK_TOKEN), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(raw));
-    if (bytesToB64(mac) !== sig) return new Response("invalid signature", { status: 401 });
+    if (!(await signatureOk(raw, sig))) return new Response("invalid signature", { status: 401 });
 
     const payload = JSON.parse(raw);
-    if (payload?.webhook_event_type !== "message_created") return json({ ok: true, skipped: "not-message" });
+    // 何が届いたかを返事に書いておく（ChatWorkのWebhook履歴で原因が分かるように）
+    if (payload?.webhook_event_type !== "message_created") {
+      return json({ ok: true, skipped: "not-message", got: payload?.webhook_event_type ?? null });
+    }
     const ev = payload.webhook_event || {};
     const roomId = String(ev.room_id ?? "");
     const body: string = ev.body ?? "";
@@ -102,7 +121,8 @@ Deno.serve(async (req) => {
 
     // ルームID → 発注先
     const { data: sup } = await admin.from("suppliers").select("id, name").eq("chatwork_room_id", roomId).maybeSingle();
-    if (!sup) return json({ ok: true, skipped: "no-supplier" });
+    // どのルームが結び付いていないのか、返事で分かるようにしておく
+    if (!sup) return json({ ok: true, skipped: "no-supplier", room: roomId });
 
     // 送信者名（ChatWork APIでルームメンバーから取得。失敗時は発注先名）
     let senderName = sup.name;
