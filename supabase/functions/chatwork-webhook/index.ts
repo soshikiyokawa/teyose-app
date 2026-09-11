@@ -18,8 +18,9 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const CHATWORK_TOKEN = Deno.env.get("CHATWORK_TOKEN") ?? "";
 // ChatWorkのWebhookは1つごとに別のトークンで署名される。
 // ルームごとにWebhookを作る場合は、トークンをカンマ区切りで並べて登録しておく
+// 区切りは半角カンマのほか、全角カンマ・読点・セミコロン・改行も受ける（貼り間違いを拾うため）
 const WEBHOOK_TOKENS = (Deno.env.get("CHATWORK_WEBHOOK_TOKEN") ?? "")
-  .split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+  .split(/[,\s;、，；]+/).map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 
@@ -86,14 +87,33 @@ async function signatureOk(raw: string, sig: string): Promise<{ ok: boolean; usa
   let usable = 0;
   let ok = false;
   for (const token of WEBHOOK_TOKENS) {
+    const bytes = tokenBytes(token);
+    if (!bytes) continue;   // Base64として読めないものは照合に使えない
     try {
-      const key = await crypto.subtle.importKey("raw", b64ToBytes(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      const key = await crypto.subtle.importKey("raw", bytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
       usable++;
       const mac = await crypto.subtle.sign("HMAC", key, data);
       if (bytesToB64(mac) === sig) ok = true;
-    } catch (_) { /* 形が違うトークンは飛ばす */ }
+    } catch (_) { /* 鍵として使えないものは飛ばす */ }
   }
   return { ok, usable };
+}
+
+// トークンをBase64デコードして鍵のもとにする。
+// URL安全形式（- _）やパディング落ちでも読めるようにしておく
+function tokenBytes(token: string): Uint8Array | null {
+  let s = token.replace(/-/g, "+").replace(/_/g, "/");
+  if (s.length % 4) s += "=".repeat(4 - (s.length % 4));
+  try { return b64ToBytes(s); } catch (_) { return null; }
+}
+
+// 貼られたトークンの「形」だけを報告する（中身は出さない）。
+//   len … 文字数／bad … Base64で使えない文字の数／ok … 鍵として読めたか
+const NON_B64 = /[^A-Za-z0-9+/=_-]/g;
+function tokenShapes() {
+  return WEBHOOK_TOKENS.map((t) => ({
+    len: t.length, bad: (t.match(NON_B64) || []).length, ok: !!tokenBytes(t),
+  }));
 }
 
 Deno.serve(async (req) => {
@@ -118,6 +138,7 @@ Deno.serve(async (req) => {
       console.log("chatwork-webhook", JSON.stringify({
         error: "invalid signature", hasSignature: !!sig,
         tokens: WEBHOOK_TOKENS.length, usable: check.usable, room,
+        shapes: tokenShapes(), sigLen: sig.length,
       }));
       return new Response("invalid signature", { status: 401 });
     }
