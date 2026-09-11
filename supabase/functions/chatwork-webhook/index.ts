@@ -77,18 +77,23 @@ async function chatworkMyAccountId(): Promise<number | null> {
   return myAccountId;
 }
 
-// 本文の署名が、登録されているトークンのどれかで作られたものか確かめる
-async function signatureOk(raw: string, sig: string): Promise<boolean> {
-  if (!sig) return false;
+// 本文の署名が、登録されているトークンのどれかで作られたものか確かめる。
+// usable は「形が正しくて実際に照合に使えたトークンの数」。
+// 登録はされていても Base64 として読めないものは使えないため、数が合わなければそれが原因
+async function signatureOk(raw: string, sig: string): Promise<{ ok: boolean; usable: number }> {
+  if (!sig) return { ok: false, usable: 0 };
   const data = new TextEncoder().encode(raw);
+  let usable = 0;
+  let ok = false;
   for (const token of WEBHOOK_TOKENS) {
     try {
       const key = await crypto.subtle.importKey("raw", b64ToBytes(token), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+      usable++;
       const mac = await crypto.subtle.sign("HMAC", key, data);
-      if (bytesToB64(mac) === sig) return true;
+      if (bytesToB64(mac) === sig) ok = true;
     } catch (_) { /* 形が違うトークンは飛ばす */ }
   }
-  return false;
+  return { ok, usable };
 }
 
 Deno.serve(async (req) => {
@@ -103,11 +108,16 @@ Deno.serve(async (req) => {
       return new Response("webhook未設定", { status: 401 });
     }
     const sig = req.headers.get("X-ChatWorkWebhookSignature") || "";
-    if (!(await signatureOk(raw, sig))) {
+    const check = await signatureOk(raw, sig);
+    if (!check.ok) {
       // 署名が合わない。ChatWorkからなら（署名あり）トークンの取り違え、
-      // 署名が無ければ ChatWork 以外からの通信
+      // 署名が無ければ ChatWork 以外からの通信。
+      // room を残して、どのルームのWebhookのトークンが足りないのか分かるようにする
+      let room: string | null = null;
+      try { room = String(JSON.parse(raw)?.webhook_event?.room_id ?? "") || null; } catch (_) {}
       console.log("chatwork-webhook", JSON.stringify({
-        error: "invalid signature", hasSignature: !!sig, tokens: WEBHOOK_TOKENS.length,
+        error: "invalid signature", hasSignature: !!sig,
+        tokens: WEBHOOK_TOKENS.length, usable: check.usable, room,
       }));
       return new Response("invalid signature", { status: 401 });
     }
