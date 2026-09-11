@@ -109,10 +109,12 @@ function tokenBytes(token: string): Uint8Array | null {
 
 // 貼られたトークンの「形」だけを報告する（中身は出さない）。
 //   len … 文字数／bad … Base64で使えない文字の数／ok … 鍵として読めたか
+//   head … 先頭3文字だけ。ChatWork側の一覧と見比べて、どのWebhookのものか探すために使う
 const NON_B64 = /[^A-Za-z0-9+/=_-]/g;
 function tokenShapes() {
   return WEBHOOK_TOKENS.map((t) => ({
     len: t.length, bad: (t.match(NON_B64) || []).length, ok: !!tokenBytes(t),
+    head: t.slice(0, 3),
   }));
 }
 
