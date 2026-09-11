@@ -51,11 +51,18 @@ function splitRuns(text: string): string[] {
 function textWidth(font: any, text: string, size: number): number {
   return splitRuns(text).reduce((w, r) => w + font.widthOfTextAtSize(r, size), 0);
 }
-// 分けた並びを、続けて見えるように順に置いていく
+// 分けた並びを、続けて見えるように順に置いていく。
+//
+// opts.bold を付けると、わずかにずらして二重に書いて太字に見せる。
+// 太字用の日本語フォントは1本5MBあり、埋め込むとPDFが6MBになって
+// ChatWorkの添付上限（5MB）に入らないため、フォント1本でまかなっている。
 function drawRuns(page: any, text: string, opts: any) {
+  const { bold, ...rest } = opts;
   let x = opts.x;
   for (const r of splitRuns(text)) {
-    page.drawText(r, { ...opts, x });
+    page.drawText(r, { ...rest, x });
+    // ずらす量は文字の大きさに合わせる（小さい文字でつぶれないように）
+    if (bold) page.drawText(r, { ...rest, x: x + Math.max(0.25, opts.size * 0.035) });
     x += opts.font.widthOfTextAtSize(r, opts.size);
   }
 }
@@ -115,11 +122,13 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   // Supabase Storage（publicバケット）に置いたフォントをHTTPで取得して埋め込む。
   const FONTS_BASE = `${SUPABASE_URL}/storage/v1/object/public/assets/fonts`;
   const regularBytes = new Uint8Array(await (await fetch(`${FONTS_BASE}/NotoSansJP-Regular.ttf`)).arrayBuffer());
-  const boldBytes = new Uint8Array(await (await fetch(`${FONTS_BASE}/NotoSansJP-Bold.ttf`)).arrayBuffer());
   // subset:trueにすると日本語のような文字数の多いフォントで文字が欠ける不具合があるため、
-  // サブセット化せずフォント全体をそのまま埋め込む
+  // サブセット化せずフォント全体をそのまま埋め込む。
+  //
+  // フォントは1本で5MB。太字用をもう1本入れるとPDFが6MBになり、
+  // ChatWorkの添付上限（5MB）を超えてリンクでしか送れなくなる。
+  // そのため太字は埋め込まず、drawRuns の bold（二重書き）で見せている。
   const font = await pdfDoc.embedFont(regularBytes, { subset: false });
-  const fontBold = await pdfDoc.embedFont(boldBytes, { subset: false });
 
   const PAGE_W = 595.28, PAGE_H = 841.89; // A4 (pt)
   const marginX = 42;
@@ -137,9 +146,9 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   let y = 800;
 
-  const drawRight = (text: string, yy: number, size = 9, f = font, color = gray) => {
-    const w = textWidth(f, text, size);
-    drawRuns(page, text, { x: rightX - w, y: yy, size, font: f, color });
+  const drawRight = (text: string, yy: number, size = 9, bold = false, color = gray) => {
+    const w = textWidth(font, text, size);
+    drawRuns(page, text, { x: rightX - w, y: yy, size, font, color, bold });
   };
   const newPageIfNeeded = (need: number) => {
     if (y - need < 50) {
@@ -153,17 +162,17 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const lastEdit = edits.length ? edits[edits.length - 1] : null;
   const editedOn = lastEdit ? String(lastEdit.at || "").slice(0, 10) : "";
 
-  drawRuns(page, "発 注 書", { x: marginX, y, size: 20, font: fontBold, color: black });
+  drawRuns(page, "発 注 書", { x: marginX, y, size: 20, font, bold: true, color: black });
   drawRuns(page, "Purchase Order", { x: marginX, y: y - 16, size: 9, font, color: gray });
   if (lastEdit) {
     drawRuns(page, `単価変更あり（${editedOn} 改定・${edits.length}回目）`, {
-      x: marginX + 92, y: y + 4, size: 9, font: fontBold, color: green,
+      x: marginX + 92, y: y + 4, size: 9, font, bold: true, color: green,
     });
   }
-  drawRight(COMPANY.name, y - 2, 11, fontBold, black);
-  drawRight(`${COMPANY.zip} ${COMPANY.address}`, y - 14, 8, font, gray);
-  drawRight(`TEL：${COMPANY.tel}`, y - 24, 8, font, gray);
-  drawRight(COMPANY.url, y - 34, 8, font, green);
+  drawRight(COMPANY.name, y - 2, 11, true, black);
+  drawRight(`${COMPANY.zip} ${COMPANY.address}`, y - 14, 8, false, gray);
+  drawRight(`TEL：${COMPANY.tel}`, y - 24, 8, false, gray);
+  drawRight(COMPANY.url, y - 34, 8, false, green);
 
   y -= 60;
   const boxH = 86;
@@ -236,16 +245,16 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
 
   newPageIfNeeded(110);
   y -= 24;
-  drawRight(`小計：¥${fmt(o.subtotal)}`, y, 11, font, rgb(0.2, 0.2, 0.2));
+  drawRight(`小計：¥${fmt(o.subtotal)}`, y, 11, false, rgb(0.2, 0.2, 0.2));
   y -= 18;
-  drawRight(`消費税（10%）：¥${fmt(o.tax)}`, y, 11, font, rgb(0.2, 0.2, 0.2));
+  drawRight(`消費税（10%）：¥${fmt(o.tax)}`, y, 11, false, rgb(0.2, 0.2, 0.2));
   y -= 22;
-  drawRight(`合計：¥${fmt(o.total)}`, y, 16, fontBold, rgb(0.29, 0.19, 0.06));
+  drawRight(`合計：¥${fmt(o.total)}`, y, 16, true, rgb(0.29, 0.19, 0.06));
 
   if (lastEdit) {
     const first = edits[0];
     y -= 16;
-    drawRight(`（当初の合計：¥${fmt(first?.total?.before)}）`, y, 8.5, font, gray);
+    drawRight(`（当初の合計：¥${fmt(first?.total?.before)}）`, y, 8.5, false, gray);
   }
 
   y -= 24;
