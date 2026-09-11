@@ -156,10 +156,14 @@ Deno.serve(async (req) => {
     const base = { supplier_id: sup.id, is_internal: false, role: "them", unread: true, sender_name: sender };
     if (textPart) rows.push({ ...base, type: "text", text: textPart });
 
+    const fileNotes: string[] = [];
     for (const fid of fileIds) {
       const got = await pullFile(admin, roomId, fid);
       if (got.url) rows.push({ ...base, type: "file", file_url: got.url, file_name: got.name, file_mime: got.mime });
-      else rows.push({ ...base, type: "text", text: `📎 ${got.name}（${got.note}。ChatWorkでご確認ください）` });
+      else {
+        fileNotes.push(`${fid}:${got.step}:${got.note}`);
+        rows.push({ ...base, type: "text", text: `📎 ${got.name}（${got.note}。ChatWorkでご確認ください）` });
+      }
     }
     if (!rows.length) return json({ ok: true, skipped: "nothing-to-save" });
 
@@ -188,7 +192,7 @@ Deno.serve(async (req) => {
       }
     } catch (_) { /* 通知失敗は無視 */ }
 
-    return json({ ok: true, saved: rows.length });
+    return json({ ok: true, saved: rows.length, files: fileIds.length, fileErrors: fileNotes });
   } catch (e) {
     return json({ error: String((e as any)?.message || e) }, 500);
   }
@@ -197,9 +201,10 @@ Deno.serve(async (req) => {
 // ChatWorkの添付を手寄のStorage（chat-files）へ入れ直し、表示用のURLを返す。
 // ダウンロードURLは発行から30秒しか使えないため、取り出したらすぐ入れ直す。
 async function pullFile(admin: any, roomId: string, fileId: string):
-  Promise<{ url: string; name: string; mime: string; note: string }> {
-  const fail = (name: string, note: string) => ({ url: "", name, mime: "", note });
-  if (!CHATWORK_TOKEN) return fail("ファイル", "ChatWorkの設定が足りません");
+  Promise<{ url: string; name: string; mime: string; note: string; step: string }> {
+  // step は「どこで止まったか」。ログに残して原因を切り分けるためのもの
+  const fail = (name: string, note: string, step: string) => ({ url: "", name, mime: "", note, step });
+  if (!CHATWORK_TOKEN) return fail("ファイル", "ChatWorkの設定が足りません", "no-token");
 
   let info: any;
   try {
@@ -207,35 +212,39 @@ async function pullFile(admin: any, roomId: string, fileId: string):
       `https://api.chatwork.com/v2/rooms/${encodeURIComponent(roomId)}/files/${encodeURIComponent(fileId)}?create_download_url=1`,
       { headers: cwHeaders },
     );
-    if (!res.ok) return fail("ファイル", `取り出せませんでした(${res.status})`);
+    if (!res.ok) {
+      // ChatWorkが返した理由をそのまま残す（401なら「Invalid API token」等）
+      const why = (await res.text()).slice(0, 200);
+      return fail("ファイル", `取り出せませんでした(${res.status})`, `info-${res.status} ${why}`);
+    }
     info = await res.json();
   } catch (e) {
-    return fail("ファイル", `取り出せませんでした（${String((e as any)?.message || e)}）`);
+    return fail("ファイル", `取り出せませんでした（${String((e as any)?.message || e)}）`, "info-throw");
   }
 
   const name = String(info?.filename || "ファイル");
-  if (!info?.download_url) return fail(name, "ダウンロード先が分かりませんでした");
-  if (Number(info?.filesize) > FILE_MAX) return fail(name, "大きすぎて取り込めません");
+  if (!info?.download_url) return fail(name, "ダウンロード先が分かりませんでした", "no-url");
+  if (Number(info?.filesize) > FILE_MAX) return fail(name, "大きすぎて取り込めません", "too-big");
 
   let bytes: Uint8Array;
   try {
     const dl = await fetch(info.download_url);
-    if (!dl.ok) return fail(name, `取り出せませんでした(${dl.status})`);
+    if (!dl.ok) return fail(name, `取り出せませんでした(${dl.status})`, `download-${dl.status}`);
     bytes = new Uint8Array(await dl.arrayBuffer());
   } catch (e) {
-    return fail(name, `取り出せませんでした（${String((e as any)?.message || e)}）`);
+    return fail(name, `取り出せませんでした（${String((e as any)?.message || e)}）`, "download-throw");
   }
-  if (bytes.byteLength > FILE_MAX) return fail(name, "大きすぎて取り込めません");
+  if (bytes.byteLength > FILE_MAX) return fail(name, "大きすぎて取り込めません", "too-big");
 
   // 保存先のキーには日本語等が使えないため、拡張子だけ残す（元の名前は file_name に持つ）
   const ext = name.match(/\.[a-zA-Z0-9]+$/)?.[0] || "";
   const mime = mimeOf(name);
   const path = `cw_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
   const { error } = await admin.storage.from("chat-files").upload(path, bytes, { contentType: mime });
-  if (error) return fail(name, `取り込めませんでした（${error.message}）`);
+  if (error) return fail(name, `取り込めませんでした（${error.message}）`, "storage");
 
   const { data } = admin.storage.from("chat-files").getPublicUrl(path);
-  return { url: data.publicUrl, name, mime, note: "" };
+  return { url: data.publicUrl, name, mime, note: "", step: "" };
 }
 
 // ダッシュボードの Logs で追えるように、1件ごとに結果を1行残す。

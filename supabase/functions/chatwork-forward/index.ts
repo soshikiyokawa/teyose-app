@@ -107,6 +107,9 @@ async function sendFile(roomId: string, url: string, name: string, message: stri
   return { ok: false, note: `（添付できませんでした：${up.status}）` };
 }
 
+// ダッシュボードの Logs で追えるように、1件ごとに結果を1行残す。
+// 呼び出し側（db.js）は転送の失敗を画面に出さないため、ここが唯一の手がかりになる
 function json(body: unknown, status = 200) {
+  console.log("chatwork-forward", JSON.stringify(body));
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
