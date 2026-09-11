@@ -61,17 +61,19 @@ function mimeOf(name: string): string {
   return MIME[ext] || "application/octet-stream";
 }
 
-// きよかわ自身のChatWorkアカウント番号（1回だけ問い合わせて覚える）
+// きよかわ自身のChatWorkアカウント番号（1回だけ問い合わせて覚える）。
+// meStatus は APIトークンが通っているかの目印（200なら有効、401なら無効）。ログに出す
 let myAccountId: number | null | undefined;
+let cwMeStatus = 0;
 async function chatworkMyAccountId(): Promise<number | null> {
   if (myAccountId !== undefined) return myAccountId;
   myAccountId = null;
   try {
-    if (CHATWORK_TOKEN) {
-      const res = await fetch("https://api.chatwork.com/v2/me", { headers: cwHeaders });
-      if (res.ok) myAccountId = Number((await res.json())?.account_id) || null;
-    }
-  } catch (_) { /* 取れなくても続行（本文での見分けに任せる） */ }
+    if (!CHATWORK_TOKEN) { cwMeStatus = -1; return myAccountId; }
+    const res = await fetch("https://api.chatwork.com/v2/me", { headers: cwHeaders });
+    cwMeStatus = res.status;
+    if (res.ok) myAccountId = Number((await res.json())?.account_id) || null;
+  } catch (_) { cwMeStatus = -2; /* 取れなくても続行（本文での見分けに任せる） */ }
   return myAccountId;
 }
 
@@ -136,16 +138,19 @@ Deno.serve(async (req) => {
 
     // 送信者名（ChatWork APIでルームメンバーから取得。失敗時は発注先名）
     let senderName = sup.name;
+    let membersStatus = 0;
     try {
       if (CHATWORK_TOKEN && ev.account_id) {
         const mres = await fetch(`https://api.chatwork.com/v2/rooms/${roomId}/members`, { headers: cwHeaders });
+        membersStatus = mres.status;
         if (mres.ok) {
           const members = await mres.json();
-          const who = (members || []).find((m: any) => m.account_id === ev.account_id);
+          // 番号の型が違うことがあるので、文字にそろえて照合する
+          const who = (members || []).find((m: any) => String(m.account_id) === String(ev.account_id));
           if (who?.name) senderName = who.name;
         }
-      }
-    } catch (_) { /* 名前が取れなくても続行 */ }
+      } else membersStatus = -1;
+    } catch (_) { membersStatus = -2; /* 名前が取れなくても続行 */ }
     const sender = senderName + "（ChatWork）";
 
     // 添付ファイルと、それ以外の文章に分ける
@@ -192,7 +197,11 @@ Deno.serve(async (req) => {
       }
     } catch (_) { /* 通知失敗は無視 */ }
 
-    return json({ ok: true, saved: rows.length, files: fileIds.length, fileErrors: fileNotes });
+    // cw は ChatWork API の返り（200なら通っている、401ならトークンが受け付けられていない）
+    return json({
+      ok: true, saved: rows.length, files: fileIds.length, fileErrors: fileNotes,
+      cw: { me: cwMeStatus, members: membersStatus },
+    });
   } catch (e) {
     return json({ error: String((e as any)?.message || e) }, 500);
   }
