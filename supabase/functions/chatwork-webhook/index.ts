@@ -96,9 +96,19 @@ Deno.serve(async (req) => {
 
     // 署名検証（未設定なら拒否＝fail-closed。なりすまし投稿を防ぐ）。
     // 登録されているトークンのどれかと合えば通す（Webhookを複数作れるようにするため）
-    if (!WEBHOOK_TOKENS.length) return new Response("webhook未設定", { status: 401 });
+    if (!WEBHOOK_TOKENS.length) {
+      console.log("chatwork-webhook", JSON.stringify({ error: "webhook未設定" }));
+      return new Response("webhook未設定", { status: 401 });
+    }
     const sig = req.headers.get("X-ChatWorkWebhookSignature") || "";
-    if (!(await signatureOk(raw, sig))) return new Response("invalid signature", { status: 401 });
+    if (!(await signatureOk(raw, sig))) {
+      // 署名が合わない。ChatWorkからなら（署名あり）トークンの取り違え、
+      // 署名が無ければ ChatWork 以外からの通信
+      console.log("chatwork-webhook", JSON.stringify({
+        error: "invalid signature", hasSignature: !!sig, tokens: WEBHOOK_TOKENS.length,
+      }));
+      return new Response("invalid signature", { status: 401 });
+    }
 
     const payload = JSON.parse(raw);
     // 何が届いたかを返事に書いておく（ChatWorkのWebhook履歴で原因が分かるように）
@@ -228,6 +238,9 @@ async function pullFile(admin: any, roomId: string, fileId: string):
   return { url: data.publicUrl, name, mime, note: "" };
 }
 
+// ダッシュボードの Logs で追えるように、1件ごとに結果を1行残す。
+// メッセージの中身は書かない（ログに本文を残さないため）
 function json(body: unknown, status = 200) {
+  console.log("chatwork-webhook", JSON.stringify(body));
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
