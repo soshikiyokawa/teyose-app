@@ -790,8 +790,14 @@ async function dbAddChatMessage(supplierName, msg){
     // きよかわ→発注先。宛先を選んでいればその人だけ（発注先の担当者でも社員でも指名できる）
     if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview).catch(()=>{});
     else dbSendPush('supplier', supplier_id, supplierName, preview).catch(()=>{});
-    // ChatWorkルームが設定されていれば転送（片方向）。宛先の指定にかかわらず送る
-    dbForwardToChatWork(supplier_id, currentUserDisplayName||'', preview).catch(()=>{});
+    // ChatWorkルームが設定されていれば転送。宛先の指定にかかわらず送る。
+    // 写真・資料はファイルそのものを添える。発注書は dbSendOrderToSupplier が
+    // PDFを添えて送るため、ここでは送らない（noChatwork）
+    if(!msg.noChatwork){
+      const cwFile = msg.type==='file'
+        ? {fileUrl:msg.fileUrl, fileName:msg.fileName, fileMime:msg.fileMime} : null;
+      dbForwardToChatWork(supplier_id, currentUserDisplayName||'', preview, cwFile).catch(()=>{});
+    }
   } else {
     // 発注先→きよかわ。宛先を選んでいればその人だけ、
     // 指定なし（ALL）なら社員全員（管理者＋一般社員）へ。発注先チャットは大工も見られるため
@@ -800,13 +806,14 @@ async function dbAddChatMessage(supplierName, msg){
   }
 }
 
-// 発注先チャットのきよかわ側発言をChatWorkへ転送（発注先にルームID設定がある場合のみ）
-async function dbForwardToChatWork(supplierId, senderName, text){
-  if(!supplierId || !text) return;
+// 発注先チャットのきよかわ側発言をChatWorkへ転送（発注先にルームID設定がある場合のみ）。
+// file を渡すと、そのファイルをChatWorkに添えて送る（5MBを超えるものはリンクになる）
+async function dbForwardToChatWork(supplierId, senderName, text, file){
+  if(!supplierId || (!text && !file?.fileUrl)) return;
   const sup = suppliers.find(s=>s.id===supplierId);
   if(!sup || !sup.chatworkRoomId) return; // ルーム未設定なら送らない（無駄打ち防止）
   if(!orderChannelsOf(sup).includes('chatwork')) return;   // 送付先に選ばれていない
-  await sb.functions.invoke('chatwork-forward', { body:{ supplierId, senderName, text } });
+  await sb.functions.invoke('chatwork-forward', { body:{ supplierId, senderName, text, ...(file||{}) } });
 }
 
 // チャット添付ファイル（写真・PDF等）をSupabase Storageにアップロードし、公開URLを返す
@@ -1645,32 +1652,43 @@ async function dbSendOrderToSupplier(order){
   const sup = (suppliers||[]).find(s=>s.name===order.suppliers);
   const ch = orderChannelsOf(sup);
 
-  // チャット（ChatWorkへの転送は dbAddChatMessage の中で行われる）
+  // 発注書PDF。ChatWorkとメールで使う（発注確定のときに作ってあるので、あればそれを使う）
+  let pdfUrl = order.pdfUrl || '';
+  if(!pdfUrl && (ch.includes('chatwork') || ch.includes('email'))){
+    try{ pdfUrl = await dbGenerateOrderPdf(order); }catch(_){}   // 作れなくても送信は続ける
+  }
+
+  // チャット（ChatWorkへはこのあとまとめて送るので、ここでは転送しない）
   if(ch.includes('chat')){
-    await dbAddChatMessage(order.suppliers,{role:'me',type:'order',orderData:order});
-  } else if(ch.includes('chatwork')){
-    // チャットには出さず、ChatWorkだけに送る
+    await dbAddChatMessage(order.suppliers,{role:'me',type:'order',orderData:order,noChatwork:true});
+  }
+
+  // ChatWork（発注書PDFを添えて送る。PDFが無いときは中身を文字で知らせる）
+  if(ch.includes('chatwork')){
     const preview = `発注書 ${order.no}（${order.project}）合計 ¥${fmt(order.total)}`;
-    dbForwardToChatWork(sup?.id, currentUserDisplayName||'', preview).catch(()=>{});
+    dbForwardToChatWork(sup?.id, currentUserDisplayName||'', preview,
+      pdfUrl ? {fileUrl:pdfUrl, fileName:`発注書_${order.no}.pdf`, fileMime:'application/pdf'} : null).catch(()=>{});
   }
 
   // メール（発注書PDFを添えて送る）
   if(ch.includes('email')){
-    await dbMailOrderToSupplier(order, sup);
+    await dbMailOrderToSupplier(order, sup, pdfUrl);
   }
 }
 
 // 発注書をメールで送る。先にPDFを作ってから、そのPDFを添えて送信する
-async function dbMailOrderToSupplier(order, sup){
+async function dbMailOrderToSupplier(order, sup, readyPdfUrl){
   if(!sup?.email){
     showToast(`${order.suppliers}にメールアドレスが登録されていません`, 4000);
     return;
   }
   showToast(`${sup.name}へメールを送っています…`, 20000);
-  let pdfUrl = '';
-  try{
-    pdfUrl = await dbGenerateOrderPdf(order);   // 失敗しても本文だけで送る
-  }catch(_){}
+  let pdfUrl = readyPdfUrl || '';
+  if(!pdfUrl){
+    try{
+      pdfUrl = await dbGenerateOrderPdf(order);   // 失敗しても本文だけで送る
+    }catch(_){}
+  }
   const { data, error } = await sb.functions.invoke('send-order-mail', { body:{ order, pdfUrl } });
   if(error || data?.error){
     // Supabaseは2xx以外だと中身を読まずにエラーにするので、理由をこちらで取り出す

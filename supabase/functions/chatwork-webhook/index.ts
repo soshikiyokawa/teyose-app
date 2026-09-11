@@ -2,10 +2,11 @@
 //
 // ChatWorkのルームに投稿があるとChatWorkがこのURLへPOSTしてくる。
 // ルームIDに対応する発注先チャットへ、そのメッセージを取り込む（相手＝発注先の発言として）。
+// 添付ファイルは ChatWork から取り出して手寄のStorageに入れ直し、資料として並べる。
 //
 // セキュリティ：X-ChatWorkWebhookSignature（本文のHMAC-SHA256, Base64）を
 //   Secrets の CHATWORK_WEBHOOK_TOKEN（ChatWorkのWebhook設定で発行されるトークン）で検証する。
-// ループ防止：手寄→ChatWorkへ転送した自分の投稿（[info][title]手寄…）は取り込まない。
+// ループ防止：きよかわのChatWorkアカウント自身の投稿は取り込まない（手寄からの転送もこれに当たる）。
 // デプロイは --no-verify-jwt（ChatWorkはSupabaseのJWTを送らないため。認証は署名で担保）。
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -19,20 +20,56 @@ const WEBHOOK_TOKEN = Deno.env.get("CHATWORK_WEBHOOK_TOKEN") ?? "";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY")!;
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY")!;
 
+// 手寄と同じ上限（40MB）。これより大きいものは取り込まず、ChatWorkで見てもらう
+const FILE_MAX = 40 * 1024 * 1024;
+
 webpush.setVapidDetails("mailto:support@kiyokawanoie.com", VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 const b64ToBytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 const bytesToB64 = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf)));
 
-// ChatWork記法の軽い掃除（宛先・引用・アイコンタグを除去）
+const cwHeaders = { "X-ChatWorkToken": CHATWORK_TOKEN };
+
+// ファイルを投稿すると本文に [download:12345]名前.pdf (54.06 KB)[/download] が入る
+const DOWNLOAD_RE = /\[download:(\d+)\][\s\S]*?\[\/download\]/g;
+
+// ChatWork記法の軽い掃除（宛先・引用・アイコン・自動見出しを除去）
 function cleanBody(s: string): string {
   return (s || "")
     .replace(/\[To:\d+\][^\n]*/g, "")
     .replace(/\[rp\s+[^\]]*\]/g, "")
     .replace(/\[piconname:\d+\]|\[picon:\d+\]/g, "")
     .replace(/\[qt\]|\[\/qt\]|\[qtmeta[^\]]*\]/g, "")
+    .replace(/\[dtext:[^\]]*\]/g, "")
     .replace(/\[info\]|\[\/info\]|\[title\]|\[\/title\]/g, "")
     .trim();
+}
+
+// 拡張子から種類を決める（手寄の画面で写真をそのまま表示するかの判断に使う）
+const MIME: Record<string, string> = {
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
+  webp: "image/webp", heic: "image/heic", bmp: "image/bmp",
+  pdf: "application/pdf", txt: "text/plain", csv: "text/csv", zip: "application/zip",
+  doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+function mimeOf(name: string): string {
+  const ext = (name.match(/\.([a-zA-Z0-9]+)$/)?.[1] || "").toLowerCase();
+  return MIME[ext] || "application/octet-stream";
+}
+
+// きよかわ自身のChatWorkアカウント番号（1回だけ問い合わせて覚える）
+let myAccountId: number | null | undefined;
+async function chatworkMyAccountId(): Promise<number | null> {
+  if (myAccountId !== undefined) return myAccountId;
+  myAccountId = null;
+  try {
+    if (CHATWORK_TOKEN) {
+      const res = await fetch("https://api.chatwork.com/v2/me", { headers: cwHeaders });
+      if (res.ok) myAccountId = Number((await res.json())?.account_id) || null;
+    }
+  } catch (_) { /* 取れなくても続行（本文での見分けに任せる） */ }
+  return myAccountId;
 }
 
 Deno.serve(async (req) => {
@@ -54,7 +91,11 @@ Deno.serve(async (req) => {
     const body: string = ev.body ?? "";
     if (!roomId || !body) return json({ ok: true, skipped: "empty" });
 
-    // 手寄→ChatWorkへ転送した自分の投稿は取り込まない（ループ防止）
+    // きよかわ自身の投稿は取り込まない。
+    // 手寄からの転送がそのまま返ってくる（二重になる）のを防ぐのが主目的。
+    // アカウント番号が取れないときは、転送の見出しの文字で見分ける
+    const me = await chatworkMyAccountId();
+    if (me && Number(ev.account_id) === me) return json({ ok: true, skipped: "self" });
     if (body.includes("手寄（きよかわ）")) return json({ ok: true, skipped: "self" });
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -67,35 +108,48 @@ Deno.serve(async (req) => {
     let senderName = sup.name;
     try {
       if (CHATWORK_TOKEN && ev.account_id) {
-        const mres = await fetch(`https://api.chatwork.com/v2/rooms/${roomId}/members`, { headers: { "X-ChatWorkToken": CHATWORK_TOKEN } });
+        const mres = await fetch(`https://api.chatwork.com/v2/rooms/${roomId}/members`, { headers: cwHeaders });
         if (mres.ok) {
           const members = await mres.json();
-          const me = (members || []).find((m: any) => m.account_id === ev.account_id);
-          if (me?.name) senderName = me.name;
+          const who = (members || []).find((m: any) => m.account_id === ev.account_id);
+          if (who?.name) senderName = who.name;
         }
       }
     } catch (_) { /* 名前が取れなくても続行 */ }
+    const sender = senderName + "（ChatWork）";
+
+    // 添付ファイルと、それ以外の文章に分ける
+    const fileIds = [...body.matchAll(DOWNLOAD_RE)].map((m) => m[1]);
+    const textPart = cleanBody(body.replace(DOWNLOAD_RE, ""));
+
+    const rows: Record<string, unknown>[] = [];
+    const base = { supplier_id: sup.id, is_internal: false, role: "them", unread: true, sender_name: sender };
+    if (textPart) rows.push({ ...base, type: "text", text: textPart });
+
+    for (const fid of fileIds) {
+      const got = await pullFile(admin, roomId, fid);
+      if (got.url) rows.push({ ...base, type: "file", file_url: got.url, file_name: got.name, file_mime: got.mime });
+      else rows.push({ ...base, type: "text", text: `📎 ${got.name}（${got.note}。ChatWorkでご確認ください）` });
+    }
+    if (!rows.length) return json({ ok: true, skipped: "nothing-to-save" });
 
     // 発注先チャットに取り込む（相手＝them）
-    const { error } = await admin.from("chat_messages").insert({
-      supplier_id: sup.id, is_internal: false, role: "them", type: "text",
-      text: cleanBody(body), unread: true, sender_name: senderName + "（ChatWork）",
-    });
+    const { error } = await admin.from("chat_messages").insert(rows);
     if (error) return json({ error: error.message }, 500);
 
     // 事務（staff）へプッシュ通知
+    const preview = (textPart || `📎 ${fileIds.length ? "ファイル" : ""}`).slice(0, 80);
     try {
       const { data: staff } = await admin.from("profiles").select("id").eq("role", "staff");
       const ids = (staff || []).map((p: any) => p.id);
       if (ids.length) {
-        await logNotifications(admin, ids,
-          { title: sup.name, body: cleanBody(body).slice(0, 80), tab: null }, "chatwork");
+        await logNotifications(admin, ids, { title: sup.name, body: preview, tab: null }, "chatwork");
         const { data: subs } = await admin.from("push_subscriptions").select("*").in("user_id", ids);
         await Promise.all((subs || []).map(async (s: any) => {
           try {
             await webpush.sendNotification(
               { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-              JSON.stringify({ title: sup.name, body: cleanBody(body).slice(0, 80) }),
+              JSON.stringify({ title: sup.name, body: preview }),
             );
           } catch (e: any) {
             if (e?.statusCode === 410 || e?.statusCode === 404) await admin.from("push_subscriptions").delete().eq("id", s.id);
@@ -104,11 +158,55 @@ Deno.serve(async (req) => {
       }
     } catch (_) { /* 通知失敗は無視 */ }
 
-    return json({ ok: true });
+    return json({ ok: true, saved: rows.length });
   } catch (e) {
     return json({ error: String((e as any)?.message || e) }, 500);
   }
 });
+
+// ChatWorkの添付を手寄のStorage（chat-files）へ入れ直し、表示用のURLを返す。
+// ダウンロードURLは発行から30秒しか使えないため、取り出したらすぐ入れ直す。
+async function pullFile(admin: any, roomId: string, fileId: string):
+  Promise<{ url: string; name: string; mime: string; note: string }> {
+  const fail = (name: string, note: string) => ({ url: "", name, mime: "", note });
+  if (!CHATWORK_TOKEN) return fail("ファイル", "ChatWorkの設定が足りません");
+
+  let info: any;
+  try {
+    const res = await fetch(
+      `https://api.chatwork.com/v2/rooms/${encodeURIComponent(roomId)}/files/${encodeURIComponent(fileId)}?create_download_url=1`,
+      { headers: cwHeaders },
+    );
+    if (!res.ok) return fail("ファイル", `取り出せませんでした(${res.status})`);
+    info = await res.json();
+  } catch (e) {
+    return fail("ファイル", `取り出せませんでした（${String((e as any)?.message || e)}）`);
+  }
+
+  const name = String(info?.filename || "ファイル");
+  if (!info?.download_url) return fail(name, "ダウンロード先が分かりませんでした");
+  if (Number(info?.filesize) > FILE_MAX) return fail(name, "大きすぎて取り込めません");
+
+  let bytes: Uint8Array;
+  try {
+    const dl = await fetch(info.download_url);
+    if (!dl.ok) return fail(name, `取り出せませんでした(${dl.status})`);
+    bytes = new Uint8Array(await dl.arrayBuffer());
+  } catch (e) {
+    return fail(name, `取り出せませんでした（${String((e as any)?.message || e)}）`);
+  }
+  if (bytes.byteLength > FILE_MAX) return fail(name, "大きすぎて取り込めません");
+
+  // 保存先のキーには日本語等が使えないため、拡張子だけ残す（元の名前は file_name に持つ）
+  const ext = name.match(/\.[a-zA-Z0-9]+$/)?.[0] || "";
+  const mime = mimeOf(name);
+  const path = `cw_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
+  const { error } = await admin.storage.from("chat-files").upload(path, bytes, { contentType: mime });
+  if (error) return fail(name, `取り込めませんでした（${error.message}）`);
+
+  const { data } = admin.storage.from("chat-files").getPublicUrl(path);
+  return { url: data.publicUrl, name, mime, note: "" };
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
