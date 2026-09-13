@@ -26,11 +26,18 @@ let _longPressTimer = null;
 let _pendingMove    = null; // { taskId, startX, startY, origStart, origEnd, isTouch }
 
 // ─ Date helpers ─
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+// 日付を、端末の暦のまま YYYY-MM-DD にする。
+// toISOString() は世界標準時に直すため、日本では「0時」が「前日の15時」になり、
+// 日付が1日戻っていた（一括変更の+1日が効かない、ドラッグで1マス動かすと戻る、の原因）
+function ymdLocal(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function todayStr() { return ymdLocal(new Date()); }
 function addDaysStr(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return ymdLocal(d);
 }
 function diffDays(a, b) {
   return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
@@ -560,16 +567,26 @@ function applyBulkShift() {
   const dir      = document.getElementById('bulk-shift-dir').value === 'later' ? 1 : -1;
   if (!fromDate || !days) { showToast('日付と日数を入力してください'); return; }
 
+  let moved = 0;
+  const touchedParents = new Set();
   scheduleTasks.forEach(t => {
-    if (t.start >= fromDate) {
+    if (t.start && t.start >= fromDate) {
       t.start = addDaysStr(t.start, days * dir);
-      t.end   = addDaysStr(t.end,   days * dir);
+      if (t.end) t.end = addDaysStr(t.end, days * dir);
+      moved++;
+      if (t.parentId) touchedParents.add(t.parentId);
     }
   });
+  // 大工程が指定日より前に始まっていて、中の小工程だけ動いた場合も、
+  // 大工程のバーを小工程に合わせる（ドラッグしたときと同じ）
+  touchedParents.forEach(_syncParentDates);
+
   scheduleDirty = true;
   document.getElementById('bulk-shift-modal').classList.remove('open');
   renderGantt();
-  showToast(`${days}日 ${dir > 0 ? '後ろ' : '前'}にずらしました`);
+  if (!moved) { showToast(`${fromDate} 以降に始まる工程がありません`); return; }
+  // 他の編集と同じく、保存を押すまでは確定しない
+  showToast(`${moved}件を${days}日${dir > 0 ? '後ろ' : '前'}にずらしました。「保存」で確定します`, 4000);
 }
 
 // ─ Excel export ─
