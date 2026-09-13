@@ -255,6 +255,14 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
   z-index: 4;
 }
+/* ダークモードでは白い縁取りが文字をにじませて読みにくくなるので付けない
+   （暗い背景に明るい文字なので、縁取りがなくても読める） */
+:root[data-theme="dark"] .gantt-bar.gantt-bar-out-r .gantt-bar-text,
+:root[data-theme="dark"] .gantt-bar.gantt-bar-out-l .gantt-bar-text { text-shadow: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gantt-bar.gantt-bar-out-r .gantt-bar-text,
+  :root:not([data-theme="light"]) .gantt-bar.gantt-bar-out-l .gantt-bar-text { text-shadow: none; }
+}
 .gantt-bar.gantt-bar-out-r .gantt-bar-text { left: 100%; margin-left: 6px; }
 .gantt-bar.gantt-bar-out-l .gantt-bar-text { right: 100%; margin-right: 6px; }
 
