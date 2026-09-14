@@ -43,3 +43,15 @@
   display:inline-block; width:6px; height:6px; border-radius:99px;
   background:var(--danger); margin-right:5px; vertical-align:middle;
 }
+
+/* 紙面（発注書・見積書・請求書）のプレビューは常に白い台紙にしている。
+   台紙をアプリの操作画面として使うとき（レシートの確認など）は sheet-app を付けて、
+   ダークモードに従わせる。付けないと、白地に明るい文字になって読めない */
+.sheet.sheet-app{background:var(--surface);color:var(--text)}
+.sheet.sheet-app .sheet-toolbar{background:var(--surface2);border-bottom-color:var(--border)}
+.sheet.sheet-app .sheet-toolbar span{color:var(--text)}
+.sheet.sheet-app .sheet-foot{background:var(--surface2);border-top-color:var(--border)}
+.sheet.sheet-app .btn:not(.primary):not(.wood):not(.danger){background:var(--surface);color:var(--text);border-color:var(--border-s)}
+.sheet.sheet-app .btn:not(.primary):not(.wood):not(.danger):hover{background:var(--surface2)}
+.sheet.sheet-app .btn.danger{background:none;border-color:transparent;color:var(--danger)}
+.sheet.sheet-app .btn.danger:hover{background:var(--danger-bg)}
