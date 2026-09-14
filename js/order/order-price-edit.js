@@ -329,7 +329,7 @@ async function refetchOrdersAndCost(){
     if(rows) orders = rows.map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,dueAsap:!!r.due_asap,
       costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),
       items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),
-      status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[]}));
+      status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[],createdByName:r.created_by_name||''}));
     if(currentUserRole==='staff' || currentUserRole==='carpenter'){
       const { data: cr } = await sb.from('cost_entries').select('*').order('created_at',{ascending:false});
       if(cr) costEntries = cr.map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),

@@ -173,6 +173,9 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   drawRight(`${COMPANY.zip} ${COMPANY.address}`, y - 14, 8, false, gray);
   drawRight(`TEL：${COMPANY.tel}`, y - 24, 8, false, gray);
   drawRight(COMPANY.url, y - 34, 8, false, green);
+  // 発注書を作った人（きよかわの担当者）。古い発注には名前が無いので出さない
+  const staffName = String(o.createdByName || o.created_by_name || "").trim();
+  if (staffName) drawRight(`担当者：${staffName}`, y - 47, 9, false, black);
 
   y -= 60;
   const boxH = 86;

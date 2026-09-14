@@ -182,6 +182,8 @@ Deno.serve(async (req) => {
         suppliers: sup?.name || "",
         items, subtotal, tax, total,
         priceEdits: [...history, edit],
+        // 作り直したPDFからも担当者が消えないように（migration-genba67.sql）
+        createdByName: order.created_by_name || "",
       });
       await updateChatOrderCard(admin, orderNo, { items, subtotal, tax, total, pdfUrl });
     } catch (e) {
