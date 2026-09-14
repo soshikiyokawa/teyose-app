@@ -186,12 +186,16 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   drawRuns(page, `発注番号：${o.no || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   drawRuns(page, `発注日：${o.date || ""}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
   iy -= 16;
-  drawRuns(page, `費目区分：${o.costType || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
+  // 案件が「経費」の発注は、費目区分ではなく勘定科目を持っている
+  const isExpense = o.project === "経費";
+  drawRuns(page, `${isExpense ? "勘定科目" : "費目区分"}：${o.costType || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   iy -= 16;
   drawRuns(page, `物件名：${o.project || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
   // 「最短」で出した発注は、日付ではなく「最短」と書いて渡す
+  // レシートから取り込んだ（支払済みの）発注は、納品希望日の代わりに支払方法を書く
+  const payment = String(o.paymentMethod || o.payment_method || "");
   const dueLabel = o.dueAsap ? "最短" : (o.dueDate || "未指定");
-  drawRuns(page, `納品希望日：${dueLabel}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
+  drawRuns(page, payment ? `支払方法：${payment}` : `納品希望日：${dueLabel}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
 
   y -= boxH + 16;
   const colX = [marginX, marginX + 260, marginX + 320, marginX + 380, marginX + 440];
@@ -263,7 +267,12 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   y -= 24;
   page.drawLine({ start: { x: marginX, y }, end: { x: marginX + tableW, y }, thickness: 0.5, color: lineColor });
   y -= 14;
-  drawRuns(page, `納品場所：${o.project || ""} 現場　／　ご納品の際は現場担当者へご連絡ください。`, {
+  const footNote = payment
+    ? `この発注はレシートから取り込んだ支払済みの記録です（支払方法：${payment}）。`
+    : isExpense
+      ? "ご納品の際は担当者へご連絡ください。"
+      : `納品場所：${o.project || ""} 現場　／　ご納品の際は現場担当者へご連絡ください。`;
+  drawRuns(page, footNote, {
     x: marginX, y, size: 8, font, color: gray,
   });
   if (lastEdit) {

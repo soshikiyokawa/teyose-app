@@ -7,6 +7,8 @@ function isReceiptOrder(){ return cart.some(c=>c._receipt); }
 // 「発注書作成」ボタンを押せないように見せる
 // （クリック自体は無効化しない。押された時にエラーを表示するため）
 function updateOrderPreviewBtnState(){
+  // 案件が「経費」なら費目区分の欄を勘定科目に切り替える（order-cart.js）
+  if(typeof syncOrderCostTypeField==='function') syncOrderCostTypeField();
   const btn=document.getElementById('order-preview-btn');
   if(!btn) return;
   // レシート取り込みは支払済みなので、納品希望日の代わりに支払方法を必須にする
@@ -31,8 +33,8 @@ function openOrderPreview(){
   const dueDate=receipt ? '' : document.getElementById('order-due-date').value;
   const payment=receipt ? document.getElementById('order-payment').value : '';
   const project=document.getElementById('order-project').value;
-  if(!project){alert('案件を選択してください。\n（現場に紐づかない発注の場合は「在庫分」を選択）');return;}
-  if(!costType){alert('費目区分を選択してください。');return;}
+  if(!project){alert('案件を選択してください。\n（現場に紐づかない発注は「在庫分」、会社の経費は「経費」を選択）');return;}
+  if(!costType){alert(costTypeLabelOf(project)+'を選択してください。');return;}
   if(receipt && !payment){alert('支払方法（JCB／Visa／現金）を選択してください。');return;}
   if(!receipt && !dueDate){alert('納品希望日を入力してください。');return;}
   // 在庫からの出庫：出庫先は現場（案件）のみ。確定直前にも在庫数を再チェックする
@@ -72,7 +74,7 @@ function openOrderPreview(){
     <div style="background:#f7f3eb;border-radius:7px;padding:10px 12px;margin-bottom:16px;font-size:12px">
       <div style="margin-bottom:4px"><span style="color:#888">発注先：</span><strong>${sup.name}</strong>${sup.contact&&sup.contact!=='—'?`　担当：${sup.contact}`:''}</div>
       <div style="display:flex;gap:16px;margin-bottom:4px"><div style="flex:1"><span style="color:#888">発注番号：</span><strong>${no}</strong></div><div style="flex:1"><span style="color:#888">発注日：</span><strong>${date}</strong></div></div>
-      <div style="display:flex;gap:16px;margin-bottom:4px"><div style="flex:1"><span style="color:#888">費目区分：</span><strong>${costType}</strong></div></div>
+      <div style="display:flex;gap:16px;margin-bottom:4px"><div style="flex:1"><span style="color:#888">${costTypeLabelOf(project)}：</span><strong>${costType}</strong></div></div>
       <div style="display:flex;gap:16px"><div style="flex:1"><span style="color:#888">物件名：</span><strong>${project}</strong></div><div style="flex:1">${receipt?`<span style="color:#888">支払方法：</span><strong>${payment}</strong>`:`<span style="color:#888">納品希望日：</span><strong>${orderDueAsap?'最短':(dueDate||'未指定')}</strong>`}</div></div>
       ${sup.tel?`<div style="margin-top:4px"><span style="color:#888">TEL：</span><strong>${sup.tel}</strong></div>`:''}
     </div>
@@ -99,7 +101,7 @@ function openOrderPreview(){
     <div style="margin-top:14px;font-size:11px;color:#888;border-top:1px solid #e0d8c8;padding-top:10px">
       ${receipt
         ? `この発注はレシートから取り込んだ支払済みの記録です（支払方法：${payment}）。`
-        : `納品場所：${project} 現場　／　ご納品の際は現場担当者へご連絡ください。`}
+        : isExpenseProject(project) ? `ご納品の際は担当者へご連絡ください。` : `納品場所：${project} 現場　／　ご納品の際は現場担当者へご連絡ください。`}
     </div>`;
   document.getElementById('order-pdf-foot').style.display='';
   document.getElementById('order-pdf-overlay').classList.add('open');

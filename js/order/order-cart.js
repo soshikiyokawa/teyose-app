@@ -46,16 +46,110 @@ function selectSupplier(id){
   renderOrderDueNote();
 }
 
-// 発注の紐づけ先（案件 or 在庫分）の選択肢。サイドバーで選択中の案件を初期値にする
+// 発注の紐づけ先（案件 or 在庫分 or 経費）の選択肢。サイドバーで選択中の案件を初期値にする
 function renderOrderProjectSelect(){
   const el=document.getElementById('order-project');
   if(!el) return;
   const prev=el.value;
   el.innerHTML='<option value="">選択してください</option>'
     +'<option value="在庫分">在庫分（案件に紐づかない発注）</option>'
+    +`<option value="${EXPENSE_PROJECT}">経費（会社の経費。勘定科目で分ける）</option>`
     +projects.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join('');
   el.value = prev || selectedProjectName || '';
   if(el.selectedIndex<0) el.selectedIndex=0;
+  updateOrderPreviewBtnState();
+}
+
+// ════ 経費（案件に紐づかない会社の経費） ════
+//
+// 案件で「経費」を選ぶと、費目区分の代わりに勘定科目を選ぶ。
+// 選んだ科目は cost_type にそのまま入る（案件名が「経費」の明細は、どの現場の原価にも混ざらない）。
+const EXPENSE_PROJECT = '経費';
+const COST_TYPE_OPTIONS = ['材料費','外注費','労務費','諸経費'];
+// desc … どんな費用がこの科目になるか／ex … よくある例
+const EXPENSE_ACCOUNTS = [
+  {name:'消耗品費',   desc:'すぐ使い切る物や、10万円未満の道具・備品。',
+   ex:'文房具、コピー用紙、電池、軍手、清掃用品、10万円未満の工具・パソコン周辺機器'},
+  {name:'旅費交通費', desc:'仕事での移動にかかる費用。',
+   ex:'電車・バス・タクシー代、高速道路料金、コインパーキング、出張の宿泊費'},
+  {name:'通信費',     desc:'電話・インターネット・郵便の費用。',
+   ex:'携帯電話・固定電話の料金、ネット回線、切手・はがき、レターパック'},
+  {name:'接待交際費', desc:'取引先やお客さまとの付き合いにかかる費用。',
+   ex:'取引先との会食、お中元・お歳暮、手土産、祝い金・香典、職人さんへの差し入れ'},
+  {name:'福利厚生費', desc:'社員みんなのための費用（特定の人だけのものは入らない）。',
+   ex:'社員の飲み物・お茶菓子、健康診断、社員旅行、慶弔見舞金、全員に配る作業着'},
+  {name:'会議費',     desc:'打合せや会議にかかる費用。飲食は1人1万円以下が目安。',
+   ex:'打合せの飲み物・お弁当、会議室の利用料、打合せを兼ねた軽い食事'},
+  {name:'広告宣伝費', desc:'会社や家づくりを知ってもらうための費用。',
+   ex:'チラシ、ホームページ、ネット広告、看板、見学会・イベントの費用、社名入りの配布物'},
+  {name:'水道光熱費', desc:'事務所・作業場・倉庫の電気・ガス・水道の料金。',
+   ex:'事務所の電気代、作業場のガス代、倉庫の水道代（現場の仮設電気・水道は案件へ）'},
+  {name:'荷造運賃',   desc:'物を送る・運ぶための費用。',
+   ex:'宅配便・運送費、段ボール・緩衝材などの梱包材'},
+  {name:'支払手数料', desc:'サービスや手続きに払う手数料。',
+   ex:'振込手数料、決済手数料、税理士・司法書士への報酬、各種の事務手数料'},
+  {name:'地代家賃',   desc:'土地や建物を借りている費用。',
+   ex:'事務所・倉庫・資材置き場の家賃、月極駐車場'},
+  {name:'租税公課',   desc:'税金や、国・役所に払うお金（法人税・住民税は入らない）。',
+   ex:'収入印紙、自動車税、固定資産税、登録免許税、住民票・印鑑証明の発行手数料'},
+  {name:'雑費',       desc:'どの科目にも当てはまらず、金額が小さく、たまにしか出ない費用。',
+   ex:'クリーニング代、少額のゴミ処理代（毎月出るもの・高額なものは雑費にしない）'},
+];
+function isExpenseProject(p){ return p === EXPENSE_PROJECT; }
+function costTypeLabelOf(project){ return isExpenseProject(project) ? '勘定科目' : '費目区分'; }
+
+// 案件に合わせて「費目区分／勘定科目」の欄を切り替える。
+// 何度呼んでも、切り替えが必要なときだけ選択肢を作り直す（選んだ値は消さない）
+let _costFieldMode = '';
+function syncOrderCostTypeField(){
+  const sel = document.getElementById('order-cost-type');
+  if(!sel) return;
+  const expense = isExpenseProject(document.getElementById('order-project')?.value);
+  const mode = expense ? 'account' : 'cost';
+  if(mode !== _costFieldMode){
+    _costFieldMode = mode;
+    const prev = sel.value;
+    const names = expense ? EXPENSE_ACCOUNTS.map(a=>a.name) : COST_TYPE_OPTIONS;
+    sel.innerHTML = '<option value="">選択してください</option>'
+      + names.map(n=>`<option value="${n}">${n}</option>`).join('');
+    sel.value = names.includes(prev) ? prev : '';
+    const lbl = document.getElementById('order-cost-type-lbl');
+    if(lbl) lbl.textContent = costTypeLabelOf(expense ? EXPENSE_PROJECT : '');
+  }
+  renderAccountHelp();
+}
+
+// 選んだ勘定科目の説明と、全科目の説明一覧
+function renderAccountHelp(){
+  const box = document.getElementById('order-account-help');
+  if(!box) return;
+  const expense = _costFieldMode === 'account';
+  box.hidden = !expense;
+  if(!expense) return;
+  const picked = document.getElementById('order-cost-type')?.value || '';
+  const cur = EXPENSE_ACCOUNTS.find(a=>a.name===picked);
+  const wasOpen = !!box.querySelector('details')?.open;
+  box.innerHTML = (cur
+      ? `<div class="acct-now"><div class="acct-now-desc">${esc(cur.desc)}</div>
+           <div class="acct-now-ex">例：${esc(cur.ex)}</div></div>`
+      : `<div class="acct-now acct-now-empty">科目を選ぶと、どんな費用が当てはまるかがここに出ます</div>`)
+    + `<details class="acct-all"${wasOpen?' open':''}>
+         <summary>どの科目か迷ったら（全科目の説明）</summary>
+         ${EXPENSE_ACCOUNTS.map(a=>`
+           <button type="button" class="acct-row${a.name===picked?' on':''}" onclick="pickExpenseAccount('${a.name}')">
+             <span class="acct-row-name">${esc(a.name)}</span>
+             <span class="acct-row-desc">${esc(a.desc)}</span>
+             <span class="acct-row-ex">例：${esc(a.ex)}</span>
+           </button>`).join('')}
+         <div class="acct-note">現場で使う材料・道具は、経費ではなくその案件を選んでください。10万円以上の物は事務に確認してください。</div>
+       </details>`;
+}
+function pickExpenseAccount(name){
+  const sel = document.getElementById('order-cost-type');
+  if(!sel) return;
+  sel.value = name;
+  const d = document.querySelector('#order-account-help details');
+  if(d) d.open = false;   // 選んだら一覧は閉じる
   updateOrderPreviewBtnState();
 }
 

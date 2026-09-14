@@ -247,3 +247,21 @@ body.drag-sorting .drag-handle{cursor:grabbing}
   background:color-mix(in srgb, var(--accent-bg) 90%, transparent);
   border-radius:10px;pointer-events:none;z-index:5
 }
+
+/* ── 経費の勘定科目：選んだ科目の説明と、全科目の説明一覧 ── */
+.acct-help{margin-top:var(--sp2)}
+.acct-now{padding:var(--sp2) var(--sp3);background:var(--surface2);border-radius:var(--radius);font-size:var(--fs2);line-height:1.6}
+.acct-now-desc{color:var(--text)}
+.acct-now-ex{color:var(--text-sub);font-size:var(--fs1);margin-top:2px}
+.acct-now-empty{color:var(--text-muted);font-size:var(--fs1)}
+.acct-all{margin-top:var(--sp2)}
+.acct-all summary{cursor:pointer;font-size:var(--fs2);color:var(--accent-t);padding:var(--sp1) 0;list-style:revert}
+.acct-row{display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);
+  padding:var(--sp2) var(--sp1);font-family:inherit;color:var(--text);cursor:pointer}
+.acct-row:hover{background:var(--surface2)}
+.acct-row.on{background:var(--accent-bg)}
+.acct-row-name{display:block;font-size:var(--fs3);font-weight:600}
+.acct-row.on .acct-row-name{color:var(--accent-t)}
+.acct-row-desc{display:block;font-size:var(--fs2);color:var(--text);margin-top:1px}
+.acct-row-ex{display:block;font-size:var(--fs1);color:var(--text-sub);margin-top:1px}
+.acct-note{font-size:var(--fs1);color:var(--text-muted);padding:var(--sp2) var(--sp1) 0;line-height:1.6}
