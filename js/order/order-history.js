@@ -56,7 +56,19 @@ const COST_TYPES=['材料費','外注費','労務費','諸経費'];
 // 原価管理は選択中の案件単位で表示する（全体表示はしない）
 // 「在庫分を表示」ボタンで、案件に紐づかない発注（在庫分）に切り替えられる
 let costViewStock=false;
-function toggleCostStock(){ costViewStock=!costViewStock; renderCost(); }
+function toggleCostStock(){ costViewStock=!costViewStock; if(costViewStock) costViewExpense=false; renderCost(); }
+
+// 「経費を表示」：案件「経費」で登録した明細を、勘定科目ごと・月ごとに見る
+// costExpenseMonth … 'YYYY-MM'。'' はすべての期間。null はまだ開いていない（開いたら今月にする）
+let costViewExpense=false;
+let costExpenseMonth=null;
+function thisMonthStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function toggleCostExpense(){
+  costViewExpense=!costViewExpense;
+  if(costViewExpense){ costViewStock=false; if(costExpenseMonth===null) costExpenseMonth=thisMonthStr(); }
+  renderCost();
+}
+function setExpenseMonth(m){ costExpenseMonth=m||''; renderCost(); }
 
 const fmtNinku=v=>{const r=Math.round(v*100)/100;return Number.isInteger(r)?r.toFixed(1):String(r);};
 
@@ -109,13 +121,19 @@ function renderStockInventory(){
 }
 
 function renderCost(){
-  const target = costViewStock ? '在庫分' : (selectedProject?.name||null);
+  const target = costViewStock ? '在庫分' : costViewExpense ? EXPENSE_PROJECT : (selectedProject?.name||null);
   document.getElementById('cost-proj-name').textContent = target||'（案件未選択）';
   document.getElementById('cost-stock-btn').classList.toggle('active', costViewStock);
+  document.getElementById('cost-expense-btn')?.classList.toggle('active', costViewExpense);
+  applyCostViewLabels();
 
   // 在庫一覧は「在庫分を表示」のときだけ出す
   document.getElementById('stock-inventory-wrap').style.display = costViewStock ? '' : 'none';
   if(costViewStock) renderStockInventory();
+  // 月別の表は「経費を表示」のときだけ出す
+  document.getElementById('expense-wrap').style.display = costViewExpense ? '' : 'none';
+
+  if(costViewExpense){ renderExpenseView(); return; }
 
   if(!target){
     document.getElementById('c-total').textContent='¥0';
@@ -205,6 +223,126 @@ function renderCostBySupplier(entries){
     <div class="cost-row" style="background:var(--surface2)">
       <div class="cost-row-top"><div class="cost-row-name" style="font-weight:700">合計</div><div class="cost-row-amt" style="font-weight:800;color:var(--wood-t)">¥${fmt(total)}</div></div>
     </div>`;
+}
+
+// ════ 経費を表示 ════
+
+// 見出しと数字の名前を、案件の原価用／経費用で切り替える
+function applyCostViewLabels(){
+  const ex = costViewExpense;
+  const set = (id, t) => { const el=document.getElementById(id); if(el) el.textContent=t; };
+  set('c-total-lbl',   ex ? '経費合計（税抜）' : '発注総額（原価）');
+  set('c-count-lbl',   ex ? '明細の件数' : '発注件数');
+  set('cost-type-lbl', ex ? '勘定科目別 集計' : '費目別 原価集計');
+  set('cost-sup-lbl',  ex ? '支払先別 集計' : '発注先別 発注金額集計');
+  set('cost-list-lbl', ex ? '経費の明細' : '発注明細（原価転記済み）');
+  // 未受領・人工は経費には関係ないので出さない
+  ['c-pending-box','c-ninku-box'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = ex ? 'none' : ''; });
+  const monthSel = document.getElementById('expense-month');
+  if(monthSel) monthSel.hidden = !ex;
+  if(ex) document.getElementById('c-ninku-breakdown').style.display='none';
+}
+
+const monthLabel = m => { const [y,mo]=String(m).split('-'); return `${y}年${Number(mo)}月`; };
+
+function renderExpenseView(){
+  // 予実・見積と実績は案件のためのものなので隠す（中で経費表示中かを見て隠れる）
+  renderCostBudget && renderCostBudget();
+  renderEstVsOrder && renderEstVsOrder();
+  const all = costEntries.filter(e=>(e.project||'')===EXPENSE_PROJECT);
+  const month = costExpenseMonth || '';
+
+  // 期間の選択肢：経費がある月＋今月（新しい順）と、すべての期間
+  const months = [...new Set([thisMonthStr(), ...all.map(e=>String(e.date||'').slice(0,7)).filter(Boolean)])].sort().reverse();
+  const sel = document.getElementById('expense-month');
+  sel.innerHTML = months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join('')
+    + '<option value="">すべての期間</option>';
+  sel.value = month;
+
+  const entries = month ? all.filter(e=>String(e.date||'').slice(0,7)===month) : all;
+  const total = entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  document.getElementById('c-total').textContent='¥'+fmt(total);
+  document.getElementById('c-count').textContent=entries.length+'件';
+
+  renderExpenseMonthly(all);
+
+  const period = month ? monthLabel(month) : 'これまで';
+  const empty = `<div class="empty">${period}の経費はまだありません。受発注でレシートを読み込み、案件で「経費」を選ぶと登録できます</div>`;
+  if(!entries.length){
+    ['cost-by-project','cost-by-supplier','cost-list'].forEach(id=>document.getElementById(id).innerHTML=empty);
+    return;
+  }
+  renderExpenseByAccount(entries);
+  renderCostBySupplier(entries);
+  renderExpenseList(entries);
+}
+
+// 勘定科目ごとの合計。科目は決まった順に並べ、登録のない科目は出さない
+function renderExpenseByAccount(entries){
+  const by = {};
+  entries.forEach(e=>{
+    const k = e.costType || '未分類';
+    (by[k] = by[k] || {amount:0, n:0});
+    by[k].amount += Number(e.amount)||0; by[k].n++;
+  });
+  const order = EXPENSE_ACCOUNTS.map(a=>a.name);
+  const keys = [...order.filter(k=>by[k]), ...Object.keys(by).filter(k=>!order.includes(k))];
+  const total = entries.reduce((s,e)=>s+(Number(e.amount)||0),0);
+  document.getElementById('cost-by-project').innerHTML = `<table class="cost-type-table">
+    <thead><tr><th>勘定科目</th><th class="r">件数</th><th class="r">金額</th><th class="r">構成比</th></tr></thead>
+    <tbody>
+      ${keys.map(k=>`<tr><td title="${esc(EXPENSE_ACCOUNTS.find(a=>a.name===k)?.desc||'')}">${esc(k)}</td>
+        <td class="r">${by[k].n}</td><td class="r">¥${fmt(by[k].amount)}</td>
+        <td class="r">${total?Math.round(by[k].amount/total*100):0}%</td></tr>`).join('')}
+      <tr class="total"><td>合計</td><td class="r">${entries.length}</td><td class="r">¥${fmt(total)}</td><td class="r">100%</td></tr>
+    </tbody>
+  </table>`;
+}
+
+// 月ごと × 勘定科目の表（期間の選択に関係なく、直近12か月ぶん）。
+// 新しい月を左に置く（スマホで横に送らなくても最近の月が見えるように）。月の見出しを押すとその月に絞る
+function renderExpenseMonthly(all){
+  const el = document.getElementById('expense-monthly');
+  if(!all.length){ el.innerHTML='<div class="empty">経費の登録はまだありません</div>'; return; }
+  const months = [...new Set(all.map(e=>String(e.date||'').slice(0,7)).filter(Boolean))].sort().reverse().slice(0,12);
+  const cell = {}, colTotal = {}, rowTotal = {};
+  all.forEach(e=>{
+    const m = String(e.date||'').slice(0,7);
+    if(!months.includes(m)) return;
+    const k = e.costType || '未分類', a = Number(e.amount)||0;
+    cell[k+'|'+m] = (cell[k+'|'+m]||0) + a;
+    colTotal[m] = (colTotal[m]||0) + a;
+    rowTotal[k] = (rowTotal[k]||0) + a;
+  });
+  const order = EXPENSE_ACCOUNTS.map(a=>a.name);
+  const keys = [...order.filter(k=>rowTotal[k]), ...Object.keys(rowTotal).filter(k=>!order.includes(k))];
+  const grand = Object.values(rowTotal).reduce((s,v)=>s+v,0);
+  const yen = v => v ? '¥'+fmt(v) : '<span class="muted">—</span>';
+  el.innerHTML = `<table class="expense-matrix">
+    <thead><tr><th class="acct">勘定科目</th>
+      ${months.map(m=>`<th class="r"><button type="button" class="em-month${m===costExpenseMonth?' on':''}" onclick="setExpenseMonth('${m}')">${monthLabel(m).replace(/^\d+年/, s=>s.slice(2))}</button></th>`).join('')}
+      <th class="r sum">合計</th></tr></thead>
+    <tbody>
+      ${keys.map(k=>`<tr><td class="acct">${esc(k)}</td>${months.map(m=>`<td class="r">${yen(cell[k+'|'+m])}</td>`).join('')}<td class="r sum">¥${fmt(rowTotal[k])}</td></tr>`).join('')}
+      <tr class="total"><td class="acct">合計</td>${months.map(m=>`<td class="r">${yen(colTotal[m])}</td>`).join('')}<td class="r sum">¥${fmt(grand)}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+// 経費の明細。支払方法は発注の側に持っているので、発注番号から引く
+function renderExpenseList(entries){
+  const payOf = no => (orders||[]).find(o=>o.no===no)?.paymentMethod || '';
+  const rows = [...entries].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  document.getElementById('cost-list').innerHTML = rows.map(e=>{
+    const pay = payOf(e.orderNo);
+    return `<div class="cost-row">
+      <div class="cost-row-top"><div class="cost-row-name">${esc(e.name)}</div><div class="cost-row-amt">¥${fmt(e.amount)}</div></div>
+      <div class="cost-row-meta"><span>${e.date}</span><span>${e.qty}${esc(e.unit||'')}</span><span>${esc(e.supplier||'')}</span>
+        ${e.costType?`<span>🏷️ ${esc(e.costType)}</span>`:''}${pay?`<span>${esc(pay)}</span>`:''}
+        <button class="btn danger xs" onclick="deleteCostEntry(${e.id})" style="margin-left:auto">削除</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 async function deleteCostEntry(id){

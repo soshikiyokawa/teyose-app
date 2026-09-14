@@ -25,8 +25,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=395">
-<link rel="stylesheet" href="css/schedule.css?v=395">
+<link rel="stylesheet" href="css/main.css?v=396">
+<link rel="stylesheet" href="css/schedule.css?v=396">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -625,13 +625,16 @@
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
     <span class="section-lbl" style="margin:0">原価サマリー</span>
     <span class="sch-proj-badge" id="cost-proj-name">（案件未選択）</span>
+    <!-- 経費を表示しているときだけ出る。月で絞る -->
+    <select id="expense-month" class="expense-month" onchange="setExpenseMonth(this.value)" hidden></select>
     <button class="sf-btn" id="cost-stock-btn" onclick="toggleCostStock()" style="margin-left:auto" title="案件に紐づかない発注（在庫分）を表示">在庫分を表示</button>
+    <button class="sf-btn" id="cost-expense-btn" onclick="toggleCostExpense()" title="会社の経費を勘定科目別に表示">経費を表示</button>
   </div>
   <div class="metric-grid" style="margin-top:8px">
-    <div class="metric"><div class="lbl">発注総額（原価）</div><div class="val g" id="c-total">¥0</div></div>
-    <div class="metric"><div class="lbl">発注件数</div><div class="val" id="c-count">0件</div></div>
-    <div class="metric"><div class="lbl">未受領</div><div class="val warn" id="c-pending">0件</div></div>
-    <div class="metric"><div class="lbl">人工（日報から累計）</div><div class="val" id="c-ninku">—</div></div>
+    <div class="metric"><div class="lbl" id="c-total-lbl">発注総額（原価）</div><div class="val g" id="c-total">¥0</div></div>
+    <div class="metric"><div class="lbl" id="c-count-lbl">発注件数</div><div class="val" id="c-count">0件</div></div>
+    <div class="metric" id="c-pending-box"><div class="lbl">未受領</div><div class="val warn" id="c-pending">0件</div></div>
+    <div class="metric" id="c-ninku-box"><div class="lbl">人工（日報から累計）</div><div class="val" id="c-ninku">—</div></div>
   </div>
   <!-- 新築案件：作業種別（木工事／上棟／墨付け刻み）ごとの人工内訳 -->
   <div id="c-ninku-breakdown" style="display:none;font-size:12px;color:var(--text-sub);margin-top:6px;padding:0 2px"></div>
@@ -648,13 +651,19 @@
     <div class="card" id="stock-inventory" style="overflow-x:auto"><div class="empty">在庫の記録がありません</div></div>
   </div>
 
-  <div class="section-lbl">費目別 原価集計</div>
+  <!-- 月別 × 勘定科目（「経費を表示」のときだけ表示） -->
+  <div id="expense-wrap" style="display:none">
+    <div class="section-lbl">月別 勘定科目集計</div>
+    <div class="card" id="expense-monthly" style="overflow-x:auto"></div>
+  </div>
+
+  <div class="section-lbl" id="cost-type-lbl">費目別 原価集計</div>
   <div class="card" id="cost-by-project" style="overflow-x:auto"><div class="empty">左の案件一覧から案件を選択してください</div></div>
 
-  <div class="section-lbl">発注先別 発注金額集計</div>
+  <div class="section-lbl" id="cost-sup-lbl">発注先別 発注金額集計</div>
   <div class="card" id="cost-by-supplier"><div class="empty">左の案件一覧から案件を選択してください</div></div>
 
-  <div class="section-lbl">発注明細（原価転記済み）</div>
+  <div class="section-lbl" id="cost-list-lbl">発注明細（原価転記済み）</div>
   <div class="card" id="cost-list"><div class="empty">左の案件一覧から案件を選択してください</div></div>
 </div>
 
@@ -3005,90 +3014,90 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=395"></script>
+<script src="js/supabase-client.js?v=396"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=395"></script>
+<script src="js/utils.js?v=396"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=395"></script>
+<script src="js/state.js?v=396"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=395"></script>
+<script src="js/data/db.js?v=396"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=395"></script>
+<script src="js/nav.js?v=396"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=395"></script>
+<script src="js/talk.js?v=396"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=395"></script>
+<script src="js/push.js?v=396"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=395"></script>
-<script src="js/estimate/estimate-items.js?v=395"></script>
-<script src="js/estimate/quote-import.js?v=395"></script>
-<script src="js/estimate/estimate-master.js?v=395"></script>
-<script src="js/estimate/estimate-summary.js?v=395"></script>
-<script src="js/estimate/estimate-crud.js?v=395"></script>
-<script src="js/estimate/parking.js?v=395"></script>
-<script src="js/estimate/estimate-pdf.js?v=395"></script>
-<script src="js/estimate/estimate-invoice.js?v=395"></script>
+<script src="js/estimate/estimate-tabs.js?v=396"></script>
+<script src="js/estimate/estimate-items.js?v=396"></script>
+<script src="js/estimate/quote-import.js?v=396"></script>
+<script src="js/estimate/estimate-master.js?v=396"></script>
+<script src="js/estimate/estimate-summary.js?v=396"></script>
+<script src="js/estimate/estimate-crud.js?v=396"></script>
+<script src="js/estimate/parking.js?v=396"></script>
+<script src="js/estimate/estimate-pdf.js?v=396"></script>
+<script src="js/estimate/estimate-invoice.js?v=396"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=395"></script>
-<script src="js/payment-schedule.js?v=395"></script>
-<script src="js/inspection.js?v=395"></script>
+<script src="js/orders-list.js?v=396"></script>
+<script src="js/payment-schedule.js?v=396"></script>
+<script src="js/inspection.js?v=396"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=395"></script>
+<script src="js/chusho.js?v=396"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=395"></script>
+<script src="js/schedule.js?v=396"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=395"></script>
-<script src="js/order/item-price.js?v=395"></script>
-<script src="js/order/item-master.js?v=395"></script>
-<script src="js/order/invoice.js?v=395"></script>
-<script src="js/order/invoice-lines.js?v=395"></script>
-<script src="js/order/ekrea-price.js?v=395"></script>
-<script src="js/order/order-cart.js?v=395"></script>
-<script src="js/order/order-confirm.js?v=395"></script>
-<script src="js/order/order-price-edit.js?v=395"></script>
-<script src="js/order/order-history.js?v=395"></script>
-<script src="js/cost-budget.js?v=395"></script>
-<script src="js/order/card-match.js?v=395"></script>
-<script src="js/receipt.js?v=395"></script>
+<script src="js/order/supplier-master.js?v=396"></script>
+<script src="js/order/item-price.js?v=396"></script>
+<script src="js/order/item-master.js?v=396"></script>
+<script src="js/order/invoice.js?v=396"></script>
+<script src="js/order/invoice-lines.js?v=396"></script>
+<script src="js/order/ekrea-price.js?v=396"></script>
+<script src="js/order/order-cart.js?v=396"></script>
+<script src="js/order/order-confirm.js?v=396"></script>
+<script src="js/order/order-price-edit.js?v=396"></script>
+<script src="js/order/order-history.js?v=396"></script>
+<script src="js/cost-budget.js?v=396"></script>
+<script src="js/order/card-match.js?v=396"></script>
+<script src="js/receipt.js?v=396"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=395"></script>
-<script src="js/genba/supplier-view.js?v=395"></script>
-<script src="js/genba/genba-files.js?v=395"></script>
-<script src="js/genba/genba-photos.js?v=395"></script>
-<script src="js/genba/genba-drawings.js?v=395"></script>
-<script src="js/genba/genba-nippo.js?v=395"></script>
-<script src="js/genba/genba-dezura.js?v=395"></script>
-<script src="js/genba/payroll.js?v=395"></script>
-<script src="js/genba/overtime-pay.js?v=395"></script>
-<script src="js/genba/leave-balance.js?v=395"></script>
-<script src="js/genba/genba-leave.js?v=395"></script>
-<script src="js/genba/genba-holiday.js?v=395"></script>
-<script src="js/genba/license.js?v=395"></script>
-<script src="js/genba/vehicle.js?v=395"></script>
-<script src="js/genba/work-calendar.js?v=395"></script>
-<script src="js/genba/account-perms.js?v=395"></script>
+<script src="js/genba/genba-tabs.js?v=396"></script>
+<script src="js/genba/supplier-view.js?v=396"></script>
+<script src="js/genba/genba-files.js?v=396"></script>
+<script src="js/genba/genba-photos.js?v=396"></script>
+<script src="js/genba/genba-drawings.js?v=396"></script>
+<script src="js/genba/genba-nippo.js?v=396"></script>
+<script src="js/genba/genba-dezura.js?v=396"></script>
+<script src="js/genba/payroll.js?v=396"></script>
+<script src="js/genba/overtime-pay.js?v=396"></script>
+<script src="js/genba/leave-balance.js?v=396"></script>
+<script src="js/genba/genba-leave.js?v=396"></script>
+<script src="js/genba/genba-holiday.js?v=396"></script>
+<script src="js/genba/license.js?v=396"></script>
+<script src="js/genba/vehicle.js?v=396"></script>
+<script src="js/genba/work-calendar.js?v=396"></script>
+<script src="js/genba/account-perms.js?v=396"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=395"></script>
+<script src="js/init.js?v=396"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=395"></script>
-<script src="js/tasks.js?v=395"></script>
-<script src="js/task-templates.js?v=395"></script>
-<script src="js/auth.js?v=395"></script>
-<script src="js/account.js?v=395"></script>
+<script src="js/notifications.js?v=396"></script>
+<script src="js/tasks.js?v=396"></script>
+<script src="js/task-templates.js?v=396"></script>
+<script src="js/auth.js?v=396"></script>
+<script src="js/account.js?v=396"></script>
 </body>
 </html>

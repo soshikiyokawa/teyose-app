@@ -265,3 +265,18 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .acct-row-desc{display:block;font-size:var(--fs2);color:var(--text);margin-top:1px}
 .acct-row-ex{display:block;font-size:var(--fs1);color:var(--text-sub);margin-top:1px}
 .acct-note{font-size:var(--fs1);color:var(--text-muted);padding:var(--sp2) var(--sp1) 0;line-height:1.6}
+
+/* ── 原価管理「経費を表示」：月の選択と、月別×勘定科目の表 ── */
+.expense-month{width:auto;min-width:8.5em;padding:4px 8px;font-size:var(--fs2)}
+.expense-matrix{border-collapse:collapse;font-size:var(--fs2);white-space:nowrap;min-width:100%}
+.expense-matrix th,.expense-matrix td{padding:6px 10px;border-bottom:1px solid var(--border)}
+.expense-matrix th{font-weight:500;color:var(--text-sub);text-align:left}
+.expense-matrix .r{text-align:right;font-variant-numeric:tabular-nums}
+.expense-matrix .acct{position:sticky;left:0;background:var(--surface);z-index:1}
+.expense-matrix .sum{font-weight:600}
+.expense-matrix tr.total td{font-weight:700;border-bottom:none;background:var(--surface2)}
+.expense-matrix tr.total td.acct{background:var(--surface2)}
+.expense-matrix .muted{color:var(--text-muted)}
+.em-month{background:none;border:none;padding:2px 4px;border-radius:var(--radius);font:inherit;color:var(--text-sub);cursor:pointer}
+.em-month:hover{color:var(--accent-t)}
+.em-month.on{background:var(--accent-bg);color:var(--accent-t);font-weight:600}

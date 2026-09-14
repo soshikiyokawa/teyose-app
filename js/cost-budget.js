@@ -43,7 +43,7 @@ function renderCostBudget(){
   const el=document.getElementById('cost-budget');
   if(!el) return;
   // 在庫分の表示中や案件未選択のときは出さない
-  const target = (typeof costViewStock!=='undefined' && costViewStock) ? null : (selectedProject?.name||null);
+  const target = ((typeof costViewStock!=='undefined' && costViewStock) || (typeof costViewExpense!=='undefined' && costViewExpense)) ? null : (selectedProject?.name||null);
   if(!target){ el.style.display='none'; return; }
   el.style.display='';
 
@@ -186,7 +186,7 @@ function estReserveNote(d){
 function renderEstVsOrder(){
   const el=document.getElementById('est-vs-order');
   if(!el) return;
-  const target=(typeof costViewStock!=='undefined' && costViewStock) ? null : (selectedProject?.name||null);
+  const target=((typeof costViewStock!=='undefined' && costViewStock) || (typeof costViewExpense!=='undefined' && costViewExpense)) ? null : (selectedProject?.name||null);
   if(!target){ el.style.display='none'; return; }
   el.style.display='';
 
