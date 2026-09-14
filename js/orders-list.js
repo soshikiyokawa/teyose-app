@@ -115,7 +115,7 @@ function olCanSeeMoney(){ return currentUserRole==='staff'; }
 // 予定日を過ぎているのに入金が予定額に届いていないものを「期日超過」とする
 function olPayState(est){
   const pays=(est?.payments||[]).filter(p=>Number(p?.amount)>0);
-  const today=insToday ? insToday() : new Date().toISOString().slice(0,10);
+  const today=localYmd();
   let planned=0, received=0, overdue=0, nextDate='';
   pays.forEach(p=>{
     const amt=Number(p.amount)||0, act=Number(p.actualAmount)||0;

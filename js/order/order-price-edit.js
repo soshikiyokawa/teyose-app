@@ -271,7 +271,7 @@ async function saveOrderPriceEdit(){
 // 何品目直せたかを返す。
 async function applyOpeToMaster(list){
   if(!list || !list.length) return 0;
-  const today = (typeof ipToday === 'function') ? ipToday() : new Date().toISOString().slice(0,10);
+  const today = localYmd();
   let done = 0;
   for(const c of list){
     try{

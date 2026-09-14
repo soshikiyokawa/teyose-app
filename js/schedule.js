@@ -26,18 +26,14 @@ let _longPressTimer = null;
 let _pendingMove    = null; // { taskId, startX, startY, origStart, origEnd, isTouch }
 
 // ─ Date helpers ─
-// 日付を、端末の暦のまま YYYY-MM-DD にする。
+// 日付は端末の暦のまま作る（localYmd は utils.js）。
 // toISOString() は世界標準時に直すため、日本では「0時」が「前日の15時」になり、
 // 日付が1日戻っていた（一括変更の+1日が効かない、ドラッグで1マス動かすと戻る、の原因）
-function ymdLocal(d) {
-  const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-function todayStr() { return ymdLocal(new Date()); }
+function todayStr() { return localYmd(new Date()); }
 function addDaysStr(dateStr, n) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return ymdLocal(d);
+  return localYmd(d);
 }
 function diffDays(a, b) {
   return Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
@@ -688,7 +684,9 @@ function renderGantt() {
   const d0 = new Date(addDaysStr(minS, -7) + 'T00:00:00');
   const dow = d0.getDay();
   d0.setDate(d0.getDate() - (dow === 0 ? 6 : dow - 1));
-  ganttD0str = d0.toISOString().slice(0, 10);
+  // 見出し（端末の暦で作る）と、バー・今日の線の位置を測る基準日をそろえる。
+  // 世界標準時で作ると基準日だけ1日前になり、バーが見出しより1列右（1日遅れ）に出ていた
+  ganttD0str = localYmd(d0);
   const totalDays = diffDays(ganttD0str, addDaysStr(maxE, 21)) + 1;
   const W = totalDays * GANTT_CELL_W;
   const todayS = todayStr();
@@ -710,7 +708,7 @@ function renderGantt() {
   const c2 = new Date(d0);
   let dayRow='', wdRow='';
   for (let i=0; i<totalDays; i++) {
-    const wd=c2.getDay(), isWE=wd===0||wd===6, isTD=c2.toISOString().slice(0,10)===todayS;
+    const wd=c2.getDay(), isWE=wd===0||wd===6, isTD=localYmd(c2)===todayS;
     const cls=isTD?'gantt-td':isWE?'gantt-we':'';
     dayRow += `<div class="gantt-day-cell ${cls}" style="width:${GANTT_CELL_W}px">${c2.getDate()}</div>`;
     wdRow  += `<div class="gantt-wd-cell ${cls}" style="width:${GANTT_CELL_W}px">${['日','月','火','水','木','金','土'][wd]}</div>`;

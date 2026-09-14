@@ -50,6 +50,14 @@ function showToast(msg, duration=2000){
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+// 日付を、端末の暦のまま YYYY-MM-DD にする（省略すると今日）。
+// new Date().toISOString().slice(0,10) は世界標準時の日付になるため、日本では
+// 朝9時前は「前日」になり、0時ちょうどの日付は1日戻る。暦の日付を作るときはこれを使う
+function localYmd(d){
+  d = d || new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
 function tsLabel(ts){
   const d=new Date(ts);const now=new Date();const diff=now-d;
   if(diff<60000) return 'たった今';

@@ -288,10 +288,10 @@ function newEstimate(){
   document.getElementById('est-title').value=defaultEstTitle();
   document.getElementById('est-no').value='E'+new Date().getFullYear()+'-'+String(estSeq++).padStart(3,'0');
   const now=new Date();
-  document.getElementById('est-date').value=now.toISOString().slice(0,10);
+  document.getElementById('est-date').value=localYmd(now);
   const expire=new Date(now);
   expire.setMonth(expire.getMonth()+1);
-  document.getElementById('est-expire').value=expire.toISOString().slice(0,10);
+  document.getElementById('est-expire').value=localYmd(expire);
   // 案件が選択されていれば、その情報を自動入力する
   const initType = selectedProject?.type||'新築';
   if(selectedProject){

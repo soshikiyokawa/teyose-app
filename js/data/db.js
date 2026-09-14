@@ -459,7 +459,7 @@ async function fetchItemPriceChanges(){
 
 // 単価の変更を登録する。適用日が今日以前なら、いまの単価も入れ替える
 async function dbSaveItemPrice(item, cost, effectiveFrom){
-  const today = gbToday ? gbToday() : new Date().toISOString().slice(0,10);
+  const today = localYmd();
   const { error } = await sb.from('item_price_changes').insert({
     item_id:item.id, cost, prev_cost:item.cost, effective_from:effectiveFrom,
     changed_by:currentUserDisplayName||''

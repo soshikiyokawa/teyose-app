@@ -47,7 +47,7 @@ function openOrderPreview(){
     }
   }
   const now=new Date();
-  const date=now.toISOString().slice(0,10);
+  const date=localYmd(now);   // 発注日（朝9時前でも今日の日付にする）
   const no=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
   const sup=selectedSupplier||{name:'—',tel:'',email:''};
   // メーカー送料を含めた形にする。

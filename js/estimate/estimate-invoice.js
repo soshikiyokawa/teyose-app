@@ -22,7 +22,7 @@ function closeInvoicePdf(){document.getElementById('invoice-pdf-overlay').classL
 function renderInvoicePdfBody(){
   const data=_invoicePdfData, c=_invoicePdfCalc;
   if(!data||!c) return;
-  const today=new Date().toISOString().slice(0,10);
+  const today=localYmd();
 
   const header=`
     <div style="background:${EST_PDF_GREEN};color:#fff;text-align:center;padding:14px 0;margin-bottom:18px;border-radius:3px">
