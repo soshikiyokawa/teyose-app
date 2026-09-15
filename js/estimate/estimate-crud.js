@@ -163,7 +163,7 @@ function collectEstData(){
       {date:v('est-extra3-date'),amount:payAmtVal('est-extra3-amount')}
     ],
     payments:estPaymentsFromForm(),
-    sections:sections.map(s=>({...s,items:[...s.items]})),discountAmount:parseFloat(v('discount-amount'))||0,taxRate:parseFloat(v('tax-rate'))||10};
+    sections:cloneSections(sections),discountAmount:parseFloat(v('discount-amount'))||0,taxRate:parseFloat(v('tax-rate'))||10};
 }
 
 // 入金の行（この順に並べる）。ラベルで保存するので、行が増えても既存データがずれない
@@ -309,8 +309,13 @@ function newEstimate(){
   estUpdateInfoTotals();
 }
 
+// 明細（工種と、その中の行）を中身まで丸ごと複製する。
+//
+// 見積を開くとき・保存するときに複製しないと、画面の明細と保存済みの見積が同じ行を指したままになる。
+// そうすると「別名で保存」で作った見積どうしも同じ行を共有し、片方の数量・単価を直すと
+// もう片方の数字まで変わっていた。行の中に入れ子の値が増えても共有しないよう、JSONで複製する
 function cloneSections(list){
-  return (list||[]).map(s=>({...s,items:s.items.map(i=>({...i}))}));
+  return JSON.parse(JSON.stringify(list||[]));
 }
 
 // 指定の工事区分のデフォルト明細を読み込む（無ければ空の工種を1つ用意）
@@ -361,7 +366,7 @@ function loadEstimate(est){
   sv('est-extra2-date',ex[1]?.date);payAmtLoad('est-extra2-amount',ex[1]?.amount);
   sv('est-extra3-date',ex[2]?.date);payAmtLoad('est-extra3-amount',ex[2]?.amount);
   estPaymentsToForm(pays);
-  sections=est.sections.map(s=>({...s,items:[...s.items]}));
+  sections=cloneSections(est.sections);
   secSeq=Math.max(secSeq,...sections.map(s=>s.id))+1;
   itemSeq=Math.max(itemSeq,1,...sections.flatMap(s=>s.items.map(i=>i.id)))+1;
   renderPresetDatalists();
