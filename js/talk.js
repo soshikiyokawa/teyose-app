@@ -28,6 +28,10 @@ function _supplierNames(supName){
 function notifyGroups(){
   const t = activeTalkPanelSupplier;
   if(isDirectThread(t)) return [];   // 相手は1人なので選ぶ必要がない
+  if(isGroupThread(t)){
+    const g = groupById(groupThreadIds[t]);
+    return [{label:'', names:(g?.memberNames||[]).filter(n=>n && n!==currentUserDisplayName)}];
+  }
   if(t===INTERNAL_THREAD) return [{label:'', names:_staffNames()}];
   if(isProjectThread(t)){
     const p = projects.find(x=>x.id===projectThreadIds[t]);
@@ -64,6 +68,7 @@ function notifyAllLabel(){
   const t = activeTalkPanelSupplier;
   if(t===INTERNAL_THREAD) return '全員';
   if(isProjectThread(t)) return '参加メンバー';
+  if(isGroupThread(t)) return 'メンバー全員';
   return currentUserRole==='supplier' ? 'きよかわの社員' : 'この発注先';
 }
 function closeNotifyPicker(){ document.getElementById('notify-modal').classList.remove('open'); updateNotifyLabel(); }
@@ -201,8 +206,7 @@ function findMsg(mid){ return (talkThreads[activeTalkPanelSupplier]||[]).find(m=
 function openMsgMenu(mid){
   const m=findMsg(mid); if(!m) return;
   menuMsgId=mid;
-  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD
-    || isProjectThread(activeTalkPanelSupplier) || isDirectThread(activeTalkPanelSupplier);
+  const internalThread = isNamedSenderThread(activeTalkPanelSupplier);
   const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';
   const isMine = m.senderName===currentUserDisplayName; // 自分が送信した本人か
   const canEdit = isMine && m.type==='text';
@@ -367,7 +371,7 @@ if(window.visualViewport){
 // 案件が増えると発注先が下に押し出されて探しにくいので、種類で分けて出す。
 let talkListTab = 'project';
 function talkThreadKind(name){
-  if(name===INTERNAL_THREAD || isDirectThread(name)) return 'internal';
+  if(name===INTERNAL_THREAD || isDirectThread(name) || isGroupThread(name)) return 'internal';
   return isProjectThread(name) ? 'project' : 'supplier';
 }
 function setTalkListTab(tab){
@@ -439,6 +443,100 @@ function startDirectChat(userId){
   openTalkPanelThread(name);
 }
 
+// ── グループチャットを作る・変える ──
+//
+// 誰でも作れて、個別チャットと同じ候補からメンバーを選ぶ。
+// 見られるのはメンバーだけ（migration-genba68.sql）。
+let groupEditId = null;            // null＝新しく作る
+let groupEditPicked = new Set();   // 選んだメンバー（自分は含めない。保存のときに必ず足す）
+
+function openGroupEditor(id){
+  const g = id ? groupById(id) : null;
+  if(id && !g){ showToast('グループが見つかりません'); return; }
+  groupEditId = g ? g.id : null;
+  groupEditPicked = new Set((g?.memberIds||[]).filter(x=>x!==currentUserId));
+  document.getElementById('group-modal-title').textContent = g ? 'グループの変更' : 'グループを作る';
+  document.getElementById('group-name').value = g ? g.name : '';
+  document.getElementById('group-save-btn').textContent = g ? '保存' : '作成';
+  document.getElementById('group-leave-btn').hidden = !g;
+  // 消せるのは作った人だけ
+  document.getElementById('group-delete-btn').hidden = !(g && g.createdBy===currentUserId);
+  renderGroupMemberPicker();
+  document.getElementById('group-modal').classList.add('open');
+  if(!g) setTimeout(()=>document.getElementById('group-name').focus(), 60);
+}
+function closeGroupEditor(){ document.getElementById('group-modal').classList.remove('open'); }
+
+function renderGroupMemberPicker(){
+  const cands = directCandidates();
+  // 候補に出ない人（発注先の人から見た他社の人など）がメンバーにいても、外してしまわないよう残す
+  const g = groupEditId ? groupById(groupEditId) : null;
+  const extra = (g?.memberIds||[])
+    .map((id,i)=>({id, name:(g.memberNames||[])[i]||'（名前不明）', kind:'そのほかのメンバー'}))
+    .filter(x=>x.id!==currentUserId && !cands.some(c=>c.id===x.id));
+  const list = [...cands, ...extra];
+  const el = document.getElementById('group-picker');
+  document.getElementById('group-count').textContent = `自分を含めて ${groupEditPicked.size+1}人`;
+  if(!list.length){ el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:12px">メンバーの候補がいません</div>'; return; }
+  let html='', lastKind='';
+  for(const c of list){
+    if(c.kind!==lastKind){ html+=`<div class="section-lbl" style="margin:10px 0 4px">${esc(c.kind)}</div>`; lastKind=c.kind; }
+    const on = groupEditPicked.has(c.id);
+    html+=`<button type="button" class="member-row${on?' on':''}" aria-pressed="${on}" onclick="toggleGroupMember('${String(c.id).replace(/'/g,"\\'")}')">
+      <span class="member-check">${on?'✓':''}</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>
+    </button>`;
+  }
+  el.innerHTML = html;
+}
+function toggleGroupMember(id){
+  if(groupEditPicked.has(id)) groupEditPicked.delete(id); else groupEditPicked.add(id);
+  const box = document.getElementById('group-picker');
+  const top = box.scrollTop;
+  renderGroupMemberPicker();
+  box.scrollTop = top;   // 選ぶたびに一覧の先頭へ戻らないように
+}
+
+async function saveGroupEditor(){
+  const name = document.getElementById('group-name').value.trim();
+  if(!name){ alert('グループ名を入れてください'); return; }
+  if(name.length>40){ alert('グループ名は40文字までにしてください'); return; }
+  if(!groupEditPicked.size){ alert('自分のほかに、メンバーを1人以上選んでください'); return; }
+  const btn = document.getElementById('group-save-btn');
+  btn.disabled = true;
+  let id = groupEditId;
+  try{
+    if(id) await dbUpdateChatGroup(id, name, [...groupEditPicked]);
+    else id = (await dbCreateChatGroup(name, [...groupEditPicked])).id;
+  }catch(_){ btn.disabled = false; return; }
+  btn.disabled = false;
+  closeGroupEditor();
+  // 名前が変わるとスレッド名も変わるので、チャットを取り直してから開く
+  try{ await fetchChatData(); }catch(_){}
+  openTalkPanelThread(groupThreadName(id));
+  showToast(groupEditId ? 'グループを保存しました' : 'グループを作りました');
+}
+
+async function leaveGroupFromEditor(){
+  const g = groupById(groupEditId); if(!g) return;
+  if(!confirm(`「${g.name}」から退出しますか？\n退出すると、このグループのやりとりは見られなくなります。`)) return;
+  try{ await dbLeaveChatGroup(g.id); }catch(_){ return; }
+  closeGroupEditor();
+  try{ await fetchChatData(); }catch(_){}
+  closeTalkPanelThread();
+  showToast('グループから退出しました');
+}
+
+async function deleteGroupFromEditor(){
+  const g = groupById(groupEditId); if(!g) return;
+  if(!confirm(`「${g.name}」を削除しますか？\nメンバー全員の画面から消え、やりとりもすべて消えます。元に戻せません。`)) return;
+  try{ await dbDeleteChatGroup(g.id); }catch(_){ return; }
+  closeGroupEditor();
+  try{ await fetchChatData(); }catch(_){}
+  closeTalkPanelThread();
+  showToast('グループを削除しました');
+}
+
 function renderTalkPanelList(){
   document.getElementById('talk-panel-list').style.display='flex';
   document.getElementById('talk-panel-detail').style.display='none';
@@ -461,9 +559,10 @@ function renderTalkPanelList(){
   // 「社内・個別」タブでは、個別チャットを始められるようにする
   const startBtn = talkListTab==='internal'
     ? `<div style="padding:8px 12px 4px">
-        <button class="btn sm" style="width:100%;justify-content:center" onclick="openDirectPicker()">
-          ＋ 個別チャットを始める
-        </button>
+        <div style="display:flex;gap:8px">
+          <button class="btn sm" style="flex:1;justify-content:center" onclick="openDirectPicker()">＋ 個別チャット</button>
+          <button class="btn sm" style="flex:1;justify-content:center" onclick="openGroupEditor()">＋ グループを作る</button>
+        </div>
       </div>` : '';
   if(!allSups.length){
     el.innerHTML=startBtn+`<div class="empty" style="padding:24px">${
@@ -476,14 +575,16 @@ function renderTalkPanelList(){
     const isInternal=name===INTERNAL_THREAD;
     const isProject=isProjectThread(name);
     const isDirect=isDirectThread(name);
+    const isGroup=isGroupThread(name);
+    const grp=isGroup ? groupById(groupThreadIds[name]) : null;
     const msgs=talkThreads[name]||[];
     const last=msgs[msgs.length-1];
     const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text)
-      :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':isDirect?'この2人だけのやりとり':'タップしてトークを開始');
+      :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':isDirect?'この2人だけのやりとり':isGroup?`メンバー ${(grp?.memberIds||[]).length}人`:'タップしてトークを開始');
     const sup=suppliers.find(s=>s.name===name);
     const unread=chatUnreadFor(name);
     return `<div class="sup-thread-row" onclick="openTalkPanelThread('${name.replace(/'/g,"\\'")}')">
-      <div class="sup-thread-icon">${isInternal?'🏡':isProject?'🏗':isDirect?'👤':'🏪'}</div>
+      <div class="sup-thread-icon">${isInternal?'🏡':isProject?'🏗':isDirect?'👤':isGroup?'👥':'🏪'}</div>
       <div class="sup-thread-info">
         <div class="sup-thread-name">${name}</div>
         <div class="sup-thread-preview">${preview}</div>
@@ -515,7 +616,12 @@ function openTalkPanelThread(supName){
   } else {
     titleEl.textContent=supName;
   }
-  document.getElementById('talk-panel-meta').textContent=
+  const metaEl=document.getElementById('talk-panel-meta');
+  if(isGroupThread(supName)){
+    const g=groupById(groupThreadIds[supName]);
+    metaEl.innerHTML=`<button type="button" class="talk-group-meta" onclick="openGroupEditor(${g?g.id:'null'})" title="メンバー・グループ名の変更、退出">
+      メンバー：${esc((g?.memberNames||[]).filter(Boolean).join('、')||'—')}<span>変更</span></button>`;
+  } else metaEl.textContent=
     isDirectThread(supName) ? 'この2人だけのやりとりです'
     : supName===INTERNAL_THREAD ? '社員メンバーのみ表示されます'
     : isProjectThread(supName) ? (()=>{ const p=projects.find(x=>x.id===projectThreadIds[supName]);
@@ -540,6 +646,7 @@ function openTalkPanelThread(supName){
 function threadKeyOf(name){
   if(name===INTERNAL_THREAD) return 'internal';
   if(isDirectThread(name)) return 'direct:'+(directThreadIds[name]||'?');
+  if(isGroupThread(name)) return 'group:'+(groupThreadIds[name]||'?');
   if(isProjectThread(name)) return 'project:'+(projectThreadIds[name]||'?');
   return 'supplier:'+(supplierIdByName(name)||'?');
 }
@@ -564,10 +671,12 @@ function visibleThreadNames(){
     .filter(p=>currentUserRole==='staff' || isMyProjectMember(p.members))
     .map(p=>projectThreadName(p.id));
   const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])]
-    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n) && !isDirectThread(n));
+    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n) && !isDirectThread(n) && !isGroupThread(n));
   // 個別チャットは、やりとりがあるものだけ出す（作った時点で talkThreads に入る）
   const directNames=Object.keys(talkThreads).filter(isDirectThread);
-  return [...(isEmployee?[INTERNAL_THREAD]:[]), ...directNames, ...projNames, ...supNames];
+  // グループは、自分がメンバーのものすべて（やりとりが無くても出す）
+  const groupNames=(chatGroups||[]).map(g=>groupThreadName(g.id));
+  return [...(isEmployee?[INTERNAL_THREAD]:[]), ...groupNames, ...directNames, ...projNames, ...supNames];
 }
 
 function chatUnreadTotal(){
@@ -685,8 +794,7 @@ function chatRenderSignature(supplier, msgs){
 function resetChatRenderSignature(){ _chatRenderSig = ''; }
 
 function renderTalkPanelMessages(forceBottom){
-  const internalThread = activeTalkPanelSupplier===INTERNAL_THREAD
-    || isProjectThread(activeTalkPanelSupplier) || isDirectThread(activeTalkPanelSupplier);
+  const internalThread = isNamedSenderThread(activeTalkPanelSupplier);
   let msgs=talkThreads[activeTalkPanelSupplier]||[];
   if(chatBookmarkFilter) msgs=msgs.filter(m=>Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName));
   document.getElementById('talk-bm-filter')?.classList.toggle('active',chatBookmarkFilter);

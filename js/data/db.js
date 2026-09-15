@@ -20,6 +20,25 @@ function directThreadName(userId){
   return name;
 }
 function isDirectThread(threadName){ return String(threadName||'').startsWith(DIRECT_THREAD_PREFIX); }
+// ── グループチャット（何人か） ──
+//
+// スレッド名は「グループ：<グループ名>」。同じ名前のグループが他にもあるときは番号を添えて分ける。
+// 見られるのはメンバーだけ（migration-genba68.sql）。
+function groupById(id){ return (chatGroups||[]).find(g=>g.id===id) || null; }
+function groupThreadName(groupId){
+  const g = groupById(groupId);
+  const base = g ? g.name : '（削除されたグループ）';
+  const dup = g && (chatGroups||[]).some(x=>x.id!==g.id && x.name===g.name);
+  const name = GROUP_THREAD_PREFIX + base + (dup ? `（${groupId}）` : '');
+  groupThreadIds[name] = groupId;
+  return name;
+}
+function isGroupThread(threadName){ return String(threadName||'').startsWith(GROUP_THREAD_PREFIX); }
+// 社員どうしのように、送った人の名前で左右を分けるスレッドか（社内・案件・個別・グループ）
+function isNamedSenderThread(threadName){
+  return threadName===INTERNAL_THREAD || isProjectThread(threadName) || isDirectThread(threadName) || isGroupThread(threadName);
+}
+
 // 自分と相手のIDを、小さいほう・大きいほうの順で返す
 function directPair(otherId){
   const a = String(currentUserId||''), b = String(otherId||'');
@@ -743,17 +762,20 @@ async function dbMarkThreadRead(thread){
 
 // ── チャット ──
 async function dbAddChatMessage(supplierName, msg){
-  const isDirect = isDirectThread(supplierName);
+  const isGroup = isGroupThread(supplierName);
+  const group_id = isGroup ? (groupThreadIds[supplierName]||null) : null;
+  if(isGroup && !group_id) return;
+  const isDirect = !isGroup && isDirectThread(supplierName);
   const otherId = isDirect ? (directThreadIds[supplierName]||null) : null;
   if(isDirect && !otherId) return;
   const [direct_a, direct_b] = isDirect ? directPair(otherId) : [null, null];
-  const isProject = !isDirect && isProjectThread(supplierName);
+  const isProject = !isGroup && !isDirect && isProjectThread(supplierName);
   const project_id = isProject ? (projectThreadIds[supplierName]||null) : null;
   const isInternal = supplierName===INTERNAL_THREAD;
-  const supplier_id = (isInternal||isProject||isDirect) ? null : supplierIdByName(supplierName);
-  if(!isInternal && !isProject && !isDirect && !supplier_id) return;
+  const supplier_id = (isInternal||isProject||isDirect||isGroup) ? null : supplierIdByName(supplierName);
+  if(!isInternal && !isProject && !isDirect && !isGroup && !supplier_id) return;
   const { data, error } = await sb.from('chat_messages').insert({
-    supplier_id, project_id, direct_a, direct_b,
+    supplier_id, project_id, direct_a, direct_b, group_id,
     is_internal:isInternal, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
     file_url:msg.fileUrl||null, file_name:msg.fileName||null, file_mime:msg.fileMime||null, unread:false,
     sender_name: currentUserDisplayName||'',
@@ -774,7 +796,12 @@ async function dbAddChatMessage(supplierName, msg){
   const picked = Array.isArray(msg.notifyNames)
     ? msg.notifyNames.filter(n=>n && n!==currentUserDisplayName) : [];
 
-  if(isDirect){
+  if(isGroup){
+    const g = groupById(group_id);
+    const names = picked.length ? picked
+      : (g?.memberNames||[]).filter(n=>n && n!==currentUserDisplayName);
+    if(names.length) dbSendPushToNames(names, `${g?.name||'グループ'} ${currentUserDisplayName||''}`, preview, null).catch(()=>{});
+  } else if(isDirect){
     // 個別チャット：相手ひとりに知らせる
     const other=(allProfiles||[]).find(p=>p.id===otherId);
     if(other?.displayName){
@@ -811,6 +838,43 @@ async function dbAddChatMessage(supplierName, msg){
     if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview).catch(()=>{});
     else dbSendPush('employee', null, supplierName, preview, currentUserId).catch(()=>{});
   }
+}
+
+// ════ グループチャットの作成・変更 ════
+//
+// メンバーは userId で持ち、表示名の控えも一緒に入れる（発注先の人は社員以外の名簿を引けないため）。
+// 自分は必ずメンバーに入れる。
+function _groupMemberRows(memberIds){
+  const ids = [...new Set([currentUserId, ...(memberIds||[])].filter(Boolean))];
+  const nameOf = id => id===currentUserId ? (currentUserDisplayName||'') : ((allProfiles||[]).find(p=>p.id===id)?.displayName || '');
+  return { member_ids: ids, member_names: ids.map(nameOf) };
+}
+async function dbCreateChatGroup(name, memberIds){
+  const row = { name: String(name||'').trim(), created_by: currentUserId, ..._groupMemberRows(memberIds) };
+  const { data, error } = await sb.from('chat_groups').insert(row).select().single();
+  if(error){ showToast('グループを作れませんでした：'+error.message); throw error; }
+  const g = {id:data.id, name:data.name, memberIds:data.member_ids||[], memberNames:data.member_names||[], createdBy:data.created_by};
+  chatGroups.push(g);
+  return g;
+}
+async function dbUpdateChatGroup(id, name, memberIds){
+  const row = { name: String(name||'').trim(), updated_at: new Date().toISOString(), ..._groupMemberRows(memberIds) };
+  const { error } = await sb.from('chat_groups').update(row).eq('id', id);
+  if(error){ showToast('グループを保存できませんでした：'+error.message); throw error; }
+  const g = groupById(id);
+  if(g){ g.name=row.name; g.memberIds=row.member_ids; g.memberNames=row.member_names; }
+}
+// 自分だけ抜ける。抜けたあとは自分から見えなくなるので、専用の手続きを使う（migration-genba68.sql）
+async function dbLeaveChatGroup(id){
+  const { error } = await sb.rpc('leave_chat_group', { p_group_id: id });
+  if(error){ showToast('退出できませんでした：'+error.message); throw error; }
+  chatGroups = chatGroups.filter(g=>g.id!==id);
+}
+// 作った人だけ消せる。中のメッセージも消える
+async function dbDeleteChatGroup(id){
+  const { error } = await sb.from('chat_groups').delete().eq('id', id);
+  if(error){ showToast('削除できませんでした：'+error.message); throw error; }
+  chatGroups = chatGroups.filter(g=>g.id!==id);
 }
 
 // 発注先チャットのきよかわ側発言をChatWorkへ転送（発注先にルームID設定がある場合のみ）。
@@ -1497,6 +1561,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'master_items'}, ()=>refetchAndRerender('master_items'))
     .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'}, ()=>refetchChatAndRerender())
     .on('postgres_changes',{event:'*',schema:'public',table:'chat_reads'}, ()=>refetchChatAndRerender(true))
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_groups'}, ()=>refetchChatAndRerender())
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'}, ()=>refetchAndRerender('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'cost_entries'}, ()=>refetchAndRerender('cost_entries'))
     .on('postgres_changes',{event:'*',schema:'public',table:'site_photos'}, ()=>refetchAndRerender('site_photos'))
@@ -1720,15 +1785,25 @@ async function fetchChatData(){
   // 案件チャットは参加メンバー、発注先は自社分のみ（RLSが自動で絞る）
   const { data: chatRows, error: chatErr } = await sb.from('chat_messages').select('*').order('created_at');
   if(chatErr) throw chatErr;
+  // グループは、自分がメンバーのものだけ返ってくる（RLS）。表がまだ無い環境でも止めない
+  try{
+    const { data: groupRows, error: groupErr } = await sb.from('chat_groups').select('*').order('created_at');
+    if(groupErr) throw groupErr;
+    chatGroups = (groupRows||[]).map(g=>({id:g.id, name:g.name, memberIds:g.member_ids||[], memberNames:g.member_names||[], createdBy:g.created_by||null}));
+  }catch(e){ console.warn('グループの取得に失敗しました', e); chatGroups = []; }
+  groupThreadIds = {};
   talkThreads = {};
   chatRows.forEach(r=>{
-    const name = r.direct_a ? directThreadName(r.direct_a===currentUserId ? r.direct_b : r.direct_a)
+    const name = r.group_id ? groupThreadName(r.group_id)
+               : r.direct_a ? directThreadName(r.direct_a===currentUserId ? r.direct_b : r.direct_a)
                : r.project_id ? projectThreadName(r.project_id)
                : r.is_internal ? INTERNAL_THREAD
                : supplierNameById(r.supplier_id);
     if(!talkThreads[name]) talkThreads[name]=[];
     talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{},replyToText:r.reply_to_text||'',replyToSender:r.reply_to_sender||'',editedAt:r.edited_at||null,bookmarks:r.bookmarks||[]});
   });
+  // まだやりとりの無いグループも一覧に出す
+  chatGroups.forEach(g=>{ const n=groupThreadName(g.id); if(!talkThreads[n]) talkThreads[n]=[]; });
 
   // 既読管理
   const { data: readRows } = await sb.from('chat_reads').select('*');
@@ -1741,8 +1816,26 @@ async function fetchChatData(){
 //     このときは既読を書き直さない。書き直すとまたリアルタイムで通知が飛んできて
 //     「再取得 → 既読を書く → 通知 → 再取得 …」と延々と回り、画面がチカチカする。
 async function refetchChatAndRerender(fromReads){
+  // 開いているのがグループなら、取り直す前にIDを覚えておく（名前が変わるとスレッド名も変わるため）
+  const openGroupId = (activeTalkPanelSupplier && isGroupThread(activeTalkPanelSupplier)) ? groupThreadIds[activeTalkPanelSupplier] : null;
   try{ await fetchChatData(); }
   catch(e){ console.warn('チャットの再取得に失敗しました', e); return; }
+  if(openGroupId && talkPanelOpen){
+    if(!groupById(openGroupId)){
+      // ほかの人に外された・グループが消された
+      closeTalkPanelThread();
+      showToast('グループのメンバーから外れたため、閉じました');
+      return;
+    }
+    const now = groupThreadName(openGroupId);
+    if(now!==activeTalkPanelSupplier){
+      activeTalkPanelSupplier = now;
+      const t=document.getElementById('talk-panel-title'); if(t) t.textContent = now;
+    }
+    const g = groupById(openGroupId);
+    const meta = document.querySelector('#talk-panel-meta .talk-group-meta');
+    if(meta) meta.innerHTML = `メンバー：${esc((g.memberNames||[]).filter(Boolean).join('、')||'—')}<span>変更</span>`;
+  }
   notifyNewChatMessages();   // 着信音・未読バッジ
   if(!talkPanelOpen) return;
   if(activeTalkPanelSupplier){

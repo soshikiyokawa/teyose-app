@@ -60,6 +60,10 @@ let projectThreadIds = {};   // {スレッド名: projectId}
 // 個別チャット（1対1）のスレッド名は「個別：<相手の名前>」。相手のIDは directThreadIds に持つ
 const DIRECT_THREAD_PREFIX = '個別：';
 let directThreadIds = {};    // {スレッド名: 相手のuserId}
+// グループチャット（何人か）のスレッド名は「グループ：<グループ名>」。IDは groupThreadIds に持つ
+const GROUP_THREAD_PREFIX = 'グループ：';
+let groupThreadIds = {};     // {スレッド名: groupId}
+let chatGroups = [];         // 自分がメンバーのグループ {id,name,memberIds,memberNames,createdBy}
 let chatReads = [];          // 既読管理（{userId,userName,thread,lastReadAt}）
 let quotingMsg = null;       // 引用中のメッセージ
 let editingMsgId = null;     // 編集中のメッセージID
