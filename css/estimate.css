@@ -95,6 +95,13 @@
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.8em}
 .ol-card-sub{font-size:11px;color:var(--text-muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   min-height:1.5em;line-height:1.5}
+/* 現場住所。番地まで読めるよう2行まで折り返し、それ以上は省略する。
+   住所が短い・無いカードとも高さがそろうよう、いつも2行分をとる */
+.ol-card-addr{font-size:11px;color:var(--text-sub);margin-top:1px;min-height:3em;line-height:1.5;
+  display:flex;align-items:flex-start;gap:3px;min-width:0}
+.ol-card-addr svg{flex-shrink:0;color:var(--text-muted);margin-top:.3em}
+.ol-card-addr span{overflow:hidden;min-width:0;overflow-wrap:anywhere;white-space:normal;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .ol-card-date{font-size:11px;color:var(--text-sub);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   min-height:1.5em;line-height:1.5}
 /* 金額と入金の状態。狭いカードでは入金の状態を下の行に折り返す */

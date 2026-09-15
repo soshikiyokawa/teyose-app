@@ -100,6 +100,11 @@ function olClientName(r){
   return r.project?.clientName || r.est?.clientName || '';
 }
 
+// 現場住所（工事場所）も同じく、案件を優先し、無ければ見積のものを使う
+function olSiteAddress(r){
+  return r.project?.address || r.est?.siteName || '';
+}
+
 // 請負金額＝契約情報の合計（請負契約＋追加契約①②③）。
 // 見積情報の「契約情報」に出る合計と同じ数字を、カードにも表にも出す
 function olContractTotal(est){
@@ -616,6 +621,9 @@ function olCardHtml(r){
     <div class="ol-card-body">
       <div class="ol-card-name">${esc(p.name)}</div>
       <div class="ol-card-sub">${esc(olClientName(r))||'&nbsp;'}</div>
+      <div class="ol-card-addr"${olSiteAddress(r)?` title="${esc(olSiteAddress(r))}"`:''}>${olSiteAddress(r)
+        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span>${esc(olSiteAddress(r))}</span>`
+        : '&nbsp;'}</div>
       <div class="ol-card-date">${period||'&nbsp;'}</div>
       ${olCanSeeMoney()?`<div class="ol-card-foot">${olContractTotal(e)
         ? `<span class="ol-card-amt">¥${fmt(olContractTotal(e))}</span>${olPayBadge(e)}`
