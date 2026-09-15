@@ -55,3 +55,4 @@
 .sheet.sheet-app .btn:not(.primary):not(.wood):not(.danger):hover{background:var(--surface2)}
 .sheet.sheet-app .btn.danger{background:none;border-color:transparent;color:var(--danger)}
 .sheet.sheet-app .btn.danger:hover{background:var(--danger-bg)}
+.sheet.sheet-app select{background:var(--surface);color:var(--text);border:1px solid var(--border-s);border-radius:var(--radius);padding:6px 8px;font-family:inherit;font-size:var(--fs2)}
