@@ -386,8 +386,8 @@ function renderTalkListTabs(names){
   const defs=[
     {key:'internal', label:'社内・個別'},
     {key:'project',  label:'案件'},
-    {key:'client',   label:'お客様'},
     {key:'supplier', label:'業者'},
+    {key:'client',   label:'お客様'},
   ].filter(d=>names.some(n=>talkThreadKind(n)===d.key));
   // 選んでいたタブが無くなったら、残っているいちばん左に寄せる
   if(defs.length && !defs.some(d=>d.key===talkListTab)) talkListTab=defs[0].key;
