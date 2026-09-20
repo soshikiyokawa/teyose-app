@@ -34,9 +34,25 @@ function groupThreadName(groupId){
   return name;
 }
 function isGroupThread(threadName){ return String(threadName||'').startsWith(GROUP_THREAD_PREFIX); }
-// 社員どうしのように、送った人の名前で左右を分けるスレッドか（社内・案件・個別・グループ）
+// ── お客様チャット（案件ごと。お客様ときよかわの担当だけ） ──
+//
+// スレッド名は「お客様：<案件名>」。社内の案件チャットとは別物で、お客様に社内のやりとりは見えない。
+// 入れるのは、その案件の client_user_id のお客様と、案件情報で選んだ社員だけ（migration-genba69.sql）。
+function clientChatOf(projectId){ return (clientChats||[]).find(c=>c.projectId===projectId) || null; }
+function clientThreadName(projectId){
+  const c = clientChatOf(projectId);
+  const p = (projects||[]).find(x=>x.id===projectId);
+  const name = CLIENT_THREAD_PREFIX + (c?.projectName || p?.name || '（削除された案件）');
+  clientThreadIds[name] = projectId;
+  return name;
+}
+function isClientThread(threadName){ return String(threadName||'').startsWith(CLIENT_THREAD_PREFIX); }
+function isClientUser(){ return currentUserRole==='client'; }
+
+// 社員どうしのように、送った人の名前で左右を分けるスレッドか（社内・案件・個別・グループ・お客様）
 function isNamedSenderThread(threadName){
-  return threadName===INTERNAL_THREAD || isProjectThread(threadName) || isDirectThread(threadName) || isGroupThread(threadName);
+  return threadName===INTERNAL_THREAD || isProjectThread(threadName) || isDirectThread(threadName)
+      || isGroupThread(threadName) || isClientThread(threadName);
 }
 
 // 自分と相手のIDを、小さいほう・大きいほうの順で返す
@@ -56,6 +72,12 @@ function supplierNameById(id){
 
 // ── 初回データ取得 ──
 async function fetchAllData(){
+  // お客様（施主）はチャットだけの役割。ほかは権限が無く空で返るので、最初から取りに行かない
+  if(isClientUser()){
+    suppliers=[]; master=[]; projects=[]; estimates=[]; orders=[]; costEntries=[]; allProfiles=[];
+    await fetchChatData();
+    return;
+  }
   const { data: supplierRows, error: supErr } = await sb.from('suppliers').select('*').order('sort_order').order('id');
   if(supErr) throw supErr;
   suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',chatworkRoomId:r.chatwork_room_id||'',orderChannels:(Array.isArray(r.order_channels)&&r.order_channels.length)?r.order_channels:['chat'],sortOrder:r.sort_order,
@@ -70,12 +92,12 @@ async function fetchAllData(){
     perBundle:Number(r.per_bundle)||0}));
   masterIdSeq = Math.max(0,...master.map(m=>m.id))+1;
 
-  await fetchChatData();
-
   // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
   if(currentUserRole==='staff'||currentUserRole==='carpenter'){
     const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
-    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],coverPhotoId:r.cover_photo_id||null,actualStartDate:r.actual_start_date||'',handoverDate:r.handover_date||'',updatedAt:r.updated_at}));
+    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],coverPhotoId:r.cover_photo_id||null,actualStartDate:r.actual_start_date||'',handoverDate:r.handover_date||'',updatedAt:r.updated_at,
+      clientUserId:r.client_user_id||null, clientEmail:r.client_email||'',
+      clientChatMemberIds:r.client_chat_member_ids||[], clientChatMemberNames:r.client_chat_member_names||[]}));
 
     await fetchGenbaData();
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
@@ -101,6 +123,10 @@ async function fetchAllData(){
       paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,
       subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[],createdByName:r.created_by_name||''}));
   }
+  // チャットは、案件（と名簿）を読んだあとに組み立てる。
+  // 先に組み立てると、案件チャット・お客様チャットの名前が「（削除された案件）」になってしまう
+  await fetchChatData();
+
   // 請求書は社内も発注先も見る（RLSで自社分に絞られる。テーブルが無くても落とさない）
   try{ await fetchInvoices(); }catch(_){ invoicesReady=false; }
   // 請求書の明細（現場ごとの請求原価）。社員だけが見る
@@ -179,9 +205,14 @@ async function dbSaveProject(proj){
     actual_start_date:proj.actualStartDate||null,handover_date:proj.handoverDate||null,map_lat:proj.mapLat??null,map_lng:proj.mapLng??null,
     parking_address:proj.parkingAddress||'',parking_lat:proj.parkingLat??null,parking_lng:proj.parkingLng??null,
     members:proj.members||[],
+    client_email:proj.clientEmail||'',
+    client_chat_member_ids:proj.clientChatMemberIds||[],
+    client_chat_member_names:proj.clientChatMemberNames||[],
     updated_at:new Date().toISOString()};
   // 実績日の列（migration-genba28.sql）が未適用でも保存できるようにする
   const stripNewCols = r => { const {actual_start_date, handover_date, ...rest} = r; return rest; };
+  // お客様チャットの列（migration-genba69.sql）が未適用でも保存できるようにする
+  const stripClientCols = r => { const {client_email, client_chat_member_ids, client_chat_member_names, ...rest} = r; return rest; };
   if(proj.id){
     // 案件名が変わった場合、紐づく見積のproject_nameも一括更新する
     const oldProject=projects.find(p=>p.id===proj.id);
@@ -190,6 +221,10 @@ async function dbSaveProject(proj){
     if(error && /actual_start_date|handover_date/.test(error.message||'')){
       console.warn('着工日・引渡日の列が未作成のため、その2つを除いて保存します');
       ({error}=await sb.from('projects').update(stripNewCols(row)).eq('id',proj.id));
+    }
+    if(error && /client_email|client_chat_member/.test(error.message||'')){
+      console.warn('お客様チャットの列が未作成のため、その分を除いて保存します');
+      ({error}=await sb.from('projects').update(stripClientCols(row)).eq('id',proj.id));
     }
     if(error){showToast('保存に失敗しました：'+error.message);throw error;}
     if(oldName && oldName!==proj.name){
@@ -202,6 +237,9 @@ async function dbSaveProject(proj){
   let {data,error}=await sb.from('projects').insert(row).select().single();
   if(error && /actual_start_date|handover_date/.test(error.message||'')){
     ({data,error}=await sb.from('projects').insert(stripNewCols(row)).select().single());
+  }
+  if(error && /client_email|client_chat_member/.test(error.message||'')){
+    ({data,error}=await sb.from('projects').insert(stripClientCols(row)).select().single());
   }
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   return data.id;
@@ -762,20 +800,23 @@ async function dbMarkThreadRead(thread){
 
 // ── チャット ──
 async function dbAddChatMessage(supplierName, msg){
-  const isGroup = isGroupThread(supplierName);
+  const isClient = isClientThread(supplierName);
+  const client_project_id = isClient ? (clientThreadIds[supplierName]||null) : null;
+  if(isClient && !client_project_id) return;
+  const isGroup = !isClient && isGroupThread(supplierName);
   const group_id = isGroup ? (groupThreadIds[supplierName]||null) : null;
   if(isGroup && !group_id) return;
-  const isDirect = !isGroup && isDirectThread(supplierName);
+  const isDirect = !isClient && !isGroup && isDirectThread(supplierName);
   const otherId = isDirect ? (directThreadIds[supplierName]||null) : null;
   if(isDirect && !otherId) return;
   const [direct_a, direct_b] = isDirect ? directPair(otherId) : [null, null];
-  const isProject = !isGroup && !isDirect && isProjectThread(supplierName);
+  const isProject = !isClient && !isGroup && !isDirect && isProjectThread(supplierName);
   const project_id = isProject ? (projectThreadIds[supplierName]||null) : null;
   const isInternal = supplierName===INTERNAL_THREAD;
-  const supplier_id = (isInternal||isProject||isDirect||isGroup) ? null : supplierIdByName(supplierName);
-  if(!isInternal && !isProject && !isDirect && !isGroup && !supplier_id) return;
+  const supplier_id = (isInternal||isProject||isDirect||isGroup||isClient) ? null : supplierIdByName(supplierName);
+  if(!isInternal && !isProject && !isDirect && !isGroup && !isClient && !supplier_id) return;
   const { data, error } = await sb.from('chat_messages').insert({
-    supplier_id, project_id, direct_a, direct_b, group_id,
+    supplier_id, project_id, direct_a, direct_b, group_id, client_project_id,
     is_internal:isInternal, role:msg.role, type:msg.type||'text', text:msg.text||null, order_data:msg.orderData||null,
     file_url:msg.fileUrl||null, file_name:msg.fileName||null, file_mime:msg.fileMime||null, unread:false,
     sender_name: currentUserDisplayName||'',
@@ -796,7 +837,19 @@ async function dbAddChatMessage(supplierName, msg){
   const picked = Array.isArray(msg.notifyNames)
     ? msg.notifyNames.filter(n=>n && n!==currentUserDisplayName) : [];
 
-  if(isGroup){
+  if(isClient){
+    const proj = (projects||[]).find(p=>p.id===client_project_id);
+    const chat = clientChatOf(client_project_id);
+    const label = chat?.projectName || proj?.name || 'お客様チャット';
+    if(isClientUser()){
+      // お客様 → きよかわの担当者へ
+      const names = (chat?.memberNames||[]).filter(Boolean);
+      if(names.length) dbSendPushToNames(names, `${label}（お客様）`, preview, null).catch(()=>{});
+    } else if(proj?.clientUserId){
+      // きよかわ → お客様ご本人へ
+      dbSendPushToUser(proj.clientUserId, 'きよかわ より', preview, null).catch(()=>{});
+    }
+  } else if(isGroup){
     const g = groupById(group_id);
     const names = picked.length ? picked
       : (g?.memberNames||[]).filter(n=>n && n!==currentUserDisplayName);
@@ -875,6 +928,20 @@ async function dbDeleteChatGroup(id){
   const { error } = await sb.from('chat_groups').delete().eq('id', id);
   if(error){ showToast('削除できませんでした：'+error.message); throw error; }
   chatGroups = chatGroups.filter(g=>g.id!==id);
+}
+
+// ════ お客様のチャット案内（アカウントを作ってご案内メールを送る） ════
+//
+// 案件情報の「チャット案内」から呼ぶ。作られるのは「チャットだけ」のお客様アカウント。
+async function dbInviteClient(projectId, email){
+  const { data, error } = await sb.functions.invoke('invite-client', {
+    body: { projectId, email, redirectTo: location.origin + location.pathname }
+  });
+  let detail = '';
+  if(error){ try{ detail = (await error.context?.json?.())?.error || ''; }catch(_){} }
+  const msg = data?.error || detail || (error ? error.message : '');
+  if(msg){ showToast('ご案内メールを送れませんでした：'+msg, 6000); throw new Error(msg); }
+  return data;
 }
 
 // 発注先チャットのきよかわ側発言をChatWorkへ転送（発注先にルームID設定がある場合のみ）。
@@ -1785,6 +1852,21 @@ async function fetchChatData(){
   // 案件チャットは参加メンバー、発注先は自社分のみ（RLSが自動で絞る）
   const { data: chatRows, error: chatErr } = await sb.from('chat_messages').select('*').order('created_at');
   if(chatErr) throw chatErr;
+  // お客様チャット。お客様は案件そのものを見られないので、専用の手続きから受け取る
+  try{
+    if(isClientUser()){
+      const { data, error } = await sb.rpc('app_my_client_chats');
+      if(error) throw error;
+      clientChats = (data||[]).map(r=>({projectId:r.project_id, projectName:r.project_name, memberNames:r.member_names||[]}));
+    } else {
+      // きよかわ側：案件情報で自分が選ばれているお客様チャットだけ
+      clientChats = (projects||[])
+        .filter(p=>(p.clientChatMemberIds||[]).includes(currentUserId))
+        .map(p=>({projectId:p.id, projectName:p.name, memberNames:p.clientChatMemberNames||[]}));
+    }
+  }catch(e){ console.warn('お客様チャットの取得に失敗しました', e); clientChats = []; }
+  clientThreadIds = {};
+
   // グループは、自分がメンバーのものだけ返ってくる（RLS）。表がまだ無い環境でも止めない
   try{
     const { data: groupRows, error: groupErr } = await sb.from('chat_groups').select('*').order('created_at');
@@ -1794,7 +1876,8 @@ async function fetchChatData(){
   groupThreadIds = {};
   talkThreads = {};
   chatRows.forEach(r=>{
-    const name = r.group_id ? groupThreadName(r.group_id)
+    const name = r.client_project_id ? clientThreadName(r.client_project_id)
+               : r.group_id ? groupThreadName(r.group_id)
                : r.direct_a ? directThreadName(r.direct_a===currentUserId ? r.direct_b : r.direct_a)
                : r.project_id ? projectThreadName(r.project_id)
                : r.is_internal ? INTERNAL_THREAD
@@ -1802,8 +1885,9 @@ async function fetchChatData(){
     if(!talkThreads[name]) talkThreads[name]=[];
     talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{},replyToText:r.reply_to_text||'',replyToSender:r.reply_to_sender||'',editedAt:r.edited_at||null,bookmarks:r.bookmarks||[]});
   });
-  // まだやりとりの無いグループも一覧に出す
+  // まだやりとりの無いグループ・お客様チャットも一覧に出す
   chatGroups.forEach(g=>{ const n=groupThreadName(g.id); if(!talkThreads[n]) talkThreads[n]=[]; });
+  clientChats.forEach(c=>{ const n=clientThreadName(c.projectId); if(!talkThreads[n]) talkThreads[n]=[]; });
 
   // 既読管理
   const { data: readRows } = await sb.from('chat_reads').select('*');

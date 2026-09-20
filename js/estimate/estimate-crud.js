@@ -510,6 +510,121 @@ function fillProjectInfoTab(p){
     projectMembers = p ? [...(p.members||[])] : staffMemberNames();
     renderProjectMembers && renderProjectMembers();
   }
+  if(typeof fillClientChatBox==='function'){
+    fillClientChatBox(p);
+  }
+}
+
+// ════ お客様チャット（案件ごと） ════
+//
+// お客様に見えるのはこのチャットだけ。社内の案件チャットは見えない（migration-genba69.sql）。
+// きよかわ側の参加者はここで選ぶ。業者は候補に出さない。
+let clientChatMemberIds = [];   // 選んだ社員のID
+
+function clientMemberCandidates(){
+  return (allProfiles||[])
+    .filter(p=>p.id && p.displayName && (p.role==='staff' || p.role==='carpenter'))
+    .map(p=>({id:p.id, name:p.displayName, kind: p.role==='staff' ? 'きよかわ（管理者）' : 'きよかわ（社員）'}))
+    .sort((a,b)=> a.kind.localeCompare(b.kind,'ja') || a.name.localeCompare(b.name,'ja'));
+}
+function clientMemberNames(){
+  const by = new Map(clientMemberCandidates().map(c=>[c.id, c.name]));
+  const old = selectedProject?.clientChatMemberIds||[];
+  const oldNames = selectedProject?.clientChatMemberNames||[];
+  return clientChatMemberIds.map(id => by.get(id) || oldNames[old.indexOf(id)] || '');
+}
+
+// 案件を開いたときに、いまの設定を画面に出す
+function fillClientChatBox(p){
+  clientChatMemberIds = [...((p?.clientChatMemberIds)||[])];
+  const mail = document.getElementById('client-email');
+  if(mail) mail.value = p?.clientEmail || '';
+  renderClientChatBox();
+}
+function renderClientChatBox(){
+  const box = document.getElementById('client-chat-box');
+  if(!box) return;
+  // 案件がまだ保存されていないと、お客様チャットは作れない
+  const saved = !!selectedProject?.id;
+  box.style.opacity = saved ? '' : '.6';
+  const names = clientMemberNames().filter(Boolean);
+  const sum = document.getElementById('client-members-summary');
+  if(sum) sum.textContent = 'きよかわの参加者：' + (names.length ? names.join('、') : '未設定');
+  const st = document.getElementById('client-chat-status');
+  const btn = document.getElementById('client-invite-btn');
+  if(st){
+    st.textContent = !saved ? '案件を保存すると使えます'
+      : selectedProject?.clientUserId ? '✓ お客様はご登録済みです（もう一度押すと、パスワード再設定のご案内を送れます）'
+      : 'メールアドレスを入れて「チャット案内」を押すと、お客様に登録のご案内が届きます';
+  }
+  if(btn) btn.textContent = selectedProject?.clientUserId ? 'ご案内を再送' : 'チャット案内';
+}
+
+function openClientMemberPicker(){
+  renderClientMemberPicker();
+  document.getElementById('client-member-modal').classList.add('open');
+}
+function closeClientMemberPicker(){
+  document.getElementById('client-member-modal').classList.remove('open');
+  renderClientChatBox();
+}
+function renderClientMemberPicker(){
+  const el = document.getElementById('client-member-picker');
+  if(!el) return;
+  const list = clientMemberCandidates();
+  if(!list.length){ el.innerHTML='<div style="font-size:12px;color:var(--text-muted);padding:10px">社員が登録されていません</div>'; return; }
+  let html='', lastKind='';
+  for(const c of list){
+    if(c.kind!==lastKind){ html+=`<div class="section-lbl" style="margin:10px 0 4px">${esc(c.kind)}</div>`; lastKind=c.kind; }
+    const on = clientChatMemberIds.includes(c.id);
+    html+=`<button type="button" class="member-row${on?' on':''}" onclick="toggleClientChatMember('${String(c.id).replace(/'/g,"\\'")}')">
+      <span class="member-check">${on?'✓':''}</span>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.name)}</span>
+    </button>`;
+  }
+  el.innerHTML = html;
+}
+function toggleClientChatMember(id){
+  const i = clientChatMemberIds.indexOf(id);
+  if(i>=0) clientChatMemberIds.splice(i,1); else clientChatMemberIds.push(id);
+  const box=document.getElementById('client-member-picker');
+  const top=box?box.scrollTop:0;
+  renderClientMemberPicker();
+  if(box) box.scrollTop=top;
+}
+
+// お客様にチャットのご案内メールを送る。大事な操作なので2段階で確かめる
+async function inviteClientChat(){
+  if(!selectedProject?.id){ alert('先に案件を保存してください。'); return; }
+  const email = (document.getElementById('client-email')?.value||'').trim();
+  if(!email){ alert('お客様のメールアドレスを入力してください。'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ alert('メールアドレスの形が正しくありません。'); return; }
+  if(!clientChatMemberIds.length){ alert('きよかわ側の担当を1人以上選んでください。'); return; }
+
+  const again = !!selectedProject.clientUserId;
+  // ① 何をするかを示す
+  if(!confirm(`${selectedProject.name}\n\nこのメールアドレスへ、チャットのご案内メールを送ります。\n\n${email}\n\nお客様は、このメールからパスワードを決めてチャットを使えるようになります。`)) return;
+  // ② 宛先をもう一度確かめる（送り先を間違えると、他人にやりとりが見えてしまうため）
+  if(!confirm(`【最終確認】\n\n宛先に間違いがないか、もう一度ご確認ください。\n\n${email}\n\nこのアドレスへ${again?'ご案内を再送':'送信'}します。よろしいですか？`)) return;
+
+  const btn = document.getElementById('client-invite-btn');
+  if(btn){ btn.disabled = true; btn.textContent = '送信中…'; }
+  try{
+    await saveProjectInfo();          // メールアドレスと担当を先に保存する
+    const res = await dbInviteClient(selectedProject.id, email);
+    // 紐づけはサーバー側で入るので、手元の案件にも反映しておく
+    if(res?.userId){
+      selectedProject.clientUserId = res.userId;
+      const i = projects.findIndex(p=>p.id===selectedProject.id);
+      if(i>=0){ projects[i].clientUserId = res.userId; projects[i].clientEmail = email; }
+    }
+    showToast(res?.note || `${email} へご案内メールを送りました`, 6000);
+  }catch(_){ /* 失敗の理由は dbInviteClient が出す */ }
+  finally{
+    if(btn) btn.disabled = false;
+    renderClientChatBox();
+    try{ await fetchChatData(); }catch(_){}
+  }
 }
 
 async function saveProjectInfo(){
@@ -532,7 +647,11 @@ async function saveProjectInfo(){
     parkingAddress: document.getElementById('est-parking')?.value.trim()||'',
     parkingLat: window._parkingLat||null,
     parkingLng: window._parkingLng||null,
-    members: (typeof projectMembers!=='undefined') ? [...projectMembers] : (base.members||[])
+    members: (typeof projectMembers!=='undefined') ? [...projectMembers] : (base.members||[]),
+    clientEmail: (document.getElementById('client-email')?.value||'').trim(),
+    clientChatMemberIds: [...clientChatMemberIds],
+    clientChatMemberNames: clientMemberNames(),
+    clientUserId: base.clientUserId||null
   };
   let savedId;
   try{ savedId=await dbSaveProject(proj); }catch(e){ return; }

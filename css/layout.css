@@ -93,3 +93,16 @@
   #est-project-sidebar{display:none !important}
   #est-project-mobile-bar{display:flex !important}
 }
+
+/* ── お客様（施主）の画面：チャットだけ ── */
+/* 見せてはいけないものを1つずつ隠すのではなく、チャット以外を全部隠してから出す */
+.role-client .main-nav-btn{display:none !important}
+.role-client #nav-talk{display:flex !important}
+.role-client .staff-only,
+.role-client .employee-only,
+.role-client .admin-only,
+.role-client .carpenter-hidden{display:none !important}
+/* 上の帯の道具（更新・通知・アカウント）は残し、社内向けのものは隠す */
+.role-client .topbar-staff{display:none !important}
+/* 案件を選ぶ帯は id で display が指定されているので、id を含む書き方で確実に隠す */
+.role-client #est-project-mobile-bar{display:none !important}

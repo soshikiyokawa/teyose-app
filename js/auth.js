@@ -66,7 +66,7 @@ async function bootstrapApp(){
   currentUserDisplayName = profile.display_name || sessionData.session.user.email;
   currentUserId = sessionData.session.user.id;
 
-  document.body.classList.remove('role-staff','role-supplier','role-carpenter');
+  document.body.classList.remove('role-staff','role-supplier','role-carpenter','role-client');
   document.body.classList.add('role-'+currentUserRole);
 
   try{
@@ -87,6 +87,9 @@ async function bootstrapApp(){
     renderSupplierSelectList();
     mainTab(currentUserRole==='staff' ? 'estimate' : 'genba');
     if(currentUserRole==='staff') estSubTab('list');   // 管理者は案件一覧から始める
+  } else if(currentUserRole==='client'){
+    // お客様：チャットだけ。ほかの画面は出さない（css/layout.css の role-client）
+    mainTab('talk');
   } else {
     // 発注先ロール：品目マスタ（自社品目の単価編集）のみ表示
     mainTab('order');

@@ -64,6 +64,10 @@ let directThreadIds = {};    // {スレッド名: 相手のuserId}
 const GROUP_THREAD_PREFIX = 'グループ：';
 let groupThreadIds = {};     // {スレッド名: groupId}
 let chatGroups = [];         // 自分がメンバーのグループ {id,name,memberIds,memberNames,createdBy}
+// お客様チャット（案件ごと）のスレッド名は「お客様：<案件名>」。案件IDは clientThreadIds に持つ
+const CLIENT_THREAD_PREFIX = 'お客様：';
+let clientThreadIds = {};    // {スレッド名: projectId}
+let clientChats = [];        // 自分が入っているお客様チャット {projectId,projectName,memberNames}
 let chatReads = [];          // 既読管理（{userId,userName,thread,lastReadAt}）
 let quotingMsg = null;       // 引用中のメッセージ
 let editingMsgId = null;     // 編集中のメッセージID

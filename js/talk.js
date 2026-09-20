@@ -28,6 +28,7 @@ function _supplierNames(supName){
 function notifyGroups(){
   const t = activeTalkPanelSupplier;
   if(isDirectThread(t)) return [];   // 相手は1人なので選ぶ必要がない
+  if(isClientThread(t)) return [];   // 宛先は決まっている（お客様／きよかわの担当）
   if(isGroupThread(t)){
     const g = groupById(groupThreadIds[t]);
     return [{label:'', names:(g?.memberNames||[]).filter(n=>n && n!==currentUserDisplayName)}];
@@ -218,7 +219,7 @@ function openMsgMenu(mid){
   html+=item('↩','引用して返信','menuQuote()');
   if(canEdit) html+=item('✏️','編集','menuEdit()');
   html+=item('🔖', bookmarked?'ブックマーク解除':'ブックマーク','menuBookmark()');
-  html+=item('✓✓','既読メンバー','menuReadMembers()');
+  if(!isClientUser()) html+=item('✓✓','既読メンバー','menuReadMembers()');
   if(hasText) html+=item('📋','テキストをコピー','menuCopy()');
   if(canDelete) html+=item('🗑','削除','menuDelete()',true);
   document.getElementById('msg-menu-items').innerHTML=html;
@@ -371,6 +372,7 @@ if(window.visualViewport){
 // 案件が増えると発注先が下に押し出されて探しにくいので、種類で分けて出す。
 let talkListTab = 'project';
 function talkThreadKind(name){
+  if(isClientThread(name)) return 'client';
   if(name===INTERNAL_THREAD || isDirectThread(name) || isGroupThread(name)) return 'internal';
   return isProjectThread(name) ? 'project' : 'supplier';
 }
@@ -384,6 +386,7 @@ function renderTalkListTabs(names){
   const defs=[
     {key:'internal', label:'社内・個別'},
     {key:'project',  label:'案件'},
+    {key:'client',   label:'お客様'},
     {key:'supplier', label:'業者'},
   ].filter(d=>names.some(n=>talkThreadKind(n)===d.key));
   // 選んでいたタブが無くなったら、残っているいちばん左に寄せる
@@ -545,7 +548,7 @@ function renderTalkPanelList(){
   const el=document.getElementById('talk-panel-thread-list');
   if(!names.length){
     document.getElementById('talk-list-tabs').style.display='none';
-    el.innerHTML='<div class="empty">発注先が登録されていません</div>';
+    el.innerHTML='<div class="empty">'+(isClientUser()?'まだチャットがありません。きよかわからのご案内をお待ちください':'発注先が登録されていません')+'</div>';
     return;
   }
   updateChatBadge();
@@ -567,6 +570,7 @@ function renderTalkPanelList(){
   if(!allSups.length){
     el.innerHTML=startBtn+`<div class="empty" style="padding:24px">${
       talkListTab==='project'?'参加している案件がありません'
+      :talkListTab==='client'?(isClientUser()?'まだやりとりがありません':'お客様チャットの担当に選ばれている案件がありません')
       :talkListTab==='internal'?'まだやりとりがありません'
       :'発注先が登録されていません'}</div>`;
     return;
@@ -577,16 +581,17 @@ function renderTalkPanelList(){
     const isDirect=isDirectThread(name);
     const isGroup=isGroupThread(name);
     const grp=isGroup ? groupById(groupThreadIds[name]) : null;
+    const isClient=isClientThread(name);
     const msgs=talkThreads[name]||[];
     const last=msgs[msgs.length-1];
     const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text)
-      :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':isDirect?'この2人だけのやりとり':isGroup?`メンバー ${(grp?.memberIds||[]).length}人`:'タップしてトークを開始');
+      :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':isDirect?'この2人だけのやりとり':isGroup?`メンバー ${(grp?.memberIds||[]).length}人`:isClient?(isClientUser()?'きよかわとのやりとり':'お客様とのやりとり'):'タップしてトークを開始');
     const sup=suppliers.find(s=>s.name===name);
     const unread=chatUnreadFor(name);
     return `<div class="sup-thread-row" onclick="openTalkPanelThread('${name.replace(/'/g,"\\'")}')">
-      <div class="sup-thread-icon">${isInternal?'🏡':isProject?'🏗':isDirect?'👤':isGroup?'👥':'🏪'}</div>
+      <div class="sup-thread-icon">${isInternal?'🏡':isProject?'🏗':isDirect?'👤':isGroup?'👥':isClient?'🏠':'🏪'}</div>
       <div class="sup-thread-info">
-        <div class="sup-thread-name">${name}</div>
+        <div class="sup-thread-name">${esc(threadLabel(name))}</div>
         <div class="sup-thread-preview">${preview}</div>
         ${sup?.tel?`<div style="font-size:11px;color:var(--text-muted)">📞 ${sup.tel}</div>`:''}
       </div>
@@ -614,10 +619,18 @@ function openTalkPanelThread(supName){
   if(tel){
     titleEl.innerHTML=`<a href="tel:${tel}" class="talk-tel" title="${esc(sup.tel)}に電話をかける">${esc(supName)}<span>📞</span></a>`;
   } else {
-    titleEl.textContent=supName;
+    titleEl.textContent=threadLabel(supName);
   }
   const metaEl=document.getElementById('talk-panel-meta');
-  if(isGroupThread(supName)){
+  if(isClientThread(supName)){
+    const pid=clientThreadIds[supName];
+    const c=clientChatOf(pid);
+    const proj=(projects||[]).find(x=>x.id===pid);
+    const names=(c?.memberNames||[]).filter(Boolean).join('、')||'—';
+    metaEl.textContent = isClientUser()
+      ? `きよかわ（担当：${names}）とのやりとりです`
+      : `お客様${proj?.clientName?`（${proj.clientName} 様）`:''}とのやりとり／きよかわ：${names}`;
+  } else if(isGroupThread(supName)){
     const g=groupById(groupThreadIds[supName]);
     metaEl.innerHTML=`<button type="button" class="talk-group-meta" onclick="openGroupEditor(${g?g.id:'null'})" title="メンバー・グループ名の変更、退出">
       メンバー：${esc((g?.memberNames||[]).filter(Boolean).join('、')||'—')}<span>変更</span></button>`;
@@ -647,6 +660,7 @@ function threadKeyOf(name){
   if(name===INTERNAL_THREAD) return 'internal';
   if(isDirectThread(name)) return 'direct:'+(directThreadIds[name]||'?');
   if(isGroupThread(name)) return 'group:'+(groupThreadIds[name]||'?');
+  if(isClientThread(name)) return 'client:'+(clientThreadIds[name]||'?');
   if(isProjectThread(name)) return 'project:'+(projectThreadIds[name]||'?');
   return 'supplier:'+(supplierIdByName(name)||'?');
 }
@@ -671,12 +685,15 @@ function visibleThreadNames(){
     .filter(p=>currentUserRole==='staff' || isMyProjectMember(p.members))
     .map(p=>projectThreadName(p.id));
   const supNames=[...new Set([...suppliers.map(s=>s.name),...Object.keys(talkThreads)])]
-    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n) && !isDirectThread(n) && !isGroupThread(n));
+    .filter(n=>n!==INTERNAL_THREAD && !isProjectThread(n) && !isDirectThread(n) && !isGroupThread(n) && !isClientThread(n));
   // 個別チャットは、やりとりがあるものだけ出す（作った時点で talkThreads に入る）
   const directNames=Object.keys(talkThreads).filter(isDirectThread);
   // グループは、自分がメンバーのものすべて（やりとりが無くても出す）
   const groupNames=(chatGroups||[]).map(g=>groupThreadName(g.id));
-  return [...(isEmployee?[INTERNAL_THREAD]:[]), ...groupNames, ...directNames, ...projNames, ...supNames];
+  const clientNames=(clientChats||[]).map(c=>clientThreadName(c.projectId));
+  // お客様は、自分の案件のお客様チャットだけ
+  if(isClientUser()) return clientNames;
+  return [...(isEmployee?[INTERNAL_THREAD]:[]), ...groupNames, ...directNames, ...projNames, ...clientNames, ...supNames];
 }
 
 function chatUnreadTotal(){
@@ -726,10 +743,27 @@ function replyRefHtml(m){
   if(!m.replyToText) return '';
   return `<div class="quote-ref">${esc(m.replyToSender||'')}：${esc(m.replyToText)}</div>`;
 }
+// 画面に出すスレッド名。お客様には社内向けの「お客様：」を付けずに案件名だけを見せる
+function threadLabel(name){
+  return (isClientUser() && isClientThread(name)) ? String(name).slice(CLIENT_THREAD_PREFIX.length) : name;
+}
+
+// お客様チャットの既読。お客様が読んだら、きよかわ側の吹き出しに「既読」を出す。
+// きよかわ側が読んだことは、お客様には出さない（お客様は自分の既読しか見られない）
+function clientReadMark(m){
+  const t = activeTalkPanelSupplier;
+  if(!isClientThread(t) || isClientUser()) return '';
+  if(m.senderName !== currentUserDisplayName) return '';   // 自分が送ったものだけ
+  const proj = (projects||[]).find(p=>p.id===clientThreadIds[t]);
+  if(!proj?.clientUserId) return '';
+  const rec = chatReads.find(r=>r.userId===proj.clientUserId && r.thread===threadKeyOf(t));
+  return (rec && rec.lastReadAt>=m.ts) ? '<span class="read-mark">既読</span>' : '';
+}
+
 function msgMarks(m){
   const edited = m.editedAt ? '<span class="edited-mark">（編集済み）</span>' : '';
   const bm = (Array.isArray(m.bookmarks)&&m.bookmarks.includes(currentUserDisplayName)) ? '<span class="bm-mark" title="ブックマーク">🔖</span>' : '';
-  return edited+bm;
+  return edited+bm+clientReadMark(m);
 }
 
 // いちばん下まで見ているか（少しの余裕をみて判定する）
