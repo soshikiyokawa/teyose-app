@@ -131,13 +131,29 @@ async function sendPasswordReset(){
   btn.disabled=true; btn.textContent='送信中…';
   // 戻り先はこのアプリ。メールのリンクを開くとパスワード設定の画面が出る
   const redirectTo = location.origin + location.pathname;
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  // 自社（Resend）から送る。Supabaseの標準メールは1時間に数通しか送れず、
+  // 届かないことがあるため（2026-09に実際に再設定できない状態になった）。
+  // 送信の仕組みが止まっているときだけ、これまでどおり標準メールに落とす
+  let failed = '';
+  const { data, error: fnErr } = await sb.functions.invoke('reset-password-mail', { body:{ email, redirectTo } });
+  if(fnErr || data?.error){
+    let detail = data?.error || '';
+    if(!detail && fnErr){ try{ detail = (await fnErr.context?.json?.())?.error || fnErr.message || ''; }catch(_){ detail = fnErr.message||''; } }
+    console.warn('自社からの再設定メールに失敗しました：', detail);
+    const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+    if(error) failed = error.message||'';
+  }
   btn.disabled=false; btn.textContent='リンクを送る';
 
   msg.style.display='block';
-  if(error && /rate|limit|too many/i.test(error.message||'')){
+  if(failed && /rate|limit|too many/i.test(failed)){
     msg.style.color='var(--warn-t)';
     msg.textContent='短い時間に何度も送信されています。しばらく待ってからお試しください';
+    return;
+  }
+  if(failed){
+    msg.style.color='var(--danger)';
+    msg.textContent='メールを送れませんでした。きよかわの担当者にご連絡ください';
     return;
   }
   // 登録の有無は出さない（どのアドレスが使われているかを知られないため）

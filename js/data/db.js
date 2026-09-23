@@ -1626,8 +1626,8 @@ function subscribeRealtime(){
   sb.channel('app-changes')
     .on('postgres_changes',{event:'*',schema:'public',table:'suppliers'}, ()=>refetchAndRerender('suppliers'))
     .on('postgres_changes',{event:'*',schema:'public',table:'master_items'}, ()=>refetchAndRerender('master_items'))
-    .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'}, ()=>refetchChatAndRerender())
-    .on('postgres_changes',{event:'*',schema:'public',table:'chat_reads'}, ()=>refetchChatAndRerender(true))
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_messages'}, onChatMessageChange)
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_reads'}, onChatReadChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'chat_groups'}, ()=>refetchChatAndRerender())
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'}, ()=>refetchAndRerender('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'cost_entries'}, ()=>refetchAndRerender('cost_entries'))
@@ -1646,8 +1646,15 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'notifications'}, ()=>refreshNotifications())
     .on('postgres_changes',{event:'*',schema:'public',table:'tasks'}, ()=>refreshTasks())
     .on('postgres_changes',{event:'*',schema:'public',table:'task_templates'}, ()=>refreshTaskTemplates())
-    .subscribe();
+    .subscribe(status=>{
+      // つなぎ直したときは、切れていた間の分を取りこぼしているので一度だけ取り直す
+      if(status==='SUBSCRIBED'){
+        if(_chatWasSubscribed) refetchChatAndRerender();
+        _chatWasSubscribed = true;
+      }
+    });
 }
+let _chatWasSubscribed = false;
 
 // 新着メッセージ（自分以外の投稿）が増えたら、着信音を鳴らして未読バッジを更新する
 let _lastChatMsgId = null;
@@ -1876,14 +1883,9 @@ async function fetchChatData(){
   groupThreadIds = {};
   talkThreads = {};
   chatRows.forEach(r=>{
-    const name = r.client_project_id ? clientThreadName(r.client_project_id)
-               : r.group_id ? groupThreadName(r.group_id)
-               : r.direct_a ? directThreadName(r.direct_a===currentUserId ? r.direct_b : r.direct_a)
-               : r.project_id ? projectThreadName(r.project_id)
-               : r.is_internal ? INTERNAL_THREAD
-               : supplierNameById(r.supplier_id);
+    const name = chatThreadNameOfRow(r);
     if(!talkThreads[name]) talkThreads[name]=[];
-    talkThreads[name].push({id:r.id,role:r.role,type:r.type,text:r.text,orderData:r.order_data,fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime,ts:new Date(r.created_at).getTime(),unread:r.unread,senderName:r.sender_name||'',reactions:r.reactions||{},replyToText:r.reply_to_text||'',replyToSender:r.reply_to_sender||'',editedAt:r.edited_at||null,bookmarks:r.bookmarks||[]});
+    talkThreads[name].push(chatRowToMsg(r));
   });
   // まだやりとりの無いグループ・お客様チャットも一覧に出す
   chatGroups.forEach(g=>{ const n=groupThreadName(g.id); if(!talkThreads[n]) talkThreads[n]=[]; });
@@ -1891,7 +1893,7 @@ async function fetchChatData(){
 
   // 既読管理
   const { data: readRows } = await sb.from('chat_reads').select('*');
-  chatReads = (readRows||[]).map(r=>({userId:r.user_id,userName:r.user_name||'',thread:r.thread,lastReadAt:new Date(r.last_read_at).getTime()}));
+  chatReads = (readRows||[]).map(chatReadRowTo);
 }
 
 // チャットの変更で呼ばれる。取り直すのはチャットだけにして、待ち時間を短くする。
@@ -1899,6 +1901,102 @@ async function fetchChatData(){
 //   fromReads … 既読（chat_reads）が変わっただけのとき true。
 //     このときは既読を書き直さない。書き直すとまたリアルタイムで通知が飛んできて
 //     「再取得 → 既読を書く → 通知 → 再取得 …」と延々と回り、画面がチカチカする。
+// ════ チャットの差分反映（1件だけ当てる） ════
+//
+// 以前は、誰かが1通書くたびにチャットを全件取り直していた（メッセージ400件＋既読200件）。
+// 人数と件数が増えるほど通信量が増え、2026-09に転送量の上限に当たる一因になった。
+// リアルタイムで届く「変わった行そのもの」を当てて、取り直さないようにする。
+// 当てられない形（知らないグループ・案件など）のときだけ、これまでどおり全件取り直す。
+
+// データベースの行 → 画面で使う形
+function chatRowToMsg(r){
+  return {id:r.id, role:r.role, type:r.type, text:r.text, orderData:r.order_data,
+    fileUrl:r.file_url, fileName:r.file_name, fileMime:r.file_mime,
+    ts:new Date(r.created_at).getTime(), unread:r.unread, senderName:r.sender_name||'',
+    reactions:r.reactions||{}, replyToText:r.reply_to_text||'', replyToSender:r.reply_to_sender||'',
+    editedAt:r.edited_at||null, bookmarks:r.bookmarks||[]};
+}
+function chatReadRowTo(r){
+  return {userId:r.user_id, userName:r.user_name||'', thread:r.thread, lastReadAt:new Date(r.last_read_at).getTime()};
+}
+// 行 → どのスレッドのものか。分からなければ null（全件取り直しに落とす）
+function chatThreadNameOfRow(r){
+  if(r.client_project_id) return clientChatOf(r.client_project_id) ? clientThreadName(r.client_project_id) : null;
+  if(r.group_id)          return groupById(r.group_id) ? groupThreadName(r.group_id) : null;
+  if(r.direct_a)          return directThreadName(r.direct_a===currentUserId ? r.direct_b : r.direct_a);
+  if(r.project_id)        return projectThreadName(r.project_id);
+  if(r.is_internal)       return INTERNAL_THREAD;
+  return supplierNameById(r.supplier_id);
+}
+
+// 届いた1件を当てる。当てられたら true
+function applyChatMessageChange(payload){
+  const kind = payload?.eventType;
+  if(kind==='DELETE'){
+    const id = payload.old?.id;
+    if(id==null) return false;
+    for(const name in talkThreads){
+      const i = (talkThreads[name]||[]).findIndex(m=>m.id===id);
+      if(i>=0){ talkThreads[name].splice(i,1); return true; }
+    }
+    return true;   // もともと持っていない（自分に関係ない）ものは、何もしなくてよい
+  }
+  const r = payload?.new;
+  if(!r || r.id==null) return false;
+  const name = chatThreadNameOfRow(r);
+  if(!name) return false;              // 知らないグループ・案件 → 取り直す
+  const msg = chatRowToMsg(r);
+  if(!talkThreads[name]) talkThreads[name]=[];
+  const list = talkThreads[name];
+  const i = list.findIndex(m=>m.id===msg.id);
+  if(i>=0){ list[i] = msg; return true; }
+  if(kind==='UPDATE'){
+    // 編集・リアクションなのに手元に無い＝取りこぼしているので取り直す
+    return false;
+  }
+  list.push(msg);
+  // 届く順が前後しても並びが崩れないようにする
+  if(list.length>1 && list[list.length-2].ts > msg.ts) list.sort((a,b)=>a.ts-b.ts);
+  return true;
+}
+
+// 既読の1件を当てる
+function applyChatReadChange(payload){
+  if(payload?.eventType==='DELETE'){
+    const id = payload.old?.id;
+    if(id==null) return false;
+    return true;   // 既読が消えることは運用上ない
+  }
+  const r = payload?.new;
+  if(!r || !r.thread || !r.user_id) return false;
+  const rec = chatReadRowTo(r);
+  const i = chatReads.findIndex(x=>x.userId===rec.userId && x.thread===rec.thread);
+  if(i>=0) chatReads[i] = rec; else chatReads.push(rec);
+  return true;
+}
+
+// 差分を当てたあとの画面の更新（取り直したときと同じ後始末）
+function afterChatChanged(fromReads){
+  notifyNewChatMessages();   // 着信音・未読バッジ
+  if(!talkPanelOpen) return;
+  if(activeTalkPanelSupplier){
+    renderTalkPanelMessages();
+    if(!fromReads) markThreadReadIfNeeded(activeTalkPanelSupplier);
+  } else {
+    renderTalkPanelList();
+  }
+}
+
+// リアルタイムの入口。当てられなければ全件取り直しに落とす
+function onChatMessageChange(payload){
+  if(applyChatMessageChange(payload)) afterChatChanged(false);
+  else refetchChatAndRerender();
+}
+function onChatReadChange(payload){
+  if(applyChatReadChange(payload)) afterChatChanged(true);
+  else refetchChatAndRerender(true);
+}
+
 async function refetchChatAndRerender(fromReads){
   // 開いているのがグループなら、取り直す前にIDを覚えておく（名前が変わるとスレッド名も変わるため）
   const openGroupId = (activeTalkPanelSupplier && isGroupThread(activeTalkPanelSupplier)) ? groupThreadIds[activeTalkPanelSupplier] : null;
@@ -1920,13 +2018,5 @@ async function refetchChatAndRerender(fromReads){
     const meta = document.querySelector('#talk-panel-meta .talk-group-meta');
     if(meta) meta.innerHTML = `メンバー：${esc((g.memberNames||[]).filter(Boolean).join('、')||'—')}<span>変更</span>`;
   }
-  notifyNewChatMessages();   // 着信音・未読バッジ
-  if(!talkPanelOpen) return;
-  if(activeTalkPanelSupplier){
-    renderTalkPanelMessages();
-    // 開いているスレッドは読んだものとして扱う（まだ読んでいない分があるときだけ書く）
-    if(!fromReads) markThreadReadIfNeeded(activeTalkPanelSupplier);
-  } else {
-    renderTalkPanelList();
-  }
+  afterChatChanged(fromReads);
 }
