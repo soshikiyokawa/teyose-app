@@ -246,11 +246,11 @@ function nippoRenderPhotos(){
   const saved = editingNippoId ? nippoPhotosOf(editingNippoId) : [];
   el.innerHTML =
     saved.map(p=>`<div class="np-thumb">
-        <img src="${esc(p.url)}" alt="" onclick="openNippoPhoto('${esc(p.url)}',${p.id})">
+        <img src="${esc(thumbUrl(p.url,400))}" alt="" onclick="openNippoPhoto('${esc(p.url)}',${p.id})">
         <button type="button" class="np-x" title="消す" onclick="nippoRemoveSavedPhoto(${p.id})">×</button>
       </div>`).join('')
     + nippoNewPhotos.map((p,i)=>`<div class="np-thumb new">
-        <img src="${p.url}" alt="" onclick="openNippoPhoto('${p.url}')">
+        <img src="${thumbUrl(p.url,400)}" alt="" onclick="openNippoPhoto('${p.url}')">
         <button type="button" class="np-x" title="やめる" onclick="nippoRemoveNewPhoto(${i})">×</button>
       </div>`).join('');
 }
@@ -348,7 +348,7 @@ function nippoMiniPhotos(reportId){
   if(!ps.length) return '';
   const shown = ps.slice(0,3);
   return `<div class="np-mini" onclick="event.stopPropagation()">
-    ${shown.map(p=>`<img src="${esc(p.url)}" alt="" loading="lazy" onclick="openNippoPhoto('${esc(p.url)}',${p.id})">`).join('')}
+    ${shown.map(p=>`<img src="${esc(thumbUrl(p.url,400))}" alt="" loading="lazy" onclick="openNippoPhoto('${esc(p.url)}',${p.id})">`).join('')}
     ${ps.length>3?`<span>ほか${ps.length-3}枚</span>`:''}
   </div>`;
 }
@@ -439,7 +439,7 @@ function renderNippoGallery(){
   grid.innerHTML = `<div class="ng-grid">${list.map(p=>{
     const n = (dailyReports||[]).find(r=>r.id===p.reportId);
     return `<figure class="ng-cell" onclick="openNippoPhoto('${esc(p.url)}',${p.id})">
-      <img src="${esc(p.url)}" alt="" loading="lazy">
+      <img src="${esc(thumbUrl(p.url,400))}" alt="" loading="lazy">
       <span class="ng-score ${ngScoreClass(p.igScore)}">${p.igScore!=null?p.igScore:'—'}</span>
       <figcaption>
         <span class="ng-who">${esc(p.uploaderName||'')}</span>

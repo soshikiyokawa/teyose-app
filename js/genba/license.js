@@ -86,7 +86,7 @@ async function renderLicensePhotos(l){
     const url=await dbLicensePhotoUrl(path);
     wrap.innerHTML = url
       ? `<div style="display:flex;align-items:center;gap:8px">
-           <img src="${url}" alt="登録した写真" style="width:96px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')">
+           <img src="${thumbUrl(url,200)}" alt="登録した写真" style="width:96px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);cursor:pointer" onclick="window.open('${url}','_blank')">
            <div style="font-size:11px;color:var(--text-sub)">タップで拡大<br>
              <button class="btn xs danger" style="margin-top:4px" onclick="deleteLicensePhoto('${kind}')">写真を削除</button></div>
          </div>`

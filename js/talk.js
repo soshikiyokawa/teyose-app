@@ -910,7 +910,7 @@ function renderTalkPanelMessages(forceBottom){
       return `${sep}<div class="talk-bubble ${isMe?'me':'them'}" data-mid="${m.id}">
         ${replyRefHtml(m)}
         ${isImage
-          ? `<a href="${m.fileUrl}" target="_blank" rel="noopener"><img src="${m.fileUrl}" alt="${esc(m.fileName||'')}" style="max-width:200px;max-height:200px;border-radius:8px;display:block"></a>`
+          ? `<a href="${m.fileUrl}" target="_blank" rel="noopener"><img src="${thumbUrl(m.fileUrl,400)}" alt="${esc(m.fileName||'')}" style="max-width:200px;max-height:200px;border-radius:8px;display:block"></a>`
           : `<a href="${m.fileUrl}" target="_blank" rel="noopener" download class="bbl" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:inherit">
               <span style="font-size:18px">📄</span><span style="word-break:break-all">${esc(m.fileName||'資料')}</span>
             </a>`}

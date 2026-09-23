@@ -50,6 +50,19 @@ function showToast(msg, duration=2000){
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+// 一覧に出す写真は、縮小したものを読み込む。
+//
+// 元の写真は1枚1MBを超えることがあり、一覧で何十枚も出すと通信量が跳ね上がる
+// （2026-09にこれが積み重なって、Supabaseの転送量の上限に当たり全員が使えなくなった）。
+// Supabaseの画像変換に任せ、幅を指定して読み込む。開いたときだけ元の大きさを出す。
+function thumbUrl(url, width, quality){
+  const u = String(url||'');
+  if(!u.includes('/storage/v1/object/public/')) return u;      // 別の置き場のものは触らない
+  if(!/\.(jpe?g|png|webp)(\?|$)/i.test(u)) return u;           // 写真以外（PDFなど）はそのまま
+  return u.split('?')[0].replace('/storage/v1/object/public/','/storage/v1/render/image/public/')
+    + '?width=' + (width||400) + '&quality=' + (quality||70);
+}
+
 // 日付を、端末の暦のまま YYYY-MM-DD にする（省略すると今日）。
 // new Date().toISOString().slice(0,10) は世界標準時の日付になるため、日本では
 // 朝9時前は「前日」になり、0時ちょうどの日付は1日戻る。暦の日付を作るときはこれを使う

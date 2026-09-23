@@ -169,7 +169,11 @@ Deno.serve(async (req) => {
 
     for (const row of rows) {
       try {
-        const res = await fetch(row.url);
+        // 採点は縮小版で足りる。元の大きさで読むと通信量が大きい（1枚1MB超のことがある）
+        const small = String(row.url || "").includes("/storage/v1/object/public/")
+          ? row.url.split("?")[0].replace("/storage/v1/object/public/", "/storage/v1/render/image/public/") + "?width=1024&quality=80"
+          : row.url;
+        const res = await fetch(small);
         if (!res.ok) throw new Error("写真を読み出せませんでした（" + res.status + "）");
         const bytes = new Uint8Array(await res.arrayBuffer());
         if (!bytes.length) throw new Error("写真の中身が空です");

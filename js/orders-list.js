@@ -612,7 +612,7 @@ function olCardHtml(r){
   return `<div class="ol-card" onclick="olOpenProject(${p.id})" title="タップして案件を開く">
     <div class="ol-card-img">
       ${photo
-        ? `<img src="${photo.url}" alt="${esc(p.name)}" loading="lazy">`
+        ? `<img src="${thumbUrl(photo.url,400)}" alt="${esc(p.name)}" loading="lazy">`
         : `<div class="ol-card-ph">${olTypeIcon(r.type)}<div class="ol-card-phtxt">${esc(r.type||'工事区分なし')}</div></div>`}
       ${olCanSeeMoney()?`<span class="ol-card-status badge ${st.cls}">${st.label}</span>`:''}
       ${r.type?`<span class="ol-card-type">${esc(r.type)}</span>`:''}

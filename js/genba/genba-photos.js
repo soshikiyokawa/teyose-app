@@ -132,7 +132,7 @@ function fbPhotoGridHtml(){
         const sel = selectedPhotoIds.has(p.id);
         const onClick = photoSelectMode ? `togglePhotoSelect(${p.id})` : `openPhotoViewer(${p.id})`;
         return `<div class="photo-cell${sel?' photo-selected':''}" onclick="${onClick}">
-          <img src="${esc(p.url)}" loading="lazy" alt="">
+          <img src="${esc(thumbUrl(p.url,400))}" loading="lazy" alt="">
           ${photoSelectMode ? `<div class="photo-check">${sel?'✓':''}</div>` : ''}
           ${p.caption ? `<div class="photo-cap">${esc(p.caption)}</div>` : ''}
         </div>`;

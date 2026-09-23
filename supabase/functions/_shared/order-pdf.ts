@@ -114,14 +114,24 @@ export async function saveOrderPdf(admin: any, order: any): Promise<string> {
   return pub.publicUrl + "?t=" + Date.now();
 }
 
+// フォントは1本5MBある。PDFを作るたびに読み直すと、その分がそのまま通信量になり
+// （2026-09にSupabaseの転送量の上限に当たった一因）、作るのも遅くなる。
+// 一度読んだら、この関数の置き場に覚えておいて使い回す
+let _fontBytes: Uint8Array | null = null;
+async function loadFont(): Promise<Uint8Array> {
+  if (_fontBytes) return _fontBytes;
+  const url = `${SUPABASE_URL}/storage/v1/object/public/assets/fonts/NotoSansJP-Regular.ttf`;
+  _fontBytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+  return _fontBytes;
+}
+
 export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
   // フォントファイルが大きく、デプロイ時にFunctionへ同梱されないことがあるため、
   // Supabase Storage（publicバケット）に置いたフォントをHTTPで取得して埋め込む。
-  const FONTS_BASE = `${SUPABASE_URL}/storage/v1/object/public/assets/fonts`;
-  const regularBytes = new Uint8Array(await (await fetch(`${FONTS_BASE}/NotoSansJP-Regular.ttf`)).arrayBuffer());
+  const regularBytes = await loadFont();
   // subset:trueにすると日本語のような文字数の多いフォントで文字が欠ける不具合があるため、
   // サブセット化せずフォント全体をそのまま埋め込む。
   //
