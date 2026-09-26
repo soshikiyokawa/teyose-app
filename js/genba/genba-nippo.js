@@ -538,35 +538,56 @@ function renderScoreCriteria(c){
 }
 
 // again＝true なら、採点済みのものも今の基準で採点し直す
+// AIで採点する。
+//
+// 1回に頼めるのは12枚まで（score-photo の決まり）なので、枚数が多いときは
+// 12枚ずつ何度かに分けて、いま出ている写真を最後まで採点する。
+// 途中経過はボタンに出し、もう一度押すとその分が終わったところで止まる。
+let _ngScoring = false;      // 採点中か
+let _ngStopScoring = false;  // 止めてほしいと言われたか
+
 async function scoreNippoGallery(again){
+  if(_ngScoring){ _ngStopScoring = true; showToast('いまの分が終わったら止めます'); return; }
+
   const list = ngList();
-  const targets = (again ? list : list.filter(p=>p.igScore==null)).slice(0,12);
+  const targets = again ? list : list.filter(p=>p.igScore==null);
   if(!targets.length){ showToast(again?'採点する写真がありません':'未採点の写真はありません'); return; }
-  if(again && !confirm(`いま出ている${list.length}枚のうち、先頭の${targets.length}枚を、今の基準で採点し直します。\n前の点数は上書きされます。よろしいですか？`)) return;
+  if(again && !confirm(`いま出ている${targets.length}枚を、今の基準で採点し直します。\n前の点数は上書きされます。\n\n12枚ずつ順に進みます（途中でボタンを押すと止まります）。よろしいですか？`)) return;
+
   const btn = document.getElementById(again ? 'ng-rescore-btn' : 'ng-score-btn');
   const label = btn.textContent;
-  btn.disabled = true; btn.textContent = `${targets.length}枚を採点中…`;
-  let results = [];
+  _ngScoring = true; _ngStopScoring = false;
+  let ok=0, ng=0, done=0;
   try{
-    results = await dbScoreNippoPhotos(targets.map(p=>p.id));
-  }catch(e){
-    showToast('採点に失敗しました：'+e.message);
+    for(let i=0; i<targets.length; i+=12){
+      const chunk = targets.slice(i, i+12);
+      btn.textContent = `採点中… ${done}/${targets.length}`;
+      let results = [];
+      try{
+        results = await dbScoreNippoPhotos(chunk.map(p=>p.id));
+      }catch(e){
+        showToast(`採点に失敗しました：${e.message}（${done}枚まで終わっています）`, 5000);
+        break;
+      }
+      // 返ってきた点数を手元にも反映する（取り直さずに済むように）
+      results.forEach(r=>{
+        const p = (nippoPhotos||[]).find(x=>x.id===r.id);
+        if(!p) return;
+        if(r.error){ ng++; return; }
+        p.igScore = r.score; p.igComment = r.comment||''; p.igScoredAt = new Date().toISOString();
+        ok++;
+      });
+      done += chunk.length;
+      renderNippoGallery();   // 途中でも結果が見えるようにする
+      if(_ngStopScoring){ showToast(`${done}枚まで採点して止めました`); break; }
+    }
+  } finally {
+    _ngScoring = false; _ngStopScoring = false;
     btn.disabled = false; btn.textContent = label;
-    renderNippoGallery();
-    return;
   }
-  // 返ってきた点数を手元にも反映する（取り直さずに済むように）
-  let ok=0, ng=0;
-  results.forEach(r=>{
-    const p = (nippoPhotos||[]).find(x=>x.id===r.id);
-    if(!p) return;
-    if(r.error){ ng++; return; }
-    p.igScore = r.score; p.igComment = r.comment||''; p.igScoredAt = new Date().toISOString();
-    ok++;
-  });
   renderNippoGallery();
   renderNippo();
-  showToast(ng ? `${ok}枚を採点しました（${ng}枚は読めませんでした）` : `${ok}枚を採点しました`);
+  showToast(ng ? `${ok}枚を採点しました（${ng}枚は読めませんでした）` : `${ok}枚を採点しました`, 4000);
 }
 
 // 写真の枠にドラッグして落としても入るようにする
