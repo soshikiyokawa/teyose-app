@@ -64,10 +64,18 @@ const CRITERIA = {
   // 片付いていない・散らかっているのは、作業中なら当たり前なので29点以下にはしない。
   // 「構図」の減点として扱う（Codexの指摘）
   gate: {
-    title: "載せてはいけないものが写っていないか",
+    title: "載せてはいけないものが、はっきり写っていないか",
     items: [
-      "表札・車のナンバー・図面の文字など、場所や個人が特定できるもの",
-      "安全上まずい状態（保護具なし・不安定な足場など）",
+      "表札の名前・車のナンバー・図面の文字が、読み取れる大きさで写っている",
+      "明らかに危ない状態（高所で保護具なし、足場が崩れているなど）",
+    ],
+    // ここに当てはまるだけでは29点以下にしない（判定が緩すぎて、
+    // 174枚中101枚が29点になってしまったため。2026-09）
+    notGate: [
+      "背景に建物や電線が写っている（場所が何となく分かる程度）",
+      "作業中の道具・材料が置いてある、散らかって見える",
+      "人の顔が写っている",
+      "人が写っていない",
     ],
   },
 
@@ -106,11 +114,19 @@ ${subs}
 ※ 人（職人・お客さま）が写っていることは減点しない。働いている姿はむしろ高く評価する。
 　 顔がはっきり写っていても、それだけで下げないこと。
 
+【1.5】fit … 選んだ被写体として、どれだけ典型的で強く写っているかを0〜6点で付ける。
+　 3が普通。その被写体の良さがはっきり出ていれば5〜6、かろうじて当てはまる程度なら0〜1。
+
 【2】写真としての出来。次の4つに、それぞれ点を付ける（合わせて${CRITERIA.quality.total}点）。
 ${qual}
 
-【3】ng … 次のものが写っていたら、その内容を短く書く。無ければ空文字。
+【3】ng … 次が「はっきり」写っているときだけ、その内容を短く書く。無ければ空文字。
 ${CRITERIA.gate.items.map((i) => "- " + i).join("\n")}
+※ ng を付けると29点以下になる。「そのままでは載せられない」写真だけに付けること。
+※ 次は ng ではない。迷ったら空文字にする。
+${CRITERIA.gate.notGate.map((i) => "- " + i).join("\n")}
+※ 「〜の懸念がある」「〜かもしれない」程度では付けない。
+　 実際に文字や数字が読み取れる、明らかに危ない、というときだけ。
 
 点の付け方でとても大事なこと:
 - 各項目は1点単位で付ける。5点刻み・きりのよい数字（5・10・15）に寄せない
@@ -141,6 +157,7 @@ const TOOL = {
         enum: [...CRITERIA.subjects.map((s) => s.title), CRITERIA.subjectOther.label],
         description: "何が写っているか。一覧から1つ選ぶ",
       },
+      fit:     { type: "integer", description: "選んだ被写体としての典型さ 0〜6点（3が普通）" },
       lead:    { type: "integer", description: "主役のはっきりさ 0〜15点" },
       people:  { type: "integer", description: "人の動きや表情 0〜10点" },
       light:   { type: "integer", description: "明るさ 0〜10点" },
@@ -148,7 +165,7 @@ const TOOL = {
       ng:      { type: "string", description: "載せてはいけないものが写っていればその内容。無ければ空文字" },
       comment: { type: "string", description: "その点数にした理由。日本語30字以内" },
     },
-    required: ["subject", "lead", "people", "light", "frame", "ng", "comment"],
+    required: ["subject", "fit", "lead", "people", "light", "frame", "ng", "comment"],
   },
 };
 
@@ -160,7 +177,10 @@ function totalFrom(input: any): { score: number; parts: Record<string, number>; 
   const clamp = (v: unknown, max: number) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
   const name = String(input?.subject || "").trim();
   const known = SUBJECT_POINTS[name] != null;
-  const parts: Record<string, number> = { subject: known ? SUBJECT_POINTS[name] : CRITERIA.subjectOther.base };
+  // 被写体の点は、当てはまり具合（fit 0〜6、3が普通）で±3点動かす。
+  // 同じ被写体の写真が全部同じ点になるのを防ぐため
+  const base = known ? SUBJECT_POINTS[name] : CRITERIA.subjectOther.base;
+  const parts: Record<string, number> = { subject: Math.max(0, base - 3 + clamp(input?.fit, 6)) };
   for (const p of CRITERIA.quality.points) parts[p.key] = clamp(input?.[p.key], p.max);
   let score = Math.max(0, Math.min(100, Object.values(parts).reduce((a, b) => a + b, 0)));
   // 写真としての出来が極端に低い＝ぶれ・真っ暗などで成立していない。
