@@ -146,6 +146,7 @@ function renderInvoices(){
           <option value="unpaid"${invFilterState==='unpaid'?' selected':''}>未払いのみ</option>
           <option value="diff"${invFilterState==='diff'?' selected':''}>差額があるもの</option>
         </select>
+        <button class="btn sm" onclick="printPayPlan()" title="今月ふりこむ会社と金額の一覧。銀行での手続きやチェックに使えます">今月の振込予定を印刷</button>
         <button class="btn sm" onclick="printInvoiceList()">支払一覧を印刷</button>
         <button class="btn sm" onclick="openInvoiceHints()" title="手で入れた金額から覚えた、請求書の読み取りのコツ">AIの読み取りメモ${
           (invoiceHints||[]).length?`（${(invoiceHints||[]).length}）`:''}</button>
@@ -329,22 +330,30 @@ async function sendInvoice(){
   const btn=document.getElementById('invc-send');
   btn.disabled=true; btn.textContent='送信中…';
   try{
-    await dbAddInvoice({supplierId, supplierName, month, file,
-      amount:parseInt(document.getElementById('invc-amount').value)||null,
+    const amount=parseInt(document.getElementById('invc-amount').value)||null;
+    const saved=await dbAddInvoice({supplierId, supplierName, month, file, amount,
       note:document.getElementById('invc-note').value.trim()});
     await fetchInvoices();
     fileEl.value=''; document.getElementById('invc-amount').value=''; document.getElementById('invc-note').value='';
     renderInvoices();
     showToast(`${invTitle(supplierName,month)} を送信しました`);
-    // 社内に知らせる（発注先から送られたときだけ）
-    if(invIsSupplier()){
-      dbSendPushToRole('staff', '請求書が届きました',
-        `${invTitle(supplierName,month)}`, 'order/invoice').catch(()=>{});
-    }
+    // 管理者に知らせる。登録したのが発注先でも社内でも知らせる（支払いの手配は管理者が行うため）。
+    // プッシュ通知（＋アプリの通知履歴）と、見落とさないようにメールの両方を送る
+    notifyInvoiceRegistered(saved, supplierName, month, amount);
   }catch(_){
   }finally{
     btn.disabled=false; btn.textContent='送信';
   }
+}
+
+// 請求書が登録されたことを管理者に知らせる。
+// 失敗しても登録そのものは成り立っているので、画面は止めない
+function notifyInvoiceRegistered(saved, supplierName, month, amount){
+  const who = currentUserDisplayName ? `（${currentUserDisplayName}）` : '';
+  const yen = amount==null ? '' : `　¥${Number(amount).toLocaleString('ja-JP')}`;
+  dbSendPushToRole('staff', '請求書が登録されました',
+    `${invTitle(supplierName,month)}${yen}${who}`, 'order/invoice', true).catch(()=>{});
+  if(saved?.id) dbNotifyInvoice(saved.id).catch(()=>{});
 }
 
 async function openInvoice(id){
@@ -599,6 +608,88 @@ async function saveInvoicePay(){
 }
 
 // ── 支払一覧の印刷（振込のときの確認用） ──
+// ════ 今月の振込予定を印刷する ════
+//
+// 銀行での手続きや、振り込んだかのチェックに使う一覧。
+// 会社名と金額だけでなく、次の3つに分けて出すので払い漏れが見つけやすい。
+//   ① 今月に振り込む予定のもの
+//   ② 支払予定日を過ぎているのに、まだ払っていないもの（繰越）
+//   ③ 支払予定日がまだ決まっていないもの
+// 金額は請求額。請求額がまだ入っていないものは、発注額を「（発注額）」として出す。
+function payPlanAmount(v){
+  if(v.amount!=null) return { yen:v.amount, guess:false };
+  return { yen: invOrdersOf(v).total, guess:true };
+}
+function printPayPlan(){
+  const today=invFmtDate(new Date());
+  const ym=today.slice(0,7);                       // 当月（YYYY-MM）
+  const monthLabel=invMonthLabel(ym);
+  const unpaid=(invoices||[]).filter(v=>!invIsPaid(v));
+
+  const thisMonth = unpaid.filter(v=>v.dueOn && String(v.dueOn).slice(0,7)===ym);
+  const over      = unpaid.filter(v=>v.dueOn && String(v.dueOn)<today && String(v.dueOn).slice(0,7)!==ym);
+  const nodate    = unpaid.filter(v=>!v.dueOn);
+  if(!thisMonth.length && !over.length && !nodate.length){ showToast('未払いの請求書がありません'); return; }
+
+  const bySupplier=(a,b)=>String(a.supplierName||'').localeCompare(String(b.supplierName||''),'ja');
+  thisMonth.sort((a,b)=> String(a.dueOn).localeCompare(String(b.dueOn)) || bySupplier(a,b));
+  over.sort((a,b)=> String(a.dueOn).localeCompare(String(b.dueOn)) || bySupplier(a,b));
+  nodate.sort(bySupplier);
+
+  const sum = l => l.reduce((s,v)=>s+payPlanAmount(v).yen, 0);
+  const rows = (l, withDue) => l.map(v=>{
+    const a=payPlanAmount(v);
+    const d=invDiff(v);
+    // 発注が1件も無い月は、差額を出しても意味がないので黙っておく
+    const diffNote = (d!==null && d!==0 && invOrdersOf(v).total>0)
+      ? `発注額と${d>0?'＋':'−'}¥${fmt(Math.abs(d))}` : '';
+    const money = (a.guess && !a.yen) ? '<b>金額未定</b>'
+      : `<b>¥${fmt(a.yen)}</b>${a.guess?'<span class="g">（発注額）</span>':''}`;
+    return `<tr>
+      <td class="c"><span class="box"></span></td>
+      ${withDue?`<td class="c">${v.dueOn?String(v.dueOn).slice(5).replace('-','/'):'—'}</td>`:''}
+      <td><b>${esc(v.supplierName)}</b></td>
+      <td class="r">${money}</td>
+      <td class="c" style="white-space:nowrap">${invMonthLabel(v.month)}</td>
+      <td class="g">${diffNote}${v.note?`${diffNote?'／':''}${esc(v.note)}`:''}</td>
+    </tr>`;
+  }).join('');
+  const block = (title, l, withDue, warn) => !l.length ? '' : `
+    <div class="sec${warn?' warn':''}">${title}　<span class="g">${l.length}件　合計 ¥${fmt(sum(l))}</span></div>
+    <table>
+      <thead><tr><th class="c" style="width:26px">済</th>${withDue?'<th class="c" style="width:44px">予定日</th>':''}
+        <th>会社名</th><th class="r" style="width:96px">金額</th>
+        <th class="c" style="width:86px;white-space:nowrap">請求月</th><th style="width:150px">メモ</th></tr></thead>
+      <tbody>${rows(l, withDue)}</tbody>
+    </table>`;
+
+  printHtml(`${monthLabel} 振込予定`, `
+    <style>
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}
+      th{background:#2a1e0e;color:#d4a96a;padding:5px 6px;text-align:left;font-weight:600}
+      td{border-bottom:0.5px solid #e8e0d0;padding:6px}
+      td.r,th.r{text-align:right} td.c,th.c{text-align:center}
+      .g{font-size:10px;color:#888;font-weight:400}
+      .r .g{display:block}
+      .box{display:inline-block;width:11px;height:11px;border:1px solid #999;border-radius:2px}
+      .sec{font-size:12px;font-weight:700;margin:14px 0 4px;padding-bottom:3px;border-bottom:1.5px solid #2a1e0e}
+      .sec.warn{color:#a4331f;border-bottom-color:#a4331f}
+      @page{size:A4 portrait;margin:12mm}
+    </style>
+    <div style="font-size:17px;font-weight:800">${monthLabel}　振込予定</div>
+    <div style="font-size:11px;color:#888;margin-bottom:4px">
+      未払いの請求書から作っています　作成 ${today.replace(/-/g,'/')}
+    </div>
+    ${block(`${monthLabel}に振り込むもの`, thisMonth, true, false)}
+    ${block('支払予定日を過ぎている未払い（繰越）', over, true, true)}
+    ${block('支払予定日がまだ決まっていないもの', nodate, false, true)}
+    <div style="margin-top:6px;text-align:right;font-size:13px;font-weight:800">
+      ${monthLabel}に振り込む合計：¥${fmt(sum(thisMonth))}
+    </div>
+    ${over.length?`<div style="text-align:right;font-size:12px;color:#a4331f">繰越を入れると：¥${fmt(sum(thisMonth)+sum(over))}</div>`:''}
+  `);
+}
+
 function printInvoiceList(){
   let list=(invoices||[]).slice();
   if(invFilterSupplier) list=list.filter(v=>v.supplierName===invFilterSupplier);

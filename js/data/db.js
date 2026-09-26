@@ -1670,8 +1670,17 @@ async function dbSendPushToNamesNow(targetNames, title, body, tab){
   await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body, tab } });
 }
 // 役割（staff など）でまとめて通知する
-async function dbSendPushToRole(targetRole, title, body, tab){
-  await sb.functions.invoke('send-push', { body: { targetRole, title, body, tab } });
+// 請求書が登録されたことを管理者にメールで知らせる（通知を消してしまっても残るように）。
+// 送り先は Secrets の INVOICE_MAIL_TO、無ければ管理者のアカウントのメールアドレス
+async function dbNotifyInvoice(invoiceId){
+  const { data, error } = await sb.functions.invoke('notify-invoice', { body:{ invoiceId } });
+  if(error || data?.error) console.warn('請求書のお知らせメールを送れませんでした：', data?.error || error?.message);
+  return data;
+}
+// excludeSelf を true にすると、送った本人には通知しない（自分の操作は知らせなくてよい）
+async function dbSendPushToRole(targetRole, title, body, tab, excludeSelf){
+  await sb.functions.invoke('send-push', { body: { targetRole, title, body, tab,
+    ...(excludeSelf ? { excludeUserId: currentUserId } : {}) } });
 }
 
 // ── リアルタイム同期（他端末の変更を反映） ──
