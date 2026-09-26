@@ -37,7 +37,9 @@ function isGroupThread(threadName){ return String(threadName||'').startsWith(GRO
 // ── お客様チャット（案件ごと。お客様ときよかわの担当だけ） ──
 //
 // スレッド名は「お客様：<案件名>」。社内の案件チャットとは別物で、お客様に社内のやりとりは見えない。
-// 入れるのは、その案件の client_user_id のお客様と、案件情報で選んだ社員だけ（migration-genba69.sql）。
+// 入れるのは、その案件に登録したお客様（project_clients。ご主人・奥様など何人でも）と、
+// 案件情報で選んだ社員だけ（migration-genba69.sql / migration-genba70.sql）。
+// 誰の発言かは、吹き出しの上に出る名前（sender_name＝そのお客様のお名前）で分かる。
 function clientChatOf(projectId){ return (clientChats||[]).find(c=>c.projectId===projectId) || null; }
 function clientThreadName(projectId){
   const c = clientChatOf(projectId);
@@ -99,6 +101,7 @@ async function fetchAllData(){
       clientUserId:r.client_user_id||null, clientEmail:r.client_email||'',
       clientChatMemberIds:r.client_chat_member_ids||[], clientChatMemberNames:r.client_chat_member_names||[]}));
 
+    await fetchProjectClients();   // 案件ごとのお客様（ご主人・奥様など）
     await fetchGenbaData();
     await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
     await fetchCardStatements();   // カード明細（管理者のみ。テーブルが無くても落とさない）
@@ -845,9 +848,11 @@ async function dbAddChatMessage(supplierName, msg){
       // お客様 → きよかわの担当者へ
       const names = (chat?.memberNames||[]).filter(Boolean);
       if(names.length) dbSendPushToNames(names, `${label}（お客様）`, preview, null).catch(()=>{});
-    } else if(proj?.clientUserId){
-      // きよかわ → お客様ご本人へ
-      dbSendPushToUser(proj.clientUserId, 'きよかわ より', preview, null).catch(()=>{});
+    } else {
+      // きよかわ → その案件のお客様（ご主人・奥様など、ご登録済みの方みなさん）へ
+      const ids = (proj?.clients||[]).map(c=>c.userId).filter(Boolean);
+      if(!ids.length && proj?.clientUserId) ids.push(proj.clientUserId);
+      ids.forEach(uid=>dbSendPushToUser(uid, 'きよかわ より', preview, null).catch(()=>{}));
     }
   } else if(isGroup){
     const g = groupById(group_id);
@@ -933,15 +938,63 @@ async function dbDeleteChatGroup(id){
 // ════ お客様のチャット案内（アカウントを作ってご案内メールを送る） ════
 //
 // 案件情報の「チャット案内」から呼ぶ。作られるのは「チャットだけ」のお客様アカウント。
-async function dbInviteClient(projectId, email){
+// displayName は、そのお客様のお名前。チャットの発言者名になる（ご主人・奥様の見分けに使う）
+async function dbInviteClient(projectId, email, displayName){
   const { data, error } = await sb.functions.invoke('invite-client', {
-    body: { projectId, email, redirectTo: location.origin + location.pathname }
+    body: { projectId, email, displayName: displayName||'', redirectTo: location.origin + location.pathname }
   });
   let detail = '';
   if(error){ try{ detail = (await error.context?.json?.())?.error || ''; }catch(_){} }
   const msg = data?.error || detail || (error ? error.message : '');
   if(msg){ showToast('ご案内メールを送れませんでした：'+msg, 6000); throw new Error(msg); }
   return data;
+}
+
+// ── 案件ごとのお客様（ご主人・奥様など何人でも。migration-genba70.sql） ──
+function projectClientRowTo(r){
+  return { id:r.id, name:r.name||'', email:r.email||'', userId:r.user_id||null, invitedAt:r.invited_at||'' };
+}
+// 1案件ぶん読み直す
+async function dbFetchProjectClients(projectId){
+  const { data, error } = await sb.from('project_clients').select('*').eq('project_id',projectId).order('id');
+  if(error){ console.warn('お客様の読み込みに失敗：',error.message); return []; }
+  return (data||[]).map(projectClientRowTo);
+}
+// 全案件ぶん読んで projects[].clients に載せる（表が無くても落とさない）
+async function fetchProjectClients(){
+  const { data, error } = await sb.from('project_clients').select('*').order('id');
+  if(error){ console.warn('お客様の読み込みに失敗：',error.message); return; }
+  const byProject = new Map();
+  (data||[]).forEach(r=>{
+    if(!byProject.has(r.project_id)) byProject.set(r.project_id, []);
+    byProject.get(r.project_id).push(projectClientRowTo(r));
+  });
+  projects.forEach(p=>{ p.clients = byProject.get(p.id) || []; });
+}
+// 画面の行をそのまま保存する。消された行は呼ぶ側（removeClientRow）で消している
+async function dbSaveProjectClients(projectId, rows){
+  const clean = (rows||[])
+    .map(r=>({ ...r, name:String(r.name||'').trim(), email:String(r.email||'').trim() }))
+    .filter(r=>r.email);
+  for(const r of clean){
+    if(r.id){
+      const { error } = await sb.from('project_clients').update({name:r.name, email:r.email}).eq('id',r.id);
+      if(error){ showToast('お客様の保存に失敗しました：'+error.message); throw error; }
+    } else {
+      const { data, error } = await sb.from('project_clients')
+        .insert({project_id:projectId, name:r.name, email:r.email}).select().single();
+      if(error){ showToast('お客様の保存に失敗しました：'+error.message); throw error; }
+      r.id = data.id;
+    }
+  }
+  const list = await dbFetchProjectClients(projectId);
+  const i = projects.findIndex(p=>p.id===projectId);
+  if(i>=0) projects[i].clients = list;
+  return list;
+}
+async function dbDeleteProjectClient(id){
+  const { error } = await sb.from('project_clients').delete().eq('id',id);
+  if(error){ showToast('削除に失敗しました：'+error.message); throw error; }
 }
 
 // 発注先チャットのきよかわ側発言をChatWorkへ転送（発注先にルームID設定がある場合のみ）。

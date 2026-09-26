@@ -57,7 +57,10 @@ Deno.serve(async (req) => {
     if (projErr || !project) return json({ error: "案件が見つかりません" }, 404);
 
     // 画面に出す名前。指定が無ければ案件の施主名から作る
-    const name = String(displayName || "").trim()
+    // その案件に登録済みのお客様の行（あれば、お名前を引き継ぐ）
+    const { data: clientRow } = await admin.from("project_clients")
+      .select("id, name, user_id").eq("project_id", projectId).ilike("email", email).maybeSingle();
+    const name = String(displayName || "").trim() || String(clientRow?.name || "").trim()
       || (project.client_name ? `${project.client_name} 様` : "お客様");
 
     const origin = req.headers.get("origin") || "";
@@ -107,8 +110,12 @@ Deno.serve(async (req) => {
       .upsert({ id: userId, role: "client", display_name: name, supplier_id: null, work_group: "" });
     if (profErr) return json({ error: "お客様の登録に失敗しました：" + profErr.message });
 
-    const { error: linkErr } = await admin.from("projects")
-      .update({ client_user_id: userId, client_email: email }).eq("id", projectId);
+    // 案件のお客様として登録する（1案件に何人でも。ご夫婦それぞれなど）
+    const { error: linkErr } = clientRow
+      ? await admin.from("project_clients")
+          .update({ user_id: userId, name, invited_at: new Date().toISOString() }).eq("id", clientRow.id)
+      : await admin.from("project_clients")
+          .insert({ project_id: projectId, user_id: userId, name, email, invited_at: new Date().toISOString() });
     if (linkErr) return json({ error: "案件への紐づけに失敗しました：" + linkErr.message });
 
     return json({ ok: true, created, userId, note: mailNote });

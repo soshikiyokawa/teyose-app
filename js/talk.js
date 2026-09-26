@@ -627,9 +627,12 @@ function openTalkPanelThread(supName){
     const c=clientChatOf(pid);
     const proj=(projects||[]).find(x=>x.id===pid);
     const names=(c?.memberNames||[]).filter(Boolean).join('、')||'—';
+    // お客様がお二人以上（ご主人・奥様など）なら、その全員のお名前を出す
+    const clientNames=(proj?.clients||[]).map(x=>x.name).filter(Boolean).join('、')
+      || (proj?.clientName ? `${proj.clientName} 様` : '');
     metaEl.textContent = isClientUser()
       ? `きよかわ（担当：${names}）とのやりとりです`
-      : `お客様${proj?.clientName?`（${proj.clientName} 様）`:''}とのやりとり／きよかわ：${names}`;
+      : `お客様${clientNames?`（${clientNames}）`:''}とのやりとり／きよかわ：${names}`;
   } else if(isGroupThread(supName)){
     const g=groupById(groupThreadIds[supName]);
     metaEl.innerHTML=`<button type="button" class="talk-group-meta" onclick="openGroupEditor(${g?g.id:'null'})" title="メンバー・グループ名の変更、退出">
@@ -749,15 +752,26 @@ function threadLabel(name){
 }
 
 // お客様チャットの既読。お客様が読んだら、きよかわ側の吹き出しに「既読」を出す。
-// きよかわ側が読んだことは、お客様には出さない（お客様は自分の既読しか見られない）
+// きよかわ側が読んだことは、お客様には出さない（お客様は自分の既読しか見られない）。
+// お客様がお二人以上（ご主人・奥様など）のときは、読んだ方のお名前を出す
 function clientReadMark(m){
   const t = activeTalkPanelSupplier;
   if(!isClientThread(t) || isClientUser()) return '';
   if(m.senderName !== currentUserDisplayName) return '';   // 自分が送ったものだけ
   const proj = (projects||[]).find(p=>p.id===clientThreadIds[t]);
-  if(!proj?.clientUserId) return '';
-  const rec = chatReads.find(r=>r.userId===proj.clientUserId && r.thread===threadKeyOf(t));
-  return (rec && rec.lastReadAt>=m.ts) ? '<span class="read-mark">既読</span>' : '';
+  if(!proj) return '';
+  const people = (proj.clients||[]).filter(c=>c.userId);
+  if(!people.length && proj.clientUserId) people.push({userId:proj.clientUserId, name:''});
+  if(!people.length) return '';
+  const key = threadKeyOf(t);
+  const read = people.filter(c=>{
+    const rec = chatReads.find(r=>r.userId===c.userId && r.thread===key);
+    return rec && rec.lastReadAt>=m.ts;
+  });
+  if(!read.length) return '';
+  const label = (people.length>1 && read.length<people.length)
+    ? `既読 ${read.map(c=>c.name||'お客様').join('、')}` : '既読';
+  return `<span class="read-mark">${esc(label)}</span>`;
 }
 
 function msgMarks(m){

@@ -44,6 +44,20 @@
   color:#fff;font-size:12px;font-weight:800;line-height:18px;text-align:center}
 .member-row.on .member-check{background:var(--accent);border-color:var(--accent)}
 
+/* お客様チャットの1人ぶんの行（お名前・メールアドレス・状態・ご案内ボタン） */
+.client-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.client-row input{flex:1 1 150px;min-width:0;font-size:13px;padding:7px 9px;border-radius:8px;
+  border:1px solid var(--border-s);background:var(--surface);color:var(--text);font-family:inherit}
+.client-row .cl-name{flex:0 1 140px}
+.client-row .cl-state{flex-shrink:0;font-size:11px;color:var(--text-muted);min-width:56px}
+.client-row .cl-state.on{color:var(--accent-t);font-weight:700}
+@media(max-width:600px){
+  /* スマホでは縦に積むので、お一人ぶんが1枚のカードに見えるようにする */
+  .client-row{gap:5px;border:1px solid var(--border-s);border-radius:10px;padding:8px;background:var(--surface2)}
+  .client-row input{flex:1 1 100%}
+  .client-row .cl-name{flex:1 1 100%}
+}
+
 /* 参加メンバーの要約タグ（折り返して表示） */
 .member-tag{display:inline-block;max-width:100%;font-size:11px;line-height:1.5;padding:2px 8px;border-radius:99px;
   background:var(--accent-bg);color:var(--accent-t);border:1px solid var(--accent);white-space:nowrap;

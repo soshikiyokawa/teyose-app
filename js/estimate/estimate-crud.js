@@ -530,6 +530,7 @@ function fillProjectInfoTab(p){
 // お客様に見えるのはこのチャットだけ。社内の案件チャットは見えない（migration-genba69.sql）。
 // きよかわ側の参加者はここで選ぶ。業者は候補に出さない。
 let clientChatMemberIds = [];   // 選んだ社員のID
+let clientRows = [];            // その案件のお客様（{id,name,email,userId,invitedAt}）
 
 function clientMemberCandidates(){
   return (allProfiles||[])
@@ -545,29 +546,65 @@ function clientMemberNames(){
 }
 
 // 案件を開いたときに、いまの設定を画面に出す
+// 案件を開いたときに、いまの設定を画面に出す
 function fillClientChatBox(p){
   clientChatMemberIds = [...((p?.clientChatMemberIds)||[])];
-  const mail = document.getElementById('client-email');
-  if(mail) mail.value = p?.clientEmail || '';
+  // お客様は何人でも。まだ1人も居なければ、空の行を1つ出しておく
+  clientRows = (p?.clients||[]).map(c=>({...c}));
+  if(!clientRows.length) clientRows = [{id:null, name:'', email:'', userId:null}];
   renderClientChatBox();
 }
+
+function addClientRow(){
+  clientRows.push({id:null, name:'', email:'', userId:null});
+  renderClientChatBox();
+  // 足した行の名前にすぐ入力できるようにする
+  const inputs = document.querySelectorAll('#client-rows .cl-name');
+  inputs[inputs.length-1]?.focus();
+}
+function setClientRow(i, field, v){ if(clientRows[i]) clientRows[i][field] = v; }
+async function removeClientRow(i){
+  const row = clientRows[i];
+  if(!row) return;
+  if((row.name || row.email) && !confirm(`${row.name||row.email} を、この案件のお客様から外しますか？
+すでにご案内済みの場合、この案件のチャットは見られなくなります。`)) return;
+  if(row.id){ try{ await dbDeleteProjectClient(row.id); }catch(_){ return; } }
+  clientRows.splice(i,1);
+  if(!clientRows.length) clientRows = [{id:null, name:'', email:'', userId:null}];
+  renderClientChatBox();
+}
+
 function renderClientChatBox(){
   const box = document.getElementById('client-chat-box');
   if(!box) return;
   // 案件がまだ保存されていないと、お客様チャットは作れない
   const saved = !!selectedProject?.id;
   box.style.opacity = saved ? '' : '.6';
+
+  const el = document.getElementById('client-rows');
+  if(el){
+    el.innerHTML = clientRows.map((c,i)=>`
+      <div class="client-row">
+        <input class="cl-name" value="${esc(c.name||'')}" placeholder="お名前（例：清川 太郎 様）"
+          oninput="setClientRow(${i},'name',this.value)">
+        <input class="cl-mail" type="email" value="${esc(c.email||'')}" placeholder="メールアドレス"
+          oninput="setClientRow(${i},'email',this.value)">
+        <span class="cl-state${c.userId?' on':''}">${c.userId ? '✓ 登録済み' : (c.invitedAt ? 'ご案内済み' : '未登録')}</span>
+        <button type="button" class="btn sm" onclick="inviteClientChat(${i})">${c.userId ? '再送' : 'チャット案内'}</button>
+        <button type="button" class="btn danger xs" onclick="removeClientRow(${i})" title="この行を外す">×</button>
+      </div>`).join('');
+  }
+
   const names = clientMemberNames().filter(Boolean);
   const sum = document.getElementById('client-members-summary');
   if(sum) sum.textContent = 'きよかわの参加者：' + (names.length ? names.join('、') : '未設定');
   const st = document.getElementById('client-chat-status');
-  const btn = document.getElementById('client-invite-btn');
   if(st){
+    const done = clientRows.filter(c=>c.userId).length;
     st.textContent = !saved ? '案件を保存すると使えます'
-      : selectedProject?.clientUserId ? '✓ お客様はご登録済みです（もう一度押すと、パスワード再設定のご案内を送れます）'
-      : 'メールアドレスを入れて「チャット案内」を押すと、お客様に登録のご案内が届きます';
+      : done ? `${done}人のお客様がご登録済みです。お名前は、チャットの発言者名として出ます`
+      : 'お名前とメールアドレスを入れて「チャット案内」を押すと、お客様に登録のご案内が届きます';
   }
-  if(btn) btn.textContent = selectedProject?.clientUserId ? 'ご案内を再送' : 'チャット案内';
 }
 
 function openClientMemberPicker(){
@@ -604,37 +641,57 @@ function toggleClientChatMember(id){
 }
 
 // お客様にチャットのご案内メールを送る。大事な操作なので2段階で確かめる
-async function inviteClientChat(){
+async function inviteClientChat(i){
   if(!selectedProject?.id){ alert('先に案件を保存してください。'); return; }
-  const email = (document.getElementById('client-email')?.value||'').trim();
-  if(!email){ alert('お客様のメールアドレスを入力してください。'); return; }
+  const row = clientRows[i];
+  if(!row){ return; }
+  const name = String(row.name||'').trim();
+  const email = String(row.email||'').trim();
+  if(!name){ alert('お名前を入力してください。チャットの発言者名になります。'); return; }
+  if(!email){ alert('メールアドレスを入力してください。'); return; }
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ alert('メールアドレスの形が正しくありません。'); return; }
   if(!clientChatMemberIds.length){ alert('きよかわ側の担当を1人以上選んでください。'); return; }
 
-  const again = !!selectedProject.clientUserId;
+  const again = !!row.userId;
   // ① 何をするかを示す
-  if(!confirm(`${selectedProject.name}\n\nこのメールアドレスへ、チャットのご案内メールを送ります。\n\n${email}\n\nお客様は、このメールからパスワードを決めてチャットを使えるようになります。`)) return;
-  // ② 宛先をもう一度確かめる（送り先を間違えると、他人にやりとりが見えてしまうため）
-  if(!confirm(`【最終確認】\n\n宛先に間違いがないか、もう一度ご確認ください。\n\n${email}\n\nこのアドレスへ${again?'ご案内を再送':'送信'}します。よろしいですか？`)) return;
+  if(!confirm(`${selectedProject.name}
 
-  const btn = document.getElementById('client-invite-btn');
-  if(btn){ btn.disabled = true; btn.textContent = '送信中…'; }
+${name} 様へ、チャットのご案内メールを送ります。
+
+${email}
+
+お客様は、このメールからパスワードを決めてチャットを使えるようになります。`)) return;
+  // ② 宛先をもう一度確かめる（送り先を間違えると、他人にやりとりが見えてしまうため）
+  if(!confirm(`【最終確認】
+
+宛先に間違いがないか、もう一度ご確認ください。
+
+${name} 様
+${email}
+
+このアドレスへ${again?'ご案内を再送':'送信'}します。よろしいですか？`)) return;
+
   try{
-    await saveProjectInfo();          // メールアドレスと担当を先に保存する
-    const res = await dbInviteClient(selectedProject.id, email);
-    // 紐づけはサーバー側で入るので、手元の案件にも反映しておく
-    if(res?.userId){
-      selectedProject.clientUserId = res.userId;
-      const i = projects.findIndex(p=>p.id===selectedProject.id);
-      if(i>=0){ projects[i].clientUserId = res.userId; projects[i].clientEmail = email; }
-    }
+    await saveProjectInfo();          // お名前・メールアドレス・担当を先に保存する
+    const res = await dbInviteClient(selectedProject.id, email, name);
+    if(res?.userId) row.userId = res.userId;
     showToast(res?.note || `${email} へご案内メールを送りました`, 6000);
   }catch(_){ /* 失敗の理由は dbInviteClient が出す */ }
   finally{
-    if(btn) btn.disabled = false;
+    try{ await refreshProjectClients(); }catch(_){}
     renderClientChatBox();
     try{ await fetchChatData(); }catch(_){}
   }
+}
+
+// 保存してある「その案件のお客様」を読み直して、画面に反映する
+async function refreshProjectClients(){
+  if(!selectedProject?.id) return;
+  const list = await dbFetchProjectClients(selectedProject.id);
+  selectedProject.clients = list;
+  const i = projects.findIndex(p=>p.id===selectedProject.id);
+  if(i>=0) projects[i].clients = list;
+  clientRows = list.length ? list.map(c=>({...c})) : [{id:null, name:'', email:'', userId:null}];
 }
 
 async function saveProjectInfo(){
@@ -658,7 +715,7 @@ async function saveProjectInfo(){
     parkingLat: window._parkingLat||null,
     parkingLng: window._parkingLng||null,
     members: (typeof projectMembers!=='undefined') ? [...projectMembers] : (base.members||[]),
-    clientEmail: (document.getElementById('client-email')?.value||'').trim(),
+    clientEmail: String(clientRows[0]?.email||'').trim(),   // 代表の1件（古い画面の表示用）
     clientChatMemberIds: [...clientChatMemberIds],
     clientChatMemberNames: clientMemberNames(),
     clientUserId: base.clientUserId||null
@@ -666,6 +723,10 @@ async function saveProjectInfo(){
   let savedId;
   try{ savedId=await dbSaveProject(proj); }catch(e){ return; }
   proj.id=savedId; proj.updatedAt=new Date().toISOString();
+  // お客様（ご主人・奥様など）の行も保存する。新しい行にはここでIDが入る
+  try{ proj.clients = await dbSaveProjectClients(savedId, clientRows); }catch(_){ proj.clients = base.clients||[]; }
+  if(proj.clients.length) clientRows = proj.clients.map(c=>({...c}));
+  renderClientChatBox();
   const i=projects.findIndex(p=>p.id===savedId);
   if(i>=0) projects[i]={...projects[i],...proj}; else projects.unshift(proj);
   selectedProject={...projects.find(p=>p.id===savedId)};
