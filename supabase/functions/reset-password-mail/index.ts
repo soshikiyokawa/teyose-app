@@ -37,7 +37,9 @@ const TOO_SOON_MS = 2 * 60 * 1000;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { email, redirectTo } = await req.json();
+    const payload = await req.json();
+
+    const { email, redirectTo } = payload || {};
     const to = String(email || "").trim().toLowerCase();
     // 送れたかどうかに関わらず同じ返事にする（どのアドレスが登録されているかを知られないため）
     const ok = () => json({ ok: true });
