@@ -203,6 +203,54 @@ function renderOrderDueNote(){
     : `${m}/${d}（${w}）　${when}`;
 }
 
+// ── 納品場所 ──
+//
+// 「現場」ならその案件の住所、「きよかわ加工場」なら可部の加工場、
+// 「その他」なら打った場所を、そのまま発注書に書く。
+const KIYOKAWA_FACTORY = '広島県広島市安佐北区可部2-13-7';
+
+// いま選ばれている納品場所を、発注データの形（種類と住所）で返す
+function orderDeliveryOf(projectName){
+  const place = document.getElementById('order-place')?.value || '現場';
+  if(place==='きよかわ加工場') return { place, address: KIYOKAWA_FACTORY };
+  if(place==='その他')         return { place, address: (document.getElementById('order-place-other')?.value||'').trim() };
+  const p = (projects||[]).find(x=>x.name===projectName);
+  return { place:'現場', address: (p?.address||'').trim() };
+}
+// 発注書・チャットに出す1行の書き方
+function orderDeliveryLabel(o){
+  const place = o?.deliveryPlace || '';
+  const addr  = (o?.deliveryAddress || '').trim();
+  if(place==='きよかわ加工場') return `きよかわ加工場${addr?`（${addr}）`:''}`;
+  if(place==='その他')         return addr || 'その他';
+  if(place==='現場')           return `${o?.project||''} 現場${addr?`（${addr}）`:''}`;
+  // 納品場所を選ぶ前に出した古い発注は、これまでどおり「現場」と書く
+  return `${o?.project||''} 現場`;
+}
+function orderPlaceChanged(){
+  const place = document.getElementById('order-place')?.value || '現場';
+  const other = document.getElementById('order-place-other');
+  if(other) other.style.display = place==='その他' ? '' : 'none';
+  if(place==='その他') other?.focus();
+  updateOrderPreviewBtnState();
+  renderOrderPlaceNote();
+}
+// 選んだ場所の住所を小さく添える（現場住所が未登録なら教える）
+function renderOrderPlaceNote(){
+  const note = document.getElementById('order-place-note');
+  if(!note) return;
+  const place = document.getElementById('order-place')?.value || '現場';
+  if(place==='きよかわ加工場'){ note.textContent = KIYOKAWA_FACTORY; return; }
+  if(place==='その他'){ note.textContent = '発注書には、ここに書いた場所をそのまま載せます'; return; }
+  const projectName = document.getElementById('order-project')?.value || '';
+  const addr = (projects||[]).find(x=>x.name===projectName)?.address || '';
+  const noSite = projectName==='在庫分' || (typeof isExpenseProject==='function' && isExpenseProject(projectName));
+  note.innerHTML = addr ? esc(addr)
+    : noSite ? 'この案件に現場はありません。「きよかわ加工場」か「その他」を選んでください'
+    : projectName ? '<b style="color:var(--warn-t)">この案件に現場住所が入っていません</b>（案件情報で登録できます）'
+    : '案件を選ぶと現場住所が出ます';
+}
+
 function backToStep1(){
   document.getElementById('order-step1').style.display='block';
   document.getElementById('order-step2').style.display='none';

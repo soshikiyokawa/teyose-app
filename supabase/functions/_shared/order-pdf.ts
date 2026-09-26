@@ -187,8 +187,19 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const staffName = String(o.createdByName || o.created_by_name || "").trim();
   if (staffName) drawRight(`担当者：${staffName}`, y - 47, 9, false, black);
 
+  // 納品場所。選んでいない古い発注は、これまでどおり「（物件名）現場」と書く
+  const payment0 = String(o.paymentMethod || o.payment_method || "");
+  const dPlace = String(o.deliveryPlace ?? o.delivery_place ?? "");
+  const dAddr = String(o.deliveryAddress ?? o.delivery_address ?? "").trim();
+  const deliveryLabel = dPlace === "きよかわ加工場" ? `きよかわ加工場${dAddr ? `（${dAddr}）` : ""}`
+    : dPlace === "その他" ? (dAddr || "その他")
+    : dPlace === "現場" ? `${o.project || ""} 現場${dAddr ? `（${dAddr}）` : ""}`
+    : `${o.project || ""} 現場`;
+  // レシート取り込み（支払済み）の発注に納品場所は無い
+  const placeLines = payment0 ? [] : wrapByWidth(`納品場所：${deliveryLabel}`, font, 10, tableW - 20);
+
   y -= 60;
-  const boxH = 86;
+  const boxH = 86 + placeLines.length * 15;
   page.drawRectangle({ x: marginX, y: y - boxH, width: tableW, height: boxH, color: lightBg });
   let iy = y - 16;
   drawRuns(page, `発注先：${o.suppliers || ""}`, { x: marginX + 10, y: iy, size: 10, font, color: black });
@@ -206,6 +217,11 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const payment = String(o.paymentMethod || o.payment_method || "");
   const dueLabel = o.dueAsap ? "最短" : (o.dueDate || "未指定");
   drawRuns(page, payment ? `支払方法：${payment}` : `納品希望日：${dueLabel}`, { x: marginX + 260, y: iy, size: 10, font, color: black });
+  // 納品場所（長いときは折り返す）
+  for (const line of placeLines) {
+    iy -= 15;
+    drawRuns(page, line, { x: marginX + 10, y: iy, size: 10, font, color: black });
+  }
 
   y -= boxH + 16;
   const colX = [marginX, marginX + 260, marginX + 320, marginX + 380, marginX + 440];
@@ -279,9 +295,8 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   y -= 14;
   const footNote = payment
     ? `この発注はレシートから取り込んだ支払済みの記録です（支払方法：${payment}）。`
-    : isExpense
-      ? "ご納品の際は担当者へご連絡ください。"
-      : `納品場所：${o.project || ""} 現場　／　ご納品の際は現場担当者へご連絡ください。`;
+    : `納品場所：${deliveryLabel}　／　ご納品の際は${
+        (dPlace && dPlace !== "現場") || isExpense ? "担当者" : "現場担当者"}へご連絡ください。`;
   drawRuns(page, footNote, {
     x: marginX, y, size: 8, font, color: gray,
   });

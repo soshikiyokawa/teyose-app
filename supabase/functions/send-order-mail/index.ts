@@ -142,6 +142,21 @@ function itemLines(order: any, max = 10): string[] {
   return head;
 }
 
+// 納品場所。選んでいない古い発注は、これまでどおり「（物件名）現場」と書く
+function deliveryLabel(order: any): string {
+  const place = String(order.deliveryPlace ?? order.delivery_place ?? "");
+  const addr = String(order.deliveryAddress ?? order.delivery_address ?? "").trim();
+  if (place === "きよかわ加工場") return `きよかわ加工場${addr ? `（${addr}）` : ""}`;
+  if (place === "その他") return addr || "その他";
+  if (place === "現場") return `${order.project || ""} 現場${addr ? `（${addr}）` : ""}`;
+  return `${order.project || ""} 現場`;
+}
+// 届け先が現場かどうかで、連絡先の書き方を変える
+function deliveryContact(order: any): string {
+  const place = String(order.deliveryPlace ?? order.delivery_place ?? "");
+  return place && place !== "現場" ? "ご納品の際は担当者へご連絡ください。" : "ご納品の際は現場担当者へご連絡ください。";
+}
+
 function buildText(order: any, sup: any, staffName: string): string {
   return [
     `${sup.name} 御中`,
@@ -161,8 +176,8 @@ function buildText(order: any, sup: any, staffName: string): string {
     "【品目】",
     ...itemLines(order),
     "",
-    `納品場所：${order.project || ""} 現場`,
-    "ご納品の際は現場担当者へご連絡ください。",
+    `納品場所：${deliveryLabel(order)}`,
+    deliveryContact(order),
     "",
     "──────────",
     COMPANY.name,
@@ -192,7 +207,7 @@ function buildHtml(order: any, sup: any, staffName: string): string {
   </table>
   <p style="margin-bottom:4px"><b>品目</b></p>
   ${rows}
-  <p>納品場所：${esc(order.project || "")} 現場<br>ご納品の際は現場担当者へご連絡ください。</p>
+  <p>納品場所：${esc(deliveryLabel(order))}<br>${esc(deliveryContact(order))}</p>
   <hr style="border:none;border-top:1px solid #ddd">
   <div style="font-size:12px;color:#777">
     ${esc(COMPANY.name)}<br>

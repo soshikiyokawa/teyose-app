@@ -38,7 +38,7 @@ function reShowOrder(i){
     return `・${esc(it.name)} × ${q}${esc(it.unit||'')}　${
       orig!==now ? `<span style="color:#999;text-decoration:line-through">¥${fmt(orig*q)}</span> ` : ''}¥${fmt(now*q)}`;
   }).join('<br>');
-  document.getElementById('order-pdf-body').innerHTML=`<div style="padding:20px;font-size:13px;color:#555;line-height:2"><strong>${o.no}</strong><br>発注日：${o.date}<br>納品希望日：${orderDueLabel(o)}<br>物件：${o.project}<br>発注先：${o.suppliers}<br>合計：¥${fmt(o.total)}<br><br>${rows}${orderPriceEditHtml(o)}</div>`;
+  document.getElementById('order-pdf-body').innerHTML=`<div style="padding:20px;font-size:13px;color:#555;line-height:2"><strong>${o.no}</strong><br>発注日：${o.date}<br>納品希望日：${orderDueLabel(o)}<br>${o.paymentMethod?'':`納品場所：${esc(orderDeliveryLabel(o))}<br>`}物件：${o.project}<br>発注先：${o.suppliers}<br>合計：¥${fmt(o.total)}<br><br>${rows}${orderPriceEditHtml(o)}</div>`;
   document.getElementById('order-pdf-foot').style.display='none';
   document.getElementById('order-pdf-overlay').classList.add('open');
 }

@@ -185,6 +185,9 @@ Deno.serve(async (req) => {
         // 作り直したPDFからも担当者が消えないように（migration-genba67.sql）
         createdByName: order.created_by_name || "",
         paymentMethod: order.payment_method || "",
+        // 納品場所も引き継ぐ（migration-genba71.sql）
+        deliveryPlace: order.delivery_place || "",
+        deliveryAddress: order.delivery_address || "",
       });
       await updateChatOrderCard(admin, orderNo, { items, subtotal, tax, total, pdfUrl });
     } catch (e) {

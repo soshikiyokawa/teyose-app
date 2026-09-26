@@ -895,6 +895,7 @@ function renderTalkPanelMessages(forceBottom){
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">📅 ${o.date}　📦 ${o.project}${
               (liveOrder||o).dueAsap ? '　🚚 <b style="color:var(--accent-t)">最短</b>'
               : (liveOrder||o).dueDate ? '　🚚 '+(liveOrder||o).dueDate : ''}</div>
+            ${(liveOrder||o).paymentMethod ? '' : `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">📍 ${esc(orderDeliveryLabel(liveOrder||o))}</div>`}
             ${itemRows}
             <div class="ocb-total">合計 ¥${fmt(showTotal)}</div>
             ${(typeof orderPriceEditHtml==='function' && liveOrder) ? orderPriceEditHtml(liveOrder) : ''}
