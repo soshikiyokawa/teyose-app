@@ -94,17 +94,58 @@ async function sendFile(roomId: string, url: string, name: string, message: stri
     return { ok: false, note: "（5MBを超えるため、リンクでお送りします）" };
   }
 
-  const fd = new FormData();
-  // Content-Type は指定しない（区切り記号をfetchに付けさせるため）
-  fd.append("file", blob, name || "file");
-  fd.append("message", message);
+  // 1回目は元の名前で。日本語のファイル名を受け付けないことがあるので、
+  // 断られたら英数字だけの名前でもう一度送る（それでもだめならリンクで送る）
+  const first = await uploadTo(roomId, blob, name || "file", message);
+  if (first.ok) return { ok: true, note: "" };
+  const ascii = asciiName(name);
+  if (ascii !== (name || "file")) {
+    const second = await uploadTo(roomId, blob, ascii, message);
+    if (second.ok) return { ok: true, note: "" };
+    return { ok: false, note: `（添付できませんでした：${first.status} ${first.body} ／ 名前を変えても ${second.status} ${second.body}）` };
+  }
+  return { ok: false, note: `（添付できませんでした：${first.status} ${first.body}）` };
+}
+
+// multipart/form-data を自分で組み立てて送る。
+// FormData をそのまま渡すと、送信の長さが決まらない形（chunked）になることがあり、
+// ChatWork 側に断られる。全体を1つのかたまりにして長さを明示する
+async function uploadTo(roomId: string, blob: Blob, name: string, message: string) {
+  const boundary = "----teyose" + crypto.randomUUID().replace(/-/g, "");
+  const enc = new TextEncoder();
+  const head = enc.encode(
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="message"\r\n\r\n${message}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Disposition: form-data; name="file"; filename="${name.replace(/"/g, "")}"\r\n` +
+    `Content-Type: ${blob.type || "application/octet-stream"}\r\n\r\n`,
+  );
+  const tail = enc.encode(`\r\n--${boundary}--\r\n`);
+  const file = new Uint8Array(await blob.arrayBuffer());
+  const body = new Uint8Array(head.length + file.length + tail.length);
+  body.set(head, 0);
+  body.set(file, head.length);
+  body.set(tail, head.length + file.length);
+
   const up = await fetch(`https://api.chatwork.com/v2/rooms/${encodeURIComponent(roomId)}/files`, {
     method: "POST",
-    headers: { "X-ChatWorkToken": CHATWORK_TOKEN },
-    body: fd,
+    headers: {
+      "X-ChatWorkToken": CHATWORK_TOKEN,
+      "Content-Type": `multipart/form-data; boundary=${boundary}`,
+      "Content-Length": String(body.length),
+    },
+    body,
   });
-  if (up.ok) return { ok: true, note: "" };
-  return { ok: false, note: `（添付できませんでした：${up.status}）` };
+  const why = up.ok ? "" : (await up.text()).slice(0, 120).replace(/\s+/g, " ");
+  return { ok: up.ok, status: up.status, body: why, name };
+}
+
+// 日本語を含まない名前にする（拡張子は残す）
+function asciiName(name: string): string {
+  const s = String(name || "");
+  const ext = (s.match(/\.[A-Za-z0-9]+$/) || [""])[0] || "";
+  const stem = s.slice(0, s.length - ext.length).replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "");
+  return (stem || "file") + (ext || "");
 }
 
 // ダッシュボードの Logs で追えるように、1件ごとに結果を1行残す。

@@ -29,33 +29,34 @@ const MAX_AT_ONCE = 12;
 const CRITERIA = {
   intro: "工務店（新築・リフォームの木工事）の職人が現場で撮った写真を、"
        + "会社のInstagramに載せる写真としてどのくらい向いているかで採点します。"
-       + "まず「何が写っているか」で基準の点を置き、そこから「写真としての出来」で上下させます。"
+       + "「何が写っているか（55点）」と「写真としての出来（45点）」を足して100点満点にします。"
        + "人が写っていることは減点ではありません。むしろ、職人が作業している姿は高く評価します。",
 
   // ① 何が写っているか。ここがいちばん効く
   subjects: [
-    { stars: 5, base: 90, title: "職人が作業している姿", reason: "人が働く姿がいちばん伝わる。顔が写っていてもよい" },
-    { stars: 5, base: 88, title: "大工＋手元＋木",       reason: "きよかわらしさが最も出る" },
-    { stars: 5, base: 88, title: "上棟中の大工",         reason: "動きと迫力がある" },
-    { stars: 5, base: 88, title: "若手に教えている瞬間", reason: "技術継承という会社の物語になる" },
-    { stars: 5, base: 85, title: "加工中の手・道具",     reason: "手の仕事が伝わる" },
-    { stars: 5, base: 85, title: "完成後に隠れる仕事",   reason: "一般のお客さまが見る機会がない" },
-    { stars: 4, base: 75, title: "木組み・納まりのアップ", reason: "技術力が伝わる" },
-    { stars: 4, base: 75, title: "整理された現場",       reason: "仕事への姿勢が伝わる" },
-    { stars: 3, base: 62, title: "材料・木材",           reason: "素材の話につなげやすい" },
-    { stars: 3, base: 62, title: "建築途中の空間",       reason: "設計の説明に使える" },
-    { stars: 2, base: 50, title: "現場全景",             reason: "記録感が強くなりやすい" },
+    { stars: 5, base: 55, title: "職人が作業している姿", reason: "人が働く姿がいちばん伝わる。顔が写っていてもよい" },
+    { stars: 5, base: 53, title: "大工＋手元＋木",       reason: "きよかわらしさが最も出る" },
+    { stars: 5, base: 53, title: "上棟中の大工",         reason: "動きと迫力がある" },
+    { stars: 5, base: 53, title: "若手に教えている瞬間", reason: "技術継承という会社の物語になる" },
+    { stars: 5, base: 50, title: "加工中の手・道具",     reason: "手の仕事が伝わる" },
+    { stars: 5, base: 50, title: "完成後に隠れる仕事",   reason: "一般のお客さまが見る機会がない" },
+    { stars: 4, base: 42, title: "木組み・納まりのアップ", reason: "技術力が伝わる" },
+    { stars: 4, base: 42, title: "整理された現場",       reason: "仕事への姿勢が伝わる" },
+    { stars: 3, base: 32, title: "材料・木材",           reason: "素材の話につなげやすい" },
+    { stars: 3, base: 32, title: "建築途中の空間",       reason: "設計の説明に使える" },
+    { stars: 2, base: 22, title: "現場全景",             reason: "記録感が強くなりやすい" },
   ],
-  subjectOther: { base: 45, label: "上のどれにも当てはまらないもの" },
+  subjectMax: 55,
+  subjectOther: { base: 15, label: "上のどれにも当てはまらないもの" },
 
   // ② 写真としての出来。基準の点から上下させる幅
   quality: {
-    swing: 15,
+    total: 45,
     points: [
-      { title: "主役がはっきりしているか", detail: "何の写真か一目で分かること" },
-      { title: "人の動きや表情が伝わるか", detail: "働いている様子が伝わるほどよい。人が写っていること自体は減点しない" },
-      { title: "明るさ",                   detail: "暗すぎ・白飛び・逆光で見えなくなっていないこと" },
-      { title: "構図",                     detail: "水平・垂直が取れていて、余計なものが写り込んでいないこと" },
+      { key: "lead",   max: 15, title: "主役がはっきりしているか", detail: "何の写真か一目で分かること" },
+      { key: "people", max: 10, title: "人の動きや表情が伝わるか", detail: "働いている様子が伝わるほどよい。人が写っていること自体は減点しない" },
+      { key: "light",  max: 10, title: "明るさ",                   detail: "暗すぎ・白飛び・逆光で見えなくなっていないこと" },
+      { key: "frame",  max: 10, title: "構図",                     detail: "水平・垂直が取れていて、余計なものが写り込んでいないこと" },
     ],
   },
 
@@ -77,7 +78,8 @@ const CRITERIA = {
     { from: 0,  to: 29,  label: "手ぶれ・真っ暗など写真として成立していない／載せてはいけないものが写っている" },
   ],
   notes: [
-    "点数はまず「何が写っているか」で決まります。腕のいい全景より、ふつうの手元のほうが高く出ます。",
+    "点数は「何が写っているか（55点）」＋「写真としての出来（45点）」の足し算です。1点単位で付きます。",
+    "腕のいい全景より、ふつうの手元のほうが高く出ます。",
     "人が写っていることは減点しません。職人が作業している姿はいちばん高く評価します（顔が写っていても構いません）。",
     "顔が写った写真を実際に載せるときは、念のためご本人に一言お願いします。",
     "一言コメントの頭に、どの写真と見たかを書かせています。見立てが違っていたら教えてください。",
@@ -87,51 +89,78 @@ const CRITERIA = {
 };
 
 function buildPrompt(): string {
-  const subs = CRITERIA.subjects
-    .map((s) => `- ${s.title}（${s.reason}）… ${s.base}点あたり`).join("\n");
-  const qual = CRITERIA.quality.points.map((p, i) => `${i + 1}. ${p.title}。${p.detail}`).join("\n");
+  const subs = CRITERIA.subjects.map((s) => `- ${s.title}（${s.reason}）… ${s.base}点`).join("\n");
+  const qual = CRITERIA.quality.points
+    .map((p) => `- ${p.key}（${p.title}）… 0〜${p.max}点。${p.detail}`).join("\n");
   const bands = CRITERIA.bands.map((b) => `- ${b.from}〜${b.to} … ${b.label}`).join("\n");
   return `これは工務店（新築・リフォームの木工事）の職人が現場で撮った写真です。
-この会社のInstagramに載せる写真としてどのくらい向いているかを、100点満点で採点してください。
+この会社のInstagramに載せる写真としてどのくらい向いているかを、項目ごとに点を付けてください。
+合計点はこちらで足すので、あなたは項目ごとの点だけを出してください。
 
-【手順1】何が写っているかを見て、基準の点を置く。ここがいちばん効きます。
+【1】subject … 何が写っているか。次から最も近いものを1つだけ選び、その名前をそのまま返す。
 ${subs}
-- ${CRITERIA.subjectOther.label} … ${CRITERIA.subjectOther.base}点あたり
-※ 当てはまるものが複数あれば、いちばん高いものを取る。
-※ 腕のいい全景より、ふつうに撮れた手元のほうを高くすること。
+- ${CRITERIA.subjectOther.label}（その他）… ${CRITERIA.subjectOther.base}点
+※ 当てはまるものが複数あれば、いちばん点の高いものを選ぶ。
 ※ 人（職人・お客さま）が写っていることは減点しない。働いている姿はむしろ高く評価する。
 　 顔がはっきり写っていても、それだけで下げないこと。
 
-【手順2】写真としての出来で、手順1の点を最大±${CRITERIA.quality.swing}点まで動かす。
+【2】写真としての出来。次の4つに、それぞれ点を付ける（合わせて${CRITERIA.quality.total}点）。
 ${qual}
 
-【手順3】次のものが写っていたら、何が写っていても29点以下にする。
+【3】ng … 次のものが写っていたら、その内容を短く書く。無ければ空文字。
 ${CRITERIA.gate.items.map((i) => "- " + i).join("\n")}
 
-点数の目安:
+点の付け方でとても大事なこと:
+- 各項目は1点単位で付ける。5点刻み・きりのよい数字に寄せない（13点、9点、7点のように付ける）
+- ふつうの出来なら、その項目の満点のおよそ6割。良ければ8〜9割、悪ければ2〜3割
+- 満点や0点は、はっきりそう言える写真だけに使う
+- 写真ごとに差が出るように、少しの違いでも点を変える
+
+参考（合計点の目安）:
 ${bands}
 
 comment は日本語30字以内。頭に「どの写真と見たか」を短く書き、そのあとに
 よければ何がよいか、惜しければ何を直せばよいかを書く。
 例：「木組みのアップ。水平が少し傾いている」
 「良い写真です」のような当たり障りのない言い方はしない。
-手順3のものが写っている場合は、必ずそれを書く。`;
+ng があるときは、必ずその内容を書く。`;
 }
 
 const PROMPT = buildPrompt();
 
 const TOOL = {
   name: "save_score",
-  description: "写真の採点を保存する",
+  description: "写真の採点を、項目ごとに保存する",
   input_schema: {
     type: "object" as const,
     properties: {
-      score: { type: "integer", description: "0〜100の点数" },
+      subject: { type: "string", description: "何が写っているか。一覧の名前をそのまま返す" },
+      lead:    { type: "integer", description: "主役のはっきりさ 0〜15点" },
+      people:  { type: "integer", description: "人の動きや表情 0〜10点" },
+      light:   { type: "integer", description: "明るさ 0〜10点" },
+      frame:   { type: "integer", description: "構図 0〜10点" },
+      ng:      { type: "string", description: "載せてはいけないものが写っていればその内容。無ければ空文字" },
       comment: { type: "string", description: "その点数にした理由。日本語30字以内" },
     },
-    required: ["score", "comment"],
+    required: ["subject", "lead", "people", "light", "frame", "ng", "comment"],
   },
 };
+
+// 項目ごとの点を足して合計を出す。丸い数字に寄らないよう、合計はこちらで計算する
+const SUBJECT_POINTS: Record<string, number> = Object.fromEntries(
+  CRITERIA.subjects.map((s) => [s.title, s.base]),
+);
+function totalFrom(input: any): { score: number; parts: Record<string, number>; subject: string } {
+  const clamp = (v: unknown, max: number) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
+  const name = String(input?.subject || "").trim();
+  const known = SUBJECT_POINTS[name] != null;
+  const parts: Record<string, number> = { subject: known ? SUBJECT_POINTS[name] : CRITERIA.subjectOther.base };
+  for (const p of CRITERIA.quality.points) parts[p.key] = clamp(input?.[p.key], p.max);
+  let score = Math.max(0, Math.min(100, Object.values(parts).reduce((a, b) => a + b, 0)));
+  // 載せてはいけないものが写っていたら、何が写っていても29点以下
+  if (String(input?.ng || "").trim()) score = Math.min(score, 29);
+  return { score, parts, subject: known ? name : CRITERIA.subjectOther.label };
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -201,8 +230,8 @@ Deno.serve(async (req) => {
 
         const use: any = message.content.find((c: any) => c.type === "tool_use");
         if (!use) throw new Error("採点できませんでした");
-        const score = Math.max(0, Math.min(100, Math.round(Number(use.input?.score))));
-        if (!Number.isFinite(score)) throw new Error("点数を読み取れませんでした");
+        const { score, parts, subject } = totalFrom(use.input);
+        console.log("score-photo", JSON.stringify({ id: row.id, score, subject, parts }));
         const comment = String(use.input?.comment || "").trim().replace(/\s+/g, " ").slice(0, 120);
 
         const { error: upErr } = await admin.from("nippo_photos")
