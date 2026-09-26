@@ -489,6 +489,16 @@ function _selectProjectSidebarGo(id){
 function fillProjectInfoTab(p){
   const sv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   sv('est-project', p?.name);
+  // 工事区分（案件一覧のカードの左上に出るもの）。選択肢は工事区分マスタから
+  const tsel = document.getElementById('info-type');
+  if(tsel){
+    const cur = p?.type || '';
+    const names = (typeof estimateTypes!=='undefined' ? estimateTypes : []).map(t=>t.name);
+    // 一覧に無い区分が入っている案件でも、その値を消してしまわないよう残す
+    if(cur && !names.includes(cur)) names.unshift(cur);
+    tsel.innerHTML = names.map(n=>`<option${n===cur?' selected':''}>${esc(n)}</option>`).join('');
+    if(cur) tsel.value = cur;
+  }
   sv('est-site', p?.address);
   sv('est-start-date', p?.startDate);
   sv('est-end-date', p?.endDate);
@@ -635,7 +645,7 @@ async function saveProjectInfo(){
     id: selectedProject?.id || undefined,
     name,
     clientName: base.clientName||'',
-    type: base.type||'新築',
+    type: document.getElementById('info-type')?.value || base.type || '新築',
     address: document.getElementById('est-site').value.trim(),
     note: base.note||'',
     startDate: document.getElementById('est-start-date').value||'',
@@ -662,6 +672,8 @@ async function saveProjectInfo(){
   selectedProjectName=proj.name;
   estDirty=false;
   renderProjectSidebar();
+  // 案件一覧のカード（工事区分・物件名・住所など）にもすぐ反映する
+  if(typeof renderOrdersList==='function') renderOrdersList();
   renderInfoGenbaSections && renderInfoGenbaSections();
   showToast('案件を保存しました');
 }
@@ -718,6 +730,9 @@ async function saveProject(){
     }
     closeProjectModal();
     renderProjectSidebar();
+    if(typeof renderOrdersList==='function') renderOrdersList();
+    // 案件情報タブを開いていれば、そちらの工事区分も合わせる
+    if(selectedProject?.id===proj.id) fillProjectInfoTab(selectedProject);
     showToast(editingProjectId?'案件を更新しました':'案件を作成しました');
   }catch(e){}
 }
