@@ -1925,6 +1925,35 @@ async function dbMailOrderToSupplier(order, sup, readyPdfUrl){
 //
 // 新しいメッセージが届いたときに、案件・見積・発注・タスクまで全部取り直していると
 // 何十件も通信が走って数秒かかる。チャットは2件だけ取れば足りるので分けてある。
+// お客様チャットの参加者（案件情報で選んだきよかわ側の担当）を読み直して、手元の案件に反映する。
+//
+// 案件を読み込んだあとに、ほかの端末・ほかの社員がお客様チャットを作った・担当を変えた場合、
+// 手元の案件は古いままで「自分が入っているお客様チャット」に気づけない。
+// チャットを組み立て直すたびに、この2列だけを軽く読み直す。
+// 手元の案件にも反映するので、そのあとの画面表示（案件情報の参加者欄）もそろう。
+// 読めなかったときは null を返し、呼び出し元は手元の案件のままで組み立てる。
+async function refreshClientChatMembership(){
+  if(!(currentUserRole==='staff'||currentUserRole==='carpenter')) return null;
+  try{
+    const { data, error } = await sb.from('projects')
+      .select('id, name, client_chat_member_ids, client_chat_member_names');
+    if(error) throw error;
+    const rows = data||[];
+    const byId = new Map(rows.map(r=>[r.id, r]));
+    projects.forEach(p=>{
+      const r = byId.get(p.id);
+      if(!r) return;
+      p.clientChatMemberIds   = r.client_chat_member_ids   || [];
+      p.clientChatMemberNames = r.client_chat_member_names || [];
+    });
+    return rows;
+  }catch(e){
+    // 列がまだ無い環境などでは、手元の案件のままで組み立てる
+    console.warn('お客様チャットの参加者を読み直せませんでした', e?.message||e);
+    return null;
+  }
+}
+
 async function fetchChatData(){
   // チャットは社内・発注先とも社員（管理者＋一般社員）は全件、
   // 案件チャットは参加メンバー、発注先は自社分のみ（RLSが自動で絞る）
@@ -1937,10 +1966,15 @@ async function fetchChatData(){
       if(error) throw error;
       clientChats = (data||[]).map(r=>({projectId:r.project_id, projectName:r.project_name, memberNames:r.member_names||[]}));
     } else {
-      // きよかわ側：案件情報で自分が選ばれているお客様チャットだけ
-      clientChats = (projects||[])
-        .filter(p=>(p.clientChatMemberIds||[]).includes(currentUserId))
-        .map(p=>({projectId:p.id, projectName:p.name, memberNames:p.clientChatMemberNames||[]}));
+      // きよかわ側：案件情報で自分が選ばれているお客様チャットだけ。
+      // 手元の案件が古いと、できたばかりのお客様チャットに気づけないので先に読み直す
+      const fresh = await refreshClientChatMembership();
+      clientChats = fresh
+        ? fresh.filter(r=>(r.client_chat_member_ids||[]).includes(currentUserId))
+               .map(r=>({projectId:r.id, projectName:r.name, memberNames:r.client_chat_member_names||[]}))
+        : (projects||[])
+               .filter(p=>(p.clientChatMemberIds||[]).includes(currentUserId))
+               .map(p=>({projectId:p.id, projectName:p.name, memberNames:p.clientChatMemberNames||[]}));
     }
   }catch(e){ console.warn('お客様チャットの取得に失敗しました', e); clientChats = []; }
   clientThreadIds = {};
@@ -1955,6 +1989,9 @@ async function fetchChatData(){
   talkThreads = {};
   chatRows.forEach(r=>{
     const name = chatThreadNameOfRow(r);
+    // 行き先の分からないものは置かない。
+    // 入れてしまうと「null」という名前のスレッドができ、発注先チャットに紛れ込む
+    if(!name) return;
     if(!talkThreads[name]) talkThreads[name]=[];
     talkThreads[name].push(chatRowToMsg(r));
   });
