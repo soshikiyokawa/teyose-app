@@ -56,16 +56,17 @@ const CRITERIA = {
       { key: "lead",   max: 15, title: "主役がはっきりしているか", detail: "何の写真か一目で分かること" },
       { key: "people", max: 10, title: "人の動きや表情が伝わるか", detail: "働いている様子が伝わるほどよい。人が写っていること自体は減点しない" },
       { key: "light",  max: 10, title: "明るさ",                   detail: "暗すぎ・白飛び・逆光で見えなくなっていないこと" },
-      { key: "frame",  max: 10, title: "構図",                     detail: "水平・垂直が取れていて、余計なものが写り込んでいないこと" },
+      { key: "frame",  max: 10, title: "構図・周りの片付き",       detail: "水平・垂直が取れていること。作業中の道具や材料は構わないが、関係のない物が目立つと下げる" },
     ],
   },
 
   // ③ これが写っていたら、何が写っていても29点以下
+  // 片付いていない・散らかっているのは、作業中なら当たり前なので29点以下にはしない。
+  // 「構図」の減点として扱う（Codexの指摘）
   gate: {
     title: "載せてはいけないものが写っていないか",
     items: [
       "表札・車のナンバー・図面の文字など、場所や個人が特定できるもの",
-      "散らかった様子",
       "安全上まずい状態（保護具なし・不安定な足場など）",
     ],
   },
@@ -92,7 +93,8 @@ function buildPrompt(): string {
   const subs = CRITERIA.subjects.map((s) => `- ${s.title}（${s.reason}）… ${s.base}点`).join("\n");
   const qual = CRITERIA.quality.points
     .map((p) => `- ${p.key}（${p.title}）… 0〜${p.max}点。${p.detail}`).join("\n");
-  const bands = CRITERIA.bands.map((b) => `- ${b.from}〜${b.to} … ${b.label}`).join("\n");
+  // 合計点の目安（bands）は指示文に入れない。入れると、その帯の数字に寄ってしまう。
+  // 画面の「採点基準」には出す（criteria で返している）
   return `これは工務店（新築・リフォームの木工事）の職人が現場で撮った写真です。
 この会社のInstagramに載せる写真としてどのくらい向いているかを、項目ごとに点を付けてください。
 合計点はこちらで足すので、あなたは項目ごとの点だけを出してください。
@@ -111,13 +113,13 @@ ${qual}
 ${CRITERIA.gate.items.map((i) => "- " + i).join("\n")}
 
 点の付け方でとても大事なこと:
-- 各項目は1点単位で付ける。5点刻み・きりのよい数字に寄せない（13点、9点、7点のように付ける）
-- ふつうの出来なら、その項目の満点のおよそ6割。良ければ8〜9割、悪ければ2〜3割
+- 各項目は1点単位で付ける。5点刻み・きりのよい数字（5・10・15）に寄せない
+- 「だいたい何割」で決めず、その写真で実際に見えたもので決める
+  例）主役：主役が画面の3分の1以上を占め、背景が邪魔していない＝高い／
+      何を見せたいか分からない＝低い
+  例）明るさ：顔や手元の細部が見える＝高い／暗部がつぶれている・白く飛んでいる＝低い
+- 4つの項目に同じ点を並べない。写真ごとに必ず差を付ける
 - 満点や0点は、はっきりそう言える写真だけに使う
-- 写真ごとに差が出るように、少しの違いでも点を変える
-
-参考（合計点の目安）:
-${bands}
 
 comment は日本語30字以内。頭に「どの写真と見たか」を短く書き、そのあとに
 よければ何がよいか、惜しければ何を直せばよいかを書く。
@@ -134,7 +136,11 @@ const TOOL = {
   input_schema: {
     type: "object" as const,
     properties: {
-      subject: { type: "string", description: "何が写っているか。一覧の名前をそのまま返す" },
+      subject: {
+        type: "string",
+        enum: [...CRITERIA.subjects.map((s) => s.title), CRITERIA.subjectOther.label],
+        description: "何が写っているか。一覧から1つ選ぶ",
+      },
       lead:    { type: "integer", description: "主役のはっきりさ 0〜15点" },
       people:  { type: "integer", description: "人の動きや表情 0〜10点" },
       light:   { type: "integer", description: "明るさ 0〜10点" },
@@ -157,6 +163,10 @@ function totalFrom(input: any): { score: number; parts: Record<string, number>; 
   const parts: Record<string, number> = { subject: known ? SUBJECT_POINTS[name] : CRITERIA.subjectOther.base };
   for (const p of CRITERIA.quality.points) parts[p.key] = clamp(input?.[p.key], p.max);
   let score = Math.max(0, Math.min(100, Object.values(parts).reduce((a, b) => a + b, 0)));
+  // 写真としての出来が極端に低い＝ぶれ・真っ暗などで成立していない。
+  // 被写体の点だけで55点になってしまうのを防ぐ（Codexの指摘）
+  const qualityTotal = CRITERIA.quality.points.reduce((a, p) => a + parts[p.key], 0);
+  if (qualityTotal <= 8) score = Math.min(score, 29);
   // 載せてはいけないものが写っていたら、何が写っていても29点以下
   if (String(input?.ng || "").trim()) score = Math.min(score, 29);
   return { score, parts, subject: known ? name : CRITERIA.subjectOther.label };
