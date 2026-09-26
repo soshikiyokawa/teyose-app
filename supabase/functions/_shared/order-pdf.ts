@@ -175,7 +175,7 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   drawRuns(page, "発 注 書", { x: marginX, y, size: 20, font, bold: true, color: black });
   drawRuns(page, "Purchase Order", { x: marginX, y: y - 16, size: 9, font, color: gray });
   if (lastEdit) {
-    drawRuns(page, `単価変更あり（${editedOn} 改定・${edits.length}回目）`, {
+    drawRuns(page, `訂正版（${editedOn} 改定・${edits.length}回目）`, {
       x: marginX + 92, y: y + 4, size: 9, font, bold: true, color: green,
     });
   }
@@ -288,7 +288,7 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   if (lastEdit) {
     y -= 12;
     const by = String(lastEdit.byName || "");
-    drawRuns(page, `この発注書は ${editedOn} に単価変更のため作り直したものです${by ? `（変更：${by}）` : ""}。`, {
+    drawRuns(page, `この発注書は ${editedOn} に金額を直して作り直した訂正版です${by ? `（変更：${by}）` : ""}。前の発注書は破棄してください（新しい発注ではありません）。`, {
       x: marginX, y, size: 8, font, color: gray,
     });
   }

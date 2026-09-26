@@ -312,6 +312,23 @@ async function notifyOrderPriceEdit(order, changed, data, note){
   // 社員全員（管理者＋一般社員）へ。自分が社員の場合は自分を除く
   await dbSendPush('employee', null, `${label}の変更：${order.suppliers}`, body, currentUserId, 'order/history')
     .catch(()=>{});
+  // ChatWorkにも訂正版を送り直す。
+  //
+  // 送らないと、発注先の手元には古い金額の発注書しか残らない。
+  // 新しい発注と間違われないよう、【訂正版】と発注番号を書き、前の分は破棄と伝える。
+  // 送れるのはきよかわの社員だけなので（chatwork-forward）、発注先が直したときは送らない
+  const sup = (suppliers||[]).find(s=>s.name===order.suppliers);
+  if(sup && currentUserRole!=='supplier'
+     && typeof orderChannelsOf==='function' && orderChannelsOf(sup).includes('chatwork')){
+    const cwText = `【訂正版】発注書 ${order.no}（${order.project}）\n`
+      + `${label}を直しました。\n${lines}\n`
+      + `合計 ¥${fmt(order.total)} → ¥${fmt(data.total)}\n`
+      + `新しい発注ではありません。前回お送りした発注書は破棄し、こちらでお願いします。`;
+    dbForwardToChatWork(sup.id, currentUserDisplayName||'', cwText,
+      data.pdfUrl ? {fileUrl:data.pdfUrl, fileName:`発注書_${order.no}_訂正版.pdf`, fileMime:'application/pdf'} : null)
+      .catch(()=>{});
+  }
+
   // その発注先とのチャットにも残す（通知はもう送ったので silent）
   await dbAddChatMessage(order.suppliers, {
     role: currentUserRole === 'supplier' ? 'them' : 'me',
