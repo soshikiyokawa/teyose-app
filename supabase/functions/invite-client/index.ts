@@ -23,6 +23,10 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const MAIL_FROM = Deno.env.get("INVITE_MAIL_FROM") || Deno.env.get("ORDER_MAIL_FROM") || "";
 const MAIL_BCC = Deno.env.get("INVITE_MAIL_BCC") || "";
+// はじめかたの資料（パソコン・スマートフォンそれぞれの開き方）。社員の招待メールと同じもの
+const MANUAL_URL = Deno.env.get("INVITE_CLIENT_MANUAL_URL") || Deno.env.get("INVITE_MANUAL_URL")
+  || `${SUPABASE_URL}/storage/v1/object/public/assets/docs/teyose-manual.pdf`;
+const MANUAL_NAME = "手寄 はじめかた.pdf";
 const COMPANY = "株式会社きよかわ";
 
 const corsHeaders = {
@@ -106,8 +110,11 @@ Deno.serve(async (req) => {
     }
 
     // ── お客様の権限（チャットだけ）と、案件への紐づけ ──
-    const { error: profErr } = await admin.from("profiles")
-      .upsert({ id: userId, role: "client", display_name: name, supplier_id: null, work_group: "" });
+    // 新しくお作りしたアカウントは、ご自分でパスワードを決めるまで false。
+    // false の間は、アプリを開くとパスワード設定の画面が出る（migration-genba72.sql）
+    const prof: Record<string, unknown> = { id: userId, role: "client", display_name: name, supplier_id: null, work_group: "" };
+    if (created) prof.password_set = false;
+    const { error: profErr } = await admin.from("profiles").upsert(prof);
     if (profErr) return json({ error: "お客様の登録に失敗しました：" + profErr.message });
 
     // 案件のお客様として登録する（1案件に何人でも。ご夫婦それぞれなど）
@@ -157,6 +164,21 @@ async function sendClientMail(to: string, name: string, projectName: string, lin
   const lead = again
     ? "すでにご登録いただいているアカウントです。下のボタンからパスワードを設定し直してご利用ください。"
     : "工事の進み具合のご連絡や、ご質問のやりとりに、チャットをご用意しました。";
+
+  // はじめかたの資料を添える（取れなくても、ご案内そのものは送る）
+  let attachments: Array<Record<string, string>> = [];
+  try {
+    const res = await fetch(MANUAL_URL);
+    if (res.ok) {
+      const buf = new Uint8Array(await res.arrayBuffer());
+      if (buf.length && buf.length < 8 * 1024 * 1024) {
+        attachments = [{ filename: MANUAL_NAME, content: toBase64(buf) }];
+      }
+    }
+  } catch (_) { /* 資料が取れなくても送る */ }
+  const manualNote = attachments.length
+    ? `パソコン・スマートフォンそれぞれの開き方は、添付の「${MANUAL_NAME}」をご覧ください。`
+    : "";
   const html = `<div style="font-family:'Hiragino Sans','Yu Gothic',sans-serif;font-size:14px;line-height:1.9;color:#16161a">
   <p>${esc(name)}</p>
   <p>いつもお世話になっております。${COMPANY}です。<br>${esc(lead)}</p>
@@ -167,10 +189,12 @@ async function sendClientMail(to: string, name: string, projectName: string, lin
     </a>
   </p>
   <p style="font-size:13px;color:#5a5a63">
-    ボタンを押すと画面が開きますので、お好きなパスワードをお決めください。<br>
+    ボタンを押すと画面が開きますので、お好きなパスワードをお決めください（8文字以上）。<br>
+    パスワードをお決めいただくまで、チャットはお使いいただけません。<br>
     次回からは、メールアドレスとそのパスワードでご利用いただけます。<br>
     ご覧いただけるのは、${COMPANY}とのチャットのみです。
   </p>
+  ${manualNote ? `<p style="font-size:13px;color:#5a5a63">${esc(manualNote)}</p>` : ""}
   <p style="font-size:13px;color:#5a5a63">
     リンクが開けない場合は、お手数ですが下のURLをブラウザに貼り付けてください。<br>
     <span style="word-break:break-all">${esc(link)}</span>
@@ -178,14 +202,17 @@ async function sendClientMail(to: string, name: string, projectName: string, lin
   <p style="font-size:12px;color:#8a8a93">このメールにお心当たりがない場合は、お手数ですが破棄してください。</p>
 </div>`;
   const text = `${name}\n\nいつもお世話になっております。${COMPANY}です。\n${lead}\n\n`
-    + `対象の工事：${projectName}\n\n下のURLを開いて、パスワードをお決めください。\n${link}\n\n`
+    + `対象の工事：${projectName}\n\n下のURLを開いて、パスワードをお決めください（8文字以上）。\n${link}\n\n`
+    + `パスワードをお決めいただくまで、チャットはお使いいただけません。\n`
     + `次回からは、メールアドレスとそのパスワードでご利用いただけます。\n`
-    + `ご覧いただけるのは、${COMPANY}とのチャットのみです。\n`;
+    + `ご覧いただけるのは、${COMPANY}とのチャットのみです。\n`
+    + (manualNote ? `\n${manualNote}\n` : "");
 
   const payload: Record<string, unknown> = {
     from: MAIL_FROM, to: [to], subject: `【${COMPANY}】${title}`, html, text,
   };
   if (MAIL_BCC) payload.bcc = [MAIL_BCC];
+  if (attachments.length) payload.attachments = attachments;
   try {
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -197,6 +224,15 @@ async function sendClientMail(to: string, name: string, projectName: string, lin
   } catch (e) {
     return { error: String((e as any)?.message || e) };
   }
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let bin = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(bin);
 }
 
 function json(body: unknown, status = 200) {

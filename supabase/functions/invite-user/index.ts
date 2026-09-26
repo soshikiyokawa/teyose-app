@@ -117,12 +117,15 @@ Deno.serve(async (req) => {
     }
 
     // ── プロフィール（権限・表示名・所属・勤怠区分）を作成 ──
+    // ご本人がパスワードを決めるまでは password_set = false。
+    // false の間は、アプリを開くとパスワード設定の画面が出る（migration-genba72.sql）
     const { error: profErr } = await admin.from("profiles").upsert({
       id: userId,
       role,
       display_name: displayName,
       supplier_id: role === "supplier" ? (supplierId || null) : null,
       work_group: role === "supplier" ? "" : (workGroup || ""),
+      password_set: false,
     });
     if (profErr) return json({ error: "プロフィールの作成に失敗しました：" + profErr.message });
 

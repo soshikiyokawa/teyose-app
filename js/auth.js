@@ -103,10 +103,13 @@ async function bootstrapApp(){
   updateTaskBadge();          // 自分あての未済タスクの件数
   pushNotifyPrefToSW();      // 通知の設定（バナー・サウンド）をService Workerへ
 
-  // 招待メール・パスワード再設定のリンクから来た場合：パスワード設定を求める
-  if(APP_NEEDS_PASSWORD_SETUP && !window._passwordSetupDone){
-    document.getElementById('invite-pass-modal').classList.add('open');
-    setTimeout(()=>document.getElementById('inv-pass1')?.focus(),100);
+  // パスワード設定を求める場面は2つ。
+  //   ① 招待メール・再設定メールのリンクから来たとき
+  //   ② まだご自分でパスワードを決めていないとき（profiles.password_set が false）
+  // ②があるので、リンクで入ったあと画面を読み込み直しても、決めるまで必ず出る
+  const mustSetPassword = profile.password_set === false;
+  if((APP_NEEDS_PASSWORD_SETUP || mustSetPassword) && !window._passwordSetupDone){
+    openInvitePassModal(mustSetPassword);
   }
 
   // 通知タップからの起動（URLハッシュ）／ログイン復元前に届いた遷移要求をここで開く
@@ -121,6 +124,18 @@ async function bootstrapApp(){
 }
 
 // ── 招待から来た人のパスワード設定 ──
+//
+// まだ決めていない人（must=true）には、決めるまで閉じられないことを伝える。
+// 画面を読み込み直しても、profiles.password_set が false のあいだは必ずまた出る。
+function openInvitePassModal(must){
+  const note = document.getElementById('inv-pass-note');
+  if(note) note.textContent = must
+    ? '今後のログインに使うパスワードを設定してください（8文字以上）。設定するまで、ご利用いただけません。'
+    : '手寄へようこそ。今後のログインに使うパスワードを設定してください（8文字以上）。';
+  document.getElementById('invite-pass-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('inv-pass1')?.focus(),100);
+}
+
 async function saveInvitePassword(){
   const p1=document.getElementById('inv-pass1').value;
   const p2=document.getElementById('inv-pass2').value;
@@ -131,6 +146,9 @@ async function saveInvitePassword(){
   const { error } = await sb.auth.updateUser({password:p1});
   btn.disabled=false; btn.textContent='パスワードを設定';
   if(error){ showToast('設定に失敗しました：'+error.message); return; }
+  // 決めたことを記録する（次に開いたときにまた出ないように）
+  try{ await sb.rpc('app_mark_password_set'); }
+  catch(e){ console.warn('パスワード設定の記録に失敗しました', e?.message||e); }
   window._passwordSetupDone=true;
   document.getElementById('invite-pass-modal').classList.remove('open');
   showToast('パスワードを設定しました。次回からこのパスワードでログインできます');

@@ -63,6 +63,10 @@ Deno.serve(async (req) => {
     });
     if (upErr) return json({ error: "設定に失敗しました：" + upErr.message }, 500);
 
+    // 管理者が決めたパスワードを本人にお伝えするので、設定済みとして扱う
+    // （これをしないと、本人が入ったときにパスワード設定の画面が出てしまう）
+    await admin.from("profiles").update({ password_set: true }).eq("id", userId);
+
     // ── ③ 記録（パスワードそのものは残さない） ──
     console.log(
       `パスワードを設定：対象=${updated?.user?.email || userId} 実行者=${caller.display_name || userData.user.email}`,
