@@ -72,7 +72,28 @@ function supplierNameById(id){
   return s ? s.name : '（不明な発注先）';
 }
 
+// 読み込みの仕事を、同時に limit 本までに絞って走らせる。
+// 弱い回線で何十本も同時に投げると帯域を取り合って逆に遅くなるため、空いた枠に次を流す
+async function runWithLimit(jobs, limit){
+  let i = 0;
+  const workers = Array.from({length: Math.min(limit, jobs.length)}, async () => {
+    while(i < jobs.length) await jobs[i++]();
+  });
+  await Promise.all(workers);
+}
+
 // ── 初回データ取得 ──
+//
+// スマホの回線では、Supabaseへの1往復に200ms前後かかる。
+// 以前はこれを40回以上「1つずつ」待っていたため、開いてから使えるまでに
+// 8〜10秒かかっていた（データ量は全部でも1MB足らずで、遅さの原因は往復の回数）。
+//
+// いまは ① 互いに関係しないものを一度に頼み ② 受け取ってから順に組み立てる。
+// 待ち時間は、いちばん遅い1本ぶんで済む。
+//
+// 組み立ての順番には決まりがある。
+//   ・発注先 → 品目・発注・原価（発注先の名前を引くため）
+//   ・案件・名簿 → チャット（スレッドの名前に案件名と相手の名前を使うため）
 async function fetchAllData(){
   // お客様（施主）はチャットだけの役割。ほかは権限が無く空で返るので、最初から取りに行かない
   if(isClientUser()){
@@ -80,110 +101,127 @@ async function fetchAllData(){
     await fetchChatData();
     return;
   }
-  const { data: supplierRows, error: supErr } = await sb.from('suppliers').select('*').order('sort_order').order('id');
-  if(supErr) throw supErr;
-  suppliers = supplierRows.map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',chatworkRoomId:r.chatwork_room_id||'',orderChannels:(Array.isArray(r.order_channels)&&r.order_channels.length)?r.order_channels:['chat'],sortOrder:r.sort_order,
+  const isEmployee = currentUserRole==='staff' || currentUserRole==='carpenter';
+  const isSupplierUser = currentUserRole==='supplier';
+
+  // ── ① いっぺんに頼む ──
+  //
+  // ただし本当に全部同時ではなく、8本ずつに絞って流す。
+  // 弱い回線で何十本も同時に投げると、帯域を取り合って逆に遅くなるため
+  const R = {};                                       // 受け取った生データの置き場
+  const get = (key, makeQuery) => () => Promise.resolve(makeQuery()).then(res => { R[key] = res; });
+  // 表がまだ無い環境でも止めないもの。失敗しても続ける
+  const soft = (fn, onFail) => () => fn().catch(e => {
+    console.warn('読み込みに失敗しました（続行）', e?.message || e);
+    if(onFail) onFail();
+  });
+
+  const jobs = [
+    get('suppliers', ()=>sb.from('suppliers').select('*').order('sort_order').order('id')),
+    get('master',    ()=>sb.from('master_items').select('*').order('sort_order').order('id')),
+    get('chat',      fetchChatRows),
+    soft(fetchProfiles),
+    soft(fetchMyNotifications, ()=>{ notificationsReady=false; }),
+    soft(fetchTasks,           ()=>{ tasksReady=false; }),
+    soft(fetchInvoices,        ()=>{ invoicesReady=false; }),
+    soft(fetchItemPriceChanges,()=>{ priceHistoryReady=false; }),
+  ];
+
+  if(isEmployee){
+    jobs.push(
+      get('projects',    ()=>sb.from('projects').select('*').order('updated_at',{ascending:false})),
+      get('projClients', ()=>sb.from('project_clients').select('*').order('id')),
+      get('estTypes',    ()=>sb.from('estimate_types').select('*').order('sort_order').order('id')),
+      get('estCats',     ()=>sb.from('estimate_categories').select('*').order('sort_order').order('id')),
+      get('estPresets',  ()=>sb.from('estimate_presets').select('*').order('sort_order').order('id')),
+      get('estDefaults', ()=>sb.from('estimate_defaults').select('*')),
+      get('estimates',   ()=>sb.from('estimates').select('*').order('updated_at',{ascending:false})),
+      get('orders',      ()=>sb.from('orders').select('*').order('created_at',{ascending:false})),
+      get('costs',       ()=>sb.from('cost_entries').select('*').order('created_at',{ascending:false})),
+      soft(fetchGenbaData),
+      soft(fetchCardStatements),
+      soft(fetchVehicles),
+      soft(fetchInspections),
+      soft(fetchAppSettings),
+      soft(fetchWorkCalendar),
+      soft(fetchInvoiceLines,  ()=>{ invoiceLinesReady=false; }),
+      soft(fetchInvoiceHints,  ()=>{ invoiceHints=[]; }),
+      soft(fetchTaskTemplates, ()=>{ taskTemplatesReady=false; }),
+    );
+  } else if(isSupplierUser){
+    jobs.push(
+      get('projects', ()=>sb.from('projects').select('*')),
+      get('orders',   ()=>sb.from('orders').select('*').order('date',{ascending:false})),
+      soft(fetchSupplierGenbaData),
+    );
+  }
+  await runWithLimit(jobs, 8);
+
+  // ── ② 受け取ったものを、順に組み立てる（ここから先は通信しない） ──
+  //
+  // 無いと画面が空っぽになってしまうものは、失敗をそのまま上に投げる。
+  // 黙って空の一覧を出すと「データが消えた」と勘違いさせてしまうため
+  for(const key of ['suppliers','master','projects','estimates','orders','costs']){
+    if(R[key]?.error) throw R[key].error;
+  }
+  suppliers = (R.suppliers.data||[]).map(r=>({id:r.id,name:r.name,contact:r.contact||'',tel:r.tel||'',email:r.email||'',cats:r.cats||'',note:r.note||'',chatworkRoomId:r.chatwork_room_id||'',orderChannels:(Array.isArray(r.order_channels)&&r.order_channels.length)?r.order_channels:['chat'],sortOrder:r.sort_order,
     closingDay:Number(r.closing_day)||0, invoiceRegNo:r.invoice_reg_no||''}));
   supplierIdSeq = Math.max(0,...suppliers.map(s=>s.id))+1;
 
-  const { data: itemRows, error: itemErr } = await sb.from('master_items').select('*').order('sort_order').order('id');
-  if(itemErr) throw itemErr;
-  master = itemRows.map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,price:Number(r.price),cost:Number(r.cost),supplier:supplierNameById(r.supplier_id),sortOrder:r.sort_order,
+  master = (R.master.data||[]).map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,price:Number(r.price),cost:Number(r.cost),supplier:supplierNameById(r.supplier_id),sortOrder:r.sort_order,
     makerCode:r.maker_code||'', webPrice:(r.web_price==null?null:Number(r.web_price)), webPriceAt:r.web_price_at||'',
     shipping:Number(r.shipping)||0, shippingPer:(r.shipping_per==='unit'?'unit':'order'),
     perBundle:Number(r.per_bundle)||0}));
   masterIdSeq = Math.max(0,...master.map(m=>m.id))+1;
 
-  // 案件と現場管理データは社内全員（staff＋carpenter）が取得する
-  if(currentUserRole==='staff'||currentUserRole==='carpenter'){
-    const { data: projectRows } = await sb.from('projects').select('*').order('updated_at',{ascending:false});
-    projects = (projectRows||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],coverPhotoId:r.cover_photo_id||null,actualStartDate:r.actual_start_date||'',handoverDate:r.handover_date||'',updatedAt:r.updated_at,
+  if(isEmployee){
+    projects = (R.projects?.data||[]).map(r=>({id:r.id,name:r.name,clientName:r.client_name||'',type:r.type||'新築',address:r.address||'',note:r.note||'',startDate:r.start_date||'',endDate:r.end_date||'',mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',parkingLat:r.parking_lat||null,parkingLng:r.parking_lng||null,members:r.members||[],coverPhotoId:r.cover_photo_id||null,actualStartDate:r.actual_start_date||'',handoverDate:r.handover_date||'',updatedAt:r.updated_at,
       clientUserId:r.client_user_id||null, clientEmail:r.client_email||'',
       clientChatMemberIds:r.client_chat_member_ids||[], clientChatMemberNames:r.client_chat_member_names||[]}));
+    applyProjectClients(R.projClients);   // 案件ごとのお客様（ご主人・奥様など）
 
-    await fetchProjectClients();   // 案件ごとのお客様（ご主人・奥様など）
-    await fetchGenbaData();
-    await fetchProfiles();   // 社員一覧（チャットの通知先選択などに使う）
-    await fetchCardStatements();   // カード明細（管理者のみ。テーブルが無くても落とさない）
-    await fetchVehicles();         // 車両管理（テーブルが無くても落とさない）
-    await fetchInspections();      // 定期点検（同上）
-    await fetchAppSettings();      // 会社共通の設定（同上）
-  } else if(currentUserRole==='supplier'){
-    // 業者：参加している案件だけ取得（RLSで自動的に絞られる）。案件情報の表示にも使う
-    const { data: projectRows } = await sb.from('projects').select('*');
-    projects = (projectRows||[])
+    estimateTypes = (R.estTypes?.data||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
+    estTypeIdSeq = Math.max(0,...estimateTypes.map(t=>t.id))+1;
+
+    estimateCategories = (R.estCats?.data||[]).map(r=>({id:r.id,name:r.name,workType:r.work_type||'新築',sortOrder:r.sort_order}));
+    estCatIdSeq = Math.max(0,...estimateCategories.map(c=>c.id))+1;
+
+    estimatePresets = (R.estPresets?.data||[]).map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,cost:Number(r.cost),workType:r.work_type||'新築',sortOrder:r.sort_order}));
+    estPresetIdSeq = Math.max(0,...estimatePresets.map(p=>p.id))+1;
+
+    estimateDefaults = {};
+    (R.estDefaults?.data||[]).forEach(r=>{estimateDefaults[r.type]=r.sections||[];});
+    renderPresetDatalists();
+
+    estimates = (R.estimates?.data||[]).map(rowToEstimate);
+    estSeq = estimates.length+1;
+
+    orders = (R.orders?.data||[]).map(orderRowTo);
+    costEntries = (R.costs?.data||[]).map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status}));
+  } else if(isSupplierUser){
+    // 業者：参加している案件だけ（RLSでも絞られる）。案件情報の表示にも使う
+    projects = (R.projects?.data||[])
       .filter(r=>isMyProjectMember(r.members))
       .map(r=>({id:r.id,name:r.name,type:r.type||'',address:r.address||'',note:r.note||'',
         startDate:r.start_date||'',endDate:r.end_date||'',actualStartDate:r.actual_start_date||'',handoverDate:r.handover_date||'',
         mapLat:r.map_lat||null,mapLng:r.map_lng||null,parkingAddress:r.parking_address||'',
         members:r.members||[]}));
-    // 現場写真・図面・フォルダ（参加している案件の分だけRLSが返す）
-    await fetchSupplierGenbaData();
-    await fetchProfiles();   // 名前だけの名簿（チャットの通知先を指名するのに使う）
     // 自社宛の発注（受領ボタンの状態に使う）
-    const { data: myOrders } = await sb.from('orders').select('*').order('date',{ascending:false});
-    orders = (myOrders||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,dueAsap:!!r.due_asap,costType:r.cost_type,
-      paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,
-      subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[],createdByName:r.created_by_name||'',deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||''}));
+    orders = (R.orders?.data||[]).map(orderRowTo);
   }
-  // チャットは、案件（と名簿）を読んだあとに組み立てる。
+
+  // チャットは、案件と名簿がそろってから組み立てる。
   // 先に組み立てると、案件チャット・お客様チャットの名前が「（削除された案件）」になってしまう
-  await fetchChatData();
+  buildChatData(R.chat);
+}
 
-  // 請求書は社内も発注先も見る（RLSで自社分に絞られる。テーブルが無くても落とさない）
-  try{ await fetchInvoices(); }catch(_){ invoicesReady=false; }
-  // 請求書の明細（現場ごとの請求原価）。社員だけが見る
-  if(currentUserRole==='staff'||currentUserRole==='carpenter'){
-    try{ await fetchInvoiceLines(); }catch(_){ invoiceLinesReady=false; }
-    // 請求書の読み取りのコツ（表がまだ無くても落とさない）
-    try{ await fetchInvoiceHints(); }catch(_){ invoiceHints=[]; }
-  }
-  // 単価の変更履歴（表がまだ無くても落とさない）
-  try{ await fetchItemPriceChanges(); }catch(_){ priceHistoryReady=false; }
-  // 通知履歴（表がまだ無くても落とさない）
-  try{ await fetchMyNotifications(); }catch(_){ notificationsReady=false; }
-  // タスク（表がまだ無くても落とさない）
-  try{ await fetchTasks(); }catch(_){ tasksReady=false; }
-  // 定型タスク（社員のみ。表がまだ無くても落とさない）
-  if(currentUserRole==='staff'||currentUserRole==='carpenter'){
-    try{ await fetchTaskTemplates(); }catch(_){ taskTemplatesReady=false; }
-  }
-
-  // 見積・原価・受発注データは管理者(staff)＋一般社員(carpenter)が取得（全機能アクセス）
-  if(currentUserRole==='staff'||currentUserRole==='carpenter'){
-    // 勤務カレンダーと会社共通の設定は、残業時間の数え方（所定労働時間・週の上限）に要る。
-    // 一般社員も自分の残業時間を見るので、社員なら誰でも読む（RLSも app_is_employee()）
-    await fetchWorkCalendar();
-    if(currentUserRole!=='staff') try{ await fetchAppSettings(); }catch(_){}
-
-    const { data: typeRows } = await sb.from('estimate_types').select('*').order('sort_order').order('id');
-    estimateTypes = (typeRows||[]).map(r=>({id:r.id,name:r.name,sortOrder:r.sort_order}));
-    estTypeIdSeq = Math.max(0,...estimateTypes.map(t=>t.id))+1;
-
-    const { data: catRows } = await sb.from('estimate_categories').select('*').order('sort_order').order('id');
-    estimateCategories = (catRows||[]).map(r=>({id:r.id,name:r.name,workType:r.work_type||'新築',sortOrder:r.sort_order}));
-    estCatIdSeq = Math.max(0,...estimateCategories.map(c=>c.id))+1;
-
-    const { data: presetRows } = await sb.from('estimate_presets').select('*').order('sort_order').order('id');
-    estimatePresets = (presetRows||[]).map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,cost:Number(r.cost),workType:r.work_type||'新築',sortOrder:r.sort_order}));
-    estPresetIdSeq = Math.max(0,...estimatePresets.map(p=>p.id))+1;
-
-    const { data: defRows } = await sb.from('estimate_defaults').select('*');
-    estimateDefaults = {};
-    (defRows||[]).forEach(r=>{estimateDefaults[r.type]=r.sections||[];});
-
-    renderPresetDatalists();
-
-    const { data: estRows } = await sb.from('estimates').select('*').order('updated_at',{ascending:false});
-    estimates = (estRows||[]).map(rowToEstimate);
-    estSeq = estimates.length+1;
-
-    const { data: orderRows } = await sb.from('orders').select('*').order('created_at',{ascending:false});
-    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,dueAsap:!!r.due_asap,costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[],createdByName:r.created_by_name||'',deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||''}));
-
-    const { data: costRows } = await sb.from('cost_entries').select('*').order('created_at',{ascending:false});
-    costEntries = (costRows||[]).map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status}));
-  }
+// 発注の行を、画面が使う形にする（社員も業者も同じ形）
+function orderRowTo(r){
+  return {id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,dueAsap:!!r.due_asap,costType:r.cost_type,
+    paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,
+    subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',
+    priceEdits:r.price_edits||[],createdByName:r.created_by_name||'',
+    deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||''};
 }
 
 function rowToEstimate(r){
@@ -980,16 +1018,23 @@ async function dbFetchProjectClients(projectId){
   if(error){ console.warn('お客様の読み込みに失敗：',error.message); return []; }
   return (data||[]).map(projectClientRowTo);
 }
-// 全案件ぶん読んで projects[].clients に載せる（表が無くても落とさない）
-async function fetchProjectClients(){
-  const { data, error } = await sb.from('project_clients').select('*').order('id');
-  if(error){ console.warn('お客様の読み込みに失敗：',error.message); return; }
+// 読んできた全案件ぶんの行を projects[].clients に載せる（表が無くても落とさない）
+function applyProjectClients(res){
+  if(!res || res.error){
+    if(res?.error) console.warn('お客様の読み込みに失敗：', res.error.message);
+    projects.forEach(p=>{ if(!p.clients) p.clients = []; });
+    return;
+  }
   const byProject = new Map();
-  (data||[]).forEach(r=>{
+  (res.data||[]).forEach(r=>{
     if(!byProject.has(r.project_id)) byProject.set(r.project_id, []);
     byProject.get(r.project_id).push(projectClientRowTo(r));
   });
   projects.forEach(p=>{ p.clients = byProject.get(p.id) || []; });
+}
+// 1回だけ読み直したいとき（案件情報の画面から）
+async function fetchProjectClients(){
+  applyProjectClients(await sb.from('project_clients').select('*').order('id'));
 }
 // 画面の行をそのまま保存する。消された行は呼ぶ側（removeClientRow）で消している
 async function dbSaveProjectClients(projectId, rows){
@@ -1088,10 +1133,17 @@ async function fetchProfiles(){
       workGroup:'', supplierId:p.supplier_id||null, hireDate:'', leaveAdjust:0, leaveAdjustNote:''}));
     return;
   }
-  // 有給の列（migration-genba20.sql）が未適用でも動くよう、失敗したら従来の列だけで取得する
+  // 有給の列（migration-genba20.sql）が未適用でも動くよう、失敗したら従来の列だけで取得する。
+  // 一般社員は名簿（employee_directory）も要るので、一緒に頼んで待ち時間を1回ぶんにする
   const BASE = 'id, display_name, role, work_group, supplier_id';
-  let { data: profs, error } = await sb.from('profiles').select(BASE+', hire_date, leave_adjust, leave_adjust_note').order('display_name');
-  if(error){
+  const [profRes, dirRes] = await Promise.all([
+    sb.from('profiles').select(BASE+', hire_date, leave_adjust, leave_adjust_note').order('display_name'),
+    currentUserRole!=='staff'
+      ? sb.from('employee_directory').select('id, display_name, role, work_group')
+      : Promise.resolve({data:null}),
+  ]);
+  let profs = profRes.data;
+  if(profRes.error){
     leaveColumnsReady = false;
     ({ data: profs } = await sb.from('profiles').select(BASE).order('display_name'));
   } else {
@@ -1103,7 +1155,7 @@ async function fetchProfiles(){
   // （有給の設定は含まれない名簿。migration-genba31.sql）
   if(currentUserRole!=='staff'){
     // 区分（role）の列はmigration-genba34.sqlで足したもの。無くても動くようにしておく
-    let { data: dir } = await sb.from('employee_directory').select('id, display_name, role, work_group');
+    let dir = dirRes.data;
     if(!dir) ({ data: dir } = await sb.from('employee_directory').select('id, display_name, work_group'));
     (dir||[]).forEach(p=>{
       if(allProfiles.some(x=>x.id===p.id)) return;
@@ -1156,56 +1208,66 @@ async function dbSetWorkGroup(userId, group){
 // ── 現場管理（写真・図面・日報・有給） ──
 // 発注先向け：現場写真・図面・フォルダだけ取得する（日報などは対象外）
 async function fetchSupplierGenbaData(){
-  const { data: photoRows } = await sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false});
+  // 3つは互いに関係しないので、いっぺんに頼む
+  const [photoRes, drawingRes, folderRes] = await Promise.all([
+    sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false}),
+    sb.from('drawings').select('*').order('created_at',{ascending:false}),
+    sb.from('site_folders').select('*').order('name'),
+  ]);
+  const photoRows = photoRes.data, drawingRows = drawingRes.data, folderRows = folderRes.data;
   sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
 
-  const { data: drawingRows } = await sb.from('drawings').select('*').order('created_at',{ascending:false});
   drawings = (drawingRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,kind:r.kind||'drawing',fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime||'',note:r.note||'',uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
 
-  const { data: folderRows } = await sb.from('site_folders').select('*').order('name');
   siteFolders = (folderRows||[]).map(r=>({id:r.id,projectId:r.project_id,kind:r.kind,parentId:r.parent_id||null,name:r.name,createdBy:r.created_by}));
 }
 
 async function fetchGenbaData(){
   // 残業時間の集計は覚えてあるので、元になる日報を取り直したら捨てる
   if(typeof otForgetHours==='function') otForgetHours();
-  const { data: photoRows } = await sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false});
+  // 現場管理の9つは互いに関係しないので、いっぺんに頼む（スマホでの待ち時間を減らすため）
+  const [photoRows_, drawingRows_, folderRows_, viewRows_, nippoRows_, npRows_, leaveRows_, holidayRows_, licRows_] = await Promise.all([
+    sb.from('site_photos').select('*').order('shot_date',{ascending:false}).order('id',{ascending:false}),
+    sb.from('drawings').select('*').order('created_at',{ascending:false}),
+    sb.from('site_folders').select('*').order('name'),
+    sb.from('drawing_views').select('*').order('viewed_at',{ascending:false}),
+    sb.from('daily_reports').select('*').order('work_date',{ascending:false}).order('id',{ascending:false}),
+    sb.from('nippo_photos').select('*').order('report_id',{ascending:false}).order('sort_order').order('id'),
+    sb.from('leave_requests').select('*').order('created_at',{ascending:false}),
+    sb.from('holiday_requests').select('*').order('created_at',{ascending:false}),
+    sb.from('licenses').select('*'),
+  ]);
+  const photoRows = photoRows_.data, drawingRows = drawingRows_.data, folderRows = folderRows_.data,
+        viewRows = viewRows_.data, nippoRows = nippoRows_.data,
+        leaveRows = leaveRows_.data, holidayRows = holidayRows_.data, licRows = licRows_.data;
   sitePhotos = (photoRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,url:r.url,caption:r.caption||'',shotDate:r.shot_date,uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
 
-  const { data: drawingRows } = await sb.from('drawings').select('*').order('created_at',{ascending:false});
   drawings = (drawingRows||[]).map(r=>({id:r.id,projectId:r.project_id,folderId:r.folder_id||null,kind:r.kind||'drawing',fileUrl:r.file_url,fileName:r.file_name,fileMime:r.file_mime||'',note:r.note||'',uploadedBy:r.uploaded_by,uploaderName:r.uploader_name||'',createdAt:r.created_at}));
 
-  const { data: folderRows } = await sb.from('site_folders').select('*').order('name');
   siteFolders = (folderRows||[]).map(r=>({id:r.id,projectId:r.project_id,kind:r.kind,parentId:r.parent_id||null,name:r.name,createdBy:r.created_by}));
 
-  const { data: viewRows } = await sb.from('drawing_views').select('*').order('viewed_at',{ascending:false});
   drawingViews = (viewRows||[]).map(r=>({id:r.id,drawingId:r.drawing_id,userId:r.user_id,userName:r.user_name||'',viewedAt:r.viewed_at}));
 
   // 日報・有給はRLSが自動で絞る（carpenter＝自分の分のみ／staff＝全員分）
-  const { data: nippoRows } = await sb.from('daily_reports').select('*').order('work_date',{ascending:false}).order('id',{ascending:false});
   dailyReports = (nippoRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',workKind:r.work_kind||'',content:r.content||'',startTime:r.start_time||'08:00',endTime:r.end_time||'18:00',breakMinutes:r.break_minutes,workMinutes:r.work_minutes,overtimeMinutes:r.overtime_minutes,otStatus:r.ot_status||'none',otApproverName:r.ot_approver_name||'',otReviewerName:r.ot_reviewer_name||'',otReviewNote:r.ot_review_note||''}));
 
   // 日報に付けた写真（表がまだ無くても落とさない）
-  try{
-    const { data: npRows, error: npErr } = await sb.from('nippo_photos').select('*')
-      .order('report_id',{ascending:false}).order('sort_order').order('id');
-    nippoPhotosReady = !npErr;
+  {
+    const npRows = npRows_.data;
+    nippoPhotosReady = !npRows_.error;
     nippoPhotos = (npRows||[]).map(r=>({id:r.id, reportId:r.report_id, url:r.url,
       caption:r.caption||'', sortOrder:r.sort_order||0,
       uploadedBy:r.uploaded_by, uploaderName:r.uploader_name||'', createdAt:r.created_at,
       igScore:(r.ig_score==null?null:Number(r.ig_score)),
       igComment:r.ig_comment||'', igScoredAt:r.ig_scored_at||''}));
-  }catch(_){ nippoPhotos=[]; nippoPhotosReady=false; }
+  }
 
-  const { data: leaveRows } = await sb.from('leave_requests').select('*').order('created_at',{ascending:false});
   leaveRequests = (leaveRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',startDate:r.start_date,endDate:r.end_date,leaveType:r.leave_type,days:Number(r.days),reason:r.reason||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,absenceDates:r.absence_dates||[],createdAt:r.created_at}));
 
-  const { data: holidayRows } = await sb.from('holiday_requests').select('*').order('created_at',{ascending:false});
   holidayRequests = (holidayRows||[]).map(r=>({id:r.id,userId:r.user_id,userName:r.user_name||'',workDate:r.work_date,projectId:r.project_id,projectName:r.project_name||'',reason:r.reason||'',substituteDate:r.substitute_date||null,approverName:r.approver_name||'',status:r.status,reviewerName:r.reviewer_name||'',reviewNote:r.review_note||'',reviewedAt:r.reviewed_at,createdAt:r.created_at}));
 
   // 免許・自動車保険（RLSで本人と管理者の分だけが返る）。migration-genba22.sql 未実行でも動くようにする
-  const { data: licRows, error: licErr } = await sb.from('licenses').select('*');
-  licenseTableReady = !licErr;
+  licenseTableReady = !licRows_.error;
   licenses = (licRows||[]).map(r=>({userId:r.user_id,userName:r.user_name||'',
     licenseNo:r.license_no||'', licenseExpire:r.license_expire||'', licensePhoto:r.license_photo||'',
     insurer:r.insurer||'', liabilityPerson:r.liability_person||'', liabilityObject:r.liability_object||'',
@@ -1955,43 +2017,61 @@ async function dbMailOrderToSupplier(order, sup, readyPdfUrl){
 // チャットを組み立て直すたびに、この2列だけを軽く読み直す。
 // 手元の案件にも反映するので、そのあとの画面表示（案件情報の参加者欄）もそろう。
 // 読めなかったときは null を返し、呼び出し元は手元の案件のままで組み立てる。
-async function refreshClientChatMembership(){
-  if(!(currentUserRole==='staff'||currentUserRole==='carpenter')) return null;
-  try{
-    const { data, error } = await sb.from('projects')
-      .select('id, name, client_chat_member_ids, client_chat_member_names');
-    if(error) throw error;
-    const rows = data||[];
-    const byId = new Map(rows.map(r=>[r.id, r]));
-    projects.forEach(p=>{
-      const r = byId.get(p.id);
-      if(!r) return;
-      p.clientChatMemberIds   = r.client_chat_member_ids   || [];
-      p.clientChatMemberNames = r.client_chat_member_names || [];
-    });
-    return rows;
-  }catch(e){
+//
+// 通信（clientChatMembershipRows）と反映（applyClientChatMembership）を分けてあるのは、
+// 起動時にほかの読み込みと一緒に走らせるため
+function clientChatMembershipRows(){
+  if(!(currentUserRole==='staff'||currentUserRole==='carpenter')) return Promise.resolve({data:null,error:null});
+  return sb.from('projects').select('id, name, client_chat_member_ids, client_chat_member_names');
+}
+function applyClientChatMembership(res){
+  if(!res || res.error || !res.data){
     // 列がまだ無い環境などでは、手元の案件のままで組み立てる
-    console.warn('お客様チャットの参加者を読み直せませんでした', e?.message||e);
+    if(res?.error) console.warn('お客様チャットの参加者を読み直せませんでした', res.error.message);
     return null;
   }
+  const byId = new Map(res.data.map(r=>[r.id, r]));
+  projects.forEach(p=>{
+    const r = byId.get(p.id);
+    if(!r) return;
+    p.clientChatMemberIds   = r.client_chat_member_ids   || [];
+    p.clientChatMemberNames = r.client_chat_member_names || [];
+  });
+  return res.data;
 }
 
-async function fetchChatData(){
-  // チャットは社内・発注先とも社員（管理者＋一般社員）は全件、
-  // 案件チャットは参加メンバー、発注先は自社分のみ（RLSが自動で絞る）
-  const { data: chatRows, error: chatErr } = await sb.from('chat_messages').select('*').order('created_at');
-  if(chatErr) throw chatErr;
-  // お客様チャット。お客様は案件そのものを見られないので、専用の手続きから受け取る
+// チャットの読み込みは「通信（fetchChatRows）」と「組み立て（buildChatData）」に分けてある。
+// 起動時は、ほかの読み込みと一緒に通信だけ先に走らせ、案件と名簿がそろってから組み立てる。
+// こうしないと、案件チャット・お客様チャットの名前が「（削除された案件）」になってしまう
+async function fetchChatRows(){
+  const [msgs, groups, reads, mine] = await Promise.all([
+    sb.from('chat_messages').select('*').order('created_at'),
+    sb.from('chat_groups').select('*').order('created_at'),
+    sb.from('chat_reads').select('*'),
+    // お客様チャットの持ち主。お客様は案件そのものを見られないので、専用の手続きから受け取る
+    isClientUser() ? sb.rpc('app_my_client_chats') : clientChatMembershipRows(),
+  ]);
+  if(msgs.error) throw msgs.error;
+  return { msgs, groups, reads, mine };
+}
+
+async function fetchChatData(prefetched){
+  const raw = prefetched || await fetchChatRows();
+  buildChatData(raw);
+}
+
+// 受け取った行から、画面が使う形に組み立てる（ここでは通信しない）
+function buildChatData(raw){
+  const chatRows = raw.msgs.data || [];
+  // お客様チャット
   try{
     if(isClientUser()){
-      const { data, error } = await sb.rpc('app_my_client_chats');
-      if(error) throw error;
-      clientChats = (data||[]).map(r=>({projectId:r.project_id, projectName:r.project_name, memberNames:r.member_names||[]}));
+      if(raw.mine?.error) throw raw.mine.error;
+      clientChats = (raw.mine?.data||[]).map(r=>({projectId:r.project_id, projectName:r.project_name, memberNames:r.member_names||[]}));
     } else {
       // きよかわ側：案件情報で自分が選ばれているお客様チャットだけ。
-      // 手元の案件が古いと、できたばかりのお客様チャットに気づけないので先に読み直す
-      const fresh = await refreshClientChatMembership();
+      // 手元の案件が古いと、できたばかりのお客様チャットに気づけないので読み直したものを使う
+      const fresh = applyClientChatMembership(raw.mine);
       clientChats = fresh
         ? fresh.filter(r=>(r.client_chat_member_ids||[]).includes(currentUserId))
                .map(r=>({projectId:r.id, projectName:r.name, memberNames:r.client_chat_member_names||[]}))
@@ -2003,11 +2083,8 @@ async function fetchChatData(){
   clientThreadIds = {};
 
   // グループは、自分がメンバーのものだけ返ってくる（RLS）。表がまだ無い環境でも止めない
-  try{
-    const { data: groupRows, error: groupErr } = await sb.from('chat_groups').select('*').order('created_at');
-    if(groupErr) throw groupErr;
-    chatGroups = (groupRows||[]).map(g=>({id:g.id, name:g.name, memberIds:g.member_ids||[], memberNames:g.member_names||[], createdBy:g.created_by||null}));
-  }catch(e){ console.warn('グループの取得に失敗しました', e); chatGroups = []; }
+  if(raw.groups?.error){ console.warn('グループの取得に失敗しました', raw.groups.error.message); chatGroups = []; }
+  else chatGroups = (raw.groups?.data||[]).map(g=>({id:g.id, name:g.name, memberIds:g.member_ids||[], memberNames:g.member_names||[], createdBy:g.created_by||null}));
   groupThreadIds = {};
   talkThreads = {};
   chatRows.forEach(r=>{
@@ -2023,8 +2100,7 @@ async function fetchChatData(){
   clientChats.forEach(c=>{ const n=clientThreadName(c.projectId); if(!talkThreads[n]) talkThreads[n]=[]; });
 
   // 既読管理
-  const { data: readRows } = await sb.from('chat_reads').select('*');
-  chatReads = (readRows||[]).map(chatReadRowTo);
+  chatReads = (raw.reads?.data||[]).map(chatReadRowTo);
 }
 
 // チャットの変更で呼ばれる。取り直すのはチャットだけにして、待ち時間を短くする。
@@ -2052,6 +2128,8 @@ function chatReadRowTo(r){
 }
 // 行 → どのスレッドのものか。分からなければ null（全件取り直しに落とす）
 function chatThreadNameOfRow(r){
+  // お客様に見えるのはお客様チャットだけ。ほかの行が混ざっても置かない
+  if(isClientUser() && !r.client_project_id) return null;
   if(r.client_project_id) return clientChatOf(r.client_project_id) ? clientThreadName(r.client_project_id) : null;
   if(r.group_id)          return groupById(r.group_id) ? groupThreadName(r.group_id) : null;
   if(r.direct_a)          return directThreadName(r.direct_a===currentUserId ? r.direct_b : r.direct_a);
