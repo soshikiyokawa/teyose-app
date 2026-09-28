@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     const { data: prof } = await admin.from("profiles").select("role").eq("id", userData.user.id).single();
     if (!(prof?.role === "staff" || prof?.role === "carpenter")) return json({ error: "権限がありません" }, 403);
 
-    const { supplierId, senderName, text, fileUrl, fileName } = await req.json();
+    const { supplierId, senderName, text, fileUrl, fileName, fileNameAscii } = await req.json();
     if (!supplierId || (!text && !fileUrl)) return json({ ok: true, skipped: "no-content" });
 
     // 発注先のChatWorkルームIDを取得（未設定なら転送しない）
@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
     // ファイルつき：ファイルそのものを添えて送る
     if (fileUrl) {
-      const sent = await sendFile(roomId, fileUrl, fileName, wrap(caption));
+      const sent = await sendFile(roomId, fileUrl, fileName, wrap(caption), fileNameAscii);
       if (sent.ok) return json({ ok: true, attached: true });
       // 添えられなかったときは、せめてリンクで届ける（ここで止めない）
       const r = await sendText(roomId, wrap(`${caption}\n${sent.note}\n${fileUrl}`));
@@ -81,7 +81,7 @@ async function sendText(roomId: string, body: string): Promise<{ ok: boolean; no
 }
 
 // ファイルを添えて投稿。Storageから取り直してChatWorkへ送り直す
-async function sendFile(roomId: string, url: string, name: string, message: string): Promise<{ ok: boolean; note: string }> {
+async function sendFile(roomId: string, url: string, name: string, message: string, asciiHint?: string): Promise<{ ok: boolean; note: string }> {
   let blob: Blob;
   try {
     const res = await fetch(url);
@@ -94,49 +94,43 @@ async function sendFile(roomId: string, url: string, name: string, message: stri
     return { ok: false, note: "（5MBを超えるため、リンクでお送りします）" };
   }
 
-  // 1回目は元の名前で。日本語のファイル名を受け付けないことがあるので、
-  // 断られたら英数字だけの名前でもう一度送る（それでもだめならリンクで送る）
-  const first = await uploadTo(roomId, blob, name || "file", message);
+  // ファイル名は、まず英数字だけの名前で送る。
+  // ChatWorkは日本語のファイル名を断ることがあるため、そちらを本命にして、
+  // だめだったときに元の名前でもう一度試す
+  // 呼び出し側が分かりやすい英数字の名前をくれていれば、それを使う
+  const ascii = asciiName(asciiHint || name);
+  const first = await uploadTo(roomId, blob, ascii, message);
   if (first.ok) return { ok: true, note: "" };
-  const ascii = asciiName(name);
-  if (ascii !== (name || "file")) {
-    const second = await uploadTo(roomId, blob, ascii, message);
+  if (name && name !== ascii) {
+    const second = await uploadTo(roomId, blob, name, message);
     if (second.ok) return { ok: true, note: "" };
-    return { ok: false, note: `（添付できませんでした：${first.status} ${first.body} ／ 名前を変えても ${second.status} ${second.body}）` };
+    return { ok: false, note: `（添付できませんでした：${first.status} ${first.body} ／ 元の名前でも ${second.status} ${second.body}）` };
   }
   return { ok: false, note: `（添付できませんでした：${first.status} ${first.body}）` };
 }
 
-// multipart/form-data を自分で組み立てて送る。
-// FormData をそのまま渡すと、送信の長さが決まらない形（chunked）になることがあり、
-// ChatWork 側に断られる。全体を1つのかたまりにして長さを明示する
+// multipart/form-data で送る。
+//
+// 組み立ては FormData に任せ、いったん Request に入れて「かたまり」に変える。
+// こうすると境界文字・改行・長さの扱いを自分で書かずに済み、
+// 送信の長さが決まらない形（chunked。ChatWorkに断られる）にもならない。
+//
+// 並びは curl の例（-F file=… -F message=…）に合わせて、ファイルを先にする。
 async function uploadTo(roomId: string, blob: Blob, name: string, message: string) {
-  const boundary = "----teyose" + crypto.randomUUID().replace(/-/g, "");
-  const enc = new TextEncoder();
-  const head = enc.encode(
-    `--${boundary}\r\n` +
-    `Content-Disposition: form-data; name="message"\r\n\r\n${message}\r\n` +
-    `--${boundary}\r\n` +
-    `Content-Disposition: form-data; name="file"; filename="${name.replace(/"/g, "")}"\r\n` +
-    `Content-Type: ${blob.type || "application/octet-stream"}\r\n\r\n`,
-  );
-  const tail = enc.encode(`\r\n--${boundary}--\r\n`);
-  const file = new Uint8Array(await blob.arrayBuffer());
-  const body = new Uint8Array(head.length + file.length + tail.length);
-  body.set(head, 0);
-  body.set(file, head.length);
-  body.set(tail, head.length + file.length);
+  const fd = new FormData();
+  fd.append("file", new File([blob], name.replace(/"/g, ""), { type: blob.type || "application/pdf" }));
+  fd.append("message", message);
+
+  const packed = new Request("https://api.chatwork.com/", { method: "POST", body: fd });
+  const contentType = packed.headers.get("content-type") || "";
+  const body = new Uint8Array(await packed.arrayBuffer());
 
   const up = await fetch(`https://api.chatwork.com/v2/rooms/${encodeURIComponent(roomId)}/files`, {
     method: "POST",
-    headers: {
-      "X-ChatWorkToken": CHATWORK_TOKEN,
-      "Content-Type": `multipart/form-data; boundary=${boundary}`,
-      "Content-Length": String(body.length),
-    },
+    headers: { "X-ChatWorkToken": CHATWORK_TOKEN, "Content-Type": contentType },
     body,
   });
-  const why = up.ok ? "" : (await up.text()).slice(0, 120).replace(/\s+/g, " ");
+  const why = up.ok ? "" : (await up.text()).slice(0, 160).replace(/\s+/g, " ");
   return { ok: up.ok, status: up.status, body: why, name };
 }
 

@@ -325,7 +325,7 @@ async function notifyOrderPriceEdit(order, changed, data, note){
       + `合計 ¥${fmt(order.total)} → ¥${fmt(data.total)}\n`
       + `新しい発注ではありません。前回お送りした発注書は破棄し、こちらでお願いします。`;
     dbForwardToChatWork(sup.id, currentUserDisplayName||'', cwText,
-      data.pdfUrl ? {fileUrl:data.pdfUrl, fileName:`発注書_${order.no}_訂正版.pdf`, fileMime:'application/pdf'} : null)
+      data.pdfUrl ? {fileUrl:data.pdfUrl, fileName:`発注書_${order.no}_訂正版.pdf`, fileNameAscii:`order_${order.no}_revised.pdf`, fileMime:'application/pdf'} : null)
       .catch(()=>{});
   }
 

@@ -1012,7 +1012,17 @@ async function dbForwardToChatWork(supplierId, senderName, text, file){
   const sup = suppliers.find(s=>s.id===supplierId);
   if(!sup || !sup.chatworkRoomId) return; // ルーム未設定なら送らない（無駄打ち防止）
   if(!orderChannelsOf(sup).includes('chatwork')) return;   // 送付先に選ばれていない
-  await sb.functions.invoke('chatwork-forward', { body:{ supplierId, senderName, text, ...(file||{}) } });
+  const { data, error } = await sb.functions.invoke('chatwork-forward', { body:{ supplierId, senderName, text, ...(file||{}) } });
+  // ファイルを添えたつもりが添わずリンクになった場合は、その理由を画面に出す。
+  // 出さないと「送ったつもり」のまま気づけない（ChatWork側にはリンクだけが届く）
+  if(file?.fileUrl){
+    if(error || data?.error){
+      showToast(`ChatWorkへ送れませんでした：${data?.error || error?.message || ''}`, 8000);
+    } else if(data && data.attached===false){
+      showToast(`ChatWorkにはリンクで届きました${data.note ? '：'+data.note : ''}`, 8000);
+    }
+  }
+  return data;
 }
 
 // チャット添付ファイル（写真・PDF等）をSupabase Storageにアップロードし、公開URLを返す
@@ -1887,7 +1897,7 @@ async function dbSendOrderToSupplier(order){
       + (order.paymentMethod ? '' : `\n納品場所：${orderDeliveryLabel(order)}`)
       + (staffName ? `\n担当者：${staffName}` : '');
     dbForwardToChatWork(sup?.id, staffName, preview,
-      pdfUrl ? {fileUrl:pdfUrl, fileName:`発注書_${order.no}.pdf`, fileMime:'application/pdf'} : null).catch(()=>{});
+      pdfUrl ? {fileUrl:pdfUrl, fileName:`発注書_${order.no}.pdf`, fileNameAscii:`order_${order.no}.pdf`, fileMime:'application/pdf'} : null).catch(()=>{});
   }
 
   // メール（発注書PDFを添えて送る）
