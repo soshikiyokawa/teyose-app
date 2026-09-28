@@ -188,6 +188,8 @@ Deno.serve(async (req) => {
         // 納品場所も引き継ぐ（migration-genba71.sql）
         deliveryPlace: order.delivery_place || "",
         deliveryAddress: order.delivery_address || "",
+        // 備考も引き継ぐ（migration-genba73.sql）
+        note: order.note || "",
       });
       await updateChatOrderCard(admin, orderNo, { items, subtotal, tax, total, pdfUrl });
     } catch (e) {

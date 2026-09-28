@@ -191,12 +191,16 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   const payment0 = String(o.paymentMethod || o.payment_method || "");
   const dPlace = String(o.deliveryPlace ?? o.delivery_place ?? "");
   const dAddr = String(o.deliveryAddress ?? o.delivery_address ?? "").trim();
-  const deliveryLabel = dPlace === "きよかわ加工場" ? `きよかわ加工場${dAddr ? `（${dAddr}）` : ""}`
-    : dPlace === "その他" ? (dAddr || "その他")
-    : dPlace === "現場" ? `${o.project || ""} 現場${dAddr ? `（${dAddr}）` : ""}`
+  // 場所の名前と住所は行を分ける。住所は必ず出す（現場でも加工場でも）
+  const deliveryName = dPlace === "きよかわ加工場" ? "きよかわ加工場"
+    : dPlace === "その他" ? (dAddr ? "ご指定の場所" : "その他")
     : `${o.project || ""} 現場`;
+  const deliveryLabel = deliveryName + (dAddr ? `（${dAddr}）` : "");
   // レシート取り込み（支払済み）の発注に納品場所は無い
-  const placeLines = payment0 ? [] : wrapByWidth(`納品場所：${deliveryLabel}`, font, 10, tableW - 20);
+  const placeLines = payment0 ? [] : [
+    ...wrapByWidth(`納品場所：${deliveryName}`, font, 10, tableW - 20),
+    ...(dAddr ? wrapByWidth(`　　　　　${dAddr}`, font, 10, tableW - 20) : []),
+  ];
 
   y -= 60;
   const boxH = 86 + placeLines.length * 15;
@@ -288,6 +292,26 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
     const first = edits[0];
     y -= 16;
     drawRight(`（当初の合計：¥${fmt(first?.total?.before)}）`, y, 8.5, false, gray);
+  }
+
+  // 備考（自由記述）。品目や納品場所だけでは伝えきれないことを、枠で囲んで載せる
+  const noteText = String(o.note || "").trim();
+  if (noteText) {
+    const noteLines = noteText.split("\n").flatMap((l: string) => wrapByWidth(l, font, 10, tableW - 24));
+    const boxHeight = 20 + noteLines.length * 14;
+    newPageIfNeeded(boxHeight + 40);
+    y -= 26;
+    page.drawRectangle({
+      x: marginX, y: y - boxHeight + 14, width: tableW, height: boxHeight,
+      borderColor: lineColor, borderWidth: 0.8, color: lightBg,
+    });
+    drawRuns(page, "備考", { x: marginX + 12, y: y, size: 8, font, color: gray });
+    let ny = y - 14;
+    for (const line of noteLines) {
+      drawRuns(page, line, { x: marginX + 12, y: ny, size: 10, font, color: black });
+      ny -= 14;
+    }
+    y = y - boxHeight + 14;
   }
 
   y -= 24;

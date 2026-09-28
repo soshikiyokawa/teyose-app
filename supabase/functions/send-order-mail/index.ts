@@ -142,14 +142,17 @@ function itemLines(order: any, max = 10): string[] {
   return head;
 }
 
-// 納品場所。選んでいない古い発注は、これまでどおり「（物件名）現場」と書く
-function deliveryLabel(order: any): string {
+// 納品場所。名前と住所は行を分けて書く（住所は現場でも加工場でも必ず出す）。
+// 選んでいない古い発注は、これまでどおり「（物件名）現場」と書く
+function deliveryName(order: any): string {
   const place = String(order.deliveryPlace ?? order.delivery_place ?? "");
-  const addr = String(order.deliveryAddress ?? order.delivery_address ?? "").trim();
-  if (place === "きよかわ加工場") return `きよかわ加工場${addr ? `（${addr}）` : ""}`;
-  if (place === "その他") return addr || "その他";
-  if (place === "現場") return `${order.project || ""} 現場${addr ? `（${addr}）` : ""}`;
+  const addr = deliveryAddr(order);
+  if (place === "きよかわ加工場") return "きよかわ加工場";
+  if (place === "その他") return addr ? "ご指定の場所" : "その他";
   return `${order.project || ""} 現場`;
+}
+function deliveryAddr(order: any): string {
+  return String(order.deliveryAddress ?? order.delivery_address ?? "").trim();
 }
 // 届け先が現場かどうかで、連絡先の書き方を変える
 function deliveryContact(order: any): string {
@@ -176,8 +179,12 @@ function buildText(order: any, sup: any, staffName: string): string {
     "【品目】",
     ...itemLines(order),
     "",
-    `納品場所：${deliveryLabel(order)}`,
+    `納品場所：${deliveryName(order)}`,
+    deliveryAddr(order) ? `　　　　　${deliveryAddr(order)}` : "",
     deliveryContact(order),
+    order.note ? "" : "",
+    order.note ? "【備考】" : "",
+    order.note ? String(order.note) : "",
     "",
     "──────────",
     COMPANY.name,
@@ -207,7 +214,8 @@ function buildHtml(order: any, sup: any, staffName: string): string {
   </table>
   <p style="margin-bottom:4px"><b>品目</b></p>
   ${rows}
-  <p>納品場所：${esc(deliveryLabel(order))}<br>${esc(deliveryContact(order))}</p>
+  <p>納品場所：${esc(deliveryName(order))}${deliveryAddr(order) ? `<br><span style="margin-left:5em">${esc(deliveryAddr(order))}</span>` : ""}<br>${esc(deliveryContact(order))}</p>
+  ${order.note ? `<p style="border:1px solid #ddd;border-radius:6px;padding:8px 10px;white-space:pre-wrap"><b style="font-size:12px;color:#777">備考</b><br>${esc(order.note)}</p>` : ""}
   <hr style="border:none;border-top:1px solid #ddd">
   <div style="font-size:12px;color:#777">
     ${esc(COMPANY.name)}<br>

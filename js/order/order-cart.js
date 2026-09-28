@@ -217,6 +217,16 @@ function orderDeliveryOf(projectName){
   const p = (projects||[]).find(x=>x.name===projectName);
   return { place:'現場', address: (p?.address||'').trim() };
 }
+// 納品場所の「名前」と「住所」を分けて返す。
+// 発注書やメールでは、住所を次の行に出したほうが読みやすい
+function orderDeliveryName(o){
+  const place = o?.deliveryPlace || '';
+  if(place==='きよかわ加工場') return 'きよかわ加工場';
+  if(place==='その他')         return (o?.deliveryAddress||'').trim() ? 'ご指定の場所' : 'その他';
+  return `${o?.project||''} 現場`;   // 選ぶ前の古い発注も、これまでどおり「現場」
+}
+function orderDeliveryAddr(o){ return String(o?.deliveryAddress||'').trim(); }
+
 // 発注書・チャットに出す1行の書き方
 function orderDeliveryLabel(o){
   const place = o?.deliveryPlace || '';

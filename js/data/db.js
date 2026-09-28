@@ -124,7 +124,7 @@ async function fetchAllData(){
     const { data: myOrders } = await sb.from('orders').select('*').order('date',{ascending:false});
     orders = (myOrders||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,dueAsap:!!r.due_asap,costType:r.cost_type,
       paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,
-      subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[],createdByName:r.created_by_name||'',deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||''}));
+      subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[],createdByName:r.created_by_name||'',deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||''}));
   }
   // チャットは、案件（と名簿）を読んだあとに組み立てる。
   // 先に組み立てると、案件チャット・お客様チャットの名前が「（削除された案件）」になってしまう
@@ -179,7 +179,7 @@ async function fetchAllData(){
     estSeq = estimates.length+1;
 
     const { data: orderRows } = await sb.from('orders').select('*').order('created_at',{ascending:false});
-    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,dueAsap:!!r.due_asap,costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[],createdByName:r.created_by_name||'',deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||''}));
+    orders = (orderRows||[]).map(r=>({id:r.id,no:r.no,project:r.project,date:r.date,dueDate:r.due_date,dueAsap:!!r.due_asap,costType:r.cost_type,paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',priceEdits:r.price_edits||[],createdByName:r.created_by_name||'',deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||''}));
 
     const { data: costRows } = await sb.from('cost_entries').select('*').order('created_at',{ascending:false});
     costEntries = (costRows||[]).map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status}));
@@ -452,11 +452,22 @@ async function dbDeleteChatMessage(supplierName,msgId){
 }
 
 // 発注書PDFをサーバー側（Edge Function）で生成・保存してもらい、ダウンロード用URLを受け取る
+// 発注書PDFを作る。
+//
+// PDFには5MBの日本語フォントを埋め込むため、作る側が立ち上がったばかりだと
+// 時間切れで落ちることがある（2026-09-28に5件中3件が作られていなかった）。
+// 1回目が落ちたら少し待ってもう一度頼む。2回目はフォントが手元に残っていて速い
 async function dbGenerateOrderPdf(order){
-  const { data, error } = await sb.functions.invoke('generate-order-pdf', { body: order });
-  if(error){showToast('発注書PDFの生成に失敗しました：'+error.message);throw error;}
-  if(data?.error){showToast('発注書PDFの生成に失敗しました：'+data.error);throw new Error(data.error);}
-  return data.url;
+  let last = '';
+  for(let i=0; i<2; i++){
+    if(i) await new Promise(r=>setTimeout(r, 1500));
+    const { data, error } = await sb.functions.invoke('generate-order-pdf', { body: order });
+    if(data?.url) return data.url;
+    last = data?.error || error?.message || '理由不明';
+    console.warn(`発注書PDFの生成に失敗（${i+1}回目）：`, last);
+  }
+  showToast('発注書PDFを作れませんでした：'+last+'（発注そのものは記録されます）', 8000);
+  throw new Error(last);
 }
 
 // ── 発注確定（発注書・原価・チャット投稿） ──
@@ -467,7 +478,8 @@ async function dbConfirmOrder(order){
     items:order.items,subtotal:order.subtotal,tax:order.tax,total:order.total,status:'pending',
     created_by_name:order.createdByName||'',   // 発注書の「担当者」（migration-genba67.sql）
     delivery_place:order.deliveryPlace||'',    // 納品場所（migration-genba71.sql）
-    delivery_address:order.deliveryAddress||''
+    delivery_address:order.deliveryAddress||'',
+    note:order.note||''                        // 備考（migration-genba73.sql）
   };
   let { data: orderRow, error: orderErr } =
     await sb.from('orders').insert({...base, payment_method:order.paymentMethod||''}).select().single();
@@ -483,9 +495,9 @@ async function dbConfirmOrder(order){
     ({ data: orderRow, error: orderErr } = await sb.from('orders').insert({...noName, payment_method:order.paymentMethod||''}).select().single());
   }
   // 納品場所の列（migration-genba71.sql）が未適用でも発注は通す
-  if(orderErr && /delivery_place|delivery_address/.test(orderErr.message||'')){
-    console.warn('納品場所の列が未作成のため、納品場所を保存せずに続行します');
-    const { delivery_place, delivery_address, ...noPlace } = base;
+  if(orderErr && /delivery_place|delivery_address|'note'|column .*note/.test(orderErr.message||'')){
+    console.warn('納品場所・備考の列が未作成のため、その分を除いて保存します');
+    const { delivery_place, delivery_address, note, ...noPlace } = base;
     ({ data: orderRow, error: orderErr } = await sb.from('orders').insert({...noPlace, payment_method:order.paymentMethod||''}).select().single());
   }
   if(orderErr){showToast('発注確定に失敗しました：'+orderErr.message);throw orderErr;}
@@ -1895,7 +1907,8 @@ async function dbSendOrderToSupplier(order){
     const staffName = order.createdByName || currentUserDisplayName || '';
     const preview = `発注書 ${order.no}（${order.project}）合計 ¥${fmt(order.total)}`
       + (order.paymentMethod ? '' : `\n納品場所：${orderDeliveryLabel(order)}`)
-      + (staffName ? `\n担当者：${staffName}` : '');
+      + (staffName ? `\n担当者：${staffName}` : '')
+      + (order.note ? `\n備考：${order.note}` : '');
     dbForwardToChatWork(sup?.id, staffName, preview,
       pdfUrl ? {fileUrl:pdfUrl, fileName:`発注書_${order.no}.pdf`, fileNameAscii:`order_${order.no}.pdf`, fileMime:'application/pdf'} : null).catch(()=>{});
   }
