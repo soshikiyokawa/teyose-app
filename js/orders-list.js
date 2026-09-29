@@ -420,10 +420,12 @@ function renderOrdersTotals(list){
   if(!el) return;
   el.innerHTML = olTotalsRowHtml(list);
 }
-// 合計の行。印刷する案件を選び直したときにも作り直すので、作る所を分けてある
-function olTotalsRowHtml(list){
+// 合計の行。印刷する案件を選び直したときにも作り直すので、作る所を分けてある。
+// dekiOverride を渡すと、出来高の合計をその値にする（紙では工期から出した出来高を使うため）
+function olTotalsRowHtml(list, dekiOverride){
   const totCa     = list.reduce((s,e)=>s+olContractTotal(e),0);
-  const totDeki   = list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.completion||0)/100),0);
+  const totDeki   = (dekiOverride!=null) ? dekiOverride
+    : list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.completion||0)/100),0);
   const totKai    = list.reduce((s,e)=>(s+(e.payments||[]).reduce((s2,p)=>s2+(p.actualAmount||0),0)),0);
   const totMi     = totCa - totKai;
   const totEpAmt  = list.reduce((s,e)=>{
@@ -462,6 +464,31 @@ function olTotalsRowHtml(list){
 // 選んだぶんだけで紙面を組み立て、実際の見た目のまま確かめてから印刷する。
 
 let olPrintPicked = null;   // 印刷する案件のID（Setで持つ。nullなら未設定）
+
+// 紙に並べる順番。ここに無い状態（完工・失注）は、いちばん下にまとめる
+const OL_PRINT_ORDER = ['construction','approved','sent','draft','completed','lost'];
+function olPrintOrderedRows(){
+  const picked = olPrintPicked || new Set();
+  return olVisibleRows()
+    .filter(r=>picked.has(r.project.id))
+    .map((r,i)=>({r,i}))                       // 同じ状態どうしは、画面と同じ並びのまま
+    .sort((a,b)=>{
+      const ra = OL_PRINT_ORDER.indexOf(a.r.status), rb = OL_PRINT_ORDER.indexOf(b.r.status);
+      return (ra<0?99:ra) - (rb<0?99:rb) || a.i - b.i;
+    })
+    .map(x=>x.r);
+}
+
+// 工期に対して、今日がどのあたりかを％で出す（着工日＝0%、完工・引渡日＝100%）。
+// 工期が入っていなければ null（紙では空欄にする）
+function olDatePct(r){
+  if(!r.startDate || !r.endDate) return null;
+  const t0 = Date.parse(r.startDate), t1 = Date.parse(r.endDate);
+  const now = Date.parse(localYmd(new Date()));
+  if(isNaN(t0) || isNaN(t1) || isNaN(now)) return null;
+  if(t1 <= t0) return now >= t1 ? 100 : 0;   // 工期が1日のときなど
+  return Math.max(0, Math.min(100, Math.round((now - t0) / (t1 - t0) * 100)));
+}
 
 function printOrdersList(){
   if(!olCanSeeMoney()){ showToast('金額入りの一覧は管理者のみです'); return; }
@@ -533,20 +560,32 @@ function olPrintSheetHtml(autoPrint){
 
   const tbl = src.cloneNode(true);
 
-  // 選ばれていない案件の行を外し、連番を振り直す
-  const picked = olPrintPicked || new Set();
-  let n = 0;
-  tbl.querySelectorAll('tbody tr[data-pid]').forEach(tr=>{
-    if(!picked.has(Number(tr.dataset.pid))){ tr.remove(); return; }
-    n++;
-    const no = tr.querySelector('.ol-no');
-    if(no) no.textContent = n;
-  });
-  // 合計も、選んだぶんだけで計算し直す
+  // 選んだ案件だけを、状態の順（工事中→受注→提出済→下書き）に並べ直す。
+  // あわせて、完成度と出来高を「今日が工期のどのあたりか」で入れ替える
+  const rows = olPrintOrderedRows();
+  const trByPid = new Map();
+  tbl.querySelectorAll('tbody tr[data-pid]').forEach(tr=>trByPid.set(Number(tr.dataset.pid), tr));
+  const tbody = tbl.querySelector('tbody');
+  let totDeki = 0;
+  if(tbody){
+    tbody.innerHTML = '';
+    rows.forEach((r,i)=>{
+      const tr = trByPid.get(r.project.id);
+      if(!tr) return;
+      const pct = olDatePct(r);                       // 工期に対する今日の位置（％）
+      const ca  = r.est?.contractAmount || 0;
+      const deki = pct==null ? null : Math.round(ca * pct / 100);
+      if(deki!=null) totDeki += deki;
+      if(tr.cells[0])  tr.cells[0].textContent  = i+1;                       // 連番
+      if(tr.cells[9])  tr.cells[9].textContent  = pct==null ? '' : pct+'%';  // 完成度
+      if(tr.cells[10]) tr.cells[10].textContent = deki==null ? '' : '¥'+fmt(deki);  // 出来高
+      tbody.appendChild(tr);
+    });
+  }
+  // 合計も、選んだぶんだけで計算し直す（出来高は上で出した合計を使う）
   const totals = tbl.querySelector('#orders-list-totals');
   if(totals){
-    const ests = olVisibleRows().filter(r=>picked.has(r.project.id)).map(r=>r.est).filter(e=>e && e.id);
-    totals.innerHTML = olTotalsRowHtml(ests);
+    totals.innerHTML = olTotalsRowHtml(rows.map(r=>r.est).filter(e=>e && e.id), totDeki);
   }
 
   // input → 値テキストに置換
@@ -561,11 +600,14 @@ function olPrintSheetHtml(autoPrint){
   tbl.querySelectorAll('.ol-memo, .ol-op').forEach(el => el.remove());
   tbl.querySelectorAll('th').forEach(th => { const t=th.textContent.trim(); if(t==='備考'||t==='操作') th.remove(); });
 
-  // バッジを小さいテキストに置換
-  tbl.querySelectorAll('.badge').forEach(b => {
-    const t = document.createTextNode('[' + b.textContent + ']');
-    b.replaceWith(t);
-  });
+  // 工事名のうしろの状態（受注・工事中など）は紙には出さない
+  tbl.querySelectorAll('.badge').forEach(b => b.remove());
+
+  // 売上先の列は紙には出さない（3列目）
+  tbl.querySelectorAll('th').forEach(th => { if(th.textContent.trim()==='売上先') th.remove(); });
+  tbl.querySelectorAll('tbody tr').forEach(tr => { if(tr.cells[2]) tr.cells[2].remove(); });
+  const totalHead = totals?.querySelector('td[colspan]');
+  if(totalHead && Number(totalHead.getAttribute('colspan'))===5) totalHead.setAttribute('colspan','4');
 
   // 日付セルを短縮（YYYY-MM-DD → M/D）
   tbl.querySelectorAll('td').forEach(td => {
@@ -573,9 +615,10 @@ function olPrintSheetHtml(autoPrint){
       (_,y,m,d) => parseInt(m)+'/'+parseInt(d));
   });
 
-  // colgroup: 各列の幅を明示（合計 ≈ 1138pt、A3横1147ptに収まる）
+  // colgroup: 各列の幅を明示（合計 ≈ 1123pt、A3横1147ptに収まる）
+  // 売上先を外したぶん（65pt）は、工事名を広げるのに回している（改行しないため）
   // 入金は契約時金・着工金・上棟時金・最終金の4回分（日付34pt＋金額48pt）
-  const colWidths = [14,44,65,100,38,65,42,8,42,28,60,60,60,34,48,34,48,34,48,34,48,60,32,60,32];
+  const colWidths = [14,44,150,38,65,42,8,42,28,60,60,60,34,48,34,48,34,48,34,48,60,32,60,32];
   const cg = document.createElement('colgroup');
   colWidths.forEach(w => {
     const c = document.createElement('col');
@@ -586,9 +629,8 @@ function olPrintSheetHtml(autoPrint){
   if(oldCg) oldCg.replaceWith(cg); else tbl.prepend(cg);
 
   const date = new Date().toLocaleDateString('ja-JP');
-  const picked2 = olVisibleRows().filter(r=>picked.has(r.project.id)).length;
   const all2 = olVisibleRows().length;
-  const pickNote = picked2===all2 ? '' : `　（${all2}件中 ${picked2}件）`;
+  const pickNote = rows.length===all2 ? '' : `　（${all2}件中 ${rows.length}件）`;
   return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>案件一覧</title>
 <style>
@@ -597,7 +639,9 @@ function olPrintSheetHtml(autoPrint){
 body { margin: 0; font-family: "Meiryo", "Yu Gothic", sans-serif; font-size: 6.5pt; }
 h2 { font-size: 10pt; margin: 0 0 2mm; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-th, td { border: 0.4pt solid #888; padding: 1pt 2pt; overflow: hidden; word-break: break-all; vertical-align: middle; }
+/* どのマスも折り返さない。はみ出す長い名前は末尾を「…」にして1行に収める */
+th, td { border: 0.4pt solid #888; padding: 1pt 2pt; overflow: hidden; vertical-align: middle;
+  white-space: nowrap; text-overflow: ellipsis; }
 th { background: #dae3f3 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 700; text-align: center; font-size: 6pt; }
 .ol-r { text-align: right; white-space: nowrap; }
 .ol-c { text-align: left; }
