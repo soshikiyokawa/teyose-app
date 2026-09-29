@@ -88,6 +88,11 @@ function olVisibleRows(){
       return true;
     })
     .sort((a,b)=>{
+      // まず状態の順（工事中→受注→提出済→下書き。完工・失注はいちばん下）
+      const ra = OL_STATUS_ORDER.indexOf(a.status), rb = OL_STATUS_ORDER.indexOf(b.status);
+      const d = (ra<0?99:ra) - (rb<0?99:rb);
+      if(d) return d;
+      // 同じ状態どうしは、これまでどおり契約日の古い順
       const ka=(a.est.contractDate||a.est.date||a.project.startDate||'');
       const kb=(b.est.contractDate||b.est.date||b.project.startDate||'');
       return ka<kb ? -1 : ka>kb ? 1 : 0;
@@ -168,6 +173,10 @@ function olPayBadge(est){
     return `<span class="ol-pay wait" title="${s.nextDate?'入金予定 '+s.nextDate.replace(/-/g,'/'):'入金予定日は未設定'}">残 ¥${fmt(s.unpaid)}</span>`;
   return `<span class="ol-pay done">入金済</span>`;
 }
+
+// 一覧に並べる順番。画面もA3印刷もこの順。
+// ここに無い状態（完工・失注）は、いちばん下にまとめる
+const OL_STATUS_ORDER = ['construction','approved','sent','draft','completed','lost'];
 
 const OL_STATUS = {
   draft:       {label:'下書き', cls:'draft'},
@@ -464,18 +473,10 @@ function olTotalsRowHtml(list, dekiOverride){
 
 let olPrintPicked = null;   // 印刷する案件のID（Setで持つ。nullなら未設定）
 
-// 紙に並べる順番。ここに無い状態（完工・失注）は、いちばん下にまとめる
-const OL_PRINT_ORDER = ['construction','approved','sent','draft','completed','lost'];
+// 選んだ案件だけを取り出す。並び順は olVisibleRows が付けたもの（状態の順）のまま
 function olPrintOrderedRows(){
   const picked = olPrintPicked || new Set();
-  return olVisibleRows()
-    .filter(r=>picked.has(r.project.id))
-    .map((r,i)=>({r,i}))                       // 同じ状態どうしは、画面と同じ並びのまま
-    .sort((a,b)=>{
-      const ra = OL_PRINT_ORDER.indexOf(a.r.status), rb = OL_PRINT_ORDER.indexOf(b.r.status);
-      return (ra<0?99:ra) - (rb<0?99:rb) || a.i - b.i;
-    })
-    .map(x=>x.r);
+  return olVisibleRows().filter(r=>picked.has(r.project.id));
 }
 
 // 工期に対して、今日がどのあたりかを％で出す（着工日＝0%、完工・引渡日＝100%）。
