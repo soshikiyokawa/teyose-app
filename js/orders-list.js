@@ -362,7 +362,7 @@ function renderOrdersList(){
     // 見積の無い案件は、編集欄を出さずに空欄にする
     const hasEst=!!e.id;
 
-    return `<tr class="ol-row status-${r.status}">
+    return `<tr class="ol-row status-${r.status}" data-pid="${p.id}">
       <td class="ol-no">${i+1}</td>
       <td class="ol-c">${e.contractDate||''}</td>
       <td class="ol-c" style="white-space:nowrap">${esc(olClientName(r))}</td>
@@ -418,6 +418,10 @@ function renderOrdersList(){
 function renderOrdersTotals(list){
   const el = document.getElementById('orders-list-totals');
   if(!el) return;
+  el.innerHTML = olTotalsRowHtml(list);
+}
+// 合計の行。印刷する案件を選び直したときにも作り直すので、作る所を分けてある
+function olTotalsRowHtml(list){
   const totCa     = list.reduce((s,e)=>s+olContractTotal(e),0);
   const totDeki   = list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.completion||0)/100),0);
   const totKai    = list.reduce((s,e)=>(s+(e.payments||[]).reduce((s2,p)=>s2+(p.actualAmount||0),0)),0);
@@ -436,7 +440,7 @@ function renderOrdersTotals(list){
   const totApAmt  = list.reduce((s,e)=>s+(e.actualProfit||0),0);
   const totApRate = totCa ? (totApAmt/totCa*100).toFixed(1) : '—';
 
-  el.innerHTML = `<tr style="font-weight:700;background:var(--surface2);border-top:2px solid var(--border)">
+  return `<tr style="font-weight:700;background:var(--surface2);border-top:2px solid var(--border)">
     <td colspan="5" style="padding:5px 8px;text-align:center">合　　　計</td>
     <td class="ol-r">¥${fmt(totCa)}</td>
     <td colspan="4" style="padding:4px 6px"></td>
@@ -452,12 +456,98 @@ function renderOrdersTotals(list){
   </tr>`;
 }
 
+// ════ 案件一覧のA3印刷 ════
+//
+// いきなり印刷画面に飛ばさず、まず「どの案件を刷るか」を選ぶ画面を出す。
+// 選んだぶんだけで紙面を組み立て、実際の見た目のまま確かめてから印刷する。
+
+let olPrintPicked = null;   // 印刷する案件のID（Setで持つ。nullなら未設定）
+
 function printOrdersList(){
   if(!olCanSeeMoney()){ showToast('金額入りの一覧は管理者のみです'); return; }
+  const rows = olVisibleRows();
+  if(!rows.length){ showToast('印刷する案件がありません'); return; }
+  // はじめは、いま画面に出ている案件をすべて選んだ状態にする
+  olPrintPicked = new Set(rows.map(r=>r.project.id));
+  document.getElementById('ol-print-modal').classList.add('open');
+  renderOlPrintPicker();
+  renderOlPrintPreview();
+}
+function closeOlPrint(){ document.getElementById('ol-print-modal').classList.remove('open'); }
+
+// 左側：印刷する案件を選ぶ一覧
+function renderOlPrintPicker(){
+  const el = document.getElementById('ol-print-list');
+  if(!el) return;
+  const rows = olVisibleRows();
+  el.innerHTML = rows.map(r=>{
+    const on = olPrintPicked.has(r.project.id);
+    const st = OL_STATUS[r.status]||OL_STATUS.draft;
+    return `<label class="ol-pick${on?' on':''}">
+      <input type="checkbox" ${on?'checked':''} onchange="olTogglePrintPick(${r.project.id}, this.checked)">
+      <span class="ol-pick-name">${esc(r.project.name)}</span>
+      <span class="ol-pick-sub">${esc(olClientName(r)||'')}　${esc(st.label)}</span>
+    </label>`;
+  }).join('');
+  const n = document.getElementById('ol-print-count');
+  if(n) n.textContent = `${olPrintPicked.size} / ${rows.length}件`;
+}
+function olTogglePrintPick(pid, on){
+  if(on) olPrintPicked.add(pid); else olPrintPicked.delete(pid);
+  renderOlPrintPicker();
+  renderOlPrintPreview();
+}
+function olPrintPickAll(on){
+  const rows = olVisibleRows();
+  olPrintPicked = on ? new Set(rows.map(r=>r.project.id)) : new Set();
+  renderOlPrintPicker();
+  renderOlPrintPreview();
+}
+
+// 右側：刷り上がりのプレビュー。実際に印刷するのと同じHTMLをそのまま出す
+function renderOlPrintPreview(){
+  const frame = document.getElementById('ol-print-frame');
+  const btn   = document.getElementById('ol-print-go');
+  if(btn) btn.disabled = !olPrintPicked.size;
+  if(!frame) return;
+  if(!olPrintPicked.size){
+    frame.removeAttribute('srcdoc');
+    frame.srcdoc = '<div style="font-family:sans-serif;font-size:14px;color:#888;padding:40px;text-align:center">印刷する案件を選んでください</div>';
+    return;
+  }
+  frame.srcdoc = olPrintSheetHtml(false);
+}
+
+function doPrintOrdersList(){
+  if(!olPrintPicked?.size){ showToast('印刷する案件を選んでください'); return; }
+  const w = window.open('', '_blank', 'width=1200,height=800');
+  if(!w){ showToast('ポップアップをブロックされています。許可してください'); return; }
+  w.document.write(olPrintSheetHtml(true));
+  w.document.close();
+}
+
+// 印刷用の紙面をつくる。autoPrint が true なら開いた瞬間に印刷画面を出す
+function olPrintSheetHtml(autoPrint){
   const src = document.getElementById('orders-table');
-  if(!src) return;
+  if(!src) return '';
 
   const tbl = src.cloneNode(true);
+
+  // 選ばれていない案件の行を外し、連番を振り直す
+  const picked = olPrintPicked || new Set();
+  let n = 0;
+  tbl.querySelectorAll('tbody tr[data-pid]').forEach(tr=>{
+    if(!picked.has(Number(tr.dataset.pid))){ tr.remove(); return; }
+    n++;
+    const no = tr.querySelector('.ol-no');
+    if(no) no.textContent = n;
+  });
+  // 合計も、選んだぶんだけで計算し直す
+  const totals = tbl.querySelector('#orders-list-totals');
+  if(totals){
+    const ests = olVisibleRows().filter(r=>picked.has(r.project.id)).map(r=>r.est).filter(e=>e && e.id);
+    totals.innerHTML = olTotalsRowHtml(ests);
+  }
 
   // input → 値テキストに置換
   tbl.querySelectorAll('input').forEach(inp => {
@@ -496,7 +586,10 @@ function printOrdersList(){
   if(oldCg) oldCg.replaceWith(cg); else tbl.prepend(cg);
 
   const date = new Date().toLocaleDateString('ja-JP');
-  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+  const picked2 = olVisibleRows().filter(r=>picked.has(r.project.id)).length;
+  const all2 = olVisibleRows().length;
+  const pickNote = picked2===all2 ? '' : `　（${all2}件中 ${picked2}件）`;
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
 <title>案件一覧</title>
 <style>
 @page { size: A3 landscape; margin: 8mm; }
@@ -511,17 +604,37 @@ th { background: #dae3f3 !important; -webkit-print-color-adjust: exact; print-co
 .ol-no { text-align: center; color: #666; font-size: 5.5pt; }
 tr:nth-child(even) td { background: #f5f5f5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 tfoot td { font-weight: 700; background: #e8e8e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+${autoPrint ? '' : `
+/* プレビュー用。A3よこの紙を実寸で組み、画面の幅に合わせて縮めて見せる */
+html { background: #e9e9ec; }
+body { margin: 0; }
+#fit { margin: 10px auto; }
+#paper { width: 404mm; background: #fff; padding: 8mm; transform-origin: top left;
+  box-shadow: 0 0 8px rgba(0,0,0,.25); }
+`}
 </style>
 </head><body>
-<h2>案件一覧　${date}${olFilterLabel()}</h2>
+${autoPrint ? '' : '<div id="fit"><div id="paper">'}
+<h2>案件一覧　${date}${olFilterLabel()}${pickNote}</h2>
 ${tbl.outerHTML}
-<script>window.onload=function(){ window.print(); setTimeout(()=>window.close(),800); }<\/script>
+${autoPrint ? '' : '</div></div>'}
+${autoPrint
+  ? '<script>window.onload=function(){ window.print(); setTimeout(()=>window.close(),800); }<\/script>'
+  : `<script>
+function fitPaper(){
+  var p=document.getElementById('paper'), f=document.getElementById('fit');
+  if(!p||!f) return;
+  // 画面が狭くても字がつぶれないよう、これ以上は縮めない（はみ出したら横に送れる）
+  var s=Math.max(0.45, Math.min(1,(document.documentElement.clientWidth-20)/p.offsetWidth));
+  p.style.transform='scale('+s+')';
+  f.style.width=(p.offsetWidth*s)+'px';
+  f.style.height=(p.offsetHeight*s)+'px';
+}
+window.addEventListener('resize', fitPaper);
+window.addEventListener('load', fitPaper);
+fitPaper();
+<\/script>`}
 </body></html>`;
-
-  const w = window.open('', '_blank', 'width=1200,height=800');
-  if(!w){ showToast('ポップアップをブロックされています。許可してください'); return; }
-  w.document.write(html);
-  w.document.close();
 }
 
 async function saveOrdersList(){

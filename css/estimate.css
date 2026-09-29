@@ -65,6 +65,29 @@
 .member-tag.more{background:var(--surface2);color:var(--text-sub);border-color:var(--border-s);cursor:pointer;font-family:inherit}
 
 /* ── 案件一覧：絞り込み（複数えらべるチェックの一覧） ── */
+/* ── 案件一覧のA3印刷：印刷する案件を選ぶ＋刷り上がりを見る ── */
+/* overlay.css の .modal-sheet{max-width:440px} より後に効かせるため、2つ重ねて指定する */
+.modal-sheet.ol-print-sheet{max-width:min(1180px, 96vw);width:100%;max-height:92vh;display:flex;flex-direction:column}
+.ol-print-body{display:flex;gap:14px;flex:1;min-height:0}
+.ol-print-side{width:270px;flex-shrink:0;display:flex;flex-direction:column;min-height:0}
+.ol-print-side-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+#ol-print-list{flex:1;overflow-y:auto;border:1px solid var(--border-s);border-radius:8px;padding:4px}
+.ol-pick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px}
+.ol-pick:hover{background:var(--surface2)}
+.ol-pick.on{background:var(--accent-bg)}
+.ol-pick input{flex-shrink:0;width:16px;height:16px;margin:0}
+.ol-pick-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--text)}
+.ol-pick-sub{width:100%;padding-left:24px;font-size:10px;color:var(--text-muted)}
+.ol-print-view{flex:1;min-width:0;display:flex;flex-direction:column}
+#ol-print-frame{flex:1;width:100%;min-height:340px;border:1px solid var(--border-s);border-radius:8px;background:#fff}
+@media(max-width:820px){
+  /* スマホでは、選ぶ欄を上、刷り上がりを下に積む */
+  .ol-print-body{flex-direction:column}
+  .ol-print-side{width:100%}
+  #ol-print-list{max-height:30vh}
+  #ol-print-frame{min-height:38vh}
+}
+
 .ol-filter{position:relative}
 .ol-filter-btn{display:inline-flex;align-items:center;gap:4px;max-width:220px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
