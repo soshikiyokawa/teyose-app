@@ -342,8 +342,10 @@ function renderOrdersList(){
   el.innerHTML = list.map((r,i)=>{
     const e=r.est, p=r.project;
     const ca   = e.contractAmount||0;
-    const comp = e.completion||0;
-    const dekidaka = Math.round(ca * comp / 100);
+    // 完成度は、工期に対して今日がどのあたりかで出す（手で入れるのはやめた）。
+    // 出来高はそれを請負金額に掛けたもの
+    const comp = olDatePct(r);
+    const dekidaka = comp==null ? null : Math.round(ca * comp / 100);
     const pays = e.payments||[];
     const pl = olPaymentsByLabel(e);
     const kaishuu = pays.reduce((s2,p)=>s2+(Number(p?.actualAmount)||0),0);
@@ -373,16 +375,8 @@ function renderOrdersList(){
       <td class="ol-c">${r.startDate||''}${r.startIsActual?'<span style="font-size:9px;color:var(--ok-t)">（実績）</span>':''}</td>
       <td class="ol-c" style="text-align:center;padding:2px 0;color:var(--text-muted)">〜</td>
       <td class="ol-c">${r.endDate||''}${r.endIsActual?'<span style="font-size:9px;color:var(--ok-t)">（引渡）</span>':''}</td>
-      <td class="ol-c" style="padding:2px 4px">
-        ${hasEst?`<div style="display:flex;align-items:center;gap:2px;justify-content:flex-end">
-          <input type="text" inputmode="numeric" value="${comp||''}" placeholder="0"
-            data-est-id="${e.id}" data-field="completion"
-            style="width:38px;text-align:right;font-size:11px;padding:2px 3px"
-            onfocus="this.value=this.value.replace(/,/g,'')"
-          ><span style="font-size:10px;color:var(--text-muted)">%</span>
-        </div>`:''}
-      </td>
-      <td class="ol-r">${hasEst?'¥'+fmt(dekidaka):''}</td>
+      <td class="ol-r" title="工期に対して、今日がどのあたりか">${comp==null?'':comp+'%'}</td>
+      <td class="ol-r">${(hasEst&&dekidaka!=null)?'¥'+fmt(dekidaka):''}</td>
       <td class="ol-r">${hasEst?'¥'+fmt(kaishuu):''}</td>
       <td class="ol-r" style="color:${mishuu>0?'var(--danger)':'inherit'}">${hasEst?'¥'+fmt(mishuu):''}</td>
       <td class="ol-c" style="font-size:10px">${pl['契約時金']?.actualDate||''}</td>
@@ -411,14 +405,19 @@ function renderOrdersList(){
     </tr>`;
   }).join('');
 
-  renderOrdersTotals(list.map(r=>r.est).filter(e=>e && e.id));
+  // 出来高の合計も、工期から出した完成度で計算する
+  const totDeki = list.reduce((s,r)=>{
+    const pct = olDatePct(r);
+    return s + (pct==null ? 0 : Math.round((r.est?.contractAmount||0) * pct / 100));
+  }, 0);
+  renderOrdersTotals(list.map(r=>r.est).filter(e=>e && e.id), totDeki);
 }
 
 
-function renderOrdersTotals(list){
+function renderOrdersTotals(list, totDeki){
   const el = document.getElementById('orders-list-totals');
   if(!el) return;
-  el.innerHTML = olTotalsRowHtml(list);
+  el.innerHTML = olTotalsRowHtml(list, totDeki);
 }
 // 合計の行。印刷する案件を選び直したときにも作り直すので、作る所を分けてある。
 // dekiOverride を渡すと、出来高の合計をその値にする（紙では工期から出した出来高を使うため）
@@ -561,7 +560,7 @@ function olPrintSheetHtml(autoPrint){
   const tbl = src.cloneNode(true);
 
   // 選んだ案件だけを、状態の順（工事中→受注→提出済→下書き）に並べ直す。
-  // あわせて、完成度と出来高を「今日が工期のどのあたりか」で入れ替える
+  // 完成度と出来高は画面と同じ（工期に対する今日の位置）なので、そのまま使える
   const rows = olPrintOrderedRows();
   const trByPid = new Map();
   tbl.querySelectorAll('tbody tr[data-pid]').forEach(tr=>trByPid.set(Number(tr.dataset.pid), tr));
@@ -572,13 +571,9 @@ function olPrintSheetHtml(autoPrint){
     rows.forEach((r,i)=>{
       const tr = trByPid.get(r.project.id);
       if(!tr) return;
-      const pct = olDatePct(r);                       // 工期に対する今日の位置（％）
-      const ca  = r.est?.contractAmount || 0;
-      const deki = pct==null ? null : Math.round(ca * pct / 100);
-      if(deki!=null) totDeki += deki;
-      if(tr.cells[0])  tr.cells[0].textContent  = i+1;                       // 連番
-      if(tr.cells[9])  tr.cells[9].textContent  = pct==null ? '' : pct+'%';  // 完成度
-      if(tr.cells[10]) tr.cells[10].textContent = deki==null ? '' : '¥'+fmt(deki);  // 出来高
+      const pct = olDatePct(r);
+      if(pct!=null) totDeki += Math.round((r.est?.contractAmount||0) * pct / 100);
+      if(tr.cells[0]) tr.cells[0].textContent = i+1;   // 連番を振り直す
       tbody.appendChild(tr);
     });
   }
@@ -693,8 +688,8 @@ async function saveOrdersList(){
     if(el.tagName === 'TD'){
       changes[id][field] = el.textContent.trim();
     } else {
-      const raw = el.value.replace(/,/g,'');
-      changes[id][field] = field==='completion' ? (parseFloat(raw)||0) : (parseFloat(raw)||0);
+      // 完成粗利（金額）の欄。完成度は工期から出すので、もう入力欄は無い
+      changes[id][field] = parseFloat(el.value.replace(/,/g,'')) || 0;
     }
   });
   const ids = Object.keys(changes);
