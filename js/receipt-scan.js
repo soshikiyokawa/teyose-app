@@ -296,13 +296,66 @@ function rsBinarize(cv){
   return out;
 }
 
+// ── 見つけた四隅が信用できるか ──
+//
+// 信用できるなら、確認の画面を出さずにそのまま進める（毎回四隅を触るのは手間なので）。
+// あやしいときだけ「範囲を直してください」と出す。
+//
+// 見るところ
+//   ・紙らしい四角形か（角が直角に近い・向かい合う辺の長さが近い）
+//   ・写真の中で占める割合がほどよいか（小さすぎ・大きすぎは怪しい）
+//   ・写真の縁にぴったり付いていないか（付いていたらレシートが切れている疑い）
+function rsQuadQuality(quad, w, h){
+  if(!quad || quad.length !== 4) return { ok:false, why:'範囲を決められませんでした' };
+  const [tl,tr,br,bl] = quad;
+
+  // 面積（靴ひも公式）
+  let area = 0;
+  for(let i=0;i<4;i++){
+    const a = quad[i], b = quad[(i+1)%4];
+    area += a[0]*b[1] - b[0]*a[1];
+  }
+  area = Math.abs(area)/2;
+  const ratio = area / (w*h);
+  if(ratio < 0.10) return { ok:false, why:'レシートが小さく写っています' };
+  if(ratio > 0.94) return { ok:false, why:'レシートが画面いっぱいで、縁が見えません' };
+
+  // 向かい合う辺の長さが近いか（台形のゆがみはあってよいが、極端なものは怪しい）
+  const top = rsDist(tl,tr), bottom = rsDist(bl,br);
+  const left = rsDist(tl,bl), right = rsDist(tr,br);
+  if(Math.min(top,bottom) < 20 || Math.min(left,right) < 20) return { ok:false, why:'範囲が細すぎます' };
+  const hSkew = Math.max(top,bottom) / Math.min(top,bottom);
+  const vSkew = Math.max(left,right) / Math.min(left,right);
+  if(hSkew > 1.7 || vSkew > 1.7) return { ok:false, why:'斜めから撮られすぎています' };
+
+  // 4つの角が直角に近いか
+  for(let i=0;i<4;i++){
+    const p = quad[(i+3)%4], c = quad[i], n = quad[(i+1)%4];
+    const a1 = Math.atan2(p[1]-c[1], p[0]-c[0]);
+    const a2 = Math.atan2(n[1]-c[1], n[0]-c[0]);
+    let d = Math.abs(a1-a2) * 180/Math.PI;
+    if(d > 180) d = 360 - d;
+    if(d < 55 || d > 125) return { ok:false, why:'紙の形になっていません' };
+  }
+
+  // 写真の縁に張り付いていないか（切れている疑い）
+  const m = Math.max(2, Math.round(Math.min(w,h)*0.01));
+  const onEdge = quad.filter(p=>p[0]<=m || p[1]<=m || p[0]>=w-m || p[1]>=h-m).length;
+  if(onEdge >= 2) return { ok:false, why:'レシートが画面の外に出ているようです' };
+
+  return { ok:true, why:'' };
+}
+
 // ── まとめ：写真 → 整えた画像 ──
 //
 // 四隅は返すので、自動で見つけた位置が気に入らなければ手で動かせる。
 async function rsScan(file){
   const cv = await rsLoadImage(file);
   const found = rsFindQuad(cv);
-  return { source: cv, quad: found.quad, auto: found.auto };
+  const q = found.auto
+    ? rsQuadQuality(found.quad, cv.width, cv.height)
+    : { ok:false, why:'レシートの縁を見つけられませんでした' };
+  return { source: cv, quad: found.quad, auto: found.auto, confident: q.ok, why: q.why };
 }
 // 四隅が決まったあとの仕上げ
 function rsFinish(sourceCanvas, quad, opts){

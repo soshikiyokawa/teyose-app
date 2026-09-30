@@ -28,7 +28,11 @@ let cartTaxPrinted = null;
 let cartTaxPrintedBase = null;   // そのときのレシート品目の小計。変わったら使わない
 // 台帳に残すための材料（発注確定のときに使う）
 let cartReceiptRecord = null;
-function resetCartTaxPrinted(){ cartTaxPrinted = null; cartTaxPrintedBase = null; cartReceiptRecord = null; }
+function resetCartTaxPrinted(){
+  cartTaxPrinted = null; cartTaxPrintedBase = null; cartReceiptRecord = null;
+  // 次のレシートに前の写真が残らないようにする
+  rscanSrc = null; rscanQuad = null; rscanDone = null;
+}
 // いまカートに入っているレシート品目の小計（税抜。行の端数調整を含む）
 function cartReceiptSubtotal(){
   return (typeof cart!=='undefined' ? cart : []).filter(c=>c._receipt)
@@ -161,6 +165,7 @@ let rscanSrc = null;      // 元の写真（canvas）
 let rscanQuad = null;     // いまの四隅（元の写真の座標）
 let rscanView = 1;        // 画面に映している倍率
 let rscanDone = null;     // 仕上がり（canvas）
+let rscanMono = true;     // 白黒にするか（選んだら覚えておく）
 
 async function onReceiptFileChange(input) {
   const file = input.files?.[0];
@@ -170,14 +175,24 @@ async function onReceiptFileChange(input) {
   const isPdf = /pdf/i.test(file.type) || /\.pdf$/i.test(file.name || '');
   if (isPdf && file.size > 25*1024*1024) { showToast('PDFが大きすぎます（25MBまで）。ページを分けてください'); return; }
 
-  // 写真のときは、まず範囲を決める画面を出す（PDFはもう平らなのでそのまま読む）
+  // 写真のときは先に整える（PDFはもう平らなのでそのまま読む）。
+  //
+  // 自動で見つけた範囲が信用できるときは、確認の画面を出さずにそのまま読み取る。
+  // 毎回四隅を触るのは手間なので、あやしいときだけ聞く。
+  // 切り抜きが気に入らなければ、確認画面の「切り抜きを直す」からやり直せる。
   if (!isPdf && typeof rsScan === 'function') {
     showReceiptLoading(true);
     try {
       const s = await rsScan(file);
       rscanSrc = s.source; rscanQuad = s.quad;
+      if (s.confident) {
+        const done = rsFinish(rscanSrc, rscanQuad, { mono: rscanMono });
+        rscanDone = done;
+        await receiptReadFile(null, false, { base64: rsToJpeg(done, 0.85), mediaType:'image/jpeg', scanned: done });
+        return;
+      }
       showReceiptLoading(false);
-      openRscan(s.auto);
+      openRscan(s.auto, s.why);
       return;
     } catch (e) {
       showReceiptLoading(false);
@@ -188,15 +203,24 @@ async function onReceiptFileChange(input) {
   await receiptReadFile(file, isPdf);
 }
 
+// 読み取ったあとに切り抜きをやり直す（自動の結果が気に入らないとき）
+function rscanRedo(){
+  if(!rscanSrc){ showToast('写真が残っていません。もう一度読み込んでください'); return; }
+  closeReceiptConfirm();
+  openRscan(true, '');
+}
+
 // 範囲を決める画面
-function openRscan(auto){
+function openRscan(auto, why){
   const cv = document.getElementById('rscan-canvas');
   const maxW = Math.min(480, window.innerWidth - 72);
   rscanView = Math.min(1, maxW / rscanSrc.width, 420 / rscanSrc.height);
   cv.width = Math.round(rscanSrc.width * rscanView);
   cv.height = Math.round(rscanSrc.height * rscanView);
   cv.getContext('2d').drawImage(rscanSrc, 0, 0, cv.width, cv.height);
-  document.getElementById('rscan-note').textContent = auto ? '自動で見つけた範囲です' : '範囲が分からなかったので全体にしています';
+  document.getElementById('rscan-note').textContent = why ? why + '。四隅を直してください'
+    : auto ? '自動で見つけた範囲です' : '範囲が分からなかったので全体にしています';
+  const mono = document.getElementById('rscan-mono'); if(mono) mono.checked = rscanMono;
   document.getElementById('rscan-modal').classList.add('open');
   rscanPlaceDots();
   rscanPreview();
@@ -222,6 +246,7 @@ function rscanPreview(){
   clearTimeout(_rscanTimer);
   _rscanTimer = setTimeout(()=>{
     const mono = document.getElementById('rscan-mono')?.checked !== false;
+    rscanMono = mono;
     try{
       rscanDone = rsFinish(rscanSrc, rscanQuad, { mono });
       const pv = document.getElementById('rscan-preview');
@@ -282,7 +307,8 @@ async function receiptReadFile(file, isPdf, ready) {
 
     const { data, error } = await sb.functions.invoke('read-receipt', {
       // スマホから選ぶと種類が空のことがあるので、ファイル名も送って判断してもらう
-      body: { file: base64, image: base64, mediaType, fileName: file.name || '' }
+      // 整えた画像を渡すときは file が無いので、名前は空でよい（ここで落ちていた）
+      body: { file: base64, image: base64, mediaType, fileName: file?.name || '' }
     });
 
     if (error || data?.error) throw new Error(await receiptErrorText(error, data));
@@ -354,7 +380,10 @@ function renderReceiptItems() {
   if (!receiptItems.length) { el.innerHTML = '<div class="empty">品目なし</div>'; return; }
 
   const _st = receiptSettle();   // 行ごとの原価をここで一度だけ確定させる
-  el.innerHTML = `<div class="rr-tax">
+  el.innerHTML = (rscanSrc ? `<div class="rr-tax" style="justify-content:space-between">
+    <span>写真は自動で切り抜いて整えました</span>
+    <button type="button" class="btn xs" onclick="rscanRedo()">切り抜きを直す</button>
+  </div>` : '') + `<div class="rr-tax">
     <span>レシートの単価は</span>
     <button class="btn xs${receiptTaxIncluded?' primary':''}" onclick="setReceiptTaxIncluded(true)">税込</button>
     <button class="btn xs${receiptTaxIncluded?'':' primary'}" onclick="setReceiptTaxIncluded(false)">税抜</button>
