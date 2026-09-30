@@ -4,7 +4,8 @@ let projectMembers = [];   // 表示名の配列
 // 選択候補：社員（役職順）＋業者アカウント（発注先の担当者）
 function _memberCandidates(){
   const profs = (typeof allProfiles!=='undefined' ? allProfiles : []).filter(p=>p.displayName);
-  const emp = profs.filter(p=>p.role!=='supplier')
+  // お客様（client）は案件に参加しないので、参加メンバーの候補には出さない
+  const emp = profs.filter(p=>p.role==='staff'||p.role==='carpenter')
     .map(p=>({name:p.displayName, kind:'社員'}))
     .sort((a,b)=> (typeof cmpEmployee==='function' ? cmpEmployee(a.name,b.name) : a.name.localeCompare(b.name,'ja')));
   const supProfs = profs.filter(p=>p.role==='supplier');

@@ -103,7 +103,7 @@ function renderWcAssign(){
   if(!allProfiles.length){ el.innerHTML='<div class="empty" style="padding:10px">社員が登録されていません</div>'; return; }
   const groups=['','役員','一般社員','訓練校生'];
   const labels={'':'（対象外）','役員':'役員','一般社員':'一般社員','訓練校生':'訓練校生'};
-  el.innerHTML=allProfiles.filter(p=>p.role!=='supplier').map(p=>`
+  el.innerHTML=allProfiles.filter(p=>p.role==='staff'||p.role==='carpenter').map(p=>`
     <div class="wc-assign-row">
       <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.displayName||'（名前未設定）')}</span>
       <select onchange="wcSetGroup('${p.id}',this.value)" style="font-size:12px;padding:4px 6px">

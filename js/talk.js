@@ -3,9 +3,12 @@ let notifyTargets = [];   // 空＝ALL（全員）。表示名の配列
 
 // 社員（発注先ではない人）の表示名。自分は除く。
 // 発注先チャットは管理者も一般社員も見られて書き込めるので、どちらも候補に出す
+// きよかわの社員（管理者＋一般社員）の名前。
+// お客様（client）は社員ではないので入れない。入れてしまうと、通知の宛先に並び、
+// チャット本文の先頭が入った通知がお客様に届いてしまう
 function _staffNames(){
   return (typeof allProfiles!=='undefined' ? allProfiles : [])
-    .filter(p=>p.role!=='supplier' && p.displayName && p.displayName!==currentUserDisplayName)
+    .filter(p=>(p.role==='staff'||p.role==='carpenter') && p.displayName && p.displayName!==currentUserDisplayName)
     .map(p=>p.displayName);
 }
 // その発注先のアカウント（担当者）の表示名。自分は除く
@@ -408,7 +411,8 @@ function renderTalkListTabs(names){
 // 相手の候補は chat_directory と同じ考え方で、その人が名前を知ってよい相手だけ出す。
 function directCandidates(){
   return (allProfiles||[])
-    .filter(p=>p.id && p.id!==currentUserId && p.displayName)
+    // お客様（client）はお客様チャットだけの役割なので、個別チャットの相手には出さない
+    .filter(p=>p.id && p.id!==currentUserId && p.displayName && p.role!=='client')
     .map(p=>({
       id:p.id, name:p.displayName,
       kind: p.role==='supplier'

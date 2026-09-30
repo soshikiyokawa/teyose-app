@@ -48,6 +48,13 @@ Deno.serve(async (req) => {
     const targetUserIds = (profiles || [])
       .filter((p: any) => {
         if (excludeUserId && p.id === excludeUserId) return false; // 送信者自身は除外（社内チャットなど）
+        // お客様（client）へは、名前で宛先を決める通知を届けない。
+        //
+        // 通知の中身にはチャット本文の先頭が入る。名前で宛先を指定する仕組みなので、
+        // 同じ表示名の方が業者としても関わっていると（例：業者アカウントとお客様アカウント）、
+        // 業者宛のつもりの通知がお客様にも届いてしまう。
+        // お客様チャットの通知は targetRole:"user" でご本人のIDを指定しているので、これで困らない。
+        if (p.role === "client" && targetRole !== "user") return false;
         if (targetRole === "staff") return p.role === "staff";
         if (targetRole === "employee") return p.role === "staff" || p.role === "carpenter"; // 社員全員（社内チャット）
         if (targetRole === "supplier") return p.role === "supplier" && p.supplier_id === targetSupplierId;
