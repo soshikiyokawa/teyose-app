@@ -1,5 +1,43 @@
 const fmt = n => Math.round(n).toLocaleString('ja-JP');
 
+// ════ 消費税（品目ごとの税率に対応） ════
+//
+// 10%（ふつう）・8%（軽減税率＝飲食料品と新聞）・0%（非課税＝切手・印紙・商品券など）が
+// 混ざることがある。税率ごとに金額をまとめてから掛けるのが正しい出し方で、
+// 1行ずつ丸めて足すと、レシートに書かれた消費税と1円ずれることがある。
+//
+// taxRate が無い品目（これまでの発注）は、これまでどおり10%として扱う。
+const TAX_RATES = [10, 8, 0];
+const taxRateOf = it => TAX_RATES.includes(Number(it?.taxRate)) ? Number(it.taxRate) : 10;
+const taxRateLabel = r => r===0 ? '非課税' : `${r}%`;
+
+// items は {cost（税抜単価）, qty, taxRate} の並び
+function orderTaxBreakdown(items){
+  const by = new Map();
+  (items||[]).forEach(it=>{
+    const r = taxRateOf(it);
+    by.set(r, (by.get(r)||0) + (Number(it.cost)||0) * (Number(it.qty)||0));
+  });
+  const rows = [...by.entries()]
+    .sort((a,b)=>b[0]-a[0])                       // 10% → 8% → 非課税 の順
+    .map(([rate, base])=>({ rate, base, tax: Math.round(base * rate / 100) }));
+  const subtotal = rows.reduce((s,r)=>s+r.base, 0);
+  const tax = rows.reduce((s,r)=>s+r.tax, 0);
+  return { rows, subtotal, tax, total: subtotal + tax, mixed: rows.length > 1 };
+}
+// 発注書・プレビューに出す消費税の行（税率が1つなら1行、混ざっていれば税率ごと）
+function orderTaxLines(items){
+  const b = orderTaxBreakdown(items);
+  const lines = b.rows.filter(r=>r.rate>0).map(r=>({
+    label: b.mixed ? `消費税（${r.rate}%対象 ¥${fmt(r.base)}）` : `消費税（${r.rate}%）`,
+    value: r.tax,
+  }));
+  const zero = b.rows.find(r=>r.rate===0);
+  if(zero && b.mixed) lines.push({ label:'非課税分', value: zero.base, note:true });
+  if(!lines.length) lines.push({ label:'消費税（非課税）', value: 0 });
+  return lines;
+}
+
 function payAmtFocus(el){ el.value = el.value.replace(/,/g,''); }
 function payAmtBlur(el){
   const n = parseFloat(el.value.replace(/,/g,''));

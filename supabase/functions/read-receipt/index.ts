@@ -31,7 +31,23 @@ const PROMPT = `これはレシート・購入明細（ネットショップの�
 - 単価が書かれていなければ 金額÷数量 で計算する
 - 数量・単位が読めないときは qty:1, unit:"式"
 - 小計・消費税・合計・ポイント・値引きの行は含めない
-- 読めない金額は推測せず、その品目の price と amount を省く`;
+- 読めない金額は推測せず、その品目の price と amount を省く
+
+税率（taxRate）の見分け方（1品目ずつ必ず答える）:
+- 10 … ふつうの品物・工具・材料・送料・手数料
+- 8  … 軽減税率のもの。飲食料品（お茶・弁当・お菓子・飲み物など）と定期購読の新聞
+       ・「※」「*」「軽」などの印が付いている行
+       ・レシートの下に「※は軽減税率対象」と書いてあることが多い
+       ・「8%対象 ¥○○」という小計があれば、その金額に合う行が8%
+       ・お酒・外食・イートインは 10
+- 0  … 消費税がかからないもの（非課税・不課税）
+       切手・はがき・収入印紙・証紙、商品券・プリペイドカード・図書カード、
+       保険料、行政や役所への手数料（登記・証明書など）、
+       駐車場の料金のうち税がかからないもの、香典・お祝い金
+       ・レシートに「非課税」「内税対象外」「不課税」と書いてある行
+- 印や但し書きが無く判断できないときは 10
+- 「8%対象」「10%対象」の小計がレシートにある場合は、各品目の税率の合計が
+  それぞれの小計と合うかを確かめてから答える`;
 
 const TOOL = {
   name: "save_receipt_items",
@@ -44,6 +60,10 @@ const TOOL = {
         type: "boolean",
         description: "明細の単価・金額が税込かどうか。消費税の行が別にあるなら false",
       },
+      taxIncludedReason: {
+        type: "string",
+        description: "税込・税抜をそう判断した理由を、レシートのどこを見たかで一言（例：合計とは別に消費税の行があった）",
+      },
       items: {
         type: "array",
         description: "品目の行",
@@ -55,8 +75,13 @@ const TOOL = {
             unit: { type: "string", description: "単位" },
             price: { type: "number", description: "単価。明細に書かれているまま" },
             amount: { type: "number", description: "金額。明細に書かれているまま" },
+            taxRate: {
+              type: "number",
+              enum: [10, 8, 0],
+              description: "この品目の消費税率。10＝ふつう／8＝軽減税率（飲食料品・新聞）／0＝非課税（切手・印紙・商品券など）",
+            },
           },
-          required: ["name"],
+          required: ["name", "taxRate"],
         },
       },
     },
@@ -140,12 +165,15 @@ Deno.serve(async (req) => {
         const qty = num(it.qty) ?? 1;
         const amount = num(it.amount);
         const price = num(it.price) ?? (amount !== null && qty ? Math.round(amount / qty) : null);
+        // 税率は 10／8／0 のどれか。読めなかったものは、ふつうの 10 として扱う
+        const rate = [10, 8, 0].includes(Number(it.taxRate)) ? Number(it.taxRate) : 10;
         return {
           name: String(it.name || "").trim(),
           qty,
           unit: String(it.unit || "式").trim() || "式",
           price: price ?? 0,
           amount: amount ?? (price !== null ? Math.round(price * qty) : 0),
+          taxRate: rate,
         };
       })
       .filter((it: any) => it.name);
@@ -154,6 +182,7 @@ Deno.serve(async (req) => {
       shop: String(use.input?.shop || "").trim(),
       // 読めなかったときは、日本のレシートで多い税込として扱う
       taxIncluded: use.input?.taxIncluded !== false,
+      taxIncludedReason: String(use.input?.taxIncludedReason || "").trim(),
       items,
       reason: message.stop_reason === "max_tokens"
         ? "品目が多く、途中までしか読み取れていない可能性があります" : "",

@@ -111,6 +111,18 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .rr-tax{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--text-sub);
   background:var(--surface2);border-radius:8px;padding:7px 9px;margin-bottom:8px}
 .rr-tax-note{color:var(--text-muted);font-size:10px}
+/* 品目ごとの税率（10%／8%／非課税）。押して切り替える */
+.rr-rate{display:flex;gap:3px;flex-shrink:0}
+.rr-rate .btn{padding:3px 6px;font-size:10px;min-height:0}
+/* 税率が混ざっているときの内訳。レシートの「8%対象」と見比べる */
+.rr-rate-sum{margin-top:8px;padding:7px 9px;background:var(--surface2);border-radius:8px;
+  font-size:11px;color:var(--text-sub);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.rr-rate-chip{background:var(--surface);border:0.5px solid var(--border-s);border-radius:99px;
+  padding:2px 9px;font-size:11px;white-space:nowrap}
+@media(max-width:600px){
+  /* スマホでは税率のボタンを1行に収めるため、行を折り返す */
+  .rr-rate{width:100%;justify-content:flex-end;margin-top:2px}
+}
 
 /* ── 発注済みの単価を直す ── */
 .ope-row{border:0.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:7px}

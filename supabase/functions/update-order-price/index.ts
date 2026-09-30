@@ -113,8 +113,14 @@ Deno.serve(async (req) => {
 
     if (!changes.length) return json({ error: "単価が変わっていません" }, 400);
 
-    const subtotal = items.reduce((s, it) => s + num(it.cost) * num(it.qty), 0);
-    const tax = Math.round(subtotal * 0.1);
+    // 消費税は品目ごとの税率（10／8／非課税）で出す。税率ごとにまとめてから掛ける
+    const byRate = new Map<number, number>();
+    for (const it of items) {
+      const r = [10, 8, 0].includes(Number((it as any).taxRate)) ? Number((it as any).taxRate) : 10;
+      byRate.set(r, (byRate.get(r) || 0) + num(it.cost) * num(it.qty));
+    }
+    const subtotal = [...byRate.values()].reduce((s, v) => s + v, 0);
+    const tax = [...byRate.entries()].reduce((s, [r, base]) => s + Math.round(base * r / 100), 0);
     const total = subtotal + tax;
 
     const edit = {

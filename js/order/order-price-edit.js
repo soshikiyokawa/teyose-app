@@ -47,6 +47,7 @@ function openOrderPriceEdit(orderNo){
     orig: itemOrigPrice(it),
     before: itemNowPrice(it),
     after: itemNowPrice(it),
+    taxRate: taxRateOf(it),
     shipping: isShippingItem(it),
   })).filter(it => !it.shipping);
   const ship = (o.items || []).find(isShippingItem);
@@ -171,8 +172,13 @@ function renderOpeTotal(){
   const shipChanged = opeShip && opeShip.after !== opeShip.before;
   const subBefore = opeItems.reduce((s,it)=>s + it.before*it.qty, 0) + (opeShip?.before||0);
   const subAfter  = opeItems.reduce((s,it)=>s + it.after*it.qty, 0)  + (opeShip?.after||0);
-  const totBefore = subBefore + Math.round(subBefore*0.1);
-  const totAfter  = subAfter  + Math.round(subAfter*0.1);
+  // 消費税は品目ごとの税率で出す（送料は10%）
+  const taxFor = which => orderTaxBreakdown(
+    opeItems.map(it=>({cost:it[which], qty:it.qty, taxRate:it.taxRate}))
+      .concat(opeShip ? [{cost:opeShip[which], qty:1, taxRate:10}] : [])
+  ).tax;
+  const totBefore = subBefore + taxFor('before');
+  const totAfter  = subAfter  + taxFor('after');
   const n = opeItems.filter(it=>it.after!==it.before).length;
   const what = [
     n ? `${n}品目の単価を直します` : '',

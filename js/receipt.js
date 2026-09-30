@@ -2,11 +2,20 @@
 
 let receiptItems = [];
 // 読み取った明細の単価が税込かどうか。レシートによって違うので読み取り側に判定してもらう。
-// 原価は税抜で持つので、税込のときだけ ÷1.1 する
+// 原価は税抜で持つので、税込のときだけ税を抜く
 let receiptTaxIncluded = true;
-function setReceiptTaxIncluded(v){ receiptTaxIncluded = !!v; renderReceiptItems(); }
-// 表示・登録に使う税抜の単価
-function receiptCostEx(price){ return receiptTaxIncluded ? Math.round(price / 1.1) : Math.round(price); }
+let receiptTaxReason = '';     // AIが税込・税抜をそう見た理由（画面に小さく出す）
+function setReceiptTaxIncluded(v){ receiptTaxIncluded = !!v; receiptTaxReason=''; renderReceiptItems(); }
+// 表示・登録に使う税抜の単価。税率は品目ごと（10／8／非課税）
+function receiptCostEx(price, rate){
+  const r = TAX_RATES.includes(Number(rate)) ? Number(rate) : 10;
+  return receiptTaxIncluded ? Math.round(price / (1 + r/100)) : Math.round(price);
+}
+function setReceiptRate(i, rate){
+  if(!receiptItems[i]) return;
+  receiptItems[i].taxRate = Number(rate);
+  renderReceiptItems();
+}
 
 function openReceiptCamera() {
   document.getElementById('receipt-file-input').click();
@@ -85,9 +94,11 @@ async function onReceiptFileChange(input) {
       unit: it.unit || '式',
       price: Math.round(parseFloat(it.price) || parseFloat(it.amount) || 0),
       amount: Math.round(parseFloat(it.amount) || 0),
+      taxRate: TAX_RATES.includes(Number(it.taxRate)) ? Number(it.taxRate) : 10,
     }));
 
     receiptTaxIncluded = data.taxIncluded !== false;
+    receiptTaxReason = String(data.taxIncludedReason || '');
     showReceiptLoading(false);
     if (data.reason) showToast(data.reason);
     openReceiptConfirm();
@@ -137,8 +148,9 @@ function renderReceiptItems() {
     <button class="btn xs${receiptTaxIncluded?' primary':''}" onclick="setReceiptTaxIncluded(true)">税込</button>
     <button class="btn xs${receiptTaxIncluded?'':' primary'}" onclick="setReceiptTaxIncluded(false)">税抜</button>
     <span class="rr-tax-note">${receiptTaxIncluded
-      ? '原価は税抜（÷1.1）にして登録します'
-      : 'そのまま原価（税抜）として登録します'}</span>
+      ? '品目ごとの税率で税を抜いて、原価（税抜）にします'
+      : 'そのまま原価（税抜）として登録します'}${
+      receiptTaxReason ? `<br>AIの見立て：${esc(receiptTaxReason)}` : ''}</span>
   </div>` + receiptItems.map((it, i) => `
     <div class="receipt-row" id="rr-${i}">
       <div class="rr-name">
@@ -152,16 +164,37 @@ function renderReceiptItems() {
         <span style="font-size:11px;color:var(--text-muted)">${receiptTaxIncluded?'税込':'税抜'}単価</span>
         <input class="rr-input num" type="number" min="0" step="1" value="${it.price}" onchange="receiptItems[${i}].price=parseFloat(this.value)||0;updateReceiptAmt(${i})">
       </div>
+      <div class="rr-rate">
+        ${TAX_RATES.map(r=>`<button class="btn xs${taxRateOf(it)===r?' primary':''}" onclick="setReceiptRate(${i},${r})">${taxRateLabel(r)}</button>`).join('')}
+      </div>
       <div class="rr-amt" style="flex-direction:column;align-items:flex-end;gap:1px">
         <span style="font-size:11px">${receiptTaxIncluded?'税込':'税抜'} ¥<span id="rr-amt-${i}">${fmt(it.price * it.qty)}</span></span>
-        <span style="font-size:10px;color:var(--text-muted)">原価 ¥${fmt(receiptCostEx(it.price) * it.qty)}</span>
+        <span style="font-size:10px;color:var(--text-muted)">原価 ¥${fmt(receiptCostEx(it.price, it.taxRate) * it.qty)}</span>
       </div>
       <button class="btn danger xs" onclick="removeReceiptItem(${i})" style="flex-shrink:0">×</button>
-    </div>`).join('');
+    </div>`).join('') + receiptRateSummaryHtml();
 
+  updateReceiptTotals();
+}
+
+// 税率ごとの内訳。レシートの「8%対象」「10%対象」と見比べられるように出す
+function receiptRateSummaryHtml(){
+  const by = new Map();
+  receiptItems.forEach(it=>{
+    const r = taxRateOf(it);
+    by.set(r, (by.get(r)||0) + it.price * it.qty);
+  });
+  if(by.size <= 1) return '';
+  const rows = [...by.entries()].sort((a,b)=>b[0]-a[0])
+    .map(([r,amt])=>`<span class="rr-rate-chip">${r===0?'非課税':r+'%対象'}　¥${fmt(amt)}</span>`).join('');
+  return `<div class="rr-rate-sum">${receiptTaxIncluded?'税込':'税抜'}の内訳　${rows}</div>`;
+}
+
+function updateReceiptTotals(){
   const total = receiptItems.reduce((s, it) => s + it.price * it.qty, 0);
-  const totalEx = receiptItems.reduce((s, it) => s + receiptCostEx(it.price) * it.qty, 0);
-  document.getElementById('receipt-total').textContent = fmt(total);
+  const totalEx = receiptItems.reduce((s, it) => s + receiptCostEx(it.price, it.taxRate) * it.qty, 0);
+  const tEl = document.getElementById('receipt-total');
+  if (tEl) tEl.textContent = fmt(total);
   const exEl = document.getElementById('receipt-total-ex');
   if (exEl) exEl.textContent = fmt(totalEx);
 }
@@ -169,11 +202,7 @@ function renderReceiptItems() {
 function updateReceiptAmt(i) {
   const el = document.getElementById('rr-amt-' + i);
   if (el) el.textContent = fmt(receiptItems[i].price * receiptItems[i].qty);
-  const total = receiptItems.reduce((s, it) => s + it.price * it.qty, 0);
-  const totalEx = receiptItems.reduce((s, it) => s + receiptCostEx(it.price) * it.qty, 0);
-  document.getElementById('receipt-total').textContent = fmt(total);
-  const exEl = document.getElementById('receipt-total-ex');
-  if (exEl) exEl.textContent = fmt(totalEx);
+  updateReceiptTotals();
 }
 
 function removeReceiptItem(i) {
@@ -186,11 +215,12 @@ function addReceiptToCart() {
   if (!receiptItems.length) { showToast('品目がありません'); return; }
 
   receiptItems.forEach(it => {
-    const existing = cart.find(c => c.name === it.name && c._receipt);
+    // 同じ品名でも税率が違えば別の行にする（まとめると消費税が合わなくなる）
+    const existing = cart.find(c => c.name === it.name && c._receipt && taxRateOf(c) === taxRateOf(it));
     if (existing) {
       existing.qty += it.qty;
     } else {
-      const costEx = receiptCostEx(it.price);
+      const costEx = receiptCostEx(it.price, it.taxRate);
       cart.push({
         id: it._id,
         name: it.name,
@@ -198,6 +228,7 @@ function addReceiptToCart() {
         unit: it.unit,
         cost: costEx,
         price: costEx,
+        taxRate: taxRateOf(it),
         supplier: selectedSupplier.name,
         cat: '仕入',
         _receipt: true,

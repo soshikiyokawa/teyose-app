@@ -28,6 +28,38 @@ const origPrice = (it: any) =>
     ? nowPrice(it)
     : Math.round(Number(it.origPrice) || 0);
 
+// ── 消費税（品目ごとの税率） ──
+//
+// 10%（ふつう）・8%（軽減税率）・0%（非課税）が混ざることがある。
+// 税率ごとに金額をまとめてから掛ける（1行ずつ丸めると1円ずれる）。
+// taxRate が無い品目（これまでの発注）は 10% として扱う。
+// 画面側の js/utils.js の orderTaxBreakdown と同じ出し方。
+function taxRateOf(it: any): number {
+  const r = Number(it?.taxRate);
+  return [10, 8, 0].includes(r) ? r : 10;
+}
+function taxLines(o: any): string[] {
+  const by = new Map<number, number>();
+  for (const it of o.items || []) {
+    const r = taxRateOf(it);
+    by.set(r, (by.get(r) || 0) + nowPrice(it) * (Number(it.qty) || 0));
+  }
+  const rows = [...by.entries()].sort((a, b) => b[0] - a[0]);
+  const mixed = rows.length > 1;
+  const out: string[] = [];
+  for (const [rate, base] of rows) {
+    if (rate > 0) {
+      out.push(mixed
+        ? `消費税（${rate}%対象 ¥${fmt(base)}）：¥${fmt(Math.round(base * rate / 100))}`
+        : `消費税（${rate}%）：¥${fmt(Math.round(base * rate / 100))}`);
+    }
+  }
+  const zero = rows.find(([r]) => r === 0);
+  if (zero && mixed) out.push(`非課税分：¥${fmt(zero[1])}`);
+  if (!out.length) out.push(`消費税（非課税）：¥0`);
+  return out;
+}
+
 // 数字が間延びするのを防ぐ。
 //
 // フォントは、英字と数字が並ぶ型番（SUS410 など）のとき、数字を別の字形に置き換える。
@@ -284,7 +316,12 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
   y -= 24;
   drawRight(`小計：¥${fmt(o.subtotal)}`, y, 11, false, rgb(0.2, 0.2, 0.2));
   y -= 18;
-  drawRight(`消費税（10%）：¥${fmt(o.tax)}`, y, 11, false, rgb(0.2, 0.2, 0.2));
+  // 消費税は品目ごとの税率（10／8／非課税）。混ざっているときは税率ごとに出す
+  for (const line of taxLines(o)) {
+    drawRight(line, y, 11, false, rgb(0.2, 0.2, 0.2));
+    y -= 18;
+  }
+  y += 18;   // すぐ下で合計のぶんを引くので、1行ぶん戻す
   y -= 22;
   drawRight(`合計：¥${fmt(o.total)}`, y, 16, true, rgb(0.29, 0.19, 0.06));
 

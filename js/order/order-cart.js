@@ -519,7 +519,9 @@ function renderCart(){
         <div style="font-size:11px;color:var(--text-muted)">¥${fmt(c.cost)}/${c.unit}${
           cartUnitShipping(c) ? `　＋送料 ¥${fmt(cartUnitShipping(c))}/${c.unit}` : ''}${
           (c.shipping && c.shippingPer!=='unit') ? `　＋送料 ¥${fmt(c.shipping)}（1回）` : ''}${
-          bundleNote(c, c.qty)}</div>
+          bundleNote(c, c.qty)}${
+          // 10%でないものだけ印を付ける（軽減税率・非課税の品目が混ざったときに気づけるように）
+          taxRateOf(c)!==10 ? `　<b style="color:var(--accent-t)">${taxRateLabel(taxRateOf(c))}</b>` : ''}</div>
       </div>
       <div class="qty-ctrl">
         <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>

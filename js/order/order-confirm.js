@@ -73,8 +73,10 @@ function openOrderPreview(){
   });
   const ship=cartOrderShipping();
   if(ship) orderItems.push({name:'送料',qty:1,unit:'式',cost:ship,price:ship,isShipping:true,supplier:sup.name});
-  const subtotal=orderItems.reduce((s,c)=>s+c.cost*c.qty,0);
-  const tax=Math.round(subtotal*.1);
+  // 消費税は品目ごとの税率（10／8／非課税）で出す。レシート取り込みで混ざることがある
+  const taxB=orderTaxBreakdown(orderItems);
+  const subtotal=taxB.subtotal;
+  const tax=taxB.tax;
   // 発注書を作った人を、きよかわの担当者として発注書に載せる
   const createdByName = currentUserDisplayName || '';
   currentOrder={no,project,date,dueDate,dueAsap:!receipt&&orderDueAsap,costType,paymentMethod:payment,suppliers:sup.name,supplierObj:sup,items:orderItems,subtotal,tax,total:subtotal+tax,createdByName,
@@ -111,7 +113,7 @@ function openOrderPreview(){
     </div>`).join('')}
     <div style="margin-top:12px;text-align:right;font-size:13px;line-height:2.2">
       <div>小計：¥${fmt(subtotal)}</div>
-      <div>消費税（10%）：¥${fmt(tax)}</div>
+      ${orderTaxLines(orderItems).map(l=>`<div${l.note?' style="font-size:11px;color:#888"':''}>${l.label}：¥${fmt(l.value)}</div>`).join('')}
       <div style="font-size:17px;font-weight:800;color:#4a3010">合計：¥${fmt(subtotal+tax)}</div>
     </div>
     ${note?`<div style="margin-top:14px;border:1px solid #e0d8c8;border-radius:6px;padding:8px 10px;font-size:12px;color:#4a3010;white-space:pre-wrap"><b style="font-size:11px;color:#888">備考</b><br>${esc(note)}</div>`:''}
@@ -191,5 +193,5 @@ function buildOrderPdfHtml(o){
     const q=Number(c.qty)||0;
     const was=orig!==now?`<div style="font-size:10px;color:#999">当初 ¥${fmt(orig)}</div>`:'';
     return `<tr><td style="padding:6px 8px;border:0.5px solid #e8e0d0;word-break:break-word;overflow-wrap:anywhere">${c.name}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;white-space:nowrap">${c.unit}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right">${q}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right">¥${fmt(now)}${was}</td><td style="padding:6px 8px;border:0.5px solid #e8e0d0;text-align:right;font-weight:600">¥${fmt(now*q)}</td></tr>`;
-  }).join('')}</tbody></table><div style="margin-top:12px;text-align:right;font-size:13px;line-height:2.2"><div>小計：¥${fmt(o.subtotal)}</div><div>消費税（10%）：¥${fmt(o.tax)}</div><div style="font-size:17px;font-weight:800;color:#4a3010">合計：¥${fmt(o.total)}</div>${last?`<div style="font-size:11px;color:#888;line-height:1.6">（当初の合計：¥${fmt(edits[0]?.total?.before)}）</div>`:''}</div>${o.paymentMethod?`<div style="margin-top:14px;font-size:11px;color:#888;border-top:1px solid #e0d8c8;padding-top:10px">この発注はレシートから取り込んだ支払済みの記録です（支払方法：${o.paymentMethod}）。</div>`:`<div style="margin-top:14px;font-size:11px;color:#888;border-top:1px solid #e0d8c8;padding-top:10px">納品場所：${esc(orderDeliveryLabel(o))}　／　ご納品の際は${o.deliveryPlace&&o.deliveryPlace!=='現場'?'担当者':'現場担当者'}へご連絡ください。</div>`}`;
+  }).join('')}</tbody></table><div style="margin-top:12px;text-align:right;font-size:13px;line-height:2.2"><div>小計：¥${fmt(o.subtotal)}</div>${orderTaxLines(o.items).map(l=>`<div${l.note?' style="font-size:11px;color:#888"':''}>${l.label}：¥${fmt(l.value)}</div>`).join('')}<div style="font-size:17px;font-weight:800;color:#4a3010">合計：¥${fmt(o.total)}</div>${last?`<div style="font-size:11px;color:#888;line-height:1.6">（当初の合計：¥${fmt(edits[0]?.total?.before)}）</div>`:''}</div>${o.paymentMethod?`<div style="margin-top:14px;font-size:11px;color:#888;border-top:1px solid #e0d8c8;padding-top:10px">この発注はレシートから取り込んだ支払済みの記録です（支払方法：${o.paymentMethod}）。</div>`:`<div style="margin-top:14px;font-size:11px;color:#888;border-top:1px solid #e0d8c8;padding-top:10px">納品場所：${esc(orderDeliveryLabel(o))}　／　ご納品の際は${o.deliveryPlace&&o.deliveryPlace!=='現場'?'担当者':'現場担当者'}へご連絡ください。</div>`}`;
 }
