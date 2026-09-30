@@ -309,3 +309,25 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .em-month{background:none;border:none;padding:2px 4px;border-radius:var(--radius);font:inherit;color:var(--text-sub);cursor:pointer}
 .em-month:hover{color:var(--accent-t)}
 .em-month.on{background:var(--accent-bg);color:var(--accent-t);font-weight:600}
+
+/* ── レシート台帳 ── */
+.rl-row{display:flex;gap:10px;align-items:flex-start;padding:9px 10px;
+  border-bottom:0.5px solid var(--border);background:var(--surface)}
+.rl-row:first-child{border-radius:10px 10px 0 0}
+.rl-row:last-child{border-bottom:none;border-radius:0 0 10px 10px}
+.rl-thumb{width:58px;height:78px;flex-shrink:0;border-radius:6px;cursor:pointer;
+  background:var(--surface2) center top/cover no-repeat;border:0.5px solid var(--border-s);
+  display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-muted)}
+.rl-info{flex:1;min-width:0}
+.rl-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.rl-date{font-size:12px;color:var(--text-sub);font-variant-numeric:tabular-nums}
+.rl-shop{font-size:13.5px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rl-total{font-size:14px;font-weight:800;color:var(--wood-t)}
+.rl-sub{font-size:11px;color:var(--text-sub);line-height:1.7}
+.rl-items{font-size:11px;color:var(--text-muted);line-height:1.6;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rl-del{flex-shrink:0;align-self:center}
+@media(max-width:560px){
+  /* 狭い画面では店名を2行目に回す（「コーナ…」と切れないように） */
+  .rl-shop{flex-basis:100%;order:3;white-space:normal}
+}

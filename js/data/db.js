@@ -146,6 +146,7 @@ async function fetchAllData(){
       soft(fetchWorkCalendar),
       soft(fetchInvoiceLines,  ()=>{ invoiceLinesReady=false; }),
       soft(fetchInvoiceHints,  ()=>{ invoiceHints=[]; }),
+      soft(fetchReceipts,      ()=>{ receiptsReady=false; }),   // レシート台帳
       soft(fetchTaskTemplates, ()=>{ taskTemplatesReady=false; }),
     );
   } else if(isSupplierUser){
@@ -1006,6 +1007,71 @@ async function dbInviteClient(projectId, email, displayName){
   const msg = data?.error || detail || (error ? error.message : '');
   if(msg){ showToast('ご案内メールを送れませんでした：'+msg, 6000); throw new Error(msg); }
   return data;
+}
+
+// ════ レシート台帳（migration-genba76.sql） ════
+let receiptLedger = [];
+let receiptsReady = true;
+
+//
+// 整えたレシートの画像と、読み取った内容を残す。あとから支出の元をたどれるように。
+function receiptRowTo(r){
+  return { id:r.id, orderNo:r.order_no||'', paidOn:r.paid_on||'', shop:r.shop||'',
+    project:r.project||'', costType:r.cost_type||'', paymentMethod:r.payment_method||'',
+    subtotal:Number(r.subtotal)||0, tax:Number(r.tax)||0, total:Number(r.total)||0,
+    taxRows:r.tax_rows||[], items:r.items||[], filePath:r.file_path||'',
+    note:r.note||'', createdByName:r.created_by_name||'', createdAt:r.created_at };
+}
+async function fetchReceipts(){
+  const { data, error } = await sb.from('receipts').select('*')
+    .order('paid_on',{ascending:false}).order('id',{ascending:false});
+  receiptsReady = !error;
+  if(error){ receiptLedger = []; throw error; }
+  receiptLedger = (data||[]).map(receiptRowTo);
+}
+
+// 台帳に1件残す。画像は非公開の置き場所に入れ、見るときだけ期限付きのリンクを作る
+async function dbSaveReceipt(rec, imageBase64){
+  let filePath = '';
+  if(imageBase64){
+    // 置き場所は「年月/日付_発注番号.jpg」。日本語は使えないので使わない
+    const ym = String(rec.paidOn||'').slice(0,7).replace('-','') || 'unknown';
+    filePath = `${ym}/${(rec.paidOn||'').replace(/-/g,'')}_${rec.orderNo||Date.now()}.jpg`;
+    const bin = Uint8Array.from(atob(imageBase64), c=>c.charCodeAt(0));
+    const { error: upErr } = await sb.storage.from('receipts')
+      .upload(filePath, bin, { contentType:'image/jpeg', upsert:true });
+    if(upErr){ console.warn('レシート画像を置けませんでした', upErr.message); filePath = ''; }
+  }
+  const row = {
+    order_no:rec.orderNo||'', paid_on:rec.paidOn||localYmd(new Date()), shop:rec.shop||'',
+    project:rec.project||'', cost_type:rec.costType||'', payment_method:rec.paymentMethod||'',
+    subtotal:rec.subtotal||0, tax:rec.tax||0, total:rec.total||0,
+    tax_rows:rec.taxRows||[], items:rec.items||[], file_path:filePath, note:rec.note||'',
+    created_by:currentUserId||null, created_by_name:currentUserDisplayName||'',
+  };
+  const { data, error } = await sb.from('receipts').insert(row).select().single();
+  if(error){
+    console.warn('レシート台帳に残せませんでした', error.message);
+    showToast(error.code==='42P01'
+      ? 'レシート台帳の準備が必要です。supabase/migration-genba76.sql を実行してください'
+      : 'レシート台帳に残せませんでした：'+error.message, 6000);
+    return null;
+  }
+  const saved = receiptRowTo(data);
+  receiptLedger.unshift(saved);
+  return saved;
+}
+// 画像を見るためのリンク（1時間だけ有効）
+async function dbReceiptUrl(filePath){
+  const { data, error } = await sb.storage.from('receipts').createSignedUrl(filePath, 3600);
+  if(error){ showToast('レシート画像を開けませんでした：'+error.message); throw error; }
+  return data.signedUrl;
+}
+async function dbDeleteReceipt(rec){
+  if(rec.filePath){ try{ await sb.storage.from('receipts').remove([rec.filePath]); }catch(_){} }
+  const { error } = await sb.from('receipts').delete().eq('id',rec.id);
+  if(error){ showToast('削除に失敗しました：'+error.message); throw error; }
+  receiptLedger = receiptLedger.filter(r=>r.id!==rec.id);
 }
 
 // ── 案件ごとのお客様（ご主人・奥様など何人でも。migration-genba70.sql） ──

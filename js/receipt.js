@@ -19,13 +19,16 @@ let receiptPaidTotal = null;   // 印字された支払額（税込）
 let receiptTaxTotals = [];     // 税率ごとの「対象額・消費税額」の印字
 let receiptImageBase64 = null; // 整えたレシートの画像（台帳に残す）
 let receiptShop = '';          // 店名
+let receiptPaidOn = '';        // レシートの日付（買った日）
 
 // カートに入れたレシートぶんの消費税（レシートに印字された額）。
 // 印字された税額は、お店が実際に受け取った額そのもの。こちらで計算し直すと
 // 端数処理の違いで1円ずれるので、印字があればそれを使う
 let cartTaxPrinted = null;
 let cartTaxPrintedBase = null;   // そのときのレシート品目の小計。変わったら使わない
-function resetCartTaxPrinted(){ cartTaxPrinted = null; cartTaxPrintedBase = null; }
+// 台帳に残すための材料（発注確定のときに使う）
+let cartReceiptRecord = null;
+function resetCartTaxPrinted(){ cartTaxPrinted = null; cartTaxPrintedBase = null; cartReceiptRecord = null; }
 // いまカートに入っているレシート品目の小計（税抜。行の端数調整を含む）
 function cartReceiptSubtotal(){
   return (typeof cart!=='undefined' ? cart : []).filter(c=>c._receipt)
@@ -303,6 +306,9 @@ async function receiptReadFile(file, isPdf, ready) {
     receiptTaxReason = String(data.taxIncludedReason || '');
     receiptPaidTotal = (data.paidTotal==null || !(Number(data.paidTotal)>0)) ? null : Math.round(Number(data.paidTotal));
     receiptTaxTotals = Array.isArray(data.taxTotals) ? data.taxTotals : [];
+    receiptShop = String(data.shop || '');
+    receiptPaidOn = /^\d{4}-\d{2}-\d{2}$/.test(String(data.paidOn||'')) ? data.paidOn : '';
+    if(ready?.scanned) receiptImageBase64 = rsToJpeg(ready.scanned, 0.85);
     showReceiptLoading(false);
     if (data.reason) showToast(data.reason);
     openReceiptConfirm();
@@ -473,6 +479,16 @@ function addReceiptToCart() {
 
   // 品目をいじったら印字の消費税を使わない判定に使う（いまの小計を覚えておく）
   cartTaxPrintedBase = cartReceiptSubtotal();
+
+  // 台帳に残すための材料を、発注確定のときまで持っておく
+  cartReceiptRecord = {
+    paidOn: receiptPaidOn || localYmd(new Date()),
+    shop: receiptShop,
+    subtotal: st.subtotal, tax: st.tax, total: st.total,
+    taxRows: st.rows,
+    items: st.lines.map(l=>({name:l.name, qty:l.qty, unit:l.unit, price:l.price, taxRate:l.taxRate})),
+    image: receiptImageBase64,
+  };
 
   closeReceiptConfirm();
   renderItemSelectList();

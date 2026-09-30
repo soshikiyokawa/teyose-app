@@ -1,7 +1,7 @@
 // ════ 受発注：発注作成フロー（発注先選択 → 品目選択 → カート） ════
 
 function orderSubTab(t){
-  document.querySelectorAll('#page-order .sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['new','supplier','master','invoice','history','card'][i]===t));
+  document.querySelectorAll('#page-order .sub-tab-btn').forEach((b,i)=>b.classList.toggle('active',['new','supplier','master','invoice','history','card','receipt'][i]===t));
   document.querySelectorAll('#page-order .sub-page').forEach(p=>p.classList.remove('active'));
   document.getElementById('ordersub-'+t).classList.add('active');
   if(t==='new') renderSupplierSelectList();
@@ -10,6 +10,7 @@ function orderSubTab(t){
   if(t==='invoice') renderInvoices();
   if(t==='history') renderOrders();
   if(t==='card') renderCardPage();
+  if(t==='receipt') renderReceiptLedger();
 }
 
 // ── STEP1: 発注先リスト ──

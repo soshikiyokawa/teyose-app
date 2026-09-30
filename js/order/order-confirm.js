@@ -60,7 +60,9 @@ function openOrderPreview(){
     }
   }
   const now=new Date();
-  const date=localYmd(now);   // 発注日（朝9時前でも今日の日付にする）
+  // 発注日。レシートから取り込んだものは「買った日」にする
+  // （あとから登録しても、原価や月次がレシートの日付で並ぶように）
+  const date=(receipt && typeof receiptPaidOn!=='undefined' && receiptPaidOn) ? receiptPaidOn : localYmd(now);
   const no=now.getFullYear()+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0');
   const sup=selectedSupplier||{name:'—',tel:'',email:''};
   // メーカー送料を含めた形にする。
@@ -165,6 +167,21 @@ async function confirmOrder(){
       orderNo:currentOrder.no, costType:currentOrder.costType, status:'pending'
     });
   });
+
+  // ③ レシートから起こした発注は、整えた画像と読み取った内容を台帳に残す。
+  // 失敗しても発注そのものは成立させる（あとから台帳だけ入れ直せる）
+  if(typeof cartReceiptRecord!=='undefined' && cartReceiptRecord){
+    try{
+      await dbSaveReceipt({
+        ...cartReceiptRecord,
+        orderNo: currentOrder.no,
+        project: currentOrder.project,
+        costType: currentOrder.costType,
+        paymentMethod: currentOrder.paymentMethod,
+        note: currentOrder.note || '',
+      }, cartReceiptRecord.image);
+    }catch(e){ console.warn('レシート台帳に残せませんでした', e); }
+  }
 
   // UI後処理
   cart = []; currentOrder = null;

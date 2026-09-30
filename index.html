@@ -25,8 +25,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=427">
-<link rel="stylesheet" href="css/schedule.css?v=427">
+<link rel="stylesheet" href="css/main.css?v=428">
+<link rel="stylesheet" href="css/schedule.css?v=428">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -691,6 +691,7 @@
     <button class="sub-tab-btn" id="subtab-invoice" onclick="orderSubTab('invoice')">請求書</button>
     <button class="sub-tab-btn staff-only" onclick="orderSubTab('history')">発注履歴</button>
     <button class="sub-tab-btn staff-only" onclick="orderSubTab('card')">カード明細</button>
+    <button class="sub-tab-btn staff-only" onclick="orderSubTab('receipt')">レシート台帳</button>
   </div>
 
   <!-- ① 発注作成（発注先選択 → 品目選択 → カート） -->
@@ -885,6 +886,20 @@
       JCBの明細CSVをそのまま取り込めます。レシートから作った発注と金額・日付が一致する明細は自動で照合し、その現場の費用として記録します（原価は発注時に登録済みのため二重には計上しません）。
     </div>
     <div id="card-body"></div>
+  </div>
+
+  <!-- ════ レシート台帳（整えたレシートを日付順に。js/receipt-ledger.js） ════ -->
+  <div class="sub-page staff-only" id="ordersub-receipt">
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:10px 0 6px">
+      <div style="font-size:15px;font-weight:800">レシート台帳</div>
+      <span id="rl-count" style="font-size:12px;color:var(--text-sub)"></span>
+    </div>
+    <div id="rl-filter" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-bottom:8px">
+      受発注でレシートを読み取って発注を確定すると、整えた画像と読み取った内容がここに残ります（日付の新しい順）。<br>
+      画像をタップすると大きく見られます。「台帳を印刷」で、レシートを並べて貼った形の紙が出ます。
+    </div>
+    <div id="rl-body"></div>
   </div>
 </div>
 
@@ -3210,91 +3225,92 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=427"></script>
+<script src="js/supabase-client.js?v=428"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=427"></script>
+<script src="js/utils.js?v=428"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=427"></script>
+<script src="js/state.js?v=428"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=427"></script>
+<script src="js/data/db.js?v=428"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=427"></script>
+<script src="js/nav.js?v=428"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=427"></script>
+<script src="js/talk.js?v=428"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=427"></script>
+<script src="js/push.js?v=428"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=427"></script>
-<script src="js/estimate/estimate-items.js?v=427"></script>
-<script src="js/estimate/quote-import.js?v=427"></script>
-<script src="js/estimate/estimate-master.js?v=427"></script>
-<script src="js/estimate/estimate-summary.js?v=427"></script>
-<script src="js/estimate/estimate-crud.js?v=427"></script>
-<script src="js/estimate/parking.js?v=427"></script>
-<script src="js/estimate/estimate-pdf.js?v=427"></script>
-<script src="js/estimate/estimate-invoice.js?v=427"></script>
+<script src="js/estimate/estimate-tabs.js?v=428"></script>
+<script src="js/estimate/estimate-items.js?v=428"></script>
+<script src="js/estimate/quote-import.js?v=428"></script>
+<script src="js/estimate/estimate-master.js?v=428"></script>
+<script src="js/estimate/estimate-summary.js?v=428"></script>
+<script src="js/estimate/estimate-crud.js?v=428"></script>
+<script src="js/estimate/parking.js?v=428"></script>
+<script src="js/estimate/estimate-pdf.js?v=428"></script>
+<script src="js/estimate/estimate-invoice.js?v=428"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=427"></script>
-<script src="js/payment-schedule.js?v=427"></script>
-<script src="js/inspection.js?v=427"></script>
+<script src="js/orders-list.js?v=428"></script>
+<script src="js/payment-schedule.js?v=428"></script>
+<script src="js/inspection.js?v=428"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=427"></script>
+<script src="js/chusho.js?v=428"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=427"></script>
+<script src="js/schedule.js?v=428"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=427"></script>
-<script src="js/order/item-price.js?v=427"></script>
-<script src="js/order/item-master.js?v=427"></script>
-<script src="js/order/invoice.js?v=427"></script>
-<script src="js/order/invoice-lines.js?v=427"></script>
-<script src="js/order/ekrea-price.js?v=427"></script>
-<script src="js/order/order-cart.js?v=427"></script>
-<script src="js/order/order-confirm.js?v=427"></script>
-<script src="js/order/order-price-edit.js?v=427"></script>
-<script src="js/order/order-history.js?v=427"></script>
-<script src="js/cost-budget.js?v=427"></script>
-<script src="js/order/card-match.js?v=427"></script>
-<script src="js/receipt-scan.js?v=427"></script>
-<script src="js/receipt.js?v=427"></script>
+<script src="js/order/supplier-master.js?v=428"></script>
+<script src="js/order/item-price.js?v=428"></script>
+<script src="js/order/item-master.js?v=428"></script>
+<script src="js/order/invoice.js?v=428"></script>
+<script src="js/order/invoice-lines.js?v=428"></script>
+<script src="js/order/ekrea-price.js?v=428"></script>
+<script src="js/order/order-cart.js?v=428"></script>
+<script src="js/order/order-confirm.js?v=428"></script>
+<script src="js/order/order-price-edit.js?v=428"></script>
+<script src="js/order/order-history.js?v=428"></script>
+<script src="js/cost-budget.js?v=428"></script>
+<script src="js/order/card-match.js?v=428"></script>
+<script src="js/receipt-scan.js?v=428"></script>
+<script src="js/receipt-ledger.js?v=428"></script>
+<script src="js/receipt.js?v=428"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=427"></script>
-<script src="js/genba/supplier-view.js?v=427"></script>
-<script src="js/genba/genba-files.js?v=427"></script>
-<script src="js/genba/genba-photos.js?v=427"></script>
-<script src="js/genba/genba-drawings.js?v=427"></script>
-<script src="js/genba/genba-nippo.js?v=427"></script>
-<script src="js/genba/genba-dezura.js?v=427"></script>
-<script src="js/genba/payroll.js?v=427"></script>
-<script src="js/genba/overtime-pay.js?v=427"></script>
-<script src="js/genba/leave-balance.js?v=427"></script>
-<script src="js/genba/genba-leave.js?v=427"></script>
-<script src="js/genba/genba-holiday.js?v=427"></script>
-<script src="js/genba/license.js?v=427"></script>
-<script src="js/genba/vehicle.js?v=427"></script>
-<script src="js/genba/work-calendar.js?v=427"></script>
-<script src="js/genba/account-perms.js?v=427"></script>
+<script src="js/genba/genba-tabs.js?v=428"></script>
+<script src="js/genba/supplier-view.js?v=428"></script>
+<script src="js/genba/genba-files.js?v=428"></script>
+<script src="js/genba/genba-photos.js?v=428"></script>
+<script src="js/genba/genba-drawings.js?v=428"></script>
+<script src="js/genba/genba-nippo.js?v=428"></script>
+<script src="js/genba/genba-dezura.js?v=428"></script>
+<script src="js/genba/payroll.js?v=428"></script>
+<script src="js/genba/overtime-pay.js?v=428"></script>
+<script src="js/genba/leave-balance.js?v=428"></script>
+<script src="js/genba/genba-leave.js?v=428"></script>
+<script src="js/genba/genba-holiday.js?v=428"></script>
+<script src="js/genba/license.js?v=428"></script>
+<script src="js/genba/vehicle.js?v=428"></script>
+<script src="js/genba/work-calendar.js?v=428"></script>
+<script src="js/genba/account-perms.js?v=428"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=427"></script>
+<script src="js/init.js?v=428"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=427"></script>
-<script src="js/tasks.js?v=427"></script>
-<script src="js/task-templates.js?v=427"></script>
-<script src="js/auth.js?v=427"></script>
-<script src="js/account.js?v=427"></script>
+<script src="js/notifications.js?v=428"></script>
+<script src="js/tasks.js?v=428"></script>
+<script src="js/task-templates.js?v=428"></script>
+<script src="js/auth.js?v=428"></script>
+<script src="js/account.js?v=428"></script>
 </body>
 </html>

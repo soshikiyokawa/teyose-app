@@ -50,6 +50,9 @@ const PROMPT = `これはレシート・購入明細（ネットショップの�
   それぞれの小計と合うかを確かめてから答える
 
 レシートに印字されている合計も、そのまま写してください（ここがいちばん大事）:
+- paidOn … レシートの日付（買った日・支払った日）を YYYY-MM-DD で。時刻は付けない
+  ・「2026年9月30日」「26/09/30」「R8.9.30」なども西暦の YYYY-MM-DD に直す
+  ・日付が読めないときは省く（今日の日付を入れたりしない）
 - paidTotal … 最終的に支払った金額（「合計」「お買上げ計」「ご請求額」「お支払金額」など）
   ・値引き後・ポイント使用前の、税込の支払額
   ・クレジット払いなら、カードで切った金額
@@ -73,6 +76,10 @@ const TOOL = {
       taxIncludedReason: {
         type: "string",
         description: "税込・税抜をそう判断した理由を、レシートのどこを見たかで一言（例：合計とは別に消費税の行があった）",
+      },
+      paidOn: {
+        type: "string",
+        description: "レシートの日付（買った日）。YYYY-MM-DD の形。読めなければ省く",
       },
       paidTotal: {
         type: "number",
@@ -212,6 +219,8 @@ Deno.serve(async (req) => {
       taxIncluded: use.input?.taxIncluded !== false,
       taxIncludedReason: String(use.input?.taxIncludedReason || "").trim(),
       // レシートに印字された支払額と、税率ごとの内訳。合わせ込みの「正」に使う
+      // レシートの日付。台帳を日付順に並べるのに使う
+      paidOn: /^\d{4}-\d{2}-\d{2}$/.test(String(use.input?.paidOn || "")) ? String(use.input.paidOn) : "",
       paidTotal: num(use.input?.paidTotal),
       taxTotals: ((use.input?.taxTotals) || [])
         .map((t: any) => ({
