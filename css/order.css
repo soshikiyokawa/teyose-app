@@ -119,6 +119,18 @@ body.drag-sorting .drag-handle{cursor:grabbing}
   font-size:11px;color:var(--text-sub);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .rr-rate-chip{background:var(--surface);border:0.5px solid var(--border-s);border-radius:99px;
   padding:2px 9px;font-size:11px;white-space:nowrap}
+/* ── レシートの写真を整える画面 ── */
+.modal-sheet.rscan-sheet{max-width:min(560px,96vw);width:100%;max-height:94vh;overflow-y:auto}
+.rscan-stage{position:relative;display:inline-block;max-width:100%;touch-action:none;
+  background:var(--surface2);border-radius:8px;overflow:hidden}
+#rscan-canvas{display:block;max-width:100%;height:auto}
+.rscan-dot{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;
+  background:rgba(65,94,46,.35);border:2.5px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.5);
+  cursor:grab;touch-action:none}
+.rscan-dot:active{cursor:grabbing;background:rgba(65,94,46,.7)}
+.rscan-preview{max-width:100%;max-height:230px;height:auto;background:#fff;
+  border:1px solid var(--border-s);border-radius:6px}
+
 /* レシートの内訳との突き合わせ。合わせ込みの内容と、合わないときの注意 */
 .rr-check{margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;
   font-size:11px;line-height:1.85;color:var(--text-sub)}

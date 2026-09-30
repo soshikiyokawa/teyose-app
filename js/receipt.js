@@ -17,6 +17,8 @@ let receiptTaxReason = '';     // AIが税込・税抜をそう見た理由（�
 // 原価をいじるより素直で、原価管理の数字も動かさない）。
 let receiptPaidTotal = null;   // 印字された支払額（税込）
 let receiptTaxTotals = [];     // 税率ごとの「対象額・消費税額」の印字
+let receiptImageBase64 = null; // 整えたレシートの画像（台帳に残す）
+let receiptShop = '';          // 店名
 
 // カートに入れたレシートぶんの消費税（レシートに印字された額）。
 // 印字された税額は、お店が実際に受け取った額そのもの。こちらで計算し直すと
@@ -147,6 +149,16 @@ async function receiptErrorText(error, data){
   return m || '読み取りに失敗しました';
 }
 
+// ════ 写真を整えてから読み取る ════
+//
+// 斜めから撮ったレシートは台形にゆがみ、影や机・指が写り込む。
+// 先に「切り抜き・ゆがみ直し・白黒」をしてから読ませると、読み取りの精度が上がり、
+// 台帳に並べたときも見やすい（整える処理は js/receipt-scan.js）。
+let rscanSrc = null;      // 元の写真（canvas）
+let rscanQuad = null;     // いまの四隅（元の写真の座標）
+let rscanView = 1;        // 画面に映している倍率
+let rscanDone = null;     // 仕上がり（canvas）
+
 async function onReceiptFileChange(input) {
   const file = input.files?.[0];
   if (!file) return;
@@ -155,15 +167,115 @@ async function onReceiptFileChange(input) {
   const isPdf = /pdf/i.test(file.type) || /\.pdf$/i.test(file.name || '');
   if (isPdf && file.size > 25*1024*1024) { showToast('PDFが大きすぎます（25MBまで）。ページを分けてください'); return; }
 
+  // 写真のときは、まず範囲を決める画面を出す（PDFはもう平らなのでそのまま読む）
+  if (!isPdf && typeof rsScan === 'function') {
+    showReceiptLoading(true);
+    try {
+      const s = await rsScan(file);
+      rscanSrc = s.source; rscanQuad = s.quad;
+      showReceiptLoading(false);
+      openRscan(s.auto);
+      return;
+    } catch (e) {
+      showReceiptLoading(false);
+      console.warn('写真を整えられませんでした（そのまま読み取ります）', e);
+      // 整えられなくても、写真そのままで読み取りに進む
+    }
+  }
+  await receiptReadFile(file, isPdf);
+}
+
+// 範囲を決める画面
+function openRscan(auto){
+  const cv = document.getElementById('rscan-canvas');
+  const maxW = Math.min(480, window.innerWidth - 72);
+  rscanView = Math.min(1, maxW / rscanSrc.width, 420 / rscanSrc.height);
+  cv.width = Math.round(rscanSrc.width * rscanView);
+  cv.height = Math.round(rscanSrc.height * rscanView);
+  cv.getContext('2d').drawImage(rscanSrc, 0, 0, cv.width, cv.height);
+  document.getElementById('rscan-note').textContent = auto ? '自動で見つけた範囲です' : '範囲が分からなかったので全体にしています';
+  document.getElementById('rscan-modal').classList.add('open');
+  rscanPlaceDots();
+  rscanPreview();
+}
+function closeRscan(){
+  document.getElementById('rscan-modal').classList.remove('open');
+  rscanSrc = null; rscanQuad = null; rscanDone = null;
+}
+function rscanReset(){
+  rscanQuad = [[0,0],[rscanSrc.width,0],[rscanSrc.width,rscanSrc.height],[0,rscanSrc.height]];
+  rscanPlaceDots(); rscanPreview();
+}
+function rscanPlaceDots(){
+  document.querySelectorAll('#rscan-stage .rscan-dot').forEach(d=>{
+    const p = rscanQuad[Number(d.dataset.i)];
+    d.style.left = (p[0]*rscanView) + 'px';
+    d.style.top  = (p[1]*rscanView) + 'px';
+  });
+}
+// 仕上がりを小さく出して、決める前に確かめられるようにする
+let _rscanTimer = null;
+function rscanPreview(){
+  clearTimeout(_rscanTimer);
+  _rscanTimer = setTimeout(()=>{
+    const mono = document.getElementById('rscan-mono')?.checked !== false;
+    try{
+      rscanDone = rsFinish(rscanSrc, rscanQuad, { mono });
+      const pv = document.getElementById('rscan-preview');
+      pv.width = rscanDone.width; pv.height = rscanDone.height;
+      pv.getContext('2d').drawImage(rscanDone, 0, 0);
+    }catch(e){ console.warn('仕上がりを作れませんでした', e); }
+  }, 60);
+}
+// 四隅の丸を指で動かす
+(function rscanDrag(){
+  let active = null;
+  const stage = () => document.getElementById('rscan-stage');
+  const onDown = e => {
+    const d = e.target.closest('.rscan-dot');
+    if(!d) return;
+    active = Number(d.dataset.i);
+    e.preventDefault();
+  };
+  const onMove = e => {
+    if(active===null || !rscanSrc) return;
+    const box = stage().getBoundingClientRect();
+    const pt = e.touches ? e.touches[0] : e;
+    const x = Math.max(0, Math.min(rscanSrc.width,  (pt.clientX - box.left) / rscanView));
+    const y = Math.max(0, Math.min(rscanSrc.height, (pt.clientY - box.top)  / rscanView));
+    rscanQuad[active] = [x, y];
+    rscanPlaceDots();
+    rscanPreview();
+    e.preventDefault();
+  };
+  const onUp = () => { active = null; };
+  document.addEventListener('pointerdown', onDown);
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onUp);
+})();
+
+// この範囲で読み取る
+async function rscanRead(){
+  if(!rscanDone){ showToast('仕上がりを作れませんでした'); return; }
+  const base64 = rsToJpeg(rscanDone, 0.85);
+  const done = rscanDone;
+  document.getElementById('rscan-modal').classList.remove('open');
+  await receiptReadFile(null, false, { base64, mediaType:'image/jpeg', scanned:done });
+}
+
+// 読み取りにかける（写真そのまま／整えたあと／PDF、どれでもここを通る）
+async function receiptReadFile(file, isPdf, ready) {
   showReceiptLoading(true);
 
   try {
-    let base64, mediaType = file.type || '';
-    if (!isPdf) {
+    let base64 = ready?.base64, mediaType = ready?.mediaType || file?.type || '';
+    if (!base64 && !isPdf) {
       const small = await receiptShrinkImage(file).catch(() => null);
       if (small) { base64 = small.base64; mediaType = small.mediaType; }
     }
     if (!base64) base64 = await fileToBase64(file);
+    receiptImageBase64 = (mediaType||'').includes('image') ? base64 : null;   // 台帳に残す用
 
     const { data, error } = await sb.functions.invoke('read-receipt', {
       // スマホから選ぶと種類が空のことがあるので、ファイル名も送って判断してもらう
