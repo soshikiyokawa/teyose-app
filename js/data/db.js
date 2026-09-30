@@ -1173,6 +1173,16 @@ async function dbSetLeaveSettings(userId, hireDate, adjust, note){
   const p = allProfiles.find(x=>x.id===userId);
   if(p){ p.hireDate=hireDate||''; p.leaveAdjust=Number(adjust)||0; p.leaveAdjustNote=note||''; }
 }
+// アカウントの名前・メールアドレスを変える（管理者のみ）。
+// opts に {read:true} を渡すと、いま登録されている内容を読むだけ
+async function dbUpdateAccount(userId, opts){
+  const { data, error } = await sb.functions.invoke('update-account', { body:{ userId, ...(opts||{}) } });
+  let detail = '';
+  if(error){ try{ detail = (await error.context?.json?.())?.error || ''; }catch(_){} }
+  const msg = data?.error || detail || (error ? error.message : '');
+  if(msg) throw new Error(msg);
+  return data;
+}
 // アカウントの権限（role）と所属発注先を更新（管理者のみ）
 async function dbSetRole(userId, role, supplierId){
   const { error } = await sb.from('profiles').update({role, supplier_id:supplierId||null}).eq('id',userId);

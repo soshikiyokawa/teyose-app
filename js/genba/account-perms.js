@@ -78,6 +78,7 @@ function renderAccountPerms(){
       <select onchange="acctSetRole('${p.id}',this.value)"${isSelf?' disabled':''} style="font-size:12px;padding:4px 6px">
         ${PERM_OPTIONS.map(([r,l])=>`<option value="${r}"${p.role===r?' selected':''}>${l}</option>`).join('')}
       </select>
+      <button class="btn sm" onclick="openAcctEdit('${p.id}')" style="font-size:11px">名前・メール</button>
       ${isSelf?'':`<button class="btn sm" onclick="openSetPassword('${p.id}')" style="font-size:11px">パスワード</button>
       <button class="btn sm danger" onclick="acctDelete('${p.id}')" style="font-size:11px">削除</button>`}
       ${supSel}
@@ -129,6 +130,71 @@ async function acctCallDelete(userId, confirmed){
   const { data, error } = await sb.functions.invoke('delete-user', { body:{ userId, confirmed } });
   if(error || data?.error) throw new Error(await setpwErrorText(error, data));
   return data;
+}
+
+// ── 名前とメールアドレスを後から変える（管理者のみ） ──
+//
+// 名前は、この仕組みのあちこちに「名前そのもの」で入っている
+// （案件の参加メンバー・チャットの発言者・日報の申請者など）。
+// 変えるときは、それら全部を一度に付け替える（サーバー側の app_rename_user）。
+let acctEditId = '';
+
+async function openAcctEdit(userId){
+  if(currentUserRole!=='staff'){ showToast('アカウントの変更は管理者のみです'); return; }
+  const p = allProfiles.find(x=>x.id===userId); if(!p) return;
+  acctEditId = userId;
+  document.getElementById('acctedit-name').value = p.displayName || '';
+  document.getElementById('acctedit-mail').value = '';
+  document.getElementById('acctedit-mail').placeholder = '読み込み中…';
+  document.getElementById('acctedit-note').textContent = '';
+  document.getElementById('acctedit-modal').classList.add('open');
+  // いま登録されているメールアドレスを読んで入れる
+  try{
+    const res = await dbUpdateAccount(userId, { read:true });
+    if(acctEditId!==userId) return;                  // 読んでいる間に別の人を開いた
+    document.getElementById('acctedit-mail').value = res?.email || '';
+    document.getElementById('acctedit-mail').placeholder = 'example@mail.com';
+  }catch(_){
+    document.getElementById('acctedit-mail').placeholder = '（いまのアドレスを読めませんでした）';
+  }
+}
+function closeAcctEdit(){
+  acctEditId = '';
+  document.getElementById('acctedit-modal').classList.remove('open');
+}
+
+async function saveAcctEdit(){
+  const userId = acctEditId;
+  const p = allProfiles.find(x=>x.id===userId); if(!p) return;
+  const name = document.getElementById('acctedit-name').value.trim();
+  const mail = document.getElementById('acctedit-mail').value.trim();
+  if(!name){ showToast('名前を入力してください'); return; }
+  if(!mail){ showToast('メールアドレスを入力してください'); return; }
+
+  const nameChanged = name !== (p.displayName||'');
+  // ログインに使うアドレスが変わるので、名前より重い。変わるときだけ確かめる
+  let msg = `${p.displayName||''} さんのアカウントを変更します。\n\n`;
+  if(nameChanged) msg += `名前：${p.displayName||''} → ${name}\n`
+    + `　（案件の参加メンバー・チャット・日報など、名前で残っている所もまとめて付け替えます）\n`;
+  msg += `\nメールアドレスを変えた場合、次回から新しいアドレスでログインします（パスワードはそのまま）。\nよろしいですか？`;
+  if(!confirm(msg)) return;
+
+  const btn = document.getElementById('acctedit-btn');
+  btn.disabled = true; btn.textContent = '変更中…';
+  try{
+    const res = await dbUpdateAccount(userId, { displayName:name, email:mail });
+    if(!res?.changed){ showToast('変更はありませんでした'); closeAcctEdit(); return; }
+    showToast('変更しました：\n' + (res.done||[]).join('\n'), 7000);
+    closeAcctEdit();
+    // 名前は画面のあちこちで使っているので、読み直してから一覧を作り直す
+    try{ await fetchAllData(); }catch(_){ try{ await fetchProfiles(); }catch(_){} }
+    renderAccountPerms();
+    if(typeof renderOrdersList==='function') renderOrdersList();
+  }catch(e){
+    showToast('変更できませんでした：'+e.message, 7000);
+  }finally{
+    btn.disabled = false; btn.textContent = 'この内容にする';
+  }
 }
 
 // ── 管理者が、他の人のパスワードを決める ──
