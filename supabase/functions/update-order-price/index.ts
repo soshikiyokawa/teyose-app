@@ -70,6 +70,14 @@ Deno.serve(async (req) => {
         return json({ error: "この発注の単価は変更できません" }, 403);
       }
     }
+    // 経費の発注は、出した本人と清川創史・清川優香だけ（migration-genba77.sql）。
+    // この関数はRLSを通らないので、ここで同じ決まりを見る
+    if (order.project === "経費") {
+      const payrollAdmin = ["清川創史", "清川優香"].includes(String(profile.display_name || ""));
+      if (!payrollAdmin && order.created_by !== userData.user.id) {
+        return json({ error: "この経費の発注は、出したご本人だけが直せます" }, 403);
+      }
+    }
 
     // ── ② 単価を差し替える ──
     // 品目は番号（index）で指定する。名前が同じ品目が複数あっても取り違えないため

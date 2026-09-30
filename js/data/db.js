@@ -516,6 +516,7 @@ async function dbConfirmOrder(order){
     no:order.no,project:order.project,date:order.date,due_date:order.dueDate||null,due_asap:!!order.dueAsap,cost_type:order.costType,supplier_id,
     items:order.items,subtotal:order.subtotal,tax:order.tax,total:order.total,status:'pending',
     created_by_name:order.createdByName||'',   // 発注書の「担当者」（migration-genba67.sql）
+    created_by:currentUserId||null,            // 経費の発注を本人だけに見せるのに使う（migration-genba77.sql）
     delivery_place:order.deliveryPlace||'',    // 納品場所（migration-genba71.sql）
     delivery_address:order.deliveryAddress||'',
     note:order.note||''                        // 備考（migration-genba73.sql）
@@ -527,10 +528,10 @@ async function dbConfirmOrder(order){
     console.warn('payment_method列が未作成のため、支払方法を保存せずに続行します');
     ({ data: orderRow, error: orderErr } = await sb.from('orders').insert(base).select().single());
   }
-  // 担当者の列（migration-genba67.sql）が未適用でも発注は通す
-  if(orderErr && /created_by_name/.test(orderErr.message||'')){
-    console.warn('created_by_name列が未作成のため、担当者を保存せずに続行します');
-    const { created_by_name, ...noName } = base;
+  // 担当者の列（migration-genba67.sql / genba77.sql）が未適用でも発注は通す
+  if(orderErr && /created_by_name|created_by/.test(orderErr.message||'')){
+    console.warn('担当者の列が未作成のため、担当者を保存せずに続行します');
+    const { created_by_name, created_by, ...noName } = base;
     ({ data: orderRow, error: orderErr } = await sb.from('orders').insert({...noName, payment_method:order.paymentMethod||''}).select().single());
   }
   // 納品場所の列（migration-genba71.sql）が未適用でも発注は通す
