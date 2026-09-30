@@ -5,6 +5,96 @@ let receiptItems = [];
 // 原価は税抜で持つので、税込のときだけ税を抜く
 let receiptTaxIncluded = true;
 let receiptTaxReason = '';     // AIが税込・税抜をそう見た理由（画面に小さく出す）
+
+// ════ レシートに印字された支払額に「合わせ込む」ための持ち物 ════
+//
+// 税込 → 税抜 → 税込 と往復すると、1円未満の丸めのせいで数円ずれる。
+// 店によって端数の扱い（切り捨て・切り上げ・四捨五入）も、税を計算する単位
+// （1行ごと・税率ごとの小計・レシート全体）も違うので、計算では合わせきれない。
+//
+// レシートには最終的に支払った税込金額が必ず印字されている。そこを「正」にして、
+// 差は消費税の額で吸収する（消費税は、実際にお店が受け取った額そのものなので、
+// 原価をいじるより素直で、原価管理の数字も動かさない）。
+let receiptPaidTotal = null;   // 印字された支払額（税込）
+let receiptTaxTotals = [];     // 税率ごとの「対象額・消費税額」の印字
+
+// カートに入れたレシートぶんの消費税（レシートに印字された額）。
+// 印字された税額は、お店が実際に受け取った額そのもの。こちらで計算し直すと
+// 端数処理の違いで1円ずれるので、印字があればそれを使う
+let cartTaxPrinted = null;
+let cartTaxPrintedBase = null;   // そのときのレシート品目の小計。変わったら使わない
+function resetCartTaxPrinted(){ cartTaxPrinted = null; cartTaxPrintedBase = null; }
+// いまカートに入っているレシート品目の小計（税抜。行の端数調整を含む）
+function cartReceiptSubtotal(){
+  return (typeof cart!=='undefined' ? cart : []).filter(c=>c._receipt)
+    .reduce((s,c)=>s + (Number(c.cost)||0)*(Number(c.qty)||0) + (Number(c.costAdjust)||0), 0);
+}
+// 発注に使う消費税。品目をいじったあとは合わせ込みが意味を失うので使わない
+function orderPrintedTax(){
+  if(cartTaxPrinted==null || cartTaxPrintedBase==null) return null;
+  return cartReceiptSubtotal()===cartTaxPrintedBase ? cartTaxPrinted : null;
+}
+
+// ════ レシートの内訳を「正」として、原価（税抜）と消費税を確定する ════
+//
+// 考え方（Codexにも相談して決めた）
+//   ・消費税は、レシートに印字された額をそのまま使う。こちらで足し引きしない
+//     （申告に使う数字なので、端数のつじつま合わせに使ってはいけない）
+//   ・税込→税抜の丸めで出る数円の残りは、原価側で吸収する
+//     その税率のいちばん金額の大きい行に「端数」として寄せ、合計がぴったり合うようにする
+//   ・税率ごとに1回だけ端数処理する（1品目ずつ丸めて足すのは認められていない）
+function receiptSettle(){
+  const rates = [...new Set(receiptItems.map(taxRateOf))].sort((a,b)=>b-a);
+
+  // レシートに印字された税率ごとの内訳
+  const printed = new Map();
+  (receiptTaxTotals||[]).forEach(t=>{
+    const r = Number(t.rate);
+    if(!TAX_RATES.includes(r)) return;
+    const target = Math.round(Number(t.target)||0);
+    const tax = (t.tax==null || !Number.isFinite(Number(t.tax))) ? null : Math.round(Number(t.tax));
+    printed.set(r, { incl: t.targetTaxIncluded!==false ? target : target + (tax ?? Math.round(target*r/100)), tax });
+  });
+
+  const out = { lines: [], rows: [], subtotal:0, tax:0, total:0, warns: [], taxFromPrint:false };
+
+  for(const rate of rates){
+    const items = receiptItems.filter(it=>taxRateOf(it)===rate);
+    // その税率の税込対象額（明細から）
+    const inclFromItems = items.reduce((s,it)=>
+      s + (receiptTaxIncluded ? it.price*it.qty : Math.round(it.price*it.qty*(1+rate/100))), 0);
+    const p = printed.get(rate);
+    if(p && Math.abs(p.incl - inclFromItems) > Math.max(2, Math.round(inclFromItems*0.01))){
+      out.warns.push(`${taxRateLabel(rate)}：レシートの対象額 ¥${fmt(p.incl)} と明細の合計 ¥${fmt(inclFromItems)} が違います`);
+    }
+    const incl = p ? p.incl : inclFromItems;
+    // 消費税。印字があればそのまま（お店の端数処理そのもの）
+    const tax = (p && p.tax!=null) ? p.tax : Math.round(incl * rate / (100 + rate));
+    if(p && p.tax!=null) out.taxFromPrint = true;
+    const base = incl - tax;                        // その税率の税抜対象額
+
+    // 行ごとの税抜額。丸めの残りは、いちばん金額の大きい行に寄せる
+    const cost = items.map(it => receiptTaxIncluded
+      ? Math.round(it.price / (1 + rate/100))
+      : Math.round(it.price));
+    const sum = items.reduce((s,it,i)=>s + cost[i]*it.qty, 0);
+    let big = 0;
+    items.forEach((it,i)=>{ if(cost[i]*it.qty > cost[big]*items[big].qty) big = i; });
+    const adj = items.map(()=>0);
+    if(items.length) adj[big] = base - sum;
+
+    items.forEach((it,i)=>out.lines.push({ ...it, cost:cost[i], costAdjust:adj[i], taxRate:rate }));
+    out.rows.push({ rate, base, tax, incl, adjust: items.length ? adj[big] : 0 });
+    out.subtotal += base; out.tax += tax; out.total += incl;
+  }
+
+  // 印字された支払額との突き合わせ。値引き・ポイントがあると商品代金と支払額は別になる
+  if(receiptPaidTotal!=null && receiptPaidTotal>0 && receiptPaidTotal !== out.total){
+    out.warns.push(`レシートの支払額 ¥${fmt(receiptPaidTotal)} と、税率ごとの合計 ¥${fmt(out.total)} が違います`
+      + `（値引き・ポイントぶんかもしれません）`);
+  }
+  return out;
+}
 function setReceiptTaxIncluded(v){ receiptTaxIncluded = !!v; receiptTaxReason=''; renderReceiptItems(); }
 // 表示・登録に使う税抜の単価。税率は品目ごと（10／8／非課税）
 function receiptCostEx(price, rate){
@@ -99,6 +189,8 @@ async function onReceiptFileChange(input) {
 
     receiptTaxIncluded = data.taxIncluded !== false;
     receiptTaxReason = String(data.taxIncludedReason || '');
+    receiptPaidTotal = (data.paidTotal==null || !(Number(data.paidTotal)>0)) ? null : Math.round(Number(data.paidTotal));
+    receiptTaxTotals = Array.isArray(data.taxTotals) ? data.taxTotals : [];
     showReceiptLoading(false);
     if (data.reason) showToast(data.reason);
     openReceiptConfirm();
@@ -143,6 +235,7 @@ function renderReceiptItems() {
   const el = document.getElementById('receipt-item-list');
   if (!receiptItems.length) { el.innerHTML = '<div class="empty">品目なし</div>'; return; }
 
+  const _st = receiptSettle();   // 行ごとの原価をここで一度だけ確定させる
   el.innerHTML = `<div class="rr-tax">
     <span>レシートの単価は</span>
     <button class="btn xs${receiptTaxIncluded?' primary':''}" onclick="setReceiptTaxIncluded(true)">税込</button>
@@ -169,10 +262,10 @@ function renderReceiptItems() {
       </div>
       <div class="rr-amt" style="flex-direction:column;align-items:flex-end;gap:1px">
         <span style="font-size:11px">${receiptTaxIncluded?'税込':'税抜'} ¥<span id="rr-amt-${i}">${fmt(it.price * it.qty)}</span></span>
-        <span style="font-size:10px;color:var(--text-muted)">原価 ¥${fmt(receiptCostEx(it.price, it.taxRate) * it.qty)}</span>
+        <span style="font-size:10px;color:var(--text-muted)">原価 ¥${fmt(receiptLineBase(it, _st))}</span>
       </div>
       <button class="btn danger xs" onclick="removeReceiptItem(${i})" style="flex-shrink:0">×</button>
-    </div>`).join('') + receiptRateSummaryHtml();
+    </div>`).join('') + receiptRateSummaryHtml() + '<div id="receipt-check" class="rr-check"></div>';
 
   updateReceiptTotals();
 }
@@ -191,12 +284,35 @@ function receiptRateSummaryHtml(){
 }
 
 function updateReceiptTotals(){
-  const total = receiptItems.reduce((s, it) => s + it.price * it.qty, 0);
-  const totalEx = receiptItems.reduce((s, it) => s + receiptCostEx(it.price, it.taxRate) * it.qty, 0);
+  const st = receiptSettle();
   const tEl = document.getElementById('receipt-total');
-  if (tEl) tEl.textContent = fmt(total);
+  if (tEl) tEl.textContent = fmt(st.total);
   const exEl = document.getElementById('receipt-total-ex');
-  if (exEl) exEl.textContent = fmt(totalEx);
+  if (exEl) exEl.textContent = fmt(st.subtotal);
+  renderReceiptCheck(st);
+}
+
+// その行の確定した税抜額（端数を寄せた行は、そのぶんを含む）
+function receiptLineBase(it, st){
+  const line = (st || receiptSettle()).lines.find(l=>l._id===it._id);
+  return line ? line.cost*line.qty + line.costAdjust : receiptCostEx(it.price, it.taxRate)*it.qty;
+}
+
+// レシートの内訳と、どう合わせたかを見せる
+function renderReceiptCheck(st){
+  const el = document.getElementById('receipt-check');
+  if(!el) return;
+  st = st || receiptSettle();
+  const rows = st.rows.map(r=>
+    `${r.rate===0?'非課税':r.rate+'%'}：税抜 ¥${fmt(r.base)}＋消費税 ¥${fmt(r.tax)}＝¥${fmt(r.incl)}`
+    + (r.adjust ? `<span class="rr-check-fix">（うち端数 ${r.adjust>0?'＋':'−'}¥${fmt(Math.abs(r.adjust))}）</span>` : '')
+  ).join('<br>');
+  el.className = 'rr-check' + (st.warns.length ? ' warn' : '');
+  el.innerHTML = (st.warns.length ? '⚠ ' + st.warns.map(esc).join('<br>⚠ ') + '<br>' : '')
+    + rows
+    + `<br>合計 <b>¥${fmt(st.total)}</b>`
+    + (st.taxFromPrint ? '（消費税はレシートの印字どおり）' : '（消費税は税率ごとに1回だけ端数処理）')
+    + `<br><span class="rr-check-fix">税込から税抜に直すときの数円のずれは、その税率でいちばん大きい行の原価に寄せて、合計がぴったり合うようにしています</span>`;
 }
 
 function updateReceiptAmt(i) {
@@ -214,20 +330,27 @@ function addReceiptToCart() {
   if (!selectedSupplier) { showToast('発注先を選択してください'); return; }
   if (!receiptItems.length) { showToast('品目がありません'); return; }
 
-  receiptItems.forEach(it => {
-    // 同じ品名でも税率が違えば別の行にする（まとめると消費税が合わなくなる）
-    const existing = cart.find(c => c.name === it.name && c._receipt && taxRateOf(c) === taxRateOf(it));
+  // 確定した内訳（行ごとの税抜額と、レシートに印字された消費税）をそのまま使う
+  const st = receiptSettle();
+  if(st.taxFromPrint) cartTaxPrinted = (cartTaxPrinted||0) + st.tax;
+
+  st.lines.forEach(it => {
+    // 同じ品名でも税率が違えば別の行にする（まとめると消費税が合わなくなる）。
+    // 端数を寄せた行は、寄せたぶんが混ざらないよう、まとめずに別の行で持つ
+    const existing = (it.costAdjust===0)
+      ? cart.find(c => c.name === it.name && c._receipt && taxRateOf(c) === taxRateOf(it) && !c.costAdjust)
+      : null;
     if (existing) {
       existing.qty += it.qty;
     } else {
-      const costEx = receiptCostEx(it.price, it.taxRate);
       cart.push({
         id: it._id,
         name: it.name,
         qty: it.qty,
         unit: it.unit,
-        cost: costEx,
-        price: costEx,
+        cost: it.cost,
+        price: it.cost,
+        costAdjust: it.costAdjust || 0,   // 税込→税抜の丸めで出た端数（円）
         taxRate: taxRateOf(it),
         supplier: selectedSupplier.name,
         cat: '仕入',
@@ -235,6 +358,9 @@ function addReceiptToCart() {
       });
     }
   });
+
+  // 品目をいじったら印字の消費税を使わない判定に使う（いまの小計を覚えておく）
+  cartTaxPrintedBase = cartReceiptSubtotal();
 
   closeReceiptConfirm();
   renderItemSelectList();

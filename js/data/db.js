@@ -542,7 +542,7 @@ async function dbConfirmOrder(order){
 
   const costRows = order.items.map(item=>({
     date:order.date,project:order.project,name:item.name,qty:item.qty,unit:item.unit,
-    amount:item.cost*item.qty,supplier_id,order_no:order.no,cost_type:order.costType,status:'pending'
+    amount:lineBase(item),supplier_id,order_no:order.no,cost_type:order.costType,status:'pending'
   }));
   const { error: costErr } = await sb.from('cost_entries').insert(costRows);
   if(costErr){showToast('原価登録に失敗しました：'+costErr.message);throw costErr;}

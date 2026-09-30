@@ -35,6 +35,7 @@ function selectSupplier(id){
   selectedSupplier=suppliers.find(s=>s.id===id);
   activeCat='全て';
   cart=[];
+  if(typeof resetCartTaxPrinted==='function') resetCartTaxPrinted();
   document.getElementById('order-step1').style.display='none';
   document.getElementById('order-step2').style.display='block';
   document.getElementById('selected-supplier-name').textContent=selectedSupplier.name;
@@ -503,7 +504,8 @@ function cartOrderShipping(){
   return (cart||[]).reduce((s,c)=> s + (c.shippingPer==='unit' ? 0 : (Number(c.shipping)||0)), 0);
 }
 function cartGrandTotal(){
-  return (cart||[]).reduce((s,c)=>s+cartItemCost(c)*c.qty, 0) + cartOrderShipping();
+  // costAdjust（レシートを税抜に直したときの端数を寄せたぶん）も入れる
+  return (cart||[]).reduce((s,c)=>s+cartItemCost(c)*c.qty + (Number(c.costAdjust)||0), 0) + cartOrderShipping();
 }
 
 // ── カート ──
@@ -529,7 +531,7 @@ function renderCart(){
         <button class="qty-btn" onclick="changeQty(${i},1)">＋</button>
         <span style="font-size:12px;color:var(--text-sub);margin-left:2px">${c.unit}</span>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--wood-t);min-width:62px;text-align:right">¥${fmt(cartItemCost(c)*c.qty)}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--wood-t);min-width:62px;text-align:right">¥${fmt(cartItemCost(c)*c.qty + (Number(c.costAdjust)||0))}</div>
       <button class="btn danger xs" onclick="removeCartItem(${i})" style="margin-left:4px">×</button>
     </div>`).join('');
   // メーカー送料（1回の発注につき）は、まとめて1行として出す
@@ -549,4 +551,4 @@ function changeQty(i,d){
   renderCart();renderItemSelectList();
 }
 function removeCartItem(i){cart.splice(i,1);renderCart();renderItemSelectList();}
-function clearCart(){cart=[];renderCart();renderItemSelectList();}
+function clearCart(){cart=[];if(typeof resetCartTaxPrinted==='function')resetCartTaxPrinted();renderCart();renderItemSelectList();}

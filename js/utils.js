@@ -11,12 +11,18 @@ const TAX_RATES = [10, 8, 0];
 const taxRateOf = it => TAX_RATES.includes(Number(it?.taxRate)) ? Number(it.taxRate) : 10;
 const taxRateLabel = r => r===0 ? '非課税' : `${r}%`;
 
-// items は {cost（税抜単価）, qty, taxRate} の並び
+// その行の税抜の金額。costAdjust は、レシートを税込から税抜に直したときに出る
+// 数円のずれを寄せたもの（そのままだとレシートの合計と合わなくなる）
+function lineBase(it){
+  return (Number(it?.cost)||0) * (Number(it?.qty)||0) + (Number(it?.costAdjust)||0);
+}
+
+// items は {cost（税抜単価）, qty, taxRate, costAdjust} の並び
 function orderTaxBreakdown(items){
   const by = new Map();
   (items||[]).forEach(it=>{
     const r = taxRateOf(it);
-    by.set(r, (by.get(r)||0) + (Number(it.cost)||0) * (Number(it.qty)||0));
+    by.set(r, (by.get(r)||0) + lineBase(it));
   });
   const rows = [...by.entries()]
     .sort((a,b)=>b[0]-a[0])                       // 10% → 8% → 非課税 の順

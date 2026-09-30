@@ -73,10 +73,14 @@ function openOrderPreview(){
   });
   const ship=cartOrderShipping();
   if(ship) orderItems.push({name:'送料',qty:1,unit:'式',cost:ship,price:ship,isShipping:true,supplier:sup.name});
-  // 消費税は品目ごとの税率（10／8／非課税）で出す。レシート取り込みで混ざることがある
+  // 消費税は品目ごとの税率（10／8／非課税）で出す。レシート取り込みで混ざることがある。
+  // レシートから取り込んだ分は、印字された支払額に合うよう端数を消費税で調整する
+  // （税込→税抜→税込の丸めと、お店ごとの端数処理の違いで数円ずれるため）
   const taxB=orderTaxBreakdown(orderItems);
   const subtotal=taxB.subtotal;
-  const tax=taxB.tax;
+  // レシートに消費税が印字されていれば、その額をそのまま使う（お店の端数処理そのもの）
+  const printedTax = (receipt && typeof orderPrintedTax==='function') ? orderPrintedTax() : null;
+  const tax = printedTax!=null ? printedTax : taxB.tax;
   // 発注書を作った人を、きよかわの担当者として発注書に載せる
   const createdByName = currentUserDisplayName || '';
   currentOrder={no,project,date,dueDate,dueAsap:!receipt&&orderDueAsap,costType,paymentMethod:payment,suppliers:sup.name,supplierObj:sup,items:orderItems,subtotal,tax,total:subtotal+tax,createdByName,
@@ -109,7 +113,8 @@ function openOrderPreview(){
       <div style="flex:1;padding:6px 8px;text-align:center">${c.unit}</div>
       <div style="flex:1;padding:6px 8px;text-align:right">${c.qty}</div>
       <div style="flex:1.2;padding:6px 8px;text-align:right">¥${fmt(c.cost)}</div>
-      <div style="flex:1.2;padding:6px 8px;text-align:right;font-weight:600">¥${fmt(c.cost*c.qty)}</div>
+      <div style="flex:1.2;padding:6px 8px;text-align:right;font-weight:600">¥${fmt(lineBase(c))}${
+        c.costAdjust?`<span style="font-size:9px;color:#888">（端数${c.costAdjust>0?'＋':'−'}${Math.abs(c.costAdjust)}）</span>`:''}</div>
     </div>`).join('')}
     <div style="margin-top:12px;text-align:right;font-size:13px;line-height:2.2">
       <div>小計：¥${fmt(subtotal)}</div>
@@ -156,13 +161,14 @@ async function confirmOrder(){
     costEntries.unshift({
       date:currentOrder.date, project:currentOrder.project,
       name:item.name, qty:item.qty, unit:item.unit,
-      amount:item.cost*item.qty, supplier:item.supplier,
+      amount:lineBase(item), supplier:item.supplier,
       orderNo:currentOrder.no, costType:currentOrder.costType, status:'pending'
     });
   });
 
   // UI後処理
   cart = []; currentOrder = null;
+  if(typeof resetCartTaxPrinted==='function') resetCartTaxPrinted();   // レシートの合わせ込みも片付ける
   document.getElementById('order-due-date').value = '';
   document.getElementById('order-payment').value = '';
   const placeSel=document.getElementById('order-place');

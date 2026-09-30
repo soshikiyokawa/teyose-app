@@ -47,7 +47,17 @@ const PROMPT = `これはレシート・購入明細（ネットショップの�
        ・レシートに「非課税」「内税対象外」「不課税」と書いてある行
 - 印や但し書きが無く判断できないときは 10
 - 「8%対象」「10%対象」の小計がレシートにある場合は、各品目の税率の合計が
-  それぞれの小計と合うかを確かめてから答える`;
+  それぞれの小計と合うかを確かめてから答える
+
+レシートに印字されている合計も、そのまま写してください（ここがいちばん大事）:
+- paidTotal … 最終的に支払った金額（「合計」「お買上げ計」「ご請求額」「お支払金額」など）
+  ・値引き後・ポイント使用前の、税込の支払額
+  ・クレジット払いなら、カードで切った金額
+- taxTotals … 税率ごとの「対象額」と「消費税額」が印字されていれば、その数字をそのまま
+  ・例：「10%対象 ¥19,800（内消費税 ¥1,800）」→ {rate:10, target:19800, tax:1800}
+  ・target が税込か税抜かは targetTaxIncluded で答える（内税表示なら true）
+  ・印字が無ければ taxTotals は空でよい（推測して埋めない）
+- 数字が読めないときは、その項目を省く（推測しない）`;
 
 const TOOL = {
   name: "save_receipt_items",
@@ -63,6 +73,24 @@ const TOOL = {
       taxIncludedReason: {
         type: "string",
         description: "税込・税抜をそう判断した理由を、レシートのどこを見たかで一言（例：合計とは別に消費税の行があった）",
+      },
+      paidTotal: {
+        type: "number",
+        description: "レシートに印字された、最終的に支払った税込金額。読めなければ省く",
+      },
+      taxTotals: {
+        type: "array",
+        description: "税率ごとの対象額と消費税額。レシートに印字されているものだけ。無ければ空",
+        items: {
+          type: "object",
+          properties: {
+            rate: { type: "number", enum: [10, 8, 0], description: "税率" },
+            target: { type: "number", description: "その税率の対象額（印字されたまま）" },
+            tax: { type: "number", description: "その税率の消費税額（印字されたまま）" },
+            targetTaxIncluded: { type: "boolean", description: "target が税込（内税）なら true" },
+          },
+          required: ["rate", "target"],
+        },
       },
       items: {
         type: "array",
@@ -183,6 +211,16 @@ Deno.serve(async (req) => {
       // 読めなかったときは、日本のレシートで多い税込として扱う
       taxIncluded: use.input?.taxIncluded !== false,
       taxIncludedReason: String(use.input?.taxIncludedReason || "").trim(),
+      // レシートに印字された支払額と、税率ごとの内訳。合わせ込みの「正」に使う
+      paidTotal: num(use.input?.paidTotal),
+      taxTotals: ((use.input?.taxTotals) || [])
+        .map((t: any) => ({
+          rate: [10, 8, 0].includes(Number(t?.rate)) ? Number(t.rate) : null,
+          target: num(t?.target),
+          tax: num(t?.tax),
+          targetTaxIncluded: t?.targetTaxIncluded !== false,
+        }))
+        .filter((t: any) => t.rate !== null && t.target !== null),
       items,
       reason: message.stop_reason === "max_tokens"
         ? "品目が多く、途中までしか読み取れていない可能性があります" : "",

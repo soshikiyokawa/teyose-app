@@ -119,6 +119,11 @@ body.drag-sorting .drag-handle{cursor:grabbing}
   font-size:11px;color:var(--text-sub);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .rr-rate-chip{background:var(--surface);border:0.5px solid var(--border-s);border-radius:99px;
   padding:2px 9px;font-size:11px;white-space:nowrap}
+/* レシートの内訳との突き合わせ。合わせ込みの内容と、合わないときの注意 */
+.rr-check{margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:8px;
+  font-size:11px;line-height:1.85;color:var(--text-sub)}
+.rr-check.warn{background:var(--warn-bg,#fdf6e3);color:var(--text);border:1px solid var(--warn-t,#b8860b)}
+.rr-check-fix{color:var(--text-muted);font-size:10px}
 @media(max-width:600px){
   /* スマホでは税率のボタンを1行に収めるため、行を折り返す */
   .rr-rate{width:100%;justify-content:flex-end;margin-top:2px}

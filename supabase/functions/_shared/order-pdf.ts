@@ -34,6 +34,11 @@ const origPrice = (it: any) =>
 // 税率ごとに金額をまとめてから掛ける（1行ずつ丸めると1円ずれる）。
 // taxRate が無い品目（これまでの発注）は 10% として扱う。
 // 画面側の js/utils.js の orderTaxBreakdown と同じ出し方。
+// その行の税抜の金額。costAdjust は、レシートを税込から税抜に直したときに出る
+// 数円のずれを寄せたもの（画面側 js/utils.js の lineBase と同じ）
+function lineBase(it: any): number {
+  return nowPrice(it) * (Number(it?.qty) || 0) + (Number(it?.costAdjust) || 0);
+}
 function taxRateOf(it: any): number {
   const r = Number(it?.taxRate);
   return [10, 8, 0].includes(r) ? r : 10;
@@ -42,7 +47,7 @@ function taxLines(o: any): string[] {
   const by = new Map<number, number>();
   for (const it of o.items || []) {
     const r = taxRateOf(it);
-    by.set(r, (by.get(r) || 0) + nowPrice(it) * (Number(it.qty) || 0));
+    by.set(r, (by.get(r) || 0) + lineBase(it));
   }
   const rows = [...by.entries()].sort((a, b) => b[0] - a[0]);
   const mixed = rows.length > 1;
@@ -300,7 +305,7 @@ export async function buildOrderPdf(o: any): Promise<Uint8Array> {
     drawRuns(page, String(it.unit || ""), { x: colX[1] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
     drawRuns(page, String(qty), { x: colX[2] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
     drawRuns(page, "¥" + fmt(price), { x: colX[3] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
-    drawRuns(page, "¥" + fmt(price * qty), { x: colX[4] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
+    drawRuns(page, "¥" + fmt(lineBase(it)), { x: colX[4] + PAD, y: rowY, size: ROW_SIZE, font, color: black });
     y -= rowH;
     // 直した品目は、当初いくらだったかを小さく添える
     if (changed) {
