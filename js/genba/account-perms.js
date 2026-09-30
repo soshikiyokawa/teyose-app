@@ -2,7 +2,19 @@
 // 権限は role にマップ：管理者＝staff／一般社員＝carpenter／業者＝supplier
 // RLSは role（staff/carpenter/supplier）で判定しているため、DBの値は role のまま保持する。
 
+// 権限の呼び名。お客様（client）も名前を持たせておく。
+// 持たせていなかったため、アカウント権限の一覧でお客様が「管理者」と表示されていた
+// （どの選択肢にも当てはまらず、いちばん上が選ばれて見えていた）。
+const PERM_LABELS = { staff:'管理者', carpenter:'一般社員', supplier:'業者', client:'お客様' };
+const roleLabel = r => PERM_LABELS[r] || r || '（未設定）';
+
+// 「アカウント権限」の画面で選べるのは、社員と業者だけ。
+// お客様はここから選べないようにしてある（うっかり社員をお客様にしたり、
+// お客様を管理者にしたりしないように）。お客様は専用の画面で扱う
 const PERM_OPTIONS = [['staff','管理者'],['carpenter','一般社員'],['supplier','業者']];
+
+// お客様のアカウントか
+const isClientProfile = p => p?.role === 'client';
 
 function openAccountPerms(){
   if(currentUserRole!=='staff') return;
@@ -50,19 +62,24 @@ async function inviteAccount(){
     : `${displayName}さんに招待メールを送信しました`);
   if(res?.note) setTimeout(()=>alert(res.note), 400);
   try{ await fetchProfiles(); }catch(e){} // allProfilesを取り直して一覧に反映
-  renderAccountPerms();
+  renderAccountScreens();
 }
 function closeAccountPerms(){ document.getElementById('acct-modal').classList.remove('open'); }
 
+// どちらの画面が開いていても、内容がそろうように両方作り直す
+function renderAccountScreens(){ renderAccountPerms(); renderClientAccounts(); }
+
 function renderAccountPerms(){
   const el=document.getElementById('acct-list');
-  if(!allProfiles.length){ el.innerHTML='<div class="empty" style="padding:12px">アカウントがありません</div>'; return; }
+  // お客様はこの画面では扱わない（専用の「お客様アカウント」画面へ）
+  const all = allProfiles.filter(p=>!isClientProfile(p));
+  if(!all.length){ el.innerHTML='<div class="empty" style="padding:12px">アカウントがありません</div>'; return; }
   // 並び順：社員（指定の固定順）→ 業者。社員内は EMPLOYEE_ORDER、業者は末尾に名前順
   const rank = p => p.role==='supplier' ? 1 : 0;
   const cmpName = (typeof cmpEmployee==='function')
     ? cmpEmployee
     : (a,b)=>String(a).localeCompare(String(b),'ja');
-  const list = allProfiles.slice().sort((a,b)=> rank(a)-rank(b) || cmpName(a.displayName||'', b.displayName||''));
+  const list = all.slice().sort((a,b)=> rank(a)-rank(b) || cmpName(a.displayName||'', b.displayName||''));
   el.innerHTML=list.map(p=>{
     const isSelf=p.id===currentUserId;
     // 業者のときだけ所属発注先を選ばせる（在庫分は除く）
@@ -75,13 +92,61 @@ function renderAccountPerms(){
         </div>` : '';
     return `<div class="wc-assign-row" style="flex-wrap:wrap">
       <span style="flex:1;min-width:110px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.displayName||'（名前未設定）')}${isSelf?'<span style="font-size:10px;color:var(--text-muted)">（自分）</span>':''}</span>
-      <select onchange="acctSetRole('${p.id}',this.value)"${isSelf?' disabled':''} style="font-size:12px;padding:4px 6px">
-        ${PERM_OPTIONS.map(([r,l])=>`<option value="${r}"${p.role===r?' selected':''}>${l}</option>`).join('')}
-      </select>
+      ${PERM_OPTIONS.some(([r])=>r===p.role)
+        ? `<select onchange="acctSetRole('${p.id}',this.value)"${isSelf?' disabled':''} style="font-size:12px;padding:4px 6px">
+            ${PERM_OPTIONS.map(([r,l])=>`<option value="${r}"${p.role===r?' selected':''}>${l}</option>`).join('')}
+          </select>`
+        // この画面で扱わない権限（お客様など）は、選べる形にせず文字で出す。
+        // 選択肢に無い権限を select に入れると、いちばん上（管理者）が選ばれて見えてしまう
+        : `<span class="badge" style="font-size:10px;padding:1px 7px;flex-shrink:0">${esc(roleLabel(p.role))}</span>`}
       <button class="btn sm" onclick="openAcctEdit('${p.id}')" style="font-size:11px">名前・メール</button>
       ${isSelf?'':`<button class="btn sm" onclick="openSetPassword('${p.id}')" style="font-size:11px">パスワード</button>
       <button class="btn sm danger" onclick="acctDelete('${p.id}')" style="font-size:11px">削除</button>`}
       ${supSel}
+    </div>`;
+  }).join('');
+}
+
+// ════ お客様アカウント（管理者専用：社員・業者とは別の画面） ════
+//
+// 社員・業者と同じ一覧に並べていたため、権限の欄がお客様を「管理者」と見せていた。
+// 取り違えると、お客様に社内のやりとりが見えてしまう。そこで画面そのものを分け、
+// こちらには権限の切り替えを置かない（お客様はお客様のまま）。
+function openClientAccounts(){
+  if(currentUserRole!=='staff') return;
+  document.getElementById('clacct-modal').classList.add('open');
+  renderClientAccounts();
+}
+function closeClientAccounts(){ document.getElementById('clacct-modal').classList.remove('open'); }
+
+// そのお客様が、どの案件のお客様として登録されているか
+function clientProjectsOf(userId){
+  return (projects||[])
+    .filter(p=>(p.clients||[]).some(c=>c.userId===userId))
+    .map(p=>p.name);
+}
+
+function renderClientAccounts(){
+  const el=document.getElementById('clacct-list');
+  if(!el) return;
+  const list = allProfiles.filter(isClientProfile)
+    .sort((a,b)=>String(a.displayName||'').localeCompare(String(b.displayName||''),'ja'));
+  if(!list.length){
+    el.innerHTML=`<div class="empty" style="padding:14px;line-height:1.8">お客様のアカウントはまだありません<br>
+      <span style="font-size:11px;color:var(--text-muted)">案件を開いて「案件情報」→ お客様チャット →「チャット案内」から登録します</span></div>`;
+    return;
+  }
+  el.innerHTML = list.map(p=>{
+    const projs = clientProjectsOf(p.id);
+    return `<div class="wc-assign-row" style="flex-wrap:wrap">
+      <span style="flex:1;min-width:120px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.displayName||'（名前未設定）')}</span>
+      <span class="badge" style="font-size:10px;padding:1px 7px;flex-shrink:0">お客様</span>
+      <button class="btn sm" onclick="openAcctEdit('${p.id}')" style="font-size:11px">名前・メール</button>
+      <button class="btn sm" onclick="openSetPassword('${p.id}')" style="font-size:11px">パスワード</button>
+      <button class="btn sm danger" onclick="acctDelete('${p.id}')" style="font-size:11px">削除</button>
+      <div style="flex-basis:100%;font-size:10px;color:var(--text-muted);margin-top:2px">
+        ${projs.length ? '案件：'+esc(projs.join('、')) : '<b style="color:var(--warn-t)">案件に紐づいていません</b>（お客様チャットに入れません）'}
+      </div>
     </div>`;
   }).join('');
 }
@@ -120,7 +185,7 @@ async function acctDelete(userId){
     if(!res?.ok) throw new Error('削除できませんでした');
     showToast(`${name}さんのアカウントを削除しました`);
     try{ await fetchProfiles(); }catch(e){}
-    renderAccountPerms();
+    renderAccountScreens();
   }catch(e){
     showToast('削除に失敗しました：'+e.message);
   }
@@ -188,7 +253,7 @@ async function saveAcctEdit(){
     closeAcctEdit();
     // 名前は画面のあちこちで使っているので、読み直してから一覧を作り直す
     try{ await fetchAllData(); }catch(_){ try{ await fetchProfiles(); }catch(_){} }
-    renderAccountPerms();
+    renderAccountScreens();
     if(typeof renderOrdersList==='function') renderOrdersList();
   }catch(e){
     showToast('変更できませんでした：'+e.message, 7000);
