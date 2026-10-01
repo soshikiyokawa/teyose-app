@@ -588,7 +588,7 @@ function renderTalkPanelList(){
     const isClient=isClientThread(name);
     const msgs=talkThreads[name]||[];
     const last=msgs[msgs.length-1];
-    const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='file'?'📎 '+last.fileName:last.text)
+    const preview=last?(last.type==='order'?'📋 発注書 '+last.orderData.no:last.type==='quote'?'📝 見積依頼 '+(last.orderData?.no||''):last.type==='file'?'📎 '+last.fileName:last.text)
       :(isInternal?'社員メンバーの連絡用':isProject?'この案件のメンバーで連絡':isDirect?'この2人だけのやりとり':isGroup?`メンバー ${(grp?.memberIds||[]).length}人`:isClient?(isClientUser()?'きよかわとのやりとり':'お客様とのやりとり'):'タップしてトークを開始');
     const sup=suppliers.find(s=>s.name===name);
     const unread=chatUnreadFor(name);
@@ -921,6 +921,43 @@ function renderTalkPanelMessages(forceBottom){
       </div>`;
     }
     // ここまで発注書の吹き出し
+
+    // ── 見積依頼の吹き出し ──
+    // 発注書と似た見た目にするが、金額は出さない（まだ決まっていないので）
+    if(m.type==='quote'){
+      const q=m.orderData||{};
+      const live=(quoteRequests||[]).find(x=>x.no===q.no) || q;
+      const rows=(q.items||[]).slice(0,5).map(i=>
+        `<div class="ocb-row"><span>${esc(i.name||'')}${i.spec?`<span style="color:var(--text-muted)">（${esc(i.spec)}）</span>`:''}</span><span>${i.qty}${esc(i.unit||'')}</span></div>`
+      ).join('')
+        +((q.items||[]).length>5?`<div style="font-size:11px;color:var(--text-muted);padding:3px 0">他${q.items.length-5}品目…</div>`:'');
+      const answered = live.status==='answered';
+      return `${sep}<div class="talk-bubble me" data-mid="${m.id}">
+        ${replyRefHtml(m)}
+        <div class="order-card-bubble quote">
+          <div class="ocb-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#d4a96a" width="15" height="15" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+            <div><div class="ocb-title">見 積 依 頼</div><div class="ocb-no">${esc(q.no||'')}</div></div>
+          </div>
+          <div class="ocb-body">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">📦 ${esc(q.project||'')}${
+              q.replyBy?`　⏱ 回答希望 ${String(q.replyBy).replace(/-/g,'/')}`:''}</div>
+            ${rows}
+            ${q.note?`<div style="font-size:11px;color:var(--text-muted);margin-top:5px;white-space:pre-wrap">${esc(q.note)}</div>`:''}
+            <div class="ocb-total" style="font-size:12px">お見積りをお願いします${answered?'　<b style="color:var(--ok-t)">回答済み</b>':''}</div>
+          </div>
+          <div class="ocb-foot">
+            ${q.pdfUrl ? `<button class="btn sm wood" onclick="openPdfViewer('${q.pdfUrl}')" style="flex:1;justify-content:center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" width="12" height="12" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              見積依頼書を表示
+            </button>` : ''}
+            ${(!answered && live.id) ? `<button class="btn sm" onclick="quoteMarkAnswered(${live.id})" title="見積が届いたら押す">回答あり</button>` : ''}
+          </div>
+        </div>
+        <div class="ts">${time}${msgMarks(m)}</div>
+        ${reactionsHtml(m,true)}
+      </div>`;
+    }
 
     // 社内チャットは送信者名で自分／他人を判定（全員が社員のためroleでは区別できない）
     const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';

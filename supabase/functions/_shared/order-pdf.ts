@@ -21,7 +21,7 @@ export const COMPANY = {
   url: "kiyokawanoie.com",
 };
 
-const fmt = (n: number) => Math.round(Number(n) || 0).toLocaleString("ja-JP");
+export const fmt = (n: number) => Math.round(Number(n) || 0).toLocaleString("ja-JP");
 const nowPrice = (it: any) => Math.round(Number(it?.cost ?? it?.price) || 0);
 const origPrice = (it: any) =>
   it?.origPrice === undefined || it?.origPrice === null
@@ -85,7 +85,7 @@ function splitRuns(text: string): string[] {
   if (cur) out.push(cur);
   return out;
 }
-function textWidth(font: any, text: string, size: number): number {
+export function textWidth(font: any, text: string, size: number): number {
   return splitRuns(text).reduce((w, r) => w + font.widthOfTextAtSize(r, size), 0);
 }
 // 分けた並びを、続けて見えるように順に置いていく。
@@ -93,7 +93,7 @@ function textWidth(font: any, text: string, size: number): number {
 // opts.bold を付けると、わずかにずらして二重に書いて太字に見せる。
 // 太字用の日本語フォントは1本5MBあり、埋め込むとPDFが6MBになって
 // ChatWorkの添付上限（5MB）に入らないため、フォント1本でまかなっている。
-function drawRuns(page: any, text: string, opts: any) {
+export function drawRuns(page: any, text: string, opts: any) {
   const { bold, ...rest } = opts;
   let x = opts.x;
   for (const r of splitRuns(text)) {
@@ -107,7 +107,7 @@ function drawRuns(page: any, text: string, opts: any) {
 // 決まった幅に収まるように文字を折り返す。
 // 日本語には単語の区切りがないので、1文字ずつ幅を測って入るところまで詰める。
 // 英数字の続き（型番など）は、途中で切れると読みにくいので手前で折り返す。
-function wrapByWidth(text: string, font: any, size: number, maxWidth: number): string[] {
+export function wrapByWidth(text: string, font: any, size: number, maxWidth: number): string[] {
   const lines: string[] = [];
   let cur = "";
   const width = (s: string) => {
@@ -155,7 +155,7 @@ export async function saveOrderPdf(admin: any, order: any): Promise<string> {
 // （2026-09にSupabaseの転送量の上限に当たった一因）、作るのも遅くなる。
 // 一度読んだら、この関数の置き場に覚えておいて使い回す
 let _fontBytes: Uint8Array | null = null;
-async function loadFont(): Promise<Uint8Array> {
+export async function loadFont(): Promise<Uint8Array> {
   if (_fontBytes) return _fontBytes;
   const url = `${SUPABASE_URL}/storage/v1/object/public/assets/fonts/NotoSansJP-Regular.ttf`;
   _fontBytes = new Uint8Array(await (await fetch(url)).arrayBuffer());

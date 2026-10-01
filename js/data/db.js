@@ -147,6 +147,7 @@ async function fetchAllData(){
       soft(fetchInvoiceLines,  ()=>{ invoiceLinesReady=false; }),
       soft(fetchInvoiceHints,  ()=>{ invoiceHints=[]; }),
       soft(fetchReceipts,      ()=>{ receiptsReady=false; }),   // レシート台帳
+      soft(fetchQuoteRequests, ()=>{ quoteRequestsReady=false; }),   // 見積依頼
       soft(fetchTaskTemplates, ()=>{ taskTemplatesReady=false; }),
     );
   } else if(isSupplierUser){
@@ -895,7 +896,9 @@ async function dbAddChatMessage(supplierName, msg){
 
   // 通知の送信。失敗してもチャット送信自体は成立させる（msg.silent=trueなら通知しない：自動転記用）
   if(msg.silent) return;
-  const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}` : msg.type==='file' ? `📎 ${msg.fileName||'ファイル'}` : (msg.text||'');
+  const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}`
+    : msg.type==='quote' ? `📝 見積依頼 ${msg.orderData?.no||''}`
+    : msg.type==='file' ? `📎 ${msg.fileName||'ファイル'}` : (msg.text||'');
   // 宛先が指定されていれば、どのスレッドでもその人にだけ通知する（自分は除く）
   const picked = Array.isArray(msg.notifyNames)
     ? msg.notifyNames.filter(n=>n && n!==currentUserDisplayName) : [];
@@ -1008,6 +1011,111 @@ async function dbInviteClient(projectId, email, displayName){
   const msg = data?.error || detail || (error ? error.message : '');
   if(msg){ showToast('ご案内メールを送れませんでした：'+msg, 6000); throw new Error(msg); }
   return data;
+}
+
+// ════ 見積依頼（migration-genba78.sql） ════
+//
+// 発注の前に、発注先へ見積をお願いした記録。発注書と同じようにPDFを作って送る。
+let quoteRequests = [];
+let quoteRequestsReady = true;
+
+function quoteRowTo(r){
+  return { id:r.id, no:r.no, project:r.project||'', supplierId:r.supplier_id,
+    supplierName:r.supplier_name||supplierNameById(r.supplier_id), replyBy:r.reply_by||'',
+    note:r.note||'', items:r.items||[], status:r.status||'sent', pdfUrl:r.pdf_url||'',
+    answeredAt:r.answered_at||null, createdByName:r.created_by_name||'', createdAt:r.created_at };
+}
+async function fetchQuoteRequests(){
+  const { data, error } = await sb.from('quote_requests').select('*').order('created_at',{ascending:false});
+  quoteRequestsReady = !error;
+  if(error){ quoteRequests = []; throw error; }
+  quoteRequests = (data||[]).map(quoteRowTo);
+}
+
+async function dbGenerateQuotePdf(q){
+  let last = '';
+  for(let i=0;i<2;i++){
+    if(i) await new Promise(r=>setTimeout(r, 1500));
+    const { data, error } = await sb.functions.invoke('generate-quote-pdf', { body: q });
+    if(data?.url) return data.url;
+    last = data?.error || error?.message || '理由不明';
+    console.warn(`見積依頼書PDFの生成に失敗（${i+1}回目）：`, last);
+  }
+  showToast('見積依頼書PDFを作れませんでした：'+last+'（依頼そのものは記録されます）', 8000);
+  throw new Error(last);
+}
+
+// 見積依頼を記録して、発注先へ送る（チャット・ChatWork・メールは発注先の設定どおり）
+async function dbSendQuoteRequest(q){
+  const supplier_id = supplierIdByName(q.supplierName);
+  const row = {
+    no:q.no, project:q.project||'', supplier_id, supplier_name:q.supplierName||'',
+    reply_by:q.replyBy||null, note:q.note||'', items:q.items||[], status:'sent',
+    pdf_url:q.pdfUrl||'', created_by:currentUserId||null, created_by_name:q.createdByName||'',
+  };
+  const { data, error } = await sb.from('quote_requests').insert(row).select().single();
+  if(error){
+    showToast(error.code==='42P01'
+      ? 'データベースの準備が必要です。supabase/migration-genba78.sql を実行してください'
+      : '見積依頼の記録に失敗しました：'+error.message, 6000);
+    throw error;
+  }
+  const saved = quoteRowTo(data);
+  quoteRequests.unshift(saved);
+
+  // 発注先へ届ける（送付先の設定は発注と同じものを使う）
+  const sup = (suppliers||[]).find(s=>s.id===supplier_id);
+  const ch = orderChannelsOf(sup);
+  const staffName = q.createdByName || currentUserDisplayName || '';
+  const lines = (q.items||[]).map(i=>`・${i.name}${i.spec?`（${i.spec}）`:''} ${i.qty}${i.unit}`).join('\n');
+  const text = `【見積依頼】${q.no}\n件名：${q.project}\n`
+    + (q.replyBy ? `見積回答希望日：${q.replyBy}\n` : '')
+    + `\n${lines}\n`
+    + (q.note ? `\n備考：${q.note}\n` : '')
+    + `\nお見積りをお願いいたします。（この書類は発注ではありません）`
+    + (staffName ? `\n担当者：${staffName}` : '');
+
+  if(ch.includes('chat')){
+    // 中身は order_data の列に入れる（type で発注書と見分ける）
+    await dbAddChatMessage(q.supplierName, { role:'me', type:'quote', orderData:{...q, pdfUrl:q.pdfUrl}, noChatwork:true });
+  }
+  if(ch.includes('chatwork')){
+    dbForwardToChatWork(supplier_id, staffName, text,
+      q.pdfUrl ? {fileUrl:q.pdfUrl, fileName:`見積依頼書_${q.no}.pdf`, fileNameAscii:`rfq_${q.no}.pdf`, fileMime:'application/pdf'} : null
+    ).catch(()=>{});
+  }
+  if(ch.includes('email')){
+    await dbMailQuoteToSupplier(q, sup);
+  }
+  return saved;
+}
+
+async function dbMailQuoteToSupplier(q, sup){
+  if(!sup?.email){ showToast(`${q.supplierName}にメールアドレスが登録されていません`, 4000); return; }
+  showToast(`${sup.name}へメールを送っています…`, 20000);
+  const { data, error } = await sb.functions.invoke('send-order-mail', { body:{ quote:q, pdfUrl:q.pdfUrl } });
+  if(error || data?.error){
+    let detail = '';
+    if(error){ try{ detail = (await error.context?.json?.())?.error || ''; }catch(_){} }
+    showToast('メールを送れませんでした：'+(data?.error || detail || error?.message || ''), 8000);
+    return;
+  }
+  showToast(`${sup.name}へ見積依頼書をメールしました`);
+}
+
+// 回答があった／終わったことを記録する
+async function dbSetQuoteStatus(id, status){
+  const patch = { status };
+  if(status==='answered') patch.answered_at = new Date().toISOString();
+  const { error } = await sb.from('quote_requests').update(patch).eq('id',id);
+  if(error){ showToast('保存に失敗しました：'+error.message); throw error; }
+  const q = quoteRequests.find(x=>x.id===id);
+  if(q){ q.status = status; if(patch.answered_at) q.answeredAt = patch.answered_at; }
+}
+async function dbDeleteQuoteRequest(id){
+  const { error } = await sb.from('quote_requests').delete().eq('id',id);
+  if(error){ showToast('削除に失敗しました：'+error.message); throw error; }
+  quoteRequests = quoteRequests.filter(q=>q.id!==id);
 }
 
 // ════ レシート台帳（migration-genba76.sql） ════

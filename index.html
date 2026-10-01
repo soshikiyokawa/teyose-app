@@ -25,8 +25,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=430">
-<link rel="stylesheet" href="css/schedule.css?v=430">
+<link rel="stylesheet" href="css/main.css?v=431">
+<link rel="stylesheet" href="css/schedule.css?v=431">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -690,6 +690,7 @@
 <div class="page" id="page-order">
   <div class="sub-tab-bar">
     <button class="sub-tab-btn active staff-only" onclick="orderSubTab('new')">発注作成</button>
+    <button class="sub-tab-btn staff-only" onclick="orderSubTab('quote')">見積依頼作成</button>
     <button class="sub-tab-btn staff-only" onclick="orderSubTab('supplier')">発注先マスタ</button>
     <button class="sub-tab-btn" id="subtab-master" onclick="orderSubTab('master')">品目マスタ</button>
     <button class="sub-tab-btn" id="subtab-invoice" onclick="orderSubTab('invoice')">請求書</button>
@@ -807,6 +808,57 @@
   </div>
 
   <!-- 発注先マスタ -->
+  <!-- ════ 見積依頼作成（発注の前に、発注先へ見積をお願いする。js/order/quote-request.js） ════ -->
+  <div class="sub-page staff-only" id="ordersub-quote">
+
+    <!-- ① 発注先を選ぶ -->
+    <div id="qr-step1">
+      <div class="section-lbl" style="margin-top:0">① 見積をお願いする発注先を選ぶ</div>
+      <div class="card" id="qr-supplier-list" style="padding:0;overflow:hidden"></div>
+    </div>
+
+    <!-- ② 品目と条件 -->
+    <div id="qr-step2" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <button class="btn sm" onclick="qrBackToSupplier()">‹ 発注先を変える</button>
+        <div style="font-size:14px;font-weight:800" id="qr-supplier-name"></div>
+      </div>
+
+      <div class="form-grid">
+        <div class="fg"><label>案件名 <span style="color:var(--danger)">＊必須</span></label>
+          <input id="qr-project" placeholder="例：藪内様邸新築工事" oninput="updateQuoteBtnState()" autocomplete="off"
+            list="qr-project-list">
+          <datalist id="qr-project-list"></datalist>
+        </div>
+        <div class="fg"><label>見積回答希望日</label>
+          <input type="date" id="qr-reply-by">
+        </div>
+      </div>
+
+      <div class="section-lbl">見積してほしい品目</div>
+      <div class="card" id="qr-items" style="padding:8px"></div>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button class="btn sm primary" onclick="qrAddItem()">＋ 品目を追加</button>
+        <button class="btn sm" onclick="qrPickFromMaster()">品目マスタから選ぶ</button>
+      </div>
+      <div id="qr-master-box" class="card" style="display:none;padding:8px;margin-top:6px">
+        <div id="qr-master-list"></div>
+      </div>
+
+      <div class="fg" style="margin-top:12px"><label>備考</label>
+        <textarea id="qr-note" rows="2" placeholder="例：現場搬入の可否と納期もあわせてお知らせください" style="resize:vertical"></textarea>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <span style="flex:1;font-size:11px;color:var(--text-muted)">単価と金額は空欄で送ります（先方に書いていただく欄です）</span>
+        <button class="btn primary btn-incomplete" id="qr-preview-btn" onclick="openQuotePreview()">見積依頼書を作る</button>
+      </div>
+
+      <div class="section-lbl" style="margin-top:18px">送った見積依頼</div>
+      <div class="card" id="qr-history" style="padding:0;overflow:hidden"></div>
+    </div>
+  </div>
+
   <div class="sub-page staff-only" id="ordersub-supplier">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <span class="section-lbl" style="margin:0">発注先マスタ</span>
@@ -2694,6 +2746,18 @@
   </div>
 </div>
 
+<!-- 見積依頼書のプレビュー -->
+<div class="overlay" id="qr-pdf-overlay" onclick="if(event.target.id==='qr-pdf-overlay')closeQuotePdf()">
+  <div class="sheet">
+    <div class="sheet-toolbar"><span>見積依頼書プレビュー</span><button class="btn sm" onclick="closeQuotePdf()">閉じる</button></div>
+    <div class="sheet-body" id="qr-pdf-body"></div>
+    <div class="sheet-foot">
+      <button class="btn" onclick="closeQuotePdf()">閉じる</button>
+      <button class="btn wood" id="qr-send-btn" onclick="sendQuoteRequest()">✓ 見積依頼を送る</button>
+    </div>
+  </div>
+</div>
+
 <!-- 発注先編集 modal -->
 <div class="modal-overlay" id="supplier-modal" onclick="if(event.target.id==='supplier-modal')closeSupplierModal()">
   <div class="modal-sheet">
@@ -3230,92 +3294,93 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=430"></script>
+<script src="js/supabase-client.js?v=431"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=430"></script>
+<script src="js/utils.js?v=431"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=430"></script>
+<script src="js/state.js?v=431"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=430"></script>
+<script src="js/data/db.js?v=431"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=430"></script>
+<script src="js/nav.js?v=431"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=430"></script>
+<script src="js/talk.js?v=431"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=430"></script>
+<script src="js/push.js?v=431"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=430"></script>
-<script src="js/estimate/estimate-items.js?v=430"></script>
-<script src="js/estimate/quote-import.js?v=430"></script>
-<script src="js/estimate/estimate-master.js?v=430"></script>
-<script src="js/estimate/estimate-summary.js?v=430"></script>
-<script src="js/estimate/estimate-crud.js?v=430"></script>
-<script src="js/estimate/parking.js?v=430"></script>
-<script src="js/estimate/estimate-pdf.js?v=430"></script>
-<script src="js/estimate/estimate-invoice.js?v=430"></script>
+<script src="js/estimate/estimate-tabs.js?v=431"></script>
+<script src="js/estimate/estimate-items.js?v=431"></script>
+<script src="js/estimate/quote-import.js?v=431"></script>
+<script src="js/estimate/estimate-master.js?v=431"></script>
+<script src="js/estimate/estimate-summary.js?v=431"></script>
+<script src="js/estimate/estimate-crud.js?v=431"></script>
+<script src="js/estimate/parking.js?v=431"></script>
+<script src="js/estimate/estimate-pdf.js?v=431"></script>
+<script src="js/estimate/estimate-invoice.js?v=431"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=430"></script>
-<script src="js/payment-schedule.js?v=430"></script>
-<script src="js/inspection.js?v=430"></script>
+<script src="js/orders-list.js?v=431"></script>
+<script src="js/payment-schedule.js?v=431"></script>
+<script src="js/inspection.js?v=431"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=430"></script>
+<script src="js/chusho.js?v=431"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=430"></script>
+<script src="js/schedule.js?v=431"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=430"></script>
-<script src="js/order/item-price.js?v=430"></script>
-<script src="js/order/item-master.js?v=430"></script>
-<script src="js/order/invoice.js?v=430"></script>
-<script src="js/order/invoice-lines.js?v=430"></script>
-<script src="js/order/ekrea-price.js?v=430"></script>
-<script src="js/order/order-cart.js?v=430"></script>
-<script src="js/order/order-confirm.js?v=430"></script>
-<script src="js/order/order-price-edit.js?v=430"></script>
-<script src="js/order/order-history.js?v=430"></script>
-<script src="js/cost-budget.js?v=430"></script>
-<script src="js/order/card-match.js?v=430"></script>
-<script src="js/receipt-scan.js?v=430"></script>
-<script src="js/receipt-ledger.js?v=430"></script>
-<script src="js/receipt.js?v=430"></script>
+<script src="js/order/supplier-master.js?v=431"></script>
+<script src="js/order/item-price.js?v=431"></script>
+<script src="js/order/item-master.js?v=431"></script>
+<script src="js/order/invoice.js?v=431"></script>
+<script src="js/order/invoice-lines.js?v=431"></script>
+<script src="js/order/ekrea-price.js?v=431"></script>
+<script src="js/order/order-cart.js?v=431"></script>
+<script src="js/order/order-confirm.js?v=431"></script>
+<script src="js/order/order-price-edit.js?v=431"></script>
+<script src="js/order/order-history.js?v=431"></script>
+<script src="js/cost-budget.js?v=431"></script>
+<script src="js/order/card-match.js?v=431"></script>
+<script src="js/receipt-scan.js?v=431"></script>
+<script src="js/receipt-ledger.js?v=431"></script>
+<script src="js/order/quote-request.js?v=431"></script>
+<script src="js/receipt.js?v=431"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=430"></script>
-<script src="js/genba/supplier-view.js?v=430"></script>
-<script src="js/genba/genba-files.js?v=430"></script>
-<script src="js/genba/genba-photos.js?v=430"></script>
-<script src="js/genba/genba-drawings.js?v=430"></script>
-<script src="js/genba/genba-nippo.js?v=430"></script>
-<script src="js/genba/genba-dezura.js?v=430"></script>
-<script src="js/genba/payroll.js?v=430"></script>
-<script src="js/genba/overtime-pay.js?v=430"></script>
-<script src="js/genba/leave-balance.js?v=430"></script>
-<script src="js/genba/genba-leave.js?v=430"></script>
-<script src="js/genba/genba-holiday.js?v=430"></script>
-<script src="js/genba/license.js?v=430"></script>
-<script src="js/genba/vehicle.js?v=430"></script>
-<script src="js/genba/work-calendar.js?v=430"></script>
-<script src="js/genba/account-perms.js?v=430"></script>
+<script src="js/genba/genba-tabs.js?v=431"></script>
+<script src="js/genba/supplier-view.js?v=431"></script>
+<script src="js/genba/genba-files.js?v=431"></script>
+<script src="js/genba/genba-photos.js?v=431"></script>
+<script src="js/genba/genba-drawings.js?v=431"></script>
+<script src="js/genba/genba-nippo.js?v=431"></script>
+<script src="js/genba/genba-dezura.js?v=431"></script>
+<script src="js/genba/payroll.js?v=431"></script>
+<script src="js/genba/overtime-pay.js?v=431"></script>
+<script src="js/genba/leave-balance.js?v=431"></script>
+<script src="js/genba/genba-leave.js?v=431"></script>
+<script src="js/genba/genba-holiday.js?v=431"></script>
+<script src="js/genba/license.js?v=431"></script>
+<script src="js/genba/vehicle.js?v=431"></script>
+<script src="js/genba/work-calendar.js?v=431"></script>
+<script src="js/genba/account-perms.js?v=431"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=430"></script>
+<script src="js/init.js?v=431"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=430"></script>
-<script src="js/tasks.js?v=430"></script>
-<script src="js/task-templates.js?v=430"></script>
-<script src="js/auth.js?v=430"></script>
-<script src="js/account.js?v=430"></script>
+<script src="js/notifications.js?v=431"></script>
+<script src="js/tasks.js?v=431"></script>
+<script src="js/task-templates.js?v=431"></script>
+<script src="js/auth.js?v=431"></script>
+<script src="js/account.js?v=431"></script>
 </body>
 </html>

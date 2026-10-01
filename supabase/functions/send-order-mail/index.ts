@@ -64,8 +64,16 @@ Deno.serve(async (req) => {
       return json({ error: `メール送信の設定がまだです（${missing.join("・")} が未登録）` }, 400);
     }
 
-    const { order, pdfUrl } = await req.json();
-    if (!order?.no) return json({ error: "発注の内容がありません" }, 400);
+    // 発注書（order）と見積依頼書（quote）の両方をここから送る。
+    // 宛先の引き方・添付のしかたは同じなので、1つの関数にまとめている
+    const body0 = await req.json();
+    const quote = body0?.quote || null;
+    const pdfUrl = body0?.pdfUrl;
+    // 見積依頼は、発注と同じ形（suppliers に発注先名）に揃えて扱う
+    const order = quote
+      ? { ...quote, suppliers: quote.supplierName, no: quote.no, project: quote.project }
+      : body0?.order;
+    if (!order?.no) return json({ error: quote ? "見積依頼の内容がありません" : "発注の内容がありません" }, 400);
 
     // ── 宛先は発注先マスタから引く（画面から差し替えられないように） ──
     const { data: sup } = await admin.from("suppliers")
@@ -76,7 +84,7 @@ Deno.serve(async (req) => {
     const channels: string[] = Array.isArray(sup.order_channels) && sup.order_channels.length
       ? sup.order_channels : ["chat"];
     if (!channels.includes("email")) {
-      return json({ error: `${sup.name}は発注書の送付先にメールが選ばれていません` }, 400);
+      return json({ error: `${sup.name}は書類の送付先にメールが選ばれていません` }, 400);
     }
 
     // ── 発注書PDFを取ってきて添付する ──
@@ -86,20 +94,22 @@ Deno.serve(async (req) => {
         const res = await fetch(pdfUrl);
         if (res.ok) {
           const buf = new Uint8Array(await res.arrayBuffer());
-          attachments = [{ filename: `発注書_${order.no}.pdf`, content: toBase64(buf) }];
+          attachments = [{ filename: `${quote ? "見積依頼書" : "発注書"}_${order.no}.pdf`, content: toBase64(buf) }];
         }
       } catch (_) { /* PDFが取れなくても本文だけは送る */ }
     }
 
-    const subject = `【発注書】${order.no}　${order.project || ""}　${COMPANY.name}`;
+    const subject = quote
+      ? `【見積依頼】${order.no}　${order.project || ""}　${COMPANY.name}`
+      : `【発注書】${order.no}　${order.project || ""}　${COMPANY.name}`;
 
     // ── Resendへ送る ──
     const payload: Record<string, unknown> = {
       from: MAIL_FROM,
       to: [sup.email],
       subject,
-      text: buildText(order, sup, profile.display_name || ""),
-      html: buildHtml(order, sup, profile.display_name || ""),
+      text: quote ? buildQuoteText(order, sup, profile.display_name || "") : buildText(order, sup, profile.display_name || ""),
+      html: quote ? buildQuoteHtml(order, sup, profile.display_name || "") : buildHtml(order, sup, profile.display_name || ""),
     };
     if (MAIL_BCC) payload.bcc = [MAIL_BCC];
     if (MAIL_REPLY_TO) payload.reply_to = [MAIL_REPLY_TO];
@@ -196,6 +206,70 @@ function buildText(order: any, sup: any, staffName: string): string {
 
 function esc(s: unknown): string {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// ── 見積依頼のメール ──
+//
+// 発注書と違い、金額はこちらから書かない（それを教えてもらうための書類）。
+function quoteItemLines(q: any, max = 20): string[] {
+  const its = (q.items || []).slice(0, max).map((i: any) =>
+    `・${i.name}${i.spec ? `（${i.spec}）` : ""}　${i.qty}${i.unit || ""}`);
+  if ((q.items || []).length > max) its.push(`ほか${q.items.length - max}品目`);
+  return its;
+}
+function buildQuoteText(q: any, sup: any, staffName: string): string {
+  return [
+    `${sup.name} 御中`,
+    sup.contact ? `${sup.contact} 様` : "",
+    "",
+    "いつもお世話になっております。",
+    `${COMPANY.name}${staffName ? "の" + staffName : ""}です。`,
+    "",
+    "下記につきまして、お見積りをお願いいたします。",
+    "詳しくは添付の見積依頼書をご確認ください。",
+    "",
+    `依頼番号：${q.no}`,
+    `件　　名：${q.project || ""}`,
+    q.replyBy ? `回答希望日：${ymd(q.replyBy)}` : "",
+    "",
+    "【品目】",
+    ...quoteItemLines(q),
+    "",
+    q.note ? `【備考】\n${q.note}\n` : "",
+    "ご回答は、このメールへの返信・手寄のチャット・FAXのいずれでも構いません。",
+    "※この書類は発注ではありません。お見積りのお願いです。",
+    "",
+    "──────────",
+    COMPANY.name,
+    `${COMPANY.zip} ${COMPANY.address}`,
+    `TEL ${COMPANY.tel}`,
+    COMPANY.url,
+  ].filter((l) => l !== "").join("\n");
+}
+function buildQuoteHtml(q: any, sup: any, staffName: string): string {
+  const rows = quoteItemLines(q).map((l) => `<div>${esc(l)}</div>`).join("");
+  return `<div style="font-family:sans-serif;font-size:14px;line-height:1.9;color:#333">
+  <div>${esc(sup.name)} 御中</div>
+  ${sup.contact ? `<div>${esc(sup.contact)} 様</div>` : ""}
+  <p>いつもお世話になっております。<br>${esc(COMPANY.name)}${staffName ? "の" + esc(staffName) : ""}です。</p>
+  <p>下記につきまして、お見積りをお願いいたします。<br>詳しくは添付の見積依頼書をご確認ください。</p>
+  <table cellpadding="4" style="border-collapse:collapse;font-size:14px">
+    <tr><td style="color:#777">依頼番号</td><td><b>${esc(q.no)}</b></td></tr>
+    <tr><td style="color:#777">件名</td><td>${esc(q.project || "")}</td></tr>
+    ${q.replyBy ? `<tr><td style="color:#777">回答希望日</td><td><b>${esc(ymd(q.replyBy))}</b></td></tr>` : ""}
+  </table>
+  <p style="margin-bottom:4px"><b>品目</b></p>
+  ${rows}
+  ${q.note ? `<p style="border:1px solid #ddd;border-radius:6px;padding:8px 10px;white-space:pre-wrap"><b style="font-size:12px;color:#777">備考</b><br>${esc(q.note)}</p>` : ""}
+  <p>ご回答は、このメールへの返信・手寄のチャット・FAXのいずれでも構いません。<br>
+  <span style="color:#777;font-size:13px">※この書類は発注ではありません。お見積りのお願いです。</span></p>
+  <hr style="border:none;border-top:1px solid #ddd">
+  <div style="font-size:12px;color:#777">
+    ${esc(COMPANY.name)}<br>
+    ${esc(COMPANY.zip)} ${esc(COMPANY.address)}<br>
+    TEL ${esc(COMPANY.tel)}　${esc(COMPANY.url)}
+  </div>
+</div>`;
 }
 
 function buildHtml(order: any, sup: any, staffName: string): string {

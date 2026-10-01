@@ -331,3 +331,19 @@ body.drag-sorting .drag-handle{cursor:grabbing}
   /* 狭い画面では店名を2行目に回す（「コーナ…」と切れないように） */
   .rl-shop{flex-basis:100%;order:3;white-space:normal}
 }
+
+/* ── 見積依頼作成 ── */
+.qr-row{border-bottom:0.5px solid var(--border);padding:7px 4px}
+.qr-row:last-child{border-bottom:none}
+.qr-input{width:100%;font-size:13px;padding:6px 8px;border-radius:7px;
+  border:1px solid var(--border-s);background:var(--surface);color:var(--text);font-family:inherit}
+.qr-spec{margin-top:4px;font-size:12px}
+.qr-qty{display:flex;gap:5px;align-items:center;margin-top:4px}
+.qr-qty .num{width:84px;text-align:right}
+.qr-qty .unit{width:74px}
+.qr-qty .btn{margin-left:auto;flex-shrink:0}
+.qr-hist{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px 10px;
+  border-bottom:0.5px solid var(--border);background:var(--surface)}
+.qr-hist:last-child{border-bottom:none}
+/* 見積依頼の吹き出し（発注書より控えめに） */
+.order-card-bubble.quote .ocb-head{background:#3a4a2e}
