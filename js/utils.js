@@ -1,5 +1,31 @@
 const fmt = n => Math.round(n).toLocaleString('ja-JP');
 
+// ── きよかわの社員の名前（担当者を選ぶのに使う） ──
+//
+// 発注書・見積依頼書の「担当者」は、作った本人が既定。
+// 別の人が窓口になる場合もあるので、ここから選び直せるようにする。
+// 発注先とお客様は社員ではないので入れない。
+function employeeNames(){
+  const list = (typeof allProfiles!=='undefined' ? allProfiles : [])
+    .filter(p=>(p.role==='staff'||p.role==='carpenter') && p.displayName)
+    .map(p=>p.displayName);
+  const uniq = [...new Set(list)];
+  return typeof cmpEmployee==='function'
+    ? uniq.sort(cmpEmployee)
+    : uniq.sort((a,b)=>String(a).localeCompare(String(b),'ja'));
+}
+// 担当者を選ぶ欄を作る。いまの値（無ければログイン中の人）を選んでおく
+function fillStaffSelect(id, picked){
+  const sel = document.getElementById(id);
+  if(!sel) return;
+  const me = currentUserDisplayName || '';
+  const want = picked || sel.value || me;
+  const names = employeeNames();
+  if(want && !names.includes(want)) names.unshift(want);   // 名簿に無い名前でも消さない
+  sel.innerHTML = names.map(n=>`<option value="${esc(n)}"${n===want?' selected':''}>${esc(n)}${n===me?'（自分）':''}</option>`).join('');
+  if(!names.length) sel.innerHTML = `<option value="">（社員が登録されていません）</option>`;
+}
+
 // ════ 消費税（品目ごとの税率に対応） ════
 //
 // 10%（ふつう）・8%（軽減税率＝飲食料品と新聞）・0%（非課税＝切手・印紙・商品券など）が

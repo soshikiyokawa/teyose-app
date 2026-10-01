@@ -29,6 +29,7 @@ function updateOrderPreviewBtnState(){
   const placeOk = receipt || document.getElementById('order-place')?.value!=='その他'
     || !!(document.getElementById('order-place-other')?.value||'').trim();
   if(!receipt) renderOrderPlaceNote();
+  if(typeof fillStaffSelect==='function') fillStaffSelect('order-staff');
   const ready = !!(cart.length && costType && project && placeOk && (receipt ? payment : dueDate));
   btn.classList.toggle('btn-incomplete', !ready);
 }
@@ -83,8 +84,8 @@ function openOrderPreview(){
   // レシートに消費税が印字されていれば、その額をそのまま使う（お店の端数処理そのもの）
   const printedTax = (receipt && typeof orderPrintedTax==='function') ? orderPrintedTax() : null;
   const tax = printedTax!=null ? printedTax : taxB.tax;
-  // 発注書を作った人を、きよかわの担当者として発注書に載せる
-  const createdByName = currentUserDisplayName || '';
+  // 発注書に載せる担当者。ふだんは作った本人だが、窓口が別の人なら選び直せる
+  const createdByName = document.getElementById('order-staff')?.value || currentUserDisplayName || '';
   currentOrder={no,project,date,dueDate,dueAsap:!receipt&&orderDueAsap,costType,paymentMethod:payment,suppliers:sup.name,supplierObj:sup,items:orderItems,subtotal,tax,total:subtotal+tax,createdByName,
     deliveryPlace:delivery.place, deliveryAddress:delivery.address, note};
 

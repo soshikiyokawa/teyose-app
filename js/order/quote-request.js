@@ -17,6 +17,7 @@ function renderQuotePage(){
   if(!qrSupplier){ renderQuoteSupplierList(); return; }
   document.getElementById('qr-supplier-name').textContent = qrSupplier.name;
   // 案件名は打ってもよいが、いまある案件から選べるようにしておく
+  if(typeof fillStaffSelect==='function') fillStaffSelect('qr-staff');
   const dl = document.getElementById('qr-project-list');
   if(dl) dl.innerHTML = (projects||[]).map(p=>`<option value="${esc(p.name)}">`).join('');
   renderQuoteItems();
@@ -127,7 +128,7 @@ function openQuotePreview(){
     + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
   qrCurrent = { no, date: localYmd(now), project, replyBy, note, items,
     supplierName: qrSupplier.name, supplierObj: qrSupplier,
-    createdByName: currentUserDisplayName || '' };
+    createdByName: document.getElementById('qr-staff')?.value || currentUserDisplayName || '' };
 
   document.getElementById('qr-pdf-body').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
