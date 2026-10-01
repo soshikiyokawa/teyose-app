@@ -1103,6 +1103,15 @@ async function dbMailQuoteToSupplier(q, sup){
   showToast(`${sup.name}へ見積依頼書をメールしました`);
 }
 
+// 見積の回答（品目ごとの単価）を記録する
+async function dbSaveQuoteAnswer(id, items){
+  const { error } = await sb.from('quote_requests')
+    .update({ items, status:'answered', answered_at:new Date().toISOString() }).eq('id',id);
+  if(error){ showToast('回答の保存に失敗しました：'+error.message); throw error; }
+  const q = quoteRequests.find(x=>x.id===id);
+  if(q){ q.items = items; q.status = 'answered'; q.answeredAt = new Date().toISOString(); }
+}
+
 // 回答があった／終わったことを記録する
 async function dbSetQuoteStatus(id, status){
   const patch = { status };

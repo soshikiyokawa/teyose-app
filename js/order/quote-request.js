@@ -226,12 +226,149 @@ function renderQuoteHistory(){
       <span class="badge ${q.status==='answered'?'approved':'sent'}" style="font-size:10px;flex-shrink:0">${
         q.status==='answered'?'回答あり':q.status==='closed'?'終了':'依頼中'}</span>
       ${q.pdfUrl?`<button class="btn xs" onclick="openPdfViewer('${q.pdfUrl}')">書類</button>`:''}
-      ${q.status!=='answered'?`<button class="btn xs" onclick="quoteMarkAnswered(${q.id})">回答あり</button>`:''}
+      <button class="btn xs primary" onclick="openQuoteAnswer(${q.id})">${q.status==='answered'?'回答を見る':'回答を入力'}</button>
       ${currentUserRole==='staff'?`<button class="btn danger xs" onclick="quoteDelete(${q.id})">×</button>`:''}
     </div>`;
   }).join('');
 }
 
+// ════ 見積の回答を入れる ════
+//
+// 発注先から返ってきた単価を、品目ごとに入れる。
+// そのまま品目マスタに登録できるので、次からは発注書にそのまま使える。
+//   ・マスタに同じ品目があれば、単価だけ入れ替える（変更履歴も残る）
+//   ・無ければ新しく追加する
+let qaId = null;      // いま回答を入れている見積依頼
+let qaRows = [];      // 画面の行
+
+function openQuoteAnswer(id){
+  const q = (quoteRequests||[]).find(x=>x.id===id);
+  if(!q){ showToast('その見積依頼が見つかりません'); return; }
+  qaId = id;
+  // 同じ発注先の品目マスタから、品名が一致するものを探しておく
+  qaRows = (q.items||[]).map(it=>{
+    const hit = (master||[]).find(m=>m.supplier===q.supplierName && m.name===it.name);
+    return {
+      name: it.name, spec: it.spec||'', qty: it.qty, unit: it.unit||'式',
+      price: (it.price==null ? '' : it.price),
+      cat: hit?.cat || '',
+      toMaster: true,
+      existingId: hit?.id || null,
+      existingCost: hit?.cost ?? null,
+    };
+  });
+  document.getElementById('qa-title').textContent = `${q.supplierName}　${q.project}`;
+  document.getElementById('qa-sub').textContent = `${q.no}${q.replyBy?`　回答希望 ${String(q.replyBy).replace(/-/g,'/')}`:''}`;
+  // 分類の候補は、いまのマスタにあるものから作る
+  const cats = [...new Set((master||[]).map(m=>m.cat).filter(Boolean))].sort();
+  document.getElementById('qa-cat-list').innerHTML = cats.map(c=>`<option value="${esc(c)}">`).join('');
+  renderQuoteAnswerRows();
+  document.getElementById('qa-modal').classList.add('open');
+}
+function closeQuoteAnswer(){
+  qaId = null; qaRows = [];
+  document.getElementById('qa-modal').classList.remove('open');
+}
+function qaSet(i, field, v){
+  if(!qaRows[i]) return;
+  qaRows[i][field] = (field==='price') ? (v==='' ? '' : (parseFloat(String(v).replace(/,/g,''))||0)) : v;
+  if(field==='price' || field==='toMaster') renderQuoteAnswerRows();
+}
+function qaToggle(i, on){ if(qaRows[i]) qaRows[i].toMaster = !!on; renderQuoteAnswerRows(); }
+
+function renderQuoteAnswerRows(){
+  const el = document.getElementById('qa-rows');
+  if(!el) return;
+  el.innerHTML = qaRows.map((r,i)=>{
+    const changed = r.existingId && r.price!=='' && Number(r.price)!==Number(r.existingCost);
+    return `<div class="qa-row">
+      <div class="qa-name">${esc(r.name)}${r.spec?`<span class="qa-spec">${esc(r.spec)}</span>`:''}</div>
+      <div class="qa-line">
+        <span class="qa-qty">${r.qty}${esc(r.unit)}</span>
+        <span style="font-size:11px;color:var(--text-muted)">単価</span>
+        <input class="qa-input num" type="text" inputmode="numeric" value="${r.price===''?'':r.price}"
+          placeholder="—" onchange="qaSet(${i},'price',this.value)">
+        <span style="font-size:11px;color:var(--text-muted)">円/${esc(r.unit)}</span>
+        ${r.price!=='' ? `<span class="qa-amt">¥${fmt(Number(r.price)*Number(r.qty||0))}</span>` : ''}
+      </div>
+      <div class="qa-line">
+        <label class="qa-chk"><input type="checkbox" ${r.toMaster?'checked':''} onchange="qaToggle(${i},this.checked)">
+          品目マスタに${r.existingId?'反映':'登録'}</label>
+        ${r.toMaster ? `<input class="qa-input qa-cat" value="${esc(r.cat)}" placeholder="分類（例：木材）"
+            list="qa-cat-list" onchange="qaSet(${i},'cat',this.value)">` : ''}
+        ${r.existingId
+          ? `<span class="qa-note">${changed ? `いまの単価 ¥${fmt(r.existingCost)} → 入れ替え` : 'マスタにあります'}</span>`
+          : '<span class="qa-note">新しく追加します</span>'}
+      </div>
+    </div>`;
+  }).join('');
+  const n = qaRows.filter(r=>r.price!=='').length;
+  const m = qaRows.filter(r=>r.toMaster && r.price!=='').length;
+  const info = document.getElementById('qa-info');
+  if(info) info.textContent = `${qaRows.length}品目中 ${n}件に単価を入れました（うち${m}件をマスタに反映）`;
+}
+
+async function saveQuoteAnswer(){
+  const q = (quoteRequests||[]).find(x=>x.id===qaId);
+  if(!q) return;
+  const filled = qaRows.filter(r=>r.price!=='');
+  if(!filled.length){ showToast('単価を入れてください'); return; }
+
+  const btn = document.getElementById('qa-save-btn');
+  btn.disabled = true; btn.textContent = '保存中…';
+  let added = 0, updated = 0, failed = 0;
+  try{
+    // ① 見積依頼に回答の単価を残す
+    const items = (q.items||[]).map((it,i)=>{
+      const r = qaRows[i];
+      return (r && r.price!=='') ? {...it, price:Number(r.price)} : it;
+    });
+    await dbSaveQuoteAnswer(q.id, items);
+
+    // ② 品目マスタに反映する
+    for(const r of qaRows){
+      if(!r.toMaster || r.price==='') continue;
+      try{
+        if(r.existingId){
+          const prev = (master||[]).find(m=>m.id===r.existingId);
+          if(prev && Number(prev.cost) !== Number(r.price)){
+            // 単価の入れ替えは履歴に残す（いつ・いくらから変わったかを追えるように）
+            await dbSaveItemPrice(prev, Number(r.price), localYmd(new Date()));
+            prev.cost = Number(r.price); prev.price = Number(r.price);
+            updated++;
+          }
+        }else{
+          await dbAddMasterItem({
+            cat: String(r.cat||'').trim() || 'その他',
+            name: r.name, unit: r.unit,
+            cost: Number(r.price), price: Number(r.price),
+            supplier: q.supplierName,
+            makerCode: r.spec || '',
+            shipping: 0, shippingPer: 'order', perBundle: 0,
+          });
+          added++;
+        }
+      }catch(_){ failed++; }
+    }
+  }catch(e){
+    btn.disabled = false; btn.textContent = '回答を保存';
+    return;
+  }
+  btn.disabled = false; btn.textContent = '回答を保存';
+
+  const parts = [`${filled.length}品目の単価を記録しました`];
+  if(added)   parts.push(`${added}件を品目マスタに追加`);
+  if(updated) parts.push(`${updated}件の単価を入れ替え`);
+  if(failed)  parts.push(`${failed}件はマスタに反映できませんでした`);
+  showToast('✅ ' + parts.join('／'), 7000);
+
+  closeQuoteAnswer();
+  renderQuoteHistory();
+  if(typeof renderMaster==='function') renderMaster();
+  if(typeof renderTalkPanelMessages==='function') renderTalkPanelMessages();
+}
+
+// 回答の入力を開かずに「回答あり」だけにする（金額は入れない場合）
 async function quoteMarkAnswered(id){
   try{ await dbSetQuoteStatus(id, 'answered'); showToast('回答ありにしました'); }catch(_){ return; }
   renderQuoteHistory();
