@@ -43,32 +43,48 @@ function diffDays(a, b) {
 
 // ─ Color: 小工程は親（大工程）の色を使う。完了済みはグレー ─
 function _getTaskColor(task) {
-  if (task.done) return '#c9c9c9';
+  if (task.done) return _schIsDark() ? '#4a4a4f' : '#c9c9c9';
   const own = task.level === 0
     ? task.color
     : (scheduleTasks.find(t => t.id === task.parentId)?.color || task.color);
   return _readableBarColor(own || GANTT_COLORS[0]);
 }
 
-// 黒い文字との明暗の差。1に近いほど読みにくい
-function _blackContrast(r, g, b) {
+// 色の明るさ（0＝黒、1＝白）
+function _relLum(r, g, b) {
   const f = v => { v /= 255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); };
-  const L = 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b);
-  return (L + 0.05) / 0.05;
+  return 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b);
 }
-const BAR_MIN_CONTRAST = 7;   // 黒い文字がはっきり読める明暗の差
+// 黒い文字／白い文字との明暗の差。1に近いほど読みにくい
+function _blackContrast(r, g, b) { return (_relLum(r,g,b) + 0.05) / 0.05; }
+function _whiteContrast(r, g, b) { return 1.05 / (_relLum(r,g,b) + 0.05); }
+const BAR_MIN_CONTRAST = 7;   // 工程名がはっきり読める明暗の差
 
-// 工程名は黒で出すので、濃い色のままだと読めない。
-// 黒い字が読める明るさになるまで、少しずつ白に寄せる。
-// 前に作った工程表に入っている濃い色（昔の色の並び）も、ここで明るくなる
+// いまダークモードか
+function _schIsDark() {
+  if (typeof themeIsDark === 'function' && typeof currentTheme === 'function') {
+    try { return themeIsDark(currentTheme()); } catch(_) {}
+  }
+  const t = document.documentElement.getAttribute('data-theme');
+  if (t === 'dark')  return true;
+  if (t === 'light') return false;
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme:dark)').matches);
+}
+
+// 工程名は、明るい画面では黒、暗い画面では白で出す。
+// その字が読める明るさになるまで、バーの色を白／黒のほうへ少しずつ寄せる。
+// 前に作った工程表に入っている色や、手で選んだ色も、ここで直る
 function _readableBarColor(hex) {
   const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex||'').trim());
-  if (!m) return GANTT_COLORS[0];
+  if (!m) return _readableBarColor(GANTT_COLORS[0]);
   let r = parseInt(m[1].slice(0,2),16), g = parseInt(m[1].slice(2,4),16), b = parseInt(m[1].slice(4,6),16);
-  for (let i = 0; i < 30 && _blackContrast(r,g,b) < BAR_MIN_CONTRAST; i++) {
-    r = Math.round(r + (255-r)*0.12);
-    g = Math.round(g + (255-g)*0.12);
-    b = Math.round(b + (255-b)*0.12);
+  const dark = _schIsDark();
+  const toward = dark ? 0 : 255;                        // 暗い画面では濃いほうへ、明るい画面では薄いほうへ
+  const diff = dark ? _whiteContrast : _blackContrast;
+  for (let i = 0; i < 40 && diff(r,g,b) < BAR_MIN_CONTRAST; i++) {
+    r = Math.round(r + (toward-r)*0.12);
+    g = Math.round(g + (toward-g)*0.12);
+    b = Math.round(b + (toward-b)*0.12);
   }
   return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
 }

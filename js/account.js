@@ -44,6 +44,9 @@ function applyTheme(mode){
   // スマホの上下のふち（アドレスバーなど）の色も合わせる
   const mt = document.querySelector('meta[name=theme-color]');
   if(mt) mt.setAttribute('content', themeIsDark(mode) ? '#1b1b20' : '#ffffff');
+  // 工程表のバーの色は、明るい画面と暗い画面で作り分けている（js/schedule.js の
+  // _readableBarColor）ので、切り替えたら描き直す
+  if(typeof renderGantt==='function' && document.getElementById('gantt-inner')) renderGantt();
 }
 function setTheme(mode){
   if(!THEMES.includes(mode)) return;

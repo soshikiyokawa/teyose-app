@@ -34,7 +34,7 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   padding: 7px 12px;
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
-  background: var(--surface-1);
+  background: var(--surface, #fff);
   flex-shrink: 0;
 }
 .sch-toolbar h2 { font-size: 14px; font-weight: 700; margin: 0; flex: none; }
@@ -72,7 +72,7 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 }
 .gantt-head-left {
   flex-shrink: 0;
-  background: var(--surface-1);
+  background: var(--surface, #fff);
   border-bottom: 2px solid var(--border);
   overflow: hidden;
 }
@@ -91,9 +91,12 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 
 /* ─ Right panel ─ */
 .gantt-right-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* 年月日・曜日の見出し。
+   スマホでは上に貼り付いたまま下の工程が流れていくので、必ず地を白で塗る
+   （var(--surface-1) という色は定義されておらず、透けて工程が重なって見えていた） */
 .gantt-head-right {
   flex-shrink: 0;
-  background: var(--surface-1);
+  background: var(--surface, #fff);
   border-bottom: 2px solid var(--border);
   overflow: hidden;
 }
@@ -282,10 +285,11 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .gantt-bar-major { height: 22px; }
 .gantt-bar-minor { height: 18px; opacity: 0.88; }
 /* 工程名はバーの左端から書き、入りきらないぶんはバーの右へそのまま出す。
-   色はどこでも黒のまま変えない（途中で色が変わると読みづらいため）。
-   バーの色は黒い字が読める明るさに寄せてあり（_readableBarColor）、
-   はみ出した先の地も薄いので、同じ黒のまま最後まで読める。
-   白いふちは、暗いほうの配色でバーの外に出たときのための保険 */
+   色は途中で変えない（変わると読みづらいため）。
+   明るい画面では黒、暗い画面では白で統一する。
+   バーの色はその字が読める明るさに寄せてあり（_readableBarColor）、
+   はみ出した先の地も同じ側の明るさなので、1色のまま最後まで読める。
+   ふちは、地とバーの境目で字がにじまないようにする保険 */
 .gantt-bar-text {
   font-size: 12px;
   line-height: 1;
@@ -295,6 +299,17 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   text-shadow: 0 0 2px rgba(255,255,255,.85), 0 0 2px rgba(255,255,255,.85);
   flex: 0 0 auto;
   pointer-events: none;
+}
+/* 暗い画面では白で統一（バーの色も濃いほうへ寄せてある） */
+:root[data-theme="dark"] .gantt-bar-text {
+  color: #f4f2ee;
+  text-shadow: 0 0 2px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.85);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gantt-bar-text {
+    color: #f4f2ee;
+    text-shadow: 0 0 2px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.85);
+  }
 }
 
 /* Resize handles at bar edges */
@@ -309,8 +324,13 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 }
 .gantt-bar-hdl-l { left: 0; border-radius: 3px 0 0 3px; }
 .gantt-bar-hdl-r { right: 0; border-radius: 0 3px 3px 0; }
-/* バーが明るい色になったので、つかみ代は白ではなく影を出す（白だと見えない） */
+/* バーが明るい色になったので、つかみ代は白ではなく影を出す（白だと見えない）。
+   暗い画面ではバーが濃いので、逆に明るく光らせる */
 .gantt-bar-hdl:hover { background: rgba(0,0,0,0.14); }
+:root[data-theme="dark"] .gantt-bar-hdl:hover { background: rgba(255,255,255,0.22); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gantt-bar-hdl:hover { background: rgba(255,255,255,0.22); }
+}
 
 /* Badge */
 .gantt-badge {
