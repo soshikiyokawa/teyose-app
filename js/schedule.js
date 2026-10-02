@@ -677,20 +677,22 @@ function onProjectChanged() {
 // ─ Gantt render ─
 // バーの幅に収まらない工程名を、バーの外（右、入らなければ左）に出す。
 // 幅は描いたあとでないと分からないので、描画のいちばん最後に呼ぶ
+// 工程名は、収まっても収まらなくても、バーの左端から書き始める。
+// 入りきらないぶんはバーの右へそのまま出す。
+// 出たぶんは地の上に乗るので、そこだけ読める色（黒＋白いふち）に差し替える。
+// どこから差し替えるかを --spill に入れておき、CSS の clip-path で切り分ける
 function ganttFitBarLabels(){
   const body = document.getElementById('gantt-body-right');
   if (!body) return;
-  const total = body.scrollWidth;
   body.querySelectorAll('.gantt-bar').forEach(bar => {
     const t = bar.querySelector('.gantt-bar-text');
     if (!t) return;
-    bar.classList.remove('gantt-bar-out-r', 'gantt-bar-out-l');
+    bar.classList.remove('gantt-bar-spill');
+    bar.style.removeProperty('--spill');
     const room = bar.clientWidth - 20;          // 左右のつまみのぶんを引く
-    const need = t.scrollWidth;
-    if (need <= room) return;                   // 収まるならバーの中のまま
-    // 右に出すと画面の端で切れてしまう場合は、左に出す
-    const overflowRight = bar.offsetLeft + bar.offsetWidth + need + 12 > total;
-    bar.classList.add(overflowRight ? 'gantt-bar-out-l' : 'gantt-bar-out-r');
+    if (t.scrollWidth <= room) return;          // 収まるならそのまま
+    bar.classList.add('gantt-bar-spill');
+    bar.style.setProperty('--spill', Math.max(0, room) + 'px');
   });
 }
 
@@ -843,6 +845,7 @@ function renderGantt() {
     const barHtml = task.start && task.end
       ? `<div class="gantt-bar ${barCls} ${selCls}" id="gantt-bar-${task.id}"
            style="left:${barL}px;width:${barW}px;background:${_getTaskColor(task)}"
+           data-name="${esc(task.name)}"
            onmousedown="onBarDragStart(event,${task.id},'move')"
            ontouchstart="onBarDragStart(event,${task.id},'move')">
            <div class="gantt-bar-hdl gantt-bar-hdl-l"

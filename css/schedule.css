@@ -286,25 +286,38 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   flex: 0 0 auto;
   pointer-events: none;
 }
-/* バーに収まらない工程名は、バーの外に出して最後まで読めるようにする。
-   背景の上に出るので、白い縁取りを付けて読めるようにする */
-.gantt-bar.gantt-bar-out-r .gantt-bar-text,
-.gantt-bar.gantt-bar-out-l .gantt-bar-text {
+/* バーに収まらない工程名も、収まるときと同じようにバーの左端から書く。
+   入りきらないぶんはバーの右へそのまま出し、最後まで読めるようにする。
+   ・バーの上に乗っている部分 … 白い文字のまま（--spill より左だけ残す）
+   ・バーから出た部分       … 地の上なので、黒い文字＋白いふちに差し替える
+   --spill（バーの中に書ける幅）は ganttFitBarLabels が入れている */
+.gantt-bar.gantt-bar-spill .gantt-bar-text {
+  clip-path: inset(0 calc(100% - var(--spill, 0px)) 0 0);
+}
+/* 差し替えのぶんはバーに持たせる。
+   文字の側に持たせると、上の clip-path が中の飾りまで切ってしまうため */
+.gantt-bar.gantt-bar-spill::after {
+  content: attr(data-name);
   position: absolute;
+  left: 10px;                 /* .gantt-bar の padding-left と同じ＝文字の書き出しに合わせる */
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
   color: var(--text, #33302b);
   text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  /* バーから出たところだけを出す。上下と右は、白いふちのぶん少し広げておく */
+  clip-path: inset(-3px -4px -3px var(--spill, 0px));
+  pointer-events: none;
   z-index: 4;
 }
-/* ダークモードでは白い縁取りが文字をにじませて読みにくくなるので付けない
-   （暗い背景に明るい文字なので、縁取りがなくても読める） */
-:root[data-theme="dark"] .gantt-bar.gantt-bar-out-r .gantt-bar-text,
-:root[data-theme="dark"] .gantt-bar.gantt-bar-out-l .gantt-bar-text { text-shadow: none; }
+/* ダークモードでは白いふちが文字をにじませて読みにくくなるので付けない
+   （暗い地に明るい文字なので、ふちがなくても読める） */
+:root[data-theme="dark"] .gantt-bar.gantt-bar-spill::after { text-shadow: none; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .gantt-bar.gantt-bar-out-r .gantt-bar-text,
-  :root:not([data-theme="light"]) .gantt-bar.gantt-bar-out-l .gantt-bar-text { text-shadow: none; }
+  :root:not([data-theme="light"]) .gantt-bar.gantt-bar-spill::after { text-shadow: none; }
 }
-.gantt-bar.gantt-bar-out-r .gantt-bar-text { left: 100%; margin-left: 6px; }
-.gantt-bar.gantt-bar-out-l .gantt-bar-text { right: 100%; margin-right: 6px; }
 
 /* Resize handles at bar edges */
 .gantt-bar-hdl {
