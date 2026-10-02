@@ -655,11 +655,19 @@ function openTalkPanelThread(supName){
   setupMsgMenuHandlers();
   updateChatNewMark(false);
   _chatStick = true;
+  // 未読の境目は、既読を記録する前にここで決めておく（記録してしまうと数えられない）
+  chatSetUnreadMark(supName);
   renderTalkPanelMessages(true);
+  // 表示を切り替えた直後は箱の高さが取れないことがある。次のひと呼吸で位置を合わせ直す
+  if(chatUnreadMark) requestAnimationFrame(()=>{
+    const box=document.getElementById('talk-panel-messages');
+    if(box && box.clientHeight && chatUnreadMark?.place && chatScrollToUnread(box)) updateChatNewMark(true);
+  });
   // 開いた時刻を既読として記録し、未読バッジを更新する
   dbMarkThreadRead(threadKeyOf(supName)).then(updateChatBadge).catch(()=>{});
   updateChatBadge();
-  setTimeout(()=>document.getElementById('talk-panel-input').focus(),200);
+  // 未読から読み始めるときは、キーボードを出さない（画面が縮んで読む位置がずれる）
+  if(!chatUnreadMark) setTimeout(()=>document.getElementById('talk-panel-input').focus(),200);
 }
 
 // スレッド名 → 既読管理のキー
@@ -721,6 +729,7 @@ function updateChatBadge(){
 
 function closeTalkPanelThread(){
   activeTalkPanelSupplier=null;
+  chatUnreadMark=null;   // 閉じたら未読の境目も捨てる（次に開いたとき改めて決める）
   resetChatRenderSignature();
   document.getElementById('talk-panel-list').style.display='flex';
   document.getElementById('talk-panel-detail').style.display='none';
@@ -795,11 +804,81 @@ function chatAtBottom(el){
 // 貼り付いている間は下に居続ける（勝手に上へずれないようにするため）
 let _chatStick = true;
 
+// ════ 開いたときの位置（未読のいちばん古いところ） ════
+//
+// スレッドを開いた時点の「ここから未読」の境目。開いている間は作り直さない。
+//   ・開いた直後に既読を記録するので、描き直すたびに数え直すと境目が消えてしまう
+//   ・Realtime で新着が来ても、読んでいる途中で境目を動かさない
+let chatUnreadMark = null;        // {thread, firstId, place, hold}
+const CHAT_UNREAD_TOP = 28;       // 未読の1件目を上端からこれだけ下に置く（前の話が少し見える）
+
+function chatSetUnreadMark(threadName){
+  chatUnreadMark = null;
+  if(chatBookmarkFilter) return;   // ブックマークの絞り込み中は、境目も位置合わせもしない
+  const last = myLastReadAt(threadName);
+  let first = null;
+  for(const m of (talkThreads[threadName]||[])){
+    if(m.ts>last && m.senderName!==currentUserDisplayName && (!first || m.ts<first.ts)) first = m;
+  }
+  if(first) chatUnreadMark = {thread:threadName, firstId:first.id, place:true, hold:false};
+}
+// いま描く画面で「ここから未読」を出すメッセージID（出さないなら null）
+function chatUnreadMarkId(){
+  return (chatUnreadMark && !chatBookmarkFilter && chatUnreadMark.thread===activeTalkPanelSupplier)
+    ? chatUnreadMark.firstId : null;
+}
+
+// 自分（プログラム）で動かしたスクロールと、指で動かしたスクロールを区別する。
+// 区別しないと、未読の位置に送ったこと自体を「下まで見た」と取り違える
+let _chatProgScroll = 0;
+function chatSetScrollTop(el, top){
+  _chatProgScroll++;
+  el.scrollTop = top;
+  requestAnimationFrame(()=>{ if(_chatProgScroll>0) _chatProgScroll--; });
+  // 画面が裏に回っているとrequestAnimationFrameが来ない。
+  // 戻ってきたときに「ずっと自分で動かしている」状態で固まらないよう、保険で戻す
+  setTimeout(()=>{ _chatProgScroll = 0; }, 500);
+}
+
+// 箱の中身から見た位置（スクロールしても変わらない座標）
+function chatAnchorTop(el, node){
+  return el.scrollTop + (node.getBoundingClientRect().top - el.getBoundingClientRect().top) - el.clientTop;
+}
+
+// 「ここから未読」を画面の上のほうに置くときの、送り先の位置
+function chatUnreadAnchorY(el, sep){
+  // 未読より前に吹き出しがあるか。あるなら前の話が少し見えるところに置き、
+  // 無いなら（ぜんぶ未読）いちばん上から出す（日付の見出しを欠けさせない）
+  for(let p=sep.previousElementSibling; p; p=p.previousElementSibling){
+    if(p.classList.contains('talk-bubble')) return Math.max(0, chatAnchorTop(el,sep) - CHAT_UNREAD_TOP);
+  }
+  return 0;
+}
+
+// 「ここから未読」が画面の上のほうに来るところまで送る。
+// いちばん下まで送っても境目が見えるなら、今までどおり下へ（戻り値 false）
+function chatScrollToUnread(el){
+  const mark = chatUnreadMark;
+  if(!el || !mark || mark.thread!==activeTalkPanelSupplier) return false;
+  const sep = el.querySelector('.talk-unread-sep');
+  if(!sep){ mark.place=false; mark.hold=false; return false; }
+  const y = chatUnreadAnchorY(el, sep);
+  const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
+  mark.place = false;
+  if(y >= maxTop - 1){ mark.hold=false; return false; }   // 下まで送れば見える
+  _chatStick = false;
+  mark.hold = true;
+  chatSetScrollTop(el, y);
+  return true;
+}
+
 // 自分でスクロールしたかどうかを見て、貼り付けを入り切りする
 function chatWatchScroll(el){
   if(!el || el._chatWatched) return;
   el._chatWatched = true;
   el.addEventListener('scroll', ()=>{
+    if(_chatProgScroll) return;   // 自分で動かしたぶんは、指の操作と見なさない
+    if(chatUnreadMark) chatUnreadMark.hold = false;   // 指で動かしたら未読位置の保持をやめる
     _chatStick = chatAtBottom(el);
     if(_chatStick) updateChatNewMark(false);
   }, {passive:true});
@@ -812,7 +891,15 @@ function chatKeepBottomOnLoad(el){
   if(!el) return;
   el.querySelectorAll('img').forEach(img=>{
     if(img.complete) return;
-    const fix = ()=>{ if(_chatStick) el.scrollTop = el.scrollHeight; };
+    const fix = ()=>{
+      if(_chatStick){ chatSetScrollTop(el, el.scrollHeight); return; }
+      // 未読の位置で開いたときは、上にある写真が入って高さが増えても同じ位置に居続ける
+      const mark = chatUnreadMark;
+      if(mark && mark.hold && mark.thread===activeTalkPanelSupplier){
+        const sep = el.querySelector('.talk-unread-sep');
+        if(sep) chatSetScrollTop(el, chatUnreadAnchorY(el, sep));
+      }
+    };
     img.addEventListener('load', fix, {once:true});
     img.addEventListener('error', fix, {once:true});
   });
@@ -826,7 +913,8 @@ function chatScrollToBottom(){
   const el=document.getElementById('talk-panel-messages');
   if(!el) return;
   _chatStick = true;
-  el.scrollTop=el.scrollHeight;
+  if(chatUnreadMark) chatUnreadMark.hold = false;
+  chatSetScrollTop(el, el.scrollHeight);
   updateChatNewMark(false);
 }
 
@@ -837,7 +925,7 @@ function chatScrollToBottom(){
 // 毎回 innerHTML を作り直すと写真が読み込み直しになって画面がチカチカするため。
 let _chatRenderSig = '';
 function chatRenderSignature(supplier, msgs){
-  return supplier + '|' + (chatBookmarkFilter?'bm':'') + '|' + msgs.map(m=>[
+  return supplier + '|' + (chatBookmarkFilter?'bm':'') + '|' + (chatUnreadMarkId()??'') + '|' + msgs.map(m=>[
     m.id, m.ts, m.type, m.text, m.editedAt, m.fileUrl,
     JSON.stringify(m.reactions||{}), (m.bookmarks||[]).join(','),
     m.sending?'s':'', m.failed?'f':''
@@ -854,7 +942,12 @@ function renderTalkPanelMessages(forceBottom){
 
   // 中身が前と同じなら描き直さない（他の人の既読などで呼ばれたとき）
   const sig = chatRenderSignature(activeTalkPanelSupplier, msgs);
-  if(forceBottom!==true && sig===_chatRenderSig && el && el.children.length) return;
+  if(forceBottom!==true && sig===_chatRenderSig && el && el.children.length){
+    // 中身が同じでも、未読の位置合わせがまだ済んでいないならここでやる
+    // （開いた直後は箱の高さが取れず、見送っていることがある）
+    if(el.clientHeight && chatUnreadMark?.place) chatScrollToUnread(el);
+    return;
+  }
   _chatRenderSig = sig;
   // 描き直す前の位置と、いちばん下を見ていたかどうかを覚えておく
   const wasAtBottom = chatAtBottom(el);
@@ -869,10 +962,14 @@ function renderTalkPanelMessages(forceBottom){
     return;
   }
   let lastDate='';
+  const unreadId = chatUnreadMarkId();
   el.innerHTML=msgs.map(m=>{
     const dLabel=dateLabel(m.ts);
-    const sep=dLabel!==lastDate?`<div class="talk-date-sep">${dLabel}</div>`:'';
+    const dsep=dLabel!==lastDate?`<div class="talk-date-sep">${dLabel}</div>`:'';
     lastDate=dLabel;
+    // 日付 →「ここから未読」→ 吹き出し の順に出す。
+    // 吹き出しの手前に付けるものはこの sep にまとめてあり、下の各 return で使っている
+    const sep = dsep + (unreadId!=null && m.id===unreadId ? '<div class="talk-unread-sep">ここから未読</div>' : '');
     const time=new Date(m.ts).getHours()+':'+String(new Date(m.ts).getMinutes()).padStart(2,'0');
     if(m.type==='order'){
       const o=m.orderData;
@@ -990,15 +1087,21 @@ function renderTalkPanelMessages(forceBottom){
   // 高さが取れないので位置をいじらない
   if(!el.clientHeight){ chatKeepBottomOnLoad(el); return; }
 
+  // 開いた直後は、未読のいちばん古いところへ送る。
+  // 未読が無い／下まで送れば未読も見えるときは、今までどおりいちばん下へ
+  if(chatUnreadMark?.place && chatScrollToUnread(el)){
+    updateChatNewMark(true);   // 下に新しいぶんが残っているので、飛べる案内を出す
+  }
   // いちばん下を見ていたとき、または送信直後だけ下まで送る。
   // それ以外は読んでいた位置に戻す（勝手に下へ飛ばない）
-  if(forceBottom===true || wasAtBottom){
+  else if(forceBottom===true || wasAtBottom){
     _chatStick = true;
-    el.scrollTop=el.scrollHeight;
+    if(chatUnreadMark) chatUnreadMark.hold = false;
+    chatSetScrollTop(el, el.scrollHeight);
     updateChatNewMark(false);
   } else {
     _chatStick = false;
-    el.scrollTop=prevTop;
+    chatSetScrollTop(el, prevTop);
     // 上を読んでいる間に増えたぶんがあれば、案内を出す
     if(el.querySelectorAll('.talk-bubble').length > prevCount) updateChatNewMark(true);
   }
@@ -1044,12 +1147,13 @@ function sendTalkPanelMsg(){
       const list = talkThreads[thread]||[];
       const i = list.indexOf(temp);
       if(i>=0) list.splice(i,1);
-      renderTalkPanelMessages(true);
+      // 送り終わるまでに別のチャットへ移っていたら、そちらの位置は動かさない
+      if(thread===activeTalkPanelSupplier) renderTalkPanelMessages(true);
     })
     .catch(()=>{
       // 送れなかったときは仮の1件に印を付けて残す（消えると何が送れなかったか分からなくなる）
       temp.sending = false; temp.failed = true;
-      renderTalkPanelMessages(true);
+      if(thread===activeTalkPanelSupplier) renderTalkPanelMessages(true);
     });
 }
 

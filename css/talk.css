@@ -23,6 +23,9 @@
 .talk-bubble .ts{font-size:var(--fs1);color:var(--text-muted);padding:0 4px}
 .talk-date-sep{text-align:center;font-size:var(--fs1);color:var(--text-muted);margin:var(--sp3) 0;display:flex;align-items:center;gap:var(--sp3)}
 .talk-date-sep::before,.talk-date-sep::after{content:'';flex:1;height:1px;background:var(--border)}
+/* 開いたときの「ここから未読」の境目。日付の区切りと同じ形で、色だけ変える */
+.talk-unread-sep{text-align:center;font-size:var(--fs1);font-weight:700;color:var(--accent-t);margin:var(--sp2) 0;display:flex;align-items:center;gap:var(--sp3)}
+.talk-unread-sep::before,.talk-unread-sep::after{content:'';flex:1;height:1px;background:var(--accent-t);opacity:.5}
 
 /* ── 発注書カード（チャット内） ── */
 .order-card-bubble{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;max-width:100%}
