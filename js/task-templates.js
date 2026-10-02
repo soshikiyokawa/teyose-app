@@ -456,7 +456,7 @@ async function doTaskApply(){
     return {
       title:t.title, detail:t.detail, project_id:ttApplyProjectId,
       assignees:t.assignees, due_date:due||null, checklist:t.checklist,
-      created_by:currentUserDisplayName||'',
+      created_by:currentUserDisplayName||'', created_by_id:currentUserId||null,
       template_id:t.id, anchor_kind:t.anchorKind, anchor_name:t.anchorName,
       anchor_point:t.anchorPoint, offset_days:t.offsetDays,
       auto_due: t.anchorKind!=='none'

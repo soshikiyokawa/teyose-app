@@ -37,6 +37,11 @@
 }
 .task-asg.mine{ background:var(--accent-bg); color:var(--accent-t); font-weight:700; }
 .task-asg.none{ color:var(--text-muted); background:transparent; padding-left:0; }
+/* 自分あてではないが、自分が出したので見えているタスク */
+.task-made{
+  font-size:10px; padding:1px 6px; border-radius:99px;
+  background:#efe7f6; color:#6a4a8c; font-weight:700; white-space:nowrap;
+}
 
 .task-cl-row{ display:flex; align-items:center; gap:7px; font-size:12px; }
 

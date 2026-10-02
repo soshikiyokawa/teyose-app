@@ -3,7 +3,9 @@
 //   ・担当者は表示名の配列。案件の参加メンバーと同じ考え方で、発注先は会社名でもよい
 //     （会社名で入れておけば、その会社のアカウント全員が自分あてとして見られる）
 //   ・案件に紐づけないタスク（社内のこと）も作れる
-//   ・見えるのは、社員は全件／発注先は自分あてのぶんだけ（RLSで絞られる）
+//   ・見えるのは、作った本人と担当者だけ（RLSで絞られる。migration-genba79）。
+//     社員どうしでも、関係ないタスクは一覧にも出てこない
+//   ・担当者が「済」にすると、作った人に通知が飛ぶ
 //   ・発注先が直せるのは「済／未済」とチェックリストだけ（DB側のトリガーで止めている）
 //   ・期限が今日・明日のタスクは毎朝7時に通知が届く（task-remind）
 
@@ -26,7 +28,8 @@ async function fetchTasks(){
   tasks = (data||[]).map(r=>({
     id:r.id, title:r.title||'', detail:r.detail||'', projectId:r.project_id||null,
     assignees:r.assignees||[], dueDate:r.due_date||'', status:r.status||'open',
-    checklist:r.checklist||[], handoffs:r.handoffs||[], createdBy:r.created_by||'',
+    checklist:r.checklist||[], handoffs:r.handoffs||[],
+    createdBy:r.created_by||'', createdById:r.created_by_id||null,
     templateId:r.template_id||null, anchorKind:r.anchor_kind||'none', anchorName:r.anchor_name||'',
     anchorPoint:r.anchor_point||'start', offsetDays:Number(r.offset_days)||0, autoDue:!!r.auto_due,
     doneAt:r.done_at||null, doneBy:r.done_by||'', createdAt:r.created_at, updatedAt:r.updated_at
@@ -38,6 +41,12 @@ function taskProjectName(t){
 }
 function isMyTask(t){
   return isMyProjectMember(t.assignees);   // 表示名でも発注先の会社名でも一致する
+}
+// 自分が出したタスクか。アカウントのIDで見る（同じ名前の人がいても取り違えない）。
+// IDが入っていない昔の分だけ、表示名で見る（DB側の app_is_task_creator と同じ考え方）
+function isMyCreatedTask(t){
+  return t.createdById ? t.createdById===currentUserId
+       : (!!t.createdBy && t.createdBy===currentUserDisplayName);
 }
 function taskCanEdit(){ return currentUserRole==='staff' || currentUserRole==='carpenter'; }
 function taskCanDelete(){ return currentUserRole==='staff'; }
@@ -69,6 +78,7 @@ function taskDueLabel(t){
 function visibleTasks(){
   let list = tasks.slice();
   if(taskFilter==='mine')      list = list.filter(t=>t.status==='open' && isMyTask(t));
+  else if(taskFilter==='made') list = list.filter(t=>isMyCreatedTask(t));
   else if(taskFilter==='open') list = list.filter(t=>t.status==='open');
   else if(taskFilter==='done') list = list.filter(t=>t.status==='done');
   if(taskProjectFilter) list = list.filter(t=>taskProjectName(t)===taskProjectFilter);
@@ -108,7 +118,10 @@ function renderTaskPage(){
   const cnt=document.getElementById('task-count');
   if(cnt) cnt.textContent = `${list.length}件`;
   if(!list.length){
-    wrap.innerHTML=`<div class="empty">${taskFilter==='mine'?'自分あての未済のタスクはありません':'該当するタスクはありません'}</div>`;
+    wrap.innerHTML=`<div class="empty">${
+      taskFilter==='mine' ? '自分あての未済のタスクはありません'
+      : taskFilter==='made' ? '自分が出したタスクはありません'
+      : '該当するタスクはありません'}</div>`;
     return;
   }
   wrap.innerHTML=list.map(t=>{
@@ -134,6 +147,7 @@ function renderTaskPage(){
           ${t.assignees.length
             ? `<span class="task-asg${mine?' mine':''}">${t.assignees.map(esc).join('、')}</span>`
             : '<span class="task-asg none">担当者なし</span>'}
+          ${(!mine && isMyCreatedTask(t)) ? '<span class="task-made">自分が出した</span>' : ''}
         </div>
       </div>
     </div>`;
@@ -143,7 +157,8 @@ function renderTaskPage(){
 function renderTaskFilters(){
   const el=document.getElementById('task-filters');
   if(el){
-    const opts=[['mine','自分あて'],['open','未済すべて'],['done','済み'],['all','すべて']];
+    // 見えるのは自分あてと自分が出したぶんだけなので、「すべて」もその範囲の中
+    const opts=[['mine','自分あて'],['made','自分が出した'],['open','未済'],['done','済み'],['all','すべて']];
     el.innerHTML=opts.map(([v,l])=>
       `<button type="button" class="sf-btn${taskFilter===v?' active':''}" onclick="setTaskFilter('${v}')">${l}</button>`
     ).join('');
@@ -173,6 +188,17 @@ async function toggleTaskDone(id){
   Object.assign(t, {status:row.status, doneAt:row.done_at, doneBy:row.done_by});
   renderTaskPage(); updateTaskBadge();
   showToast(done?'済にしました':'未済に戻しました');
+  if(done) notifyTaskDone(t);
+}
+
+// 担当者が済にしたら、そのタスクを作った人に知らせる。
+// 自分で作って自分で済にしたときは送らない
+function notifyTaskDone(t){
+  if(!t.createdById || t.createdById===currentUserId) return;
+  const pn=taskProjectName(t);
+  const by=currentUserDisplayName ? currentUserDisplayName+'さんが' : '';
+  dbSendPushToUser(t.createdById, 'タスクが完了しました',
+    `${by}「${t.title}」を済にしました${pn?'（'+pn+'）':''}`, 'task').catch(()=>{});
 }
 
 // ── 作る・直す ──
@@ -641,7 +667,8 @@ async function saveTask(){
     saved=data;
   } else {
     const { data, error } = await sb.from('tasks')
-      .insert({...row, created_by:currentUserDisplayName||''}).select().single();
+      .insert({...row, created_by:currentUserDisplayName||'', created_by_id:currentUserId||null})
+      .select().single();
     if(error){ showToast('登録に失敗しました：'+error.message); return; }
     saved=data;
   }

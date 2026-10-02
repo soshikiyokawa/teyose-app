@@ -1955,7 +1955,11 @@ async function dbSendPushToNames(targetNames, title, body, tab){
 async function dbSendPushToNamesNow(targetNames, title, body, tab){
   await sb.functions.invoke('send-push', { body: { targetRole:'names', targetNames, title, body, tab } });
 }
-// 役割（staff など）でまとめて通知する
+// アカウントを指定して1人に通知する（名前が同じ人がいても取り違えない）
+async function dbSendPushToUser(targetUserId, title, body, tab){
+  if(!targetUserId) return;
+  await sb.functions.invoke('send-push', { body: { targetRole:'user', targetUserId, title, body, tab } });
+}
 // 請求書が登録されたことを管理者にメールで知らせる（通知を消してしまっても残るように）。
 // 送り先は Secrets の INVOICE_MAIL_TO、無ければ管理者のアカウントのメールアドレス
 async function dbNotifyInvoice(invoiceId){
@@ -1963,6 +1967,7 @@ async function dbNotifyInvoice(invoiceId){
   if(error || data?.error) console.warn('請求書のお知らせメールを送れませんでした：', data?.error || error?.message);
   return data;
 }
+// 役割（staff など）でまとめて通知する。
 // excludeSelf を true にすると、送った本人には通知しない（自分の操作は知らせなくてよい）
 async function dbSendPushToRole(targetRole, title, body, tab, excludeSelf){
   await sb.functions.invoke('send-push', { body: { targetRole, title, body, tab,
