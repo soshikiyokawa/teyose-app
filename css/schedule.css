@@ -524,6 +524,14 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   left: 16px; margin-left: 16px; max-width: calc(100% - 22px);
 }
 
+/* 人の札に添える「今日入っている現場」と「空き」 */
+.ss-now, .ss-free {
+  font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 99px;
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ss-now  { background: var(--accent-bg); color: var(--accent-t); }
+.ss-free { background: var(--surface2); color: var(--text-muted); }
+
 /* 「＋ 配置を足す」の行。ふだんは目立たせず、指を乗せたときだけ色を出す */
 .ss-add-row { cursor: pointer; opacity: .65; }
 .ss-add-row:hover { opacity: 1; }

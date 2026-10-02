@@ -85,7 +85,39 @@ function renderNippoOwnerSelect(){
 function setNippoOwner(v){
   nippoOwnerId = v;
   renderGenbaProjectSelects();   // 「休み」（役員のみ）の出し分けを選んだ人に合わせる
-  if(!editingNippoId) applyNippoDefaultTimes();   // 書きかけの新規なら、選んだ人の初期値に合わせる
+  if(!editingNippoId){
+    applyNippoDefaultTimes();    // 書きかけの新規なら、選んだ人の初期値に合わせる
+    applyNippoDefaultProject();  // その人のその日の現場を入れ直す
+  }
+}
+
+// ── 工事の初期値（人員配置から） ──
+//
+// その日その人がどの現場に入るかは人員配置に組んであるので、
+// 日報の「工事」にあらかじめ入れておく。もちろん別の工事も選べる。
+// 書きかけのものや、すでに選んである工事は上書きしない。
+function applyNippoDefaultProject(){
+  if(editingNippoId) return;                       // 直している日報は触らない
+  const sel = document.getElementById('nippo-project');
+  if(!sel || sel.value) return;                    // すでに選ばれていれば、そのまま
+  if(typeof ssSiteOf !== 'function') return;       // 人員配置がまだ読めていない
+  const date = document.getElementById('nippo-date')?.value;
+  const name = nippoOwnerName();
+  if(!date || !name) return;
+  // その日に2つ入っていることもある。選択肢にあるいちばん最初のものを入れる
+  for(const site of ssSiteOf(name, date)){
+    const p = (projects||[]).find(x=>x.name===site);
+    if(!p) continue;
+    const opt = [...sel.options].find(o=>o.value===String(p.id));
+    if(!opt) continue;
+    sel.value = String(p.id);
+    nippoProjectChanged();
+    return;
+  }
+}
+// 日付を変えたら、その日の現場に入れ替える
+function nippoDateChanged(){
+  applyNippoDefaultProject();
 }
 
 // ── 日報の時刻の初期値 ──
@@ -616,6 +648,7 @@ function resetNippoForm(){
   document.getElementById('nippo-other').value = '';
   document.getElementById('nippo-work-kind').value = '';
   nippoProjectChanged();
+  applyNippoDefaultProject();    // その日の人員配置から、工事をあらかじめ入れる
   document.getElementById('nippo-content').value = '';
   applyNippoDefaultTimes();      // 訓練校生なら 8:00〜17:30（所定7.5時間）
   document.getElementById('nippo-ot-approver').value = '';

@@ -77,6 +77,8 @@ async function fetchStaffAssigns(){
 async function refreshStaffAssigns(){
   try{ await fetchStaffAssigns(); }catch(_){ return; }
   if(document.getElementById('ss-inner')) renderStaffSchedule();
+  // 日報の「工事」がまだ空なら、読み込めた配置から入れておく
+  if(typeof applyNippoDefaultProject==='function') applyNippoDefaultProject();
 }
 
 // ── 日付まわり（工程表と同じ数え方） ──
@@ -116,6 +118,13 @@ function ssPersonColor(person){
   const base = STAFF_COLORS[(i < 0 ? 0 : i) % STAFF_COLORS.length];
   // 工程表と同じ決まりで、名前が読める明るさに寄せる
   return (typeof _readableBarColor === 'function') ? _readableBarColor(base) : base;
+}
+
+// その人が、ある日に入っている現場（既定は今日）。
+// 人の札に出すほか、日報の「工事」の初期値にも使う
+function ssSiteOf(person, ymd){
+  const d = ymd || ssToday();
+  return ssAssignsOf(person).filter(a=>a.start<=d && d<=a.end).map(a=>a.projectName);
 }
 
 // その人の配置を、開始の早い順に
@@ -185,6 +194,7 @@ function renderStaffSchedule(){
     const list = ssAssignsOf(person);
     const col  = ssPersonColor(person);
     const open = !!ssOpen[person];
+    const nowAt = ssSiteOf(person);
 
     // ── 人の行（工程表の大工程にあたる） ──
     leftRows += `<div class="gantt-row gantt-row-left gantt-row-major" onclick="ssToggle('${person}')">
@@ -211,13 +221,16 @@ function renderStaffSchedule(){
           <span class="gantt-bar-text">${esc(a.projectName||'（現場未入力）')}</span>
         </div>`;
     });
-    // 人の札は名前だけ。現場名は帯の側の札（下の ss-sub-chip）に任せる
+    // 人の札には、今日どこに入っているかを添える（ぱっと見で分かるように）。
+    // 帯ごとの現場名は、横にスクロールしたとき用の札（ss-sub-chip）が受け持つ
     rightRows += `<div class="gantt-row gantt-row-right gantt-row-major" data-person="${esc(person)}"
         style="width:${W}px;background-color:${col}2b">
       <div class="gantt-grid"></div>${stripes}${todayBand}${todayLine}${open?'':bands}
       <div class="gantt-grp-chip" style="border-left-color:${col}" onclick="event.stopPropagation();ssToggle('${person}')">
         <span class="gantt-grp-caret">${open?'▼':'▶'}</span>
         <span class="gantt-grp-name">${esc(person)}</span>
+        ${nowAt.length ? `<span class="ss-now">${esc(nowAt.join('・'))}</span>`
+                       : '<span class="ss-free">空き</span>'}
       </div>
       ${open?'':ssSubChipHtml(list, col)}
     </div>`;
