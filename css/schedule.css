@@ -101,14 +101,16 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 
 /* ─ Date header cells ─ */
 .gantt-month-row, .gantt-day-row, .gantt-wd-row { display: flex; flex-shrink: 0; }
+/* 日にち・曜日は現場で見るものなので、余白を詰めてでも文字を大きく出す */
 .gantt-month-cell {
   flex-shrink: 0;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-sub);
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  padding: 2px 4px;
+  padding: 0 4px;
+  line-height: 1.5;
   overflow: hidden;
   white-space: nowrap;
 }
@@ -117,10 +119,11 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   text-align: center;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  padding: 1px 0;
+  padding: 0;
+  line-height: 1.45;
 }
-.gantt-day-cell { font-size: 9px; font-weight: 600; color: var(--text-sub); }
-.gantt-wd-cell  { font-size: 9px; color: var(--text-muted); }
+.gantt-day-cell { font-size: 12px; font-weight: 700; color: var(--text-sub); }
+.gantt-wd-cell  { font-size: 11px; color: var(--text-muted); }
 .gantt-we { background: rgba(0,0,0,0.04) !important; }
 .gantt-we.gantt-day-cell, .gantt-we.gantt-wd-cell { color: var(--danger); opacity: 0.75; }
 .gantt-td { background: rgba(59,130,246,.10) !important; }
@@ -188,7 +191,7 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   border-radius: 4px;
   background: var(--surface, #fff);
   box-shadow: 0 1px 3px rgba(0,0,0,.18);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text, #33302b);
   cursor: pointer;
@@ -208,7 +211,7 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   max-width: calc(100% - 22px);
   padding: 1px 8px 1px 6px;
   border-left-width: 3px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-sub, #6b6660);
   box-shadow: 0 1px 2px rgba(0,0,0,.12);
@@ -233,7 +236,7 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 }
 .grl-name {
   flex: 1;
-  font-size: 12px;
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -275,12 +278,14 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
   z-index: 2;
 }
-.gantt-bar-major { height: 20px; }
-.gantt-bar-minor { height: 13px; opacity: 0.88; }
+/* 工程名を大きくしたぶん、バーの高さも上げる（文字が窮屈にならないように） */
+.gantt-bar-major { height: 22px; }
+.gantt-bar-minor { height: 18px; opacity: 0.88; }
 .gantt-bar-text {
-  font-size: 10px;
+  font-size: 12px;
+  line-height: 1;
   color: #fff;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   text-shadow: 0 1px 1px rgba(0,0,0,.4);
   flex: 0 0 auto;
@@ -302,8 +307,9 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   left: 10px;                 /* .gantt-bar の padding-left と同じ＝文字の書き出しに合わせる */
   top: 50%;
   transform: translateY(-50%);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 12px;              /* .gantt-bar-text と必ずそろえる（続きとして読むため） */
+  line-height: 1;
+  font-weight: 600;
   white-space: nowrap;
   color: var(--text, #33302b);
   text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
