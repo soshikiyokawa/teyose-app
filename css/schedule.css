@@ -55,11 +55,31 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .sch-empty { padding: 60px 20px; text-align: center; color: var(--text-muted); }
 .sch-empty p { margin-bottom: 16px; font-size: 13px; }
 
-/* ─ Container: gantt-container fills gantt-inner ─ */
+/* ─ Container: gantt-container fills gantt-inner ─
+   工程表の罫線の色は、ここの3つだけで決める。
+   暗い画面では地が黒に近いので、黒い線ではなく白い線にしないと見えない */
 .gantt-container {
   display: flex;
   height: 100%;
   overflow: hidden;
+  --sch-rule: var(--border);          /* 表の区切り（行・日付のマス） */
+  --sch-grid-day:  rgba(0,0,0,.08);   /* 1日ごとのうすい縦線 */
+  --sch-grid-week: rgba(0,0,0,.16);   /* 7日ごとの濃い縦線 */
+  --sch-shade: rgba(0,0,0,.045);      /* 土日にうっすら敷く色 */
+}
+:root[data-theme="dark"] .gantt-container {
+  --sch-rule: #4d4d59;
+  --sch-grid-day:  rgba(255,255,255,.11);
+  --sch-grid-week: rgba(255,255,255,.26);
+  --sch-shade: rgba(255,255,255,.055);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gantt-container {
+    --sch-rule: #4d4d59;
+    --sch-grid-day:  rgba(255,255,255,.11);
+    --sch-grid-week: rgba(255,255,255,.26);
+    --sch-shade: rgba(255,255,255,.055);
+  }
 }
 
 /* ─ Left panel — compact, 190px ─ */
@@ -68,12 +88,12 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   width: 190px;
   display: flex;
   flex-direction: column;
-  border-right: 2px solid var(--border);
+  border-right: 2px solid var(--sch-rule);
 }
 .gantt-head-left {
   flex-shrink: 0;
   background: var(--surface, #fff);
-  border-bottom: 2px solid var(--border);
+  border-bottom: 2px solid var(--sch-rule);
   overflow: hidden;
 }
 .gantt-head-left-inner {
@@ -97,7 +117,7 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .gantt-head-right {
   flex-shrink: 0;
   background: var(--surface, #fff);
-  border-bottom: 2px solid var(--border);
+  border-bottom: 2px solid var(--sch-rule);
   overflow: hidden;
 }
 .gantt-body-right { flex: 1; overflow: auto; }
@@ -110,8 +130,8 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   font-size: 12px;
   font-weight: 600;
   color: var(--text-sub);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--sch-rule);
+  border-bottom: 1px solid var(--sch-rule);
   padding: 0 4px;
   line-height: 1.5;
   overflow: hidden;
@@ -120,14 +140,14 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .gantt-day-cell, .gantt-wd-cell {
   flex-shrink: 0;
   text-align: center;
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--sch-rule);
+  border-bottom: 1px solid var(--sch-rule);
   padding: 0;
   line-height: 1.45;
 }
 .gantt-day-cell { font-size: 12px; font-weight: 700; color: var(--text-sub); }
 .gantt-wd-cell  { font-size: 11px; color: var(--text-muted); }
-.gantt-we { background: rgba(0,0,0,0.04) !important; }
+.gantt-we { background: var(--sch-shade) !important; }
 .gantt-we.gantt-day-cell, .gantt-we.gantt-wd-cell { color: var(--danger); opacity: 0.75; }
 .gantt-td { background: rgba(59,130,246,.10) !important; }
 .gantt-td.gantt-day-cell, .gantt-td.gantt-wd-cell { color: var(--accent-t, #3b82f6); font-weight: 700; opacity: 1; }
@@ -137,7 +157,7 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   display: flex;
   align-items: center;
   height: 36px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--sch-rule);
   box-sizing: border-box;
 }
 /* Compact left row — clickable */
@@ -171,13 +191,13 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   background-image:
     repeating-linear-gradient(to right,
       transparent 0, transparent calc(var(--gantt-cell, 28px) * 7 - 1px),
-      rgba(0,0,0,.16) calc(var(--gantt-cell, 28px) * 7 - 1px), rgba(0,0,0,.16) calc(var(--gantt-cell, 28px) * 7)),
+      var(--sch-grid-week) calc(var(--gantt-cell, 28px) * 7 - 1px), var(--sch-grid-week) calc(var(--gantt-cell, 28px) * 7)),
     repeating-linear-gradient(to right,
       transparent 0, transparent calc(var(--gantt-cell, 28px) - 1px),
-      rgba(0,0,0,.08) calc(var(--gantt-cell, 28px) - 1px), rgba(0,0,0,.08) var(--gantt-cell, 28px));
+      var(--sch-grid-day) calc(var(--gantt-cell, 28px) - 1px), var(--sch-grid-day) var(--gantt-cell, 28px));
 }
 /* 行の背景は大工程ごとの色で分ける（renderGantt が直に指定する）ので、縞模様は付けない */
-.gantt-row-major { border-top: 2px solid rgba(0,0,0,.10); }
+.gantt-row-major { border-top: 2px solid var(--sch-grid-week); }
 
 /* 大工程の名前と開閉のつまみ。横にスクロールしても左端に残る */
 .gantt-grp-chip {
@@ -249,7 +269,7 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .grl-days { font-size: 10px; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
 
 /* Decoration */
-.gantt-we-stripe { position: absolute; top: 0; bottom: 0; background: rgba(0,0,0,0.03); pointer-events: none; z-index: 0; }
+.gantt-we-stripe { position: absolute; top: 0; bottom: 0; background: var(--sch-shade); pointer-events: none; z-index: 0; }
 .gantt-today-line { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--danger, #ef4444); opacity: 0.5; z-index: 3; pointer-events: none; }
 /* 今日の列そのものにも色を敷く（線だけでは分かりにくいため） */
 .gantt-today-band { position: absolute; top: 0; bottom: 0; background: rgba(239,68,68,.10); pointer-events: none; z-index: 0; }
