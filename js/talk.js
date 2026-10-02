@@ -1053,17 +1053,12 @@ function sendTalkPanelMsg(){
     });
 }
 
-async function sendTalkPanelFile(fileInput){
-  const file=fileInput.files[0];
-  fileInput.value='';
-  if(!file||!activeTalkPanelSupplier) return;
-  const role = (activeTalkPanelSupplier===INTERNAL_THREAD || currentUserRole!=='supplier') ? 'me' : 'them';
-  showToast('アップロード中…', 30000);
+// 送る前のひと手間。写真は長辺1600pxのJPEGにしてから送る。
+//   ・そのままだと1枚が数MBあり、電波が弱いと送れないことがある
+//   ・iPhoneのHEICもJPEGになるので、パソコンやAndroidでも開ける
+async function talkPrepareFile(file){
+  let body = file, name = file.name || '写真', mime = file.type || '';
   try{
-    // 写真は長辺1600pxのJPEGにしてから送る。
-    //   ・そのままだと1枚が数MBあり、電波が弱いと送れないことがある
-    //   ・iPhoneのHEICもJPEGになるので、パソコンやAndroidでも開ける
-    let body = file, name = file.name || '写真', mime = file.type || '';
     if(mime.startsWith('image/') && typeof gbCompressImage==='function'){
       const blob = await gbCompressImage(file);
       if(blob && blob !== file && blob.size){
@@ -1072,14 +1067,46 @@ async function sendTalkPanelFile(fileInput){
         name = name.replace(/\.[^.]+$/,'') + '.jpg';
       }
     }
-    const fileUrl = await dbUploadChatFile(body, name, mime);
-    await dbAddChatMessage(activeTalkPanelSupplier,{role,type:'file',fileUrl,fileName:name,fileMime:mime});
-    showToast('送信しました');
-    renderTalkPanelMessages(true);   // 自分が送ったので、いちばん下まで送る
-  }catch(e){
-    // 理由が出ていない落ち方（画像の変換に失敗したときなど）もここで知らせる
-    if(!e || !e.friendly) showToast('送れませんでした：'+((e&&e.message)||e||'原因不明'));
+  }catch(_){ /* 変換できない形式はそのまま送る */ }
+  return {body,name,mime};
+}
+
+async function sendTalkPanelFile(fileInput){
+  const files=[...(fileInput.files||[])];
+  fileInput.value='';
+  // 送り先は開いたときのスレッドに固定する（送っている間に別のチャットへ移っても迷子にならない）
+  const thread = activeTalkPanelSupplier;
+  if(!files.length || !thread) return;
+  const role = (thread===INTERNAL_THREAD || currentUserRole!=='supplier') ? 'me' : 'them';
+  const many = files.length > 1;
+
+  // 選んだ順に並ぶよう1枚ずつ送る。次の1枚の変換は、送っている間に済ませておく
+  let next = talkPrepareFile(files[0]);
+  const failed = [];
+  for(let i=0;i<files.length;i++){
+    showToast(many ? `アップロード中… ${i+1}/${files.length}` : 'アップロード中…', 30000);
+    const cur = next;
+    next = (i+1<files.length) ? talkPrepareFile(files[i+1]) : null;
+    try{
+      const {body,name,mime} = await cur;
+      const fileUrl = await dbUploadChatFile(body, name, mime);
+      await dbAddChatMessage(thread,{role,type:'file',fileUrl,fileName:name,fileMime:mime});
+      // 自分が送ったので、いちばん下まで送る（1枚ずつ出るので進み具合も分かる）
+      if(thread===activeTalkPanelSupplier) renderTalkPanelMessages(true);
+    }catch(e){
+      failed.push(e);
+    }
   }
+
+  if(!failed.length){
+    showToast(many ? `${files.length}件送信しました` : '送信しました');
+    return;
+  }
+  // 理由が出ていない落ち方（画像の変換に失敗したときなど）もここで知らせる
+  const e = failed[0];
+  const why = (e && e.friendly) ? '' : '：'+((e&&e.message)||e||'原因不明');
+  if(many) showToast(`${files.length}件のうち${failed.length}件送れませんでした${why}`);
+  else if(why) showToast('送れませんでした'+why);
 }
 
 async function deleteTalkMessage(msgId){
