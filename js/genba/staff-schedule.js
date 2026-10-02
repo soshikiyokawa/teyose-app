@@ -120,6 +120,14 @@ function ssPersonColor(person){
   return (typeof _readableBarColor === 'function') ? _readableBarColor(base) : base;
 }
 
+// バーや札に出す文字。メモがあれば案件名のうしろに括弧で添える
+//   例：「浄行寺様邸新築（午前のみ）」
+function ssBarLabel(a){
+  const name = a.projectName || '（現場未入力）';
+  const note = (a.note || '').trim();
+  return note ? `${name}（${note}）` : name;
+}
+
 // その人が、ある日に入っている現場（既定は今日）。
 // 人の札に出すほか、日報の「工事」の初期値にも使う
 function ssSiteOf(person, ymd){
@@ -218,7 +226,7 @@ function renderStaffSchedule(){
           onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'move')"
           ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'move')"
           ondblclick="event.stopPropagation();ssJumpToAssign(${a.id})">
-          <span class="gantt-bar-text">${esc(a.projectName||'（現場未入力）')}</span>
+          <span class="gantt-bar-text">${esc(ssBarLabel(a))}</span>
         </div>`;
     });
     // 人の札には、今日どこに入っているかを添える（ぱっと見で分かるように）。
@@ -263,7 +271,7 @@ function renderStaffSchedule(){
           ${editable?`<div class="gantt-bar-hdl gantt-bar-hdl-l"
             onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'start')"
             ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'start')"></div>`:''}
-          <span class="gantt-bar-text">${esc(a.projectName||'（現場未入力）')}</span>
+          <span class="gantt-bar-text">${esc(ssBarLabel(a))}</span>
           ${editable?`<div class="gantt-bar-hdl gantt-bar-hdl-r"
             onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'end')"
             ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'end')"></div>`:''}
@@ -336,7 +344,7 @@ function ssSubChipHtml(list, col){
   // 切らずに測ると、表より前から始まる配置で、左端にいるのに札が出てしまう
   const data = list.map(a=>({
     id: a.id,
-    name: a.projectName || '（現場未入力）',
+    name: ssBarLabel(a),
     s: Math.max(0, ssDiffDays(ssD0, a.start)) * SS_CELL_W,
     e: Math.min(ssDays, ssDiffDays(ssD0, a.end) + 1) * SS_CELL_W
   })).filter(sp => sp.e > sp.s);
