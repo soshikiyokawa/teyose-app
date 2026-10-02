@@ -26,7 +26,12 @@ function ssRows(){
   const extra = [...new Set(staffAssigns.map(a=>a.person))]
     .filter(p=>p && !STAFF_CARPENTERS.includes(p))
     .sort((a,b)=>a.localeCompare(b,'ja'));
-  return [...STAFF_CARPENTERS, ...extra];
+  const list = [...STAFF_CARPENTERS, ...extra];
+  // ログインしている本人をいちばん上に持ってくる（自分の予定をまっ先に見るため）。
+  // 本人が社員大工でない場合（事務の方など）は、並びはそのまま
+  const i = list.indexOf(currentUserDisplayName);
+  if(i > 0) list.unshift(list.splice(i,1)[0]);
+  return list;
 }
 
 // 人ごとの帯の色。工程表のバーと同じで、名前が黒でも白でも読める明るさに寄せる
