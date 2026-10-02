@@ -281,48 +281,20 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 /* 工程名を大きくしたぶん、バーの高さも上げる（文字が窮屈にならないように） */
 .gantt-bar-major { height: 22px; }
 .gantt-bar-minor { height: 18px; opacity: 0.88; }
+/* 工程名はバーの左端から書き、入りきらないぶんはバーの右へそのまま出す。
+   色はどこでも黒のまま変えない（途中で色が変わると読みづらいため）。
+   バーの色は黒い字が読める明るさに寄せてあり（_readableBarColor）、
+   はみ出した先の地も薄いので、同じ黒のまま最後まで読める。
+   白いふちは、暗いほうの配色でバーの外に出たときのための保険 */
 .gantt-bar-text {
   font-size: 12px;
   line-height: 1;
-  color: #fff;
+  color: #23201c;
   font-weight: 600;
   white-space: nowrap;
-  text-shadow: 0 1px 1px rgba(0,0,0,.4);
+  text-shadow: 0 0 2px rgba(255,255,255,.85), 0 0 2px rgba(255,255,255,.85);
   flex: 0 0 auto;
   pointer-events: none;
-}
-/* バーに収まらない工程名も、収まるときと同じようにバーの左端から書く。
-   入りきらないぶんはバーの右へそのまま出し、最後まで読めるようにする。
-   ・バーの上に乗っている部分 … 白い文字のまま（--spill より左だけ残す）
-   ・バーから出た部分       … 地の上なので、黒い文字＋白いふちに差し替える
-   --spill（バーの中に書ける幅）は ganttFitBarLabels が入れている */
-.gantt-bar.gantt-bar-spill .gantt-bar-text {
-  clip-path: inset(0 calc(100% - var(--spill, 0px)) 0 0);
-}
-/* 差し替えのぶんはバーに持たせる。
-   文字の側に持たせると、上の clip-path が中の飾りまで切ってしまうため */
-.gantt-bar.gantt-bar-spill::after {
-  content: attr(data-name);
-  position: absolute;
-  left: 10px;                 /* .gantt-bar の padding-left と同じ＝文字の書き出しに合わせる */
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 12px;              /* .gantt-bar-text と必ずそろえる（続きとして読むため） */
-  line-height: 1;
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--text, #33302b);
-  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
-  /* バーから出たところだけを出す。上下と右は、白いふちのぶん少し広げておく */
-  clip-path: inset(-3px -4px -3px var(--spill, 0px));
-  pointer-events: none;
-  z-index: 4;
-}
-/* ダークモードでは白いふちが文字をにじませて読みにくくなるので付けない
-   （暗い地に明るい文字なので、ふちがなくても読める） */
-:root[data-theme="dark"] .gantt-bar.gantt-bar-spill::after { text-shadow: none; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .gantt-bar.gantt-bar-spill::after { text-shadow: none; }
 }
 
 /* Resize handles at bar edges */
@@ -337,7 +309,8 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 }
 .gantt-bar-hdl-l { left: 0; border-radius: 3px 0 0 3px; }
 .gantt-bar-hdl-r { right: 0; border-radius: 0 3px 3px 0; }
-.gantt-bar-hdl:hover { background: rgba(255,255,255,0.35); }
+/* バーが明るい色になったので、つかみ代は白ではなく影を出す（白だと見えない） */
+.gantt-bar-hdl:hover { background: rgba(0,0,0,0.14); }
 
 /* Badge */
 .gantt-badge {

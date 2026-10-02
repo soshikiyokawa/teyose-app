@@ -1,10 +1,12 @@
 // ════ 工程表（ガントチャート） ════
 
 const GANTT_CELL_W = 28; // px per day
+// 工程のバーの色。工程名は黒で出すので、黒い字が読める明るさの色だけを並べてある。
+// 濃い色を選んでも _readableBarColor が明るいほうへ寄せる
 const GANTT_COLORS = [
-  '#3b82f6','#10b981','#f59e0b','#ef4444',
-  '#8b5cf6','#06b6d4','#f97316','#ec4899',
-  '#84cc16','#6b7280'
+  '#93c5fd','#86efac','#fcd34d','#fca5a5',
+  '#c4b5fd','#a5f3fc','#fdba74','#f9a8d4',
+  '#bef264','#d1d5db'
 ];
 
 // ─ State ─
@@ -41,10 +43,34 @@ function diffDays(a, b) {
 
 // ─ Color: 小工程は親（大工程）の色を使う。完了済みはグレー ─
 function _getTaskColor(task) {
-  if (task.done) return '#a0a0a0';
-  if (task.level === 0) return task.color || '#3b82f6';
-  const parent = scheduleTasks.find(t => t.id === task.parentId);
-  return parent ? (parent.color || '#3b82f6') : (task.color || '#3b82f6');
+  if (task.done) return '#c9c9c9';
+  const own = task.level === 0
+    ? task.color
+    : (scheduleTasks.find(t => t.id === task.parentId)?.color || task.color);
+  return _readableBarColor(own || GANTT_COLORS[0]);
+}
+
+// 黒い文字との明暗の差。1に近いほど読みにくい
+function _blackContrast(r, g, b) {
+  const f = v => { v /= 255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); };
+  const L = 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b);
+  return (L + 0.05) / 0.05;
+}
+const BAR_MIN_CONTRAST = 7;   // 黒い文字がはっきり読める明暗の差
+
+// 工程名は黒で出すので、濃い色のままだと読めない。
+// 黒い字が読める明るさになるまで、少しずつ白に寄せる。
+// 前に作った工程表に入っている濃い色（昔の色の並び）も、ここで明るくなる
+function _readableBarColor(hex) {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex||'').trim());
+  if (!m) return GANTT_COLORS[0];
+  let r = parseInt(m[1].slice(0,2),16), g = parseInt(m[1].slice(2,4),16), b = parseInt(m[1].slice(4,6),16);
+  for (let i = 0; i < 30 && _blackContrast(r,g,b) < BAR_MIN_CONTRAST; i++) {
+    r = Math.round(r + (255-r)*0.12);
+    g = Math.round(g + (255-g)*0.12);
+    b = Math.round(b + (255-b)*0.12);
+  }
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
 }
 
 function schToggleDone(id) {
@@ -677,25 +703,6 @@ function onProjectChanged() {
 // ─ Gantt render ─
 // バーの幅に収まらない工程名を、バーの外（右、入らなければ左）に出す。
 // 幅は描いたあとでないと分からないので、描画のいちばん最後に呼ぶ
-// 工程名は、収まっても収まらなくても、バーの左端から書き始める。
-// 入りきらないぶんはバーの右へそのまま出す。
-// 出たぶんは地の上に乗るので、そこだけ読める色（黒＋白いふち）に差し替える。
-// どこから差し替えるかを --spill に入れておき、CSS の clip-path で切り分ける
-function ganttFitBarLabels(){
-  const body = document.getElementById('gantt-body-right');
-  if (!body) return;
-  body.querySelectorAll('.gantt-bar').forEach(bar => {
-    const t = bar.querySelector('.gantt-bar-text');
-    if (!t) return;
-    bar.classList.remove('gantt-bar-spill');
-    bar.style.removeProperty('--spill');
-    const room = bar.clientWidth - 20;          // 左右のつまみのぶんを引く
-    if (t.scrollWidth <= room) return;          // 収まるならそのまま
-    bar.classList.add('gantt-bar-spill');
-    bar.style.setProperty('--spill', Math.max(0, room) + 'px');
-  });
-}
-
 function renderGantt() {
   const inner = document.getElementById('gantt-inner');
   if (!inner) return;
@@ -845,7 +852,6 @@ function renderGantt() {
     const barHtml = task.start && task.end
       ? `<div class="gantt-bar ${barCls} ${selCls}" id="gantt-bar-${task.id}"
            style="left:${barL}px;width:${barW}px;background:${_getTaskColor(task)}"
-           data-name="${esc(task.name)}"
            onmousedown="onBarDragStart(event,${task.id},'move')"
            ontouchstart="onBarDragStart(event,${task.id},'move')">
            <div class="gantt-bar-hdl gantt-bar-hdl-l"
@@ -930,9 +936,6 @@ function renderGantt() {
   }
 
   ganttSyncSubChips();
-
-  // 工程名がバーに収まらないときは、バーの外に出して全部読めるようにする
-  ganttFitBarLabels();
 
   // Restore edit sheet if a task was being edited
   if (editingTaskId && scheduleTasks.find(t => t.id === editingTaskId)) {
