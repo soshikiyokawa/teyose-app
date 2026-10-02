@@ -40,7 +40,8 @@ const SS_PAST_DAYS = 7;    // 今日より前を何日ぶん出すか
 const SS_MIN_DAYS  = 56;   // 少なくともこの日数ぶんは出す
 
 let staffAssigns   = [];     // [{id, person, projectName, start, end, note}]
-let ssCollapsed    = {};     // 人ごとの開け閉め（閉じると帯1本にまとまる）
+let ssOpen         = {};     // 人ごとの開け閉め。はじめは全員閉じている
+                             // （閉じたままでも帯に現場名が出るので、9人を1画面で見渡せる）
 let ssEditId       = null;   // 直している配置のid（新しく足すときは null）
 let ssEditPerson   = '';     // 新しく足すときの相手
 let ssScrollLeft   = -1;     // 横の位置（描き直しても戻さない）
@@ -124,6 +125,8 @@ function renderStaffSchedule(){
 
   const editable = ssCanEdit();
   document.getElementById('ss-add-btn')?.style.setProperty('display', editable ? '' : 'none');
+  const tgl = document.getElementById('ss-toggle-all');
+  if(tgl) tgl.textContent = ssRows().some(p=>ssOpen[p]) ? 'すべて閉じる' : 'すべて開く';
 
   if(!ssReady){
     inner.innerHTML = '<div class="sch-empty"><p>人員配置の準備ができていません。<br>管理者にお問い合わせください</p></div>';
@@ -164,7 +167,7 @@ function renderStaffSchedule(){
   ssRows().forEach(person=>{
     const list = ssAssignsOf(person);
     const col  = ssPersonColor(person);
-    const open = !ssCollapsed[person];
+    const open = !!ssOpen[person];
     const nowAt = ssNowAt(person);
 
     // ── 人の行（工程表の大工程にあたる） ──
@@ -175,13 +178,20 @@ function renderStaffSchedule(){
       <span class="grl-days">${list.length}件</span>
     </div>`;
 
-    // 人の帯は、その人の配置がある日だけ色を敷く（空いている日がひと目で分かる）
+    // 人の帯。配置のある日だけ色を敷き、そこに現場名も出す。
+    // 閉じたままでも「いつ・どこ」が読めるので、9人を1画面で見渡せる
     let bands='';
     list.forEach(a=>{
       const s = Math.max(0, ssDiffDays(from, a.start));
       const e = Math.min(days-1, ssDiffDays(from, a.end));
       if(e < 0 || s > days-1) return;
-      bands += `<div class="ss-band" style="left:${s*SS_CELL_W}px;width:${(e-s+1)*SS_CELL_W}px;background:${col}"></div>`;
+      bands += `<div class="gantt-bar gantt-bar-minor ss-bar ss-band" id="ss-band-${a.id}"
+          style="left:${s*SS_CELL_W}px;width:${(e-s+1)*SS_CELL_W}px;background:${col}"
+          title="${esc(person)}　${esc(a.projectName)}　${a.start.replace(/-/g,'/')}〜${a.end.replace(/-/g,'/')}${a.note?'　'+esc(a.note):''}"
+          onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'move')"
+          ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'move')">
+          <span class="gantt-bar-text">${esc(a.projectName||'（現場未入力）')}</span>
+        </div>`;
     });
     rightRows += `<div class="gantt-row gantt-row-right gantt-row-major" style="width:${W}px;background-color:${col}2b">
       <div class="gantt-grid"></div>${stripes}${todayBand}${todayLine}${bands}
@@ -278,7 +288,7 @@ function renderStaffSchedule(){
 }
 
 function ssToggle(person){
-  ssCollapsed[person] = !ssCollapsed[person];
+  ssOpen[person] = !ssOpen[person];
   renderStaffSchedule();
 }
 function ssScrollToToday(){
@@ -288,8 +298,8 @@ function ssScrollToToday(){
   br.scrollLeft = Math.max(0, (off - 3) * SS_CELL_W);
 }
 function ssToggleAll(){
-  const anyOpen = ssRows().some(p=>!ssCollapsed[p]);
-  ssRows().forEach(p=>{ ssCollapsed[p] = anyOpen; });
+  const anyOpen = ssRows().some(p=>ssOpen[p]);
+  ssRows().forEach(p=>{ ssOpen[p] = !anyOpen; });
   renderStaffSchedule();
 }
 
@@ -325,13 +335,15 @@ function ssDragMove(e){
     const t = ssAddDays(_ssDrag.end, step);
     if(t >= a.start) a.end = t;
   }
-  // 引きずっている間は、バーだけ動かす（全部描き直すとカクつくため）
-  const bar = document.getElementById('ss-bar-'+a.id);
-  if(bar){
-    const s = ssDiffDays(ssD0, a.start), t = ssDiffDays(ssD0, a.end);
+  // 引きずっている間は、バーだけ動かす（全部描き直すとカクつくため）。
+  // 同じ配置は人の帯（閉じているとき）と下の行（開いているとき）の両方に出る
+  const s = ssDiffDays(ssD0, a.start), t = ssDiffDays(ssD0, a.end);
+  ['ss-bar-'+a.id, 'ss-band-'+a.id].forEach(id=>{
+    const bar = document.getElementById(id);
+    if(!bar) return;
     bar.style.left  = (s * SS_CELL_W) + 'px';
     bar.style.width = Math.max(SS_CELL_W, (t - s + 1) * SS_CELL_W) + 'px';
-  }
+  });
   e.preventDefault();
 }
 async function ssDragEnd(){

@@ -1,7 +1,7 @@
 // ════ 現場ページ：タブ切替・工事選択・共通ユーティリティ ════
 
 function genbaTab(t){
-  ['photos','drawings','nippo','leave','holiday','license','vehicle'].forEach(n=>{
+  ['photos','drawings','staff','nippo','leave','holiday','license','vehicle'].forEach(n=>{
     document.getElementById('genbasub-'+n)?.classList.toggle('active',n===t);
     document.getElementById('genbatab-'+n)?.classList.toggle('active',n===t);
   });
@@ -18,10 +18,8 @@ function renderGenbaPage(){
   renderGenbaProjectSelects();
   if(document.getElementById('genbasub-photos')?.classList.contains('active')) mountGenbaFB('photo');
   if(document.getElementById('genbasub-drawings')?.classList.contains('active')) mountGenbaFB('drawing');
-  if(document.getElementById('genbasub-nippo')?.classList.contains('active')){
-    renderNippo();
-    renderStaffSchedule();   // 日報の左に出る人員配置スケジュール
-  }
+  if(document.getElementById('genbasub-staff')?.classList.contains('active')) renderStaffSchedule();
+  if(document.getElementById('genbasub-nippo')?.classList.contains('active')) renderNippo();
   if(document.getElementById('genbasub-leave')?.classList.contains('active')) renderLeave();
   if(document.getElementById('genbasub-holiday')?.classList.contains('active')) renderHoliday();
   if(document.getElementById('genbasub-license')?.classList.contains('active')) renderLicense();

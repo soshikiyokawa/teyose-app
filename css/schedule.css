@@ -471,36 +471,21 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .gantt-ms-flag { position: absolute; transform: translateX(-2px); white-space: nowrap; font-size: 10px; font-weight: 700;
   color: #5c3d1e; background: #f5ede3; border: 1px solid #d8c3a8; border-radius: 4px; padding: 1px 6px; line-height: 14px; z-index: 4; }
 
-/* ════ 人員配置スケジュール（勤怠日報 → 日報タブの左） ════
+/* ════ 人員配置スケジュール（勤怠日報 → 人員配置タブ） ════
    表そのものは工程表と同じ .gantt-* を使う。ここは置き場所と、人の帯まわりだけ */
-
-/* 左に人員配置、右に日報。狭い画面では上下に並べる（人員配置が先） */
-.nippo-cols { display: flex; gap: 14px; align-items: flex-start; }
-.nippo-col-left  { flex: 0 0 clamp(380px, 46%, 720px); min-width: 0; }
-.nippo-col-right { flex: 1; min-width: 0; }
-@media (max-width: 1000px) {
-  .nippo-cols { display: block; }
-  .nippo-col-left { margin-bottom: 14px; }
-}
 
 .ss-card { padding: 10px 10px 8px; margin-bottom: 0; }
 .ss-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .ss-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
-/* 表の高さ。画面の高さに合わせて伸び縮みさせる */
-#ss-inner { height: clamp(300px, 56vh, 620px); overflow: hidden; }
+/* 9人ぶんがそのまま入る高さ。画面の高さに合わせて伸び縮みさせる */
+#ss-inner { height: clamp(380px, 72vh, 900px); overflow: hidden; }
 #ss-inner .gantt-left-panel { width: 150px; }
 
-/* 人の帯。その人に配置が入っている日だけ色を敷き、空いている日がひと目で分かるようにする */
-.ss-band {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 12px;
-  border-radius: 2px;
-  opacity: .9;
-  pointer-events: none;
-  z-index: 1;
-}
+/* 人の帯に出す配置。閉じたままでも「いつ・どこ」が読めるようにする。
+   工程表では大工程の行の文字を消しているので、ここだけ出し直す */
+.gantt-row-major .ss-band .gantt-bar-text { display: inline; }
+.ss-band { height: 20px; opacity: .95; }
+
 /* 人の札に出す「いま入っている現場」と「空き」 */
 .ss-now, .ss-free {
   font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 99px;
