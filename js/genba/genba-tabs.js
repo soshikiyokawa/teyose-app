@@ -18,7 +18,10 @@ function renderGenbaPage(){
   renderGenbaProjectSelects();
   if(document.getElementById('genbasub-photos')?.classList.contains('active')) mountGenbaFB('photo');
   if(document.getElementById('genbasub-drawings')?.classList.contains('active')) mountGenbaFB('drawing');
-  if(document.getElementById('genbasub-nippo')?.classList.contains('active')) renderNippo();
+  if(document.getElementById('genbasub-nippo')?.classList.contains('active')){
+    renderNippo();
+    renderStaffSchedule();   // 日報の左に出る人員配置スケジュール
+  }
   if(document.getElementById('genbasub-leave')?.classList.contains('active')) renderLeave();
   if(document.getElementById('genbasub-holiday')?.classList.contains('active')) renderHoliday();
   if(document.getElementById('genbasub-license')?.classList.contains('active')) renderLicense();

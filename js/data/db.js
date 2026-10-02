@@ -149,6 +149,7 @@ async function fetchAllData(){
       soft(fetchReceipts,      ()=>{ receiptsReady=false; }),   // レシート台帳
       soft(fetchQuoteRequests, ()=>{ quoteRequestsReady=false; }),   // 見積依頼
       soft(fetchTaskTemplates, ()=>{ taskTemplatesReady=false; }),
+      soft(fetchStaffAssigns,  ()=>{ ssReady=false; }),              // 人員配置スケジュール
     );
   } else if(isSupplierUser){
     jobs.push(
@@ -1998,6 +1999,7 @@ function subscribeRealtime(){
     .on('postgres_changes',{event:'*',schema:'public',table:'inspection_records'}, ()=>refetchAndRerender('inspections'))
     .on('postgres_changes',{event:'*',schema:'public',table:'notifications'}, ()=>refreshNotifications())
     .on('postgres_changes',{event:'*',schema:'public',table:'tasks'}, ()=>refreshTasks())
+    .on('postgres_changes',{event:'*',schema:'public',table:'staff_assignments'}, ()=>refreshStaffAssigns())
     .on('postgres_changes',{event:'*',schema:'public',table:'task_templates'}, ()=>refreshTaskTemplates())
     .subscribe(status=>{
       // つなぎ直したときは、切れていた間の分を取りこぼしているので一度だけ取り直す
