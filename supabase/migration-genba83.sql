@@ -97,7 +97,9 @@ select a.project_name                       as "いまの呼び名",
   from public.staff_assignments a
  where not exists (select 1 from public.projects p where p.name = a.project_name)
  group by a.project_name
- order by 3 = '（当てはまらない）', 1;
+ -- 当てはまらないものを後ろへ。並べ替えには式をそのまま書く
+ -- （order by に数字を書くと「◯番目の列」の意味になり、式として使えない）
+ order by (public.ss_match(a.project_name) is null), a.project_name;
 
 -- ② 1行ずつの見え方（直したあとの形）
 select a.person                                                   as "社員大工",
