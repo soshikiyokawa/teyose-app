@@ -12,7 +12,22 @@
 //
 // 置き場所：勤怠日報 → 日報タブの左。見られるのは社員、直せるのは管理者だけ。
 
-const STAFF_CARPENTERS = ['会長','太視','説志','原口','山口','梅田','石橋','梶原','創史'];
+// アカウントの表示名で持つ（js/genba/genba-nippo.js の EMPLOYEE_ORDER と同じ綴り）。
+// 日報の実績と同じ名前にそろえておくと、あとで予定と実績を突き合わせられる。
+// 並びは「会長・太視・説志・原口・山口・梅田・石橋・梶原・創史」の順
+const STAFF_CARPENTERS = [
+  '清川伸二','清川太視','清川説志','原口晴郎','山口大輔',
+  '梅田昭文','石橋実咲','梶原大地','清川創史'
+];
+
+// 表に出す行。決まった9人に加えて、名前が合わない配置が残っていたらその人も出す
+// （名前を変えたあとなどに、配置が黙って消えないようにするため）
+function ssRows(){
+  const extra = [...new Set(staffAssigns.map(a=>a.person))]
+    .filter(p=>p && !STAFF_CARPENTERS.includes(p))
+    .sort((a,b)=>a.localeCompare(b,'ja'));
+  return [...STAFF_CARPENTERS, ...extra];
+}
 
 // 人ごとの帯の色。工程表のバーと同じで、名前が黒でも白でも読める明るさに寄せる
 const STAFF_COLORS = [
@@ -146,7 +161,7 @@ function renderStaffSchedule(){
     ? `<div class="gantt-today-line" style="left:${todayOff*SS_CELL_W+Math.floor(SS_CELL_W/2)}px"></div>` : '';
 
   let leftRows='', rightRows='';
-  STAFF_CARPENTERS.forEach(person=>{
+  ssRows().forEach(person=>{
     const list = ssAssignsOf(person);
     const col  = ssPersonColor(person);
     const open = !ssCollapsed[person];
@@ -273,8 +288,8 @@ function ssScrollToToday(){
   br.scrollLeft = Math.max(0, (off - 3) * SS_CELL_W);
 }
 function ssToggleAll(){
-  const anyOpen = STAFF_CARPENTERS.some(p=>!ssCollapsed[p]);
-  STAFF_CARPENTERS.forEach(p=>{ ssCollapsed[p] = anyOpen; });
+  const anyOpen = ssRows().some(p=>!ssCollapsed[p]);
+  ssRows().forEach(p=>{ ssCollapsed[p] = anyOpen; });
   renderStaffSchedule();
 }
 
@@ -361,15 +376,15 @@ function ssFillProjectSelect(picked){
 function ssFillPersonSelect(picked){
   const sel = document.getElementById('ss-person');
   if(!sel) return;
-  sel.innerHTML = STAFF_CARPENTERS
+  sel.innerHTML = ssRows()
     .map(p=>`<option value="${esc(p)}"${p===picked?' selected':''}>${esc(p)}</option>`).join('');
   if(picked) sel.value = picked;
 }
 function ssOpenNew(person){
   if(!ssCanEdit()){ showToast('人員配置を組めるのは管理者だけです'); return; }
   ssEditId = null; ssEditPerson = person;
-  document.getElementById('ss-modal-title').textContent = person + 'の配置を足す';
-  ssFillPersonSelect(person);
+  document.getElementById('ss-modal-title').textContent = person ? person + 'の配置を足す' : '配置を足す';
+  ssFillPersonSelect(person || ssRows()[0]);
   ssFillProjectSelect('');
   document.getElementById('ss-start').value = ssToday();
   document.getElementById('ss-end').value   = ssAddDays(ssToday(), 4);
