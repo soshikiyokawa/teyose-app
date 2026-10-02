@@ -125,31 +125,48 @@ function ssPersonColor(person){
   return (typeof _readableBarColor === 'function') ? _readableBarColor(base) : base;
 }
 
-// 土日はどの列か。描くたびに作り直して、ドラッグ中にも使えるようにしておく
-let ssOffCols = [];
+// 現場に入らない日はどの列か。描くたびに作り直して、ドラッグ中にも使えるようにしておく。
+//   ・土日 … 休み
+//   ・祝日 … 勤務カレンダー（勤怠日報の「カレンダー」で登録するもの）から取る。
+//            一般社員と訓練校生で休みの日が違うので、その人の区分の側を見る
+// 訓練校生の土曜は出勤日だが、職業訓練校へ行く日なので現場には入らない。
+// つまり現場の配置としては、土曜は全員が空く。
+// 祝日の登録がまだの月もあるので、土日は登録に関わらず空ける
+let ssOffCols = { regular: [], trainee: [] };
 function ssBuildOffCols(from, days){
-  ssOffCols = [];
+  const hol = (typeof workHolidays !== 'undefined' && workHolidays) ? workHolidays : {};
+  ssOffCols = { regular: [], trainee: [] };
   for(let i=0;i<days;i++){
-    const d = new Date(ssAddDays(from, i)+'T00:00:00');
-    ssOffCols.push(d.getDay()===0 || d.getDay()===6);
+    const ymd = ssAddDays(from, i);
+    const dow = new Date(ymd+'T00:00:00').getDay();
+    ssOffCols.regular.push(dow===0 || dow===6 || !!(hol.regular && hol.regular.has(ymd)));
+    ssOffCols.trainee.push(dow===0 || dow===6 || !!(hol.trainee && hol.trainee.has(ymd)));
   }
+}
+
+// その人の勤務カレンダー（出面表・日報と同じ見分け方）
+function ssPersonCal(person){
+  const p = (typeof allProfiles !== 'undefined' ? allProfiles : [])
+    .find(x => x.displayName === person);
+  return (p && p.workGroup === '訓練校生') ? 'trainee' : 'regular';
 }
 
 // 配置を、土日で切ったひとつながりの区切りに分ける。
 // 土日は空けるだけで、日付は後ろへずらさない（終わりの日はそのまま）
 function ssSegments(a){
+  const off = ssOffCols[ssPersonCal(a.person)] || ssOffCols.regular;
   const s = Math.max(0, ssDiffDays(ssD0, a.start));
   const e = Math.min(ssDays-1, ssDiffDays(ssD0, a.end));
   const segs = [];
   let i = s;
   while(i <= e){
-    if(ssOffCols[i]){ i++; continue; }      // 土日は空ける
+    if(off[i]){ i++; continue; }             // 休みは空ける
     let j = i;
-    while(j+1 <= e && !ssOffCols[j+1]) j++;
+    while(j+1 <= e && !off[j+1]) j++;
     segs.push({s:i, e:j});
     i = j + 1;
   }
-  // 土日しかない配置（休日出勤など）は、そのまま1本で出す（見えなくならないように）
+  // 休みしかない配置（休日出勤など）は、そのまま1本で出す（見えなくならないように）
   if(!segs.length && e >= s && e >= 0 && s <= ssDays-1) segs.push({s, e, off:true});
   return segs;
 }
@@ -243,11 +260,13 @@ function renderStaffSchedule(){
       months.push({ key, label: d.getFullYear()+'年'+(d.getMonth()+1)+'月', count: 1 });
     } else months[months.length-1].count++;
     const wd = d.getDay();
-    const we = (wd===0 || wd===6);
+    // 土日に加えて、勤務カレンダーの祝日にも色を敷く（帯が切れる理由が分かるように）
+    const we = ssOffCols.regular[i];
+    const isHol = we && wd!==0 && wd!==6;   // 平日なのに休み＝祝日
     const cls = (ymd===today) ? 'gantt-td' : (we ? 'gantt-we' : '');
     dayRow += `<div class="gantt-day-cell ${cls}" style="width:${SS_CELL_W}px">${d.getDate()}</div>`;
     wdRow  += `<div class="gantt-wd-cell ${cls}" style="width:${SS_CELL_W}px">${'日月火水木金土'[wd]}</div>`;
-    if(we) stripes += `<div class="gantt-we-stripe" style="left:${i*SS_CELL_W}px;width:${SS_CELL_W}px"></div>`;
+    if(we) stripes += `<div class="gantt-we-stripe${isHol?' ss-holiday':''}" style="left:${i*SS_CELL_W}px;width:${SS_CELL_W}px"></div>`;
   }
   monthRow = months.map(m=>`<div class="gantt-month-cell" style="width:${m.count*SS_CELL_W}px">${m.label}</div>`).join('');
 

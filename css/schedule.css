@@ -537,6 +537,9 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .ss-add-row:hover { opacity: 1; }
 .ss-add-lbl { color: var(--accent-t); font-weight: 700; font-size: 12px; }
 
+/* 祝日。土日よりすこし濃くして、平日が休みであることが分かるようにする */
+.gantt-we-stripe.ss-holiday { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
 /* 1つの配置ぶんの入れもの。土日で切れたバーを何本か入れる */
 .ss-wrap { position: absolute; inset: 0; pointer-events: none; }
 .ss-wrap .ss-bar { pointer-events: auto; }
