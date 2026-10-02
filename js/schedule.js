@@ -85,8 +85,25 @@ async function loadScheduleForProject() {
     scheduleMilestones = data.milestones || {};
     scheduleTasks = data.tasks || [];
     scheduleTaskSeq = scheduleTasks.length ? Math.max(...scheduleTasks.map(t => t.id)) + 1 : 1;
+    schCollapseAll(true);   // 開いたときは大工程だけを並べる
   }
   renderGantt();
+}
+
+// 大工程の開け閉めをまとめて切り替える。
+// 開いた／閉じたは、その場の見え方だけのもの（保存しても次に開くときは閉じた形に戻る）
+function schCollapseAll(collapsed, redraw) {
+  scheduleTasks.forEach(t => { if (t.level === 0) t.collapsed = !!collapsed; });
+  if (redraw) renderGantt();
+}
+// 1つでも閉じている大工程があるか（ボタンの文字を切り替えるのに使う）
+function schAnyCollapsed() {
+  return scheduleTasks.some(t => t.level === 0 && t.collapsed
+    && scheduleTasks.some(c => c.parentId === t.id));
+}
+// 「すべて展開」と「すべて閉じる」を1つのボタンで兼ねる
+function schToggleAll() {
+  schCollapseAll(!schAnyCollapsed(), true);
 }
 
 async function saveSchedule() {
@@ -218,6 +235,7 @@ function doScheduleCopy() {
     start: t.start ? shift(t.start, diff) : t.start,
     end:   t.end   ? shift(t.end,   diff) : t.end,
     done: false,       // 進捗はリセット
+    collapsed: t.level === 0,   // 大工程だけが並んだ形で出す
   }));
   scheduleTaskSeq = seq;
   // マイルストーンも同じ日数だけずらして引き継ぐ
@@ -242,6 +260,8 @@ function schAddTask(level, parentId) {
   const end   = addDaysStr(start, level === 0 ? 14 : 7);
   const newId = scheduleTaskSeq++;
   scheduleTasks.push({ id:newId, level, parentId, name:'', start, end, person:'', color, collapsed:false, done:false });
+  // 小工程を足したときは、親の大工程を開いておく（閉じたままだと足したものが見えない）
+  if (level === 1 && parent) parent.collapsed = false;
   scheduleDirty = true;
   editingTaskId = newId;
   renderGantt();
@@ -297,6 +317,25 @@ function schUpdateTaskEdit(id, field, val) {
 function schToggleCollapse(id) {
   const t = scheduleTasks.find(t => t.id === id);
   if (t) { t.collapsed = !t.collapsed; renderGantt(); }
+}
+
+// 小工程の名前の札を出すかどうかを決める。
+//
+// 大工程の札は開け閉めのつまみも兼ねているので、いつでも出しておく。
+// 小工程の札は、バーの上に出ている名前が見えている間は引っ込める
+// （同じ名前が重なって二重に見え、バーの始まりも隠れてしまうため）。
+// 横にスクロールしてバーが画面の外へ出たら、代わりに左端へ札を出す
+function ganttSyncSubChips() {
+  const bodyR = document.getElementById('gantt-body-right');
+  if (!bodyR) return;
+  const x = bodyR.scrollLeft, w = bodyR.clientWidth;
+  bodyR.querySelectorAll('.gantt-sub-chip').forEach(chip => {
+    const barL = Number(chip.dataset.barl);
+    // 日付がまだ入っていない工程はバーが無いので、札はいつでも出す
+    const barVisible = Number.isFinite(barL) && chip.dataset.barl !== ''
+      && barL >= x - 1 && barL < x + w - 40;
+    chip.classList.toggle('is-off', barVisible);
+  });
 }
 
 // ─ Bar drag ─
@@ -663,6 +702,14 @@ function renderGantt() {
   const badge = document.getElementById('sch-proj-name');
   if (badge) badge.textContent = pName || '（案件未選択）';
 
+  // 「すべて展開／すべて閉じる」の文字は、いまの状態に合わせる
+  const toggleAll = document.getElementById('sch-toggle-all');
+  if (toggleAll){
+    const hasKids = scheduleTasks.some(t => t.parentId);
+    toggleAll.style.display = hasKids ? '' : 'none';
+    toggleAll.textContent = schAnyCollapsed() ? 'すべて展開' : 'すべて閉じる';
+  }
+
   if (!pName) {
     inner.innerHTML = `<div class="sch-empty"><p>左サイドバーで案件を選択してください</p></div>`;
     _hideEditSheet(); return;
@@ -812,7 +859,8 @@ function renderGantt() {
     const gColor = _getTaskColor(task);
     const rowBg = isMaj ? gColor + '2b' : gColor + '12';
 
-    // 大工程は、横にスクロールしても左端に名前と開閉のつまみが残るようにする
+    // 横にスクロールしても、左端に工程名が残るようにする。
+    // 大工程は開閉のつまみ付き、小工程は一段下げた小さい札で出す
     const grpChip = isMaj
       ? `<div class="gantt-grp-chip" style="border-left-color:${gColor}"
              onclick="event.stopPropagation();${hasKids?`schToggleCollapse(${task.id})`:''}">
@@ -820,16 +868,19 @@ function renderGantt() {
            <span class="gantt-grp-name">${esc(task.name)||'（工程名未入力）'}</span>
            ${hasKids && task.collapsed ? `<span class="gantt-grp-cnt">${scheduleTasks.filter(t=>t.parentId===task.id).length}</span>` : ''}
          </div>`
-      : '';
+      : `<div class="gantt-grp-chip gantt-sub-chip" style="border-left-color:${gColor}"
+             data-barl="${barHtml ? barL : ''}" data-barw="${barHtml ? barW : ''}">
+           <span class="gantt-grp-name">${esc(task.name)||'（工程名未入力）'}</span>
+         </div>`;
 
     rightRows += `<div class="gantt-row gantt-row-right ${isMaj?'gantt-row-major':''} ${isActive?'tes-active-bg':''}"
-      style="width:${W}px;background:${rowBg}">
-      ${stripes}${msLines}${todayBand}${todayLine}${barHtml}${grpChip}
+      style="width:${W}px;background-color:${rowBg}">
+      <div class="gantt-grid"></div>${stripes}${msLines}${todayBand}${todayLine}${barHtml}${grpChip}
     </div>`;
   });
 
   inner.innerHTML = `
-    <div class="gantt-container">
+    <div class="gantt-container" style="--gantt-cell:${GANTT_CELL_W}px">
       <div class="gantt-left-panel">
         <div class="gantt-head-left">
           <div class="gantt-head-left-inner">
@@ -864,6 +915,7 @@ function renderGantt() {
     ganttScrollLeft = bodyR.scrollLeft;
     if(headR) headR.scrollLeft=bodyR.scrollLeft;
     if(bodyL) bodyL.scrollTop=bodyR.scrollTop;
+    ganttSyncSubChips();
   });
   bodyL.addEventListener('scroll', ()=>{ if(bodyR) bodyR.scrollTop=bodyL.scrollTop; });
 
@@ -873,6 +925,8 @@ function renderGantt() {
   } else if (todayOff > 5) {
     bodyR.scrollLeft = Math.max(0, (todayOff - 5) * GANTT_CELL_W);
   }
+
+  ganttSyncSubChips();
 
   // 工程名がバーに収まらないときは、バーの外に出して全部読めるようにする
   ganttFitBarLabels();

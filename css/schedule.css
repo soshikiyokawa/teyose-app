@@ -143,11 +143,33 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   transition: background 0.1s;
 }
 .gantt-row-left:hover { filter: brightness(0.96); }
-.gantt-row-major { background: var(--surface-1) !important; }
-.gantt-row-minor { background: var(--surface-2) !important; }
+/* 左の工程名の列だけ。右（バーの側）の行の色は renderGantt が大工程ごとに入れるので、
+   ここで !important を掛けてしまうとその色が消える（掛かっていたため大工程の行だけ色が出ていなかった） */
+.gantt-row-left.gantt-row-major { background: var(--surface-1) !important; }
+.gantt-row-left.gantt-row-minor { background: var(--surface-2) !important; }
 .tes-active-row  { background: rgba(59,130,246,.12) !important; outline: 1px solid rgba(59,130,246,.3); outline-offset: -1px; }
 
 .gantt-row-right { position: relative; flex-shrink: 0; }
+
+/* 1日ごとのマス目。
+   日付の見出しの区切り線と同じ位置に縦線を引いて、何日ぶんのバーなのかを数えられるようにする。
+   1マスの幅（--gantt-cell）は renderGantt が GANTT_CELL_W から入れている。
+   7日ごとの線は少し濃くする（左端は月曜にそろえてあるので、週の区切りになる）。
+   行の色（.gantt-row-major）が background を !important で指定しているため、
+   行そのものの背景には描けない。行の中にいちばん下の層として重ねる */
+.gantt-grid {
+  position: absolute;
+  top: 0; bottom: 0; left: 0; right: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(to right,
+      transparent 0, transparent calc(var(--gantt-cell, 28px) * 7 - 1px),
+      rgba(0,0,0,.16) calc(var(--gantt-cell, 28px) * 7 - 1px), rgba(0,0,0,.16) calc(var(--gantt-cell, 28px) * 7)),
+    repeating-linear-gradient(to right,
+      transparent 0, transparent calc(var(--gantt-cell, 28px) - 1px),
+      rgba(0,0,0,.08) calc(var(--gantt-cell, 28px) - 1px), rgba(0,0,0,.08) var(--gantt-cell, 28px));
+}
 /* 行の背景は大工程ごとの色で分ける（renderGantt が直に指定する）ので、縞模様は付けない */
 .gantt-row-major { border-top: 2px solid rgba(0,0,0,.10); }
 
@@ -178,6 +200,24 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .gantt-row-major .gantt-bar-text { display: none; }
 .gantt-grp-caret { font-size: 9px; color: var(--text-muted); }
 .gantt-grp-name { overflow: hidden; text-overflow: ellipsis; }
+/* 小工程の札。大工程より一段下げて、細めにする（親子の関係が分かるように）。
+   押しても何も起きないので、指のかたちにはしない */
+.gantt-sub-chip {
+  left: 16px;
+  margin-left: 16px;
+  max-width: calc(100% - 22px);
+  padding: 1px 8px 1px 6px;
+  border-left-width: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-sub, #6b6660);
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  cursor: default;
+  /* 押すところが無い札なので、下にあるバーのつかみ代を邪魔しないようにする */
+  pointer-events: none;
+}
+/* バーの上の名前が見えている間は引っ込める（ganttSyncSubChips が付け外しする） */
+.gantt-sub-chip.is-off { display: none; }
 .gantt-grp-cnt {
   font-size: 10px; font-weight: 700; color: var(--text-sub);
   background: var(--surface2, #f2efe8); border-radius: 99px; padding: 0 6px;
@@ -381,8 +421,9 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   .gantt-body-right { overflow-x: auto; overflow-y: visible; height: auto; }
   /* 左の工程名の列は出さない（画面いっぱいにバーを出す。工程名はバーに出る） */
   .gantt-left-panel { display: none; }
-  /* 日付の見出しは上に貼り付けておく */
-  .gantt-head-right { position: sticky; top: 59px; z-index: 5; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+  /* 日付の見出しは上に貼り付けておく。
+     工程名の札（z-index 6）より手前に出して、見出しの上に札が乗らないようにする */
+  .gantt-head-right { position: sticky; top: 59px; z-index: 8; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
   .tes-fields { gap: 8px 10px; }
   .tes-field input[type=date] { width: 100px; }
 }
