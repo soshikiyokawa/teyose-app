@@ -537,6 +537,12 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .ss-add-row:hover { opacity: 1; }
 .ss-add-lbl { color: var(--accent-t); font-weight: 700; font-size: 12px; }
 
+/* 1つの配置ぶんの入れもの。土日で切れたバーを何本か入れる */
+.ss-wrap { position: absolute; inset: 0; pointer-events: none; }
+.ss-wrap .ss-bar { pointer-events: auto; }
+/* 土日しか入っていない配置（休日出勤など）。見えなくならないよう、薄く出す */
+.ss-bar-off { opacity: .55; }
+
 /* 配置のバー。ふだんは動かせない。「編集」を押している間だけつかめるようにする
    （指が当たって勝手に日がずれるのを防ぐ） */
 .ss-bar { cursor: pointer; }

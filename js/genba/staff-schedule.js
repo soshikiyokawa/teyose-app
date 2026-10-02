@@ -125,6 +125,59 @@ function ssPersonColor(person){
   return (typeof _readableBarColor === 'function') ? _readableBarColor(base) : base;
 }
 
+// 土日はどの列か。描くたびに作り直して、ドラッグ中にも使えるようにしておく
+let ssOffCols = [];
+function ssBuildOffCols(from, days){
+  ssOffCols = [];
+  for(let i=0;i<days;i++){
+    const d = new Date(ssAddDays(from, i)+'T00:00:00');
+    ssOffCols.push(d.getDay()===0 || d.getDay()===6);
+  }
+}
+
+// 配置を、土日で切ったひとつながりの区切りに分ける。
+// 土日は空けるだけで、日付は後ろへずらさない（終わりの日はそのまま）
+function ssSegments(a){
+  const s = Math.max(0, ssDiffDays(ssD0, a.start));
+  const e = Math.min(ssDays-1, ssDiffDays(ssD0, a.end));
+  const segs = [];
+  let i = s;
+  while(i <= e){
+    if(ssOffCols[i]){ i++; continue; }      // 土日は空ける
+    let j = i;
+    while(j+1 <= e && !ssOffCols[j+1]) j++;
+    segs.push({s:i, e:j});
+    i = j + 1;
+  }
+  // 土日しかない配置（休日出勤など）は、そのまま1本で出す（見えなくならないように）
+  if(!segs.length && e >= s && e >= 0 && s <= ssDays-1) segs.push({s, e, off:true});
+  return segs;
+}
+
+// 1つの配置ぶんのバー（土日で切れた区切りごとに1本）
+function ssBarsHtml(a, person, col, editable, extraClass){
+  const segs = ssSegments(a);
+  if(!segs.length) return '';
+  const tip = `${person?esc(person)+'　':''}${esc(a.projectName)}　${a.start.replace(/-/g,'/')}〜${a.end.replace(/-/g,'/')}${a.note?'　'+esc(a.note):''}`;
+  return segs.map((g, k)=>{
+    const first = k===0, last = k===segs.length-1;
+    return `<div class="gantt-bar gantt-bar-minor ss-bar ${extraClass||''}${g.off?' ss-bar-off':''}"
+        style="left:${g.s*SS_CELL_W}px;width:${(g.e-g.s+1)*SS_CELL_W}px;background:${col}"
+        title="${tip}"
+        onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'move')"
+        ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'move')"
+        ondblclick="event.stopPropagation();ssJumpToAssign(${a.id})">
+        ${(editable&&first)?`<div class="gantt-bar-hdl gantt-bar-hdl-l"
+          onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'start')"
+          ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'start')"></div>`:''}
+        ${first?`<span class="gantt-bar-text">${esc(ssBarLabel(a))}</span>`:''}
+        ${(editable&&last)?`<div class="gantt-bar-hdl gantt-bar-hdl-r"
+          onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'end')"
+          ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'end')"></div>`:''}
+      </div>`;
+  }).join('');
+}
+
 // バーや札に出す文字。メモがあれば案件名のうしろに括弧で添える
 //   例：「浄行寺様邸新築（午前のみ）」
 function ssBarLabel(a){
@@ -174,6 +227,7 @@ function renderStaffSchedule(){
 
   const { from, days } = ssRange();
   ssD0 = from; ssDays = days;
+  ssBuildOffCols(from, days);   // どの列が土日かを先に出しておく
   const W = days * SS_CELL_W;
   const today = ssToday();
   const todayOff = ssDiffDays(from, today);
@@ -222,17 +276,8 @@ function renderStaffSchedule(){
     // 開いているときは下に1本ずつ並ぶので、人の行には出さない（同じものが二重になるため）
     let bands='';
     list.forEach(a=>{
-      const s = Math.max(0, ssDiffDays(from, a.start));
-      const e = Math.min(days-1, ssDiffDays(from, a.end));
-      if(e < 0 || s > days-1) return;
-      bands += `<div class="gantt-bar gantt-bar-minor ss-bar ss-band" id="ss-band-${a.id}"
-          style="left:${s*SS_CELL_W}px;width:${(e-s+1)*SS_CELL_W}px;background:${col}"
-          title="${esc(person)}　${esc(a.projectName)}　${a.start.replace(/-/g,'/')}〜${a.end.replace(/-/g,'/')}${a.note?'　'+esc(a.note):''}"
-          onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'move')"
-          ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'move')"
-          ondblclick="event.stopPropagation();ssJumpToAssign(${a.id})">
-          <span class="gantt-bar-text">${esc(ssBarLabel(a))}</span>
-        </div>`;
+      const inner = ssBarsHtml(a, person, col, false, 'ss-band');
+      if(inner) bands += `<div class="ss-wrap" data-aid="${a.id}" data-col="${col}" data-band="1">${inner}</div>`;
     });
     // 人の札には、今日どこに入っているかを添える（ぱっと見で分かるように）。
     // 帯ごとの現場名は、横にスクロールしたとき用の札（ss-sub-chip）が受け持つ
@@ -252,35 +297,20 @@ function renderStaffSchedule(){
 
     // ── その人の配置（工程表の小工程にあたる） ──
     list.forEach(a=>{
-      const s = ssDiffDays(from, a.start);
-      const e = ssDiffDays(from, a.end);
-      const barL = s * SS_CELL_W;
-      const barW = Math.max(SS_CELL_W, (e - s + 1) * SS_CELL_W);
-      const dur = e - s + 1;
+      // 日数は、土日を抜いた働く日の数で出す
+      const workDays = ssSegments(a).reduce((n,g)=>n + (g.off ? 0 : g.e - g.s + 1), 0);
       // 左の列は人の名前のためのもの。案件名は書き写さず、表の側の札で見せる
       leftRows += `<div class="gantt-row gantt-row-left gantt-row-minor" onclick="ssOpenEdit(${a.id})">
         <span style="display:inline-block;width:14px"></span>
         <span class="gantt-badge gantt-badge-min">現</span>
         <span class="grl-color-dot" style="background:${col}"></span>
         <span class="grl-name"></span>
-        <span class="grl-days">${dur}日</span>
+        <span class="grl-days">${workDays}日</span>
       </div>`;
       rightRows += `<div class="gantt-row gantt-row-right" style="width:${W}px;background-color:${col}12">
         <div class="gantt-grid"></div>${stripes}${todayBand}${todayLine}
         ${ssSubChipHtml([a], col)}
-        <div class="gantt-bar gantt-bar-minor ss-bar" id="ss-bar-${a.id}"
-             style="left:${barL}px;width:${barW}px;background:${col}"
-             title="${esc(a.projectName)}　${a.start.replace(/-/g,'/')}〜${a.end.replace(/-/g,'/')}${a.note?'　'+esc(a.note):''}"
-             onmousedown="ssDragStart(event,${a.id},'move')" ontouchstart="ssDragStart(event,${a.id},'move')"
-             ondblclick="event.stopPropagation();ssJumpToAssign(${a.id})">
-          ${editable?`<div class="gantt-bar-hdl gantt-bar-hdl-l"
-            onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'start')"
-            ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'start')"></div>`:''}
-          <span class="gantt-bar-text">${esc(ssBarLabel(a))}</span>
-          ${editable?`<div class="gantt-bar-hdl gantt-bar-hdl-r"
-            onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'end')"
-            ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'end')"></div>`:''}
-        </div>
+        <div class="ss-wrap" data-aid="${a.id}" data-col="${col}">${ssBarsHtml(a, '', col, editable)}</div>
       </div>`;
     });
 
@@ -444,14 +474,11 @@ function ssDragMove(e){
     const t = ssAddDays(_ssDrag.end, step);
     if(t >= a.start) a.end = t;
   }
-  // 引きずっている間は、バーだけ動かす（全部描き直すとカクつくため）。
-  // 同じ配置は人の帯（閉じているとき）と下の行（開いているとき）の両方に出る
-  const s = ssDiffDays(ssD0, a.start), t = ssDiffDays(ssD0, a.end);
-  ['ss-bar-'+a.id, 'ss-band-'+a.id].forEach(id=>{
-    const bar = document.getElementById(id);
-    if(!bar) return;
-    bar.style.left  = (s * SS_CELL_W) + 'px';
-    bar.style.width = Math.max(SS_CELL_W, (t - s + 1) * SS_CELL_W) + 'px';
+  // 引きずっている間は、その配置のバーだけ作り直す（全部描き直すとカクつくため）。
+  // 土日で切れる位置が変わるので、位置を直すのではなく作り直す
+  document.querySelectorAll('.ss-wrap[data-aid="'+a.id+'"]').forEach(w=>{
+    const band = w.dataset.band === '1';   // 人の行の帯は、つまみを出さない
+    w.innerHTML = ssBarsHtml(a, '', w.dataset.col || '', !band && ssEditing(), band ? 'ss-band' : '');
   });
   e.preventDefault();
 }
