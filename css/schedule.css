@@ -529,6 +529,10 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .ss-add-row:hover { opacity: 1; }
 .ss-add-lbl { color: var(--accent-t); font-weight: 700; font-size: 12px; }
 
-/* 配置のバー。工程表のバーと同じだが、押せることが分かるようにする */
-.ss-bar { cursor: grab; }
-.ss-bar:active { cursor: grabbing; }
+/* 配置のバー。ふだんは動かせない。「編集」を押している間だけつかめるようにする
+   （指が当たって勝手に日がずれるのを防ぐ） */
+.ss-bar { cursor: pointer; }
+.ss-editing .ss-bar { cursor: grab; }
+.ss-editing .ss-bar:active { cursor: grabbing; }
+/* 編集中は、表のまわりに色を付けて今どちらの状態か分かるようにする */
+.ss-editing { outline: 2px solid var(--accent); outline-offset: -2px; }

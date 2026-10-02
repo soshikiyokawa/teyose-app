@@ -50,7 +50,18 @@ let ssD0           = '';     // 左端の日付
 let ssDays         = 0;
 let ssReady        = true;
 
+// 配置を組めるのは管理者だけ。
+// ただし、ふだんは触っても動かないようにしておき、
+// 「編集」を押している間だけ動かせる（指が当たって勝手にずれるのを防ぐ）
+let ssEditMode = false;
 function ssCanEdit(){ return currentUserRole === 'staff'; }
+function ssEditing(){ return ssCanEdit() && ssEditMode; }
+function ssToggleEdit(){
+  if(!ssCanEdit()){ showToast('人員配置を組めるのは管理者だけです'); return; }
+  ssEditMode = !ssEditMode;
+  renderStaffSchedule();
+  showToast(ssEditMode ? '編集できます（帯を押して直す・引きずって動かす）' : '編集を終わりました');
+}
 
 // ── 読み込み ──
 async function fetchStaffAssigns(){
@@ -118,8 +129,19 @@ function renderStaffSchedule(){
   const inner = document.getElementById('ss-inner');
   if(!inner) return;
 
-  const editable = ssCanEdit();
+  const editable = ssEditing();
   document.getElementById('ss-add-btn')?.style.setProperty('display', editable ? '' : 'none');
+  const eb = document.getElementById('ss-edit-btn');
+  if(eb){
+    eb.style.display = ssCanEdit() ? '' : 'none';
+    eb.textContent = ssEditMode ? '編集を終わる' : '編集';
+    eb.classList.toggle('primary', ssEditMode);
+  }
+  document.getElementById('ss-inner')?.classList.toggle('ss-editing', editable);
+  const hint = document.getElementById('ss-hint');
+  if(hint) hint.textContent = editable
+    ? '編集中です。帯を押すと直せます。引きずると日がずれます。長押しでその案件へ。'
+    : '誰がいつどの現場に入るかの一覧です。帯を長押しするとその案件へ飛べます。';
   const tgl = document.getElementById('ss-toggle-all');
   if(tgl) tgl.textContent = ssRows().some(p=>ssOpen[p]) ? 'すべて閉じる' : 'すべて開く';
 
@@ -173,7 +195,8 @@ function renderStaffSchedule(){
     </div>`;
 
     // 人の帯。配置のある日だけ色を敷き、そこに現場名も出す。
-    // 閉じたままでも「いつ・どこ」が読めるので、9人を1画面で見渡せる
+    // 閉じたままでも「いつ・どこ」が読めるので、9人を1画面で見渡せる。
+    // 開いているときは下に1本ずつ並ぶので、人の行には出さない（同じものが二重になるため）
     let bands='';
     list.forEach(a=>{
       const s = Math.max(0, ssDiffDays(from, a.start));
@@ -191,12 +214,12 @@ function renderStaffSchedule(){
     // 人の札は名前だけ。現場名は帯の側の札（下の ss-sub-chip）に任せる
     rightRows += `<div class="gantt-row gantt-row-right gantt-row-major" data-person="${esc(person)}"
         style="width:${W}px;background-color:${col}2b">
-      <div class="gantt-grid"></div>${stripes}${todayBand}${todayLine}${bands}
+      <div class="gantt-grid"></div>${stripes}${todayBand}${todayLine}${open?'':bands}
       <div class="gantt-grp-chip" style="border-left-color:${col}" onclick="event.stopPropagation();ssToggle('${person}')">
         <span class="gantt-grp-caret">${open?'▼':'▶'}</span>
         <span class="gantt-grp-name">${esc(person)}</span>
       </div>
-      ${ssSubChipHtml(list, col)}
+      ${open?'':ssSubChipHtml(list, col)}
     </div>`;
 
     if(!open) return;
@@ -366,7 +389,6 @@ function ssToggleAll(){
 // ── バーを引きずって動かす（工程表と同じ感じ。1日きざみ） ──
 let _ssDrag = null;
 function ssDragStart(e, id, type){
-  if(!ssCanEdit()) return;
   const a = staffAssigns.find(x=>x.id===id);
   if(!a) return;
   const pt = e.touches ? e.touches[0] : e;
@@ -383,6 +405,7 @@ function ssDragMove(e){
   const dx = pt.clientX - _ssDrag.x0;
   const step = Math.round(dx / SS_CELL_W);
   if(Math.abs(dx) >= SS_CELL_W * 0.4) _ssDrag.moved = true;
+  if(!ssEditing()) return;     // 編集中でなければ、触っても動かさない
   const a = staffAssigns.find(x=>x.id===_ssDrag.id);
   if(!a) return;
   if(_ssDrag.type === 'move'){
@@ -418,11 +441,12 @@ async function ssDragEnd(){
   if(!a) return;
   if(!d.moved){
     a.start = d.start; a.end = d.end;
-    // 長押し（0.5秒以上）なら、その案件の案件情報へ。さっと触っただけなら中身を直す画面
-    if(Date.now() - d.t0 >= SS_LONG_PRESS) ssJumpToAssign(d.id);
-    else ssOpenEdit(d.id);
+    // 長押し（0.5秒以上）なら、その案件の案件情報へ。これは編集中でなくても効く
+    if(Date.now() - d.t0 >= SS_LONG_PRESS){ ssJumpToAssign(d.id); return; }
+    ssOpenEdit(d.id);          // さっと触ったとき。編集中でなければ中身を見せるだけ
     return;
   }
+  if(!ssEditing()){ a.start = d.start; a.end = d.end; return; }
   const { error } = await sb.from('staff_assignments')
     .update({ start_date:a.start, end_date:a.end }).eq('id', d.id);
   if(error){                          // 書けなかったら元に戻す
@@ -455,7 +479,7 @@ function ssFillPersonSelect(picked){
   if(picked) sel.value = picked;
 }
 function ssOpenNew(person){
-  if(!ssCanEdit()){ showToast('人員配置を組めるのは管理者だけです'); return; }
+  if(!ssEditing()){ showToast(ssCanEdit()?'「編集」を押してから足してください':'人員配置を組めるのは管理者だけです'); return; }
   ssEditId = null; ssEditPerson = person;
   document.getElementById('ss-modal-title').textContent = person ? person + 'の配置を足す' : '配置を足す';
   ssFillPersonSelect(person || ssRows()[0]);
@@ -469,7 +493,7 @@ function ssOpenNew(person){
 function ssOpenEdit(id){
   const a = staffAssigns.find(x=>x.id===id);
   if(!a) return;
-  if(!ssCanEdit()){
+  if(!ssEditing()){
     showToast(`${a.person}：${a.projectName}（${a.start.replace(/-/g,'/')}〜${a.end.replace(/-/g,'/')}）`);
     return;
   }
