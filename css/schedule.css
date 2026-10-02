@@ -468,6 +468,11 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
   #ss-inner .gantt-right-panel { height: 100%; }
   #ss-inner .gantt-body-right { overflow: auto; height: auto; }
   #ss-inner .gantt-head-right { position: static; z-index: auto; box-shadow: none; }
+  /* スマホは幅が足りないので、ページの左右の余白もつぶして画面いっぱいに使う */
+  .ss-card { margin-left: -16px; margin-right: -16px; border-radius: 0; }
+  /* スマホでは左の名前の列が出ないので、人の名前の札は表の中に出る。
+     案件名の札は、その札の右に重ならない位置に置く */
+  .ss-sub-chip { left: 104px; margin-left: 104px; max-width: calc(100% - 110px); }
 }
 
 /* ── マイルストーン（工程表の節目） ── */
@@ -484,11 +489,17 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 /* ════ 人員配置スケジュール（勤怠日報 → 人員配置タブ） ════
    表そのものは工程表と同じ .gantt-* を使う。ここは置き場所と、人の帯まわりだけ */
 
-.ss-card { padding: 10px 10px 8px; margin-bottom: 0; }
+/* 表は横いっぱいに使う。見出しと説明だけ内側に寄せる
+   （.card の中身には左右16pxが付く決まりなので、表のぶんだけ外す） */
+.ss-card { padding: 10px 0 0; margin-bottom: 0; }
 .ss-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .ss-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
 /* 9人ぶんがそのまま入る高さ。画面の高さに合わせて伸び縮みさせる */
-#ss-inner { height: clamp(380px, 72vh, 900px); overflow: hidden; }
+#ss-inner {
+  height: clamp(380px, 72vh, 900px);
+  overflow: hidden;
+  padding-left: 0; padding-right: 0;   /* カレンダーの左右に余白を作らない */
+}
 #ss-inner .gantt-left-panel { width: 150px; }
 
 /* 人の帯に出す配置。閉じたままでも「いつ・どこ」が読めるようにする。
@@ -496,13 +507,22 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .gantt-row-major .ss-band .gantt-bar-text { display: inline; }
 .ss-band { height: 20px; opacity: .95; }
 
-/* 人の札に出す「いま入っている現場」と「空き」 */
-.ss-now, .ss-free {
-  font-size: 10px; font-weight: 700; padding: 0 6px; border-radius: 99px;
-  max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* 横にスクロールしても案件名が残るようにする札。
+   人の名前の札（左端）とぶつからないよう、少し右にずらして置く。
+   ダブルクリック（長押し）でその案件の案件情報へ飛ぶので、押せる形にする */
+.ss-sub-chip {
+  left: 108px;
+  margin-left: 108px;
+  max-width: calc(100% - 114px);
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 7;
 }
-.ss-now  { background: var(--accent-bg); color: var(--accent-t); }
-.ss-free { background: var(--surface2); color: var(--text-muted); }
+.ss-sub-chip:hover { box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+/* 配置の行（人の行ではないほう）は、左に人の名前の札が無いので寄せない */
+.gantt-row-right:not(.gantt-row-major) .ss-sub-chip {
+  left: 16px; margin-left: 16px; max-width: calc(100% - 22px);
+}
 
 /* 「＋ 配置を足す」の行。ふだんは目立たせず、指を乗せたときだけ色を出す */
 .ss-add-row { cursor: pointer; opacity: .65; }

@@ -38,6 +38,7 @@ const STAFF_COLORS = [
 const SS_CELL_W = 28;      // 1日ぶんの幅（px）。工程表と同じ
 const SS_PAST_DAYS = 7;    // 今日より前を何日ぶん出すか
 const SS_MIN_DAYS  = 56;   // 少なくともこの日数ぶんは出す
+const SS_LONG_PRESS = 500; // これ以上押し続けたら「長押し」＝案件情報へ飛ぶ（ミリ秒）
 
 let staffAssigns   = [];     // [{id, person, projectName, start, end, note}]
 let ssOpen         = {};     // 人ごとの開け閉め。はじめは全員閉じている
@@ -112,12 +113,6 @@ function ssAssignsOf(person){
     .sort((a,b)=> (a.start||'').localeCompare(b.start||'') || a.id-b.id);
 }
 
-// いまこの人が入っている現場（今日の日付で見る）
-function ssNowAt(person){
-  const t = ssToday();
-  return ssAssignsOf(person).filter(a=>a.start<=t && t<=a.end).map(a=>a.projectName);
-}
-
 // ── 画面 ──
 function renderStaffSchedule(){
   const inner = document.getElementById('ss-inner');
@@ -168,7 +163,6 @@ function renderStaffSchedule(){
     const list = ssAssignsOf(person);
     const col  = ssPersonColor(person);
     const open = !!ssOpen[person];
-    const nowAt = ssNowAt(person);
 
     // ── 人の行（工程表の大工程にあたる） ──
     leftRows += `<div class="gantt-row gantt-row-left gantt-row-major" onclick="ssToggle('${person}')">
@@ -189,18 +183,20 @@ function renderStaffSchedule(){
           style="left:${s*SS_CELL_W}px;width:${(e-s+1)*SS_CELL_W}px;background:${col}"
           title="${esc(person)}　${esc(a.projectName)}　${a.start.replace(/-/g,'/')}〜${a.end.replace(/-/g,'/')}${a.note?'　'+esc(a.note):''}"
           onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'move')"
-          ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'move')">
+          ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'move')"
+          ondblclick="event.stopPropagation();ssJumpToAssign(${a.id})">
           <span class="gantt-bar-text">${esc(a.projectName||'（現場未入力）')}</span>
         </div>`;
     });
-    rightRows += `<div class="gantt-row gantt-row-right gantt-row-major" style="width:${W}px;background-color:${col}2b">
+    // 人の札は名前だけ。現場名は帯の側の札（下の ss-sub-chip）に任せる
+    rightRows += `<div class="gantt-row gantt-row-right gantt-row-major" data-person="${esc(person)}"
+        style="width:${W}px;background-color:${col}2b">
       <div class="gantt-grid"></div>${stripes}${todayBand}${todayLine}${bands}
       <div class="gantt-grp-chip" style="border-left-color:${col}" onclick="event.stopPropagation();ssToggle('${person}')">
         <span class="gantt-grp-caret">${open?'▼':'▶'}</span>
         <span class="gantt-grp-name">${esc(person)}</span>
-        ${nowAt.length ? `<span class="ss-now">${esc(nowAt.join('・'))}</span>`
-                       : '<span class="ss-free">空き</span>'}
       </div>
+      ${ssSubChipHtml(list, col)}
     </div>`;
 
     if(!open) return;
@@ -212,19 +208,22 @@ function renderStaffSchedule(){
       const barL = s * SS_CELL_W;
       const barW = Math.max(SS_CELL_W, (e - s + 1) * SS_CELL_W);
       const dur = e - s + 1;
+      // 左の列は人の名前のためのもの。案件名は書き写さず、表の側の札で見せる
       leftRows += `<div class="gantt-row gantt-row-left gantt-row-minor" onclick="ssOpenEdit(${a.id})">
         <span style="display:inline-block;width:14px"></span>
         <span class="gantt-badge gantt-badge-min">現</span>
         <span class="grl-color-dot" style="background:${col}"></span>
-        <span class="grl-name">${esc(a.projectName||'（現場未入力）')}</span>
+        <span class="grl-name"></span>
         <span class="grl-days">${dur}日</span>
       </div>`;
       rightRows += `<div class="gantt-row gantt-row-right" style="width:${W}px;background-color:${col}12">
         <div class="gantt-grid"></div>${stripes}${todayBand}${todayLine}
+        ${ssSubChipHtml([a], col)}
         <div class="gantt-bar gantt-bar-minor ss-bar" id="ss-bar-${a.id}"
              style="left:${barL}px;width:${barW}px;background:${col}"
              title="${esc(a.projectName)}　${a.start.replace(/-/g,'/')}〜${a.end.replace(/-/g,'/')}${a.note?'　'+esc(a.note):''}"
-             onmousedown="ssDragStart(event,${a.id},'move')" ontouchstart="ssDragStart(event,${a.id},'move')">
+             onmousedown="ssDragStart(event,${a.id},'move')" ontouchstart="ssDragStart(event,${a.id},'move')"
+             ondblclick="event.stopPropagation();ssJumpToAssign(${a.id})">
           ${editable?`<div class="gantt-bar-hdl gantt-bar-hdl-l"
             onmousedown="event.stopPropagation();ssDragStart(event,${a.id},'start')"
             ontouchstart="event.stopPropagation();ssDragStart(event,${a.id},'start')"></div>`:''}
@@ -278,6 +277,7 @@ function renderStaffSchedule(){
     ssScrollLeft = br.scrollLeft;
     hr.scrollLeft = br.scrollLeft;
     bl.scrollTop  = br.scrollTop;
+    ssSyncSubChips();
   });
   bl.addEventListener('scroll', ()=>{ br.scrollTop = bl.scrollTop; });
 
@@ -285,6 +285,66 @@ function renderStaffSchedule(){
   br.scrollLeft = (ssScrollLeft >= 0) ? ssScrollLeft
                 : Math.max(0, (todayOff - 3) * SS_CELL_W);
   hr.scrollLeft = br.scrollLeft;
+  ssSyncSubChips();
+}
+
+// ── 横にスクロールしても案件名が残るようにする ──
+//
+// 工程表と同じ考え方。バーの上の案件名が左へ消えたら、代わりに左端へ札を出す。
+// 人の行は配置が何本も並ぶので、札は1枚だけ出し、
+// いま画面の左端に当たっている（または直前の）配置の案件名を出す。
+// どの配置ぶんを出すかは ssSyncSubChips が決める
+function ssSubChipHtml(list, col){
+  if(!list.length) return '';
+  // 表に出ている範囲で測る（帯も同じように端で切っているので、そろえる）。
+  // 切らずに測ると、表より前から始まる配置で、左端にいるのに札が出てしまう
+  const data = list.map(a=>({
+    id: a.id,
+    name: a.projectName || '（現場未入力）',
+    s: Math.max(0, ssDiffDays(ssD0, a.start)) * SS_CELL_W,
+    e: Math.min(ssDays, ssDiffDays(ssD0, a.end) + 1) * SS_CELL_W
+  })).filter(sp => sp.e > sp.s);
+  return `<div class="gantt-grp-chip gantt-sub-chip ss-sub-chip is-off"
+      style="border-left-color:${col}" data-spans='${esc(JSON.stringify(data))}'
+      ondblclick="ssJumpToProjectFromChip(this)">
+    <span class="gantt-grp-name"></span></div>`;
+}
+
+// 横の位置に合わせて、札に出す案件名を決める。
+// バーの上の文字が見えている間は札を引っ込める（同じ名前が二重に出ないように）
+function ssSyncSubChips(){
+  const body = document.getElementById('ss-body-right');
+  if(!body) return;
+  const x = body.scrollLeft, w = body.clientWidth;
+  body.querySelectorAll('.ss-sub-chip').forEach(chip=>{
+    let spans = [];
+    try{ spans = JSON.parse(chip.dataset.spans || '[]'); }catch(_){}
+    // 画面の左端に掛かっている配置。無ければ、左端より前にあるいちばん近いもの
+    const here = spans.find(sp => sp.s <= x && x < sp.e)
+             || [...spans].reverse().find(sp => sp.e <= x);
+    // バーの書き出しが画面の中にあるなら、バーの文字がそのまま読めるので札は要らない
+    const visible = here && here.s >= x - 1 && here.s < x + w - 40;
+    if(!here || visible){ chip.classList.add('is-off'); chip.dataset.pid=''; return; }
+    chip.classList.remove('is-off');
+    chip.dataset.pid = here.id;
+    const label = chip.querySelector('.gantt-grp-name');
+    if(label.textContent !== here.name) label.textContent = here.name;
+  });
+}
+
+// 札の案件名をダブルタップ（長押し）すると、その案件の案件情報を開く
+function ssJumpToProjectFromChip(chip){
+  ssJumpToAssign(chip.dataset.pid);
+}
+function ssJumpToAssign(id){
+  const a = staffAssigns.find(x=>String(x.id)===String(id));
+  ssJumpToProject(a ? a.projectName : '');
+}
+function ssJumpToProject(name){
+  const p = (projects||[]).find(x=>x.name===name);
+  if(!p){ showToast(`「${name||'この現場'}」は案件に登録されていません`); return; }
+  if(typeof olOpenProject === 'function') olOpenProject(p.id);
+  else showToast('案件情報を開けませんでした');
 }
 
 function ssToggle(person){
@@ -310,7 +370,7 @@ function ssDragStart(e, id, type){
   const a = staffAssigns.find(x=>x.id===id);
   if(!a) return;
   const pt = e.touches ? e.touches[0] : e;
-  _ssDrag = { id, type, x0: pt.clientX, start: a.start, end: a.end, moved: false };
+  _ssDrag = { id, type, x0: pt.clientX, start: a.start, end: a.end, moved: false, t0: Date.now() };
   document.addEventListener('mousemove', ssDragMove, { passive:false });
   document.addEventListener('mouseup',   ssDragEnd);
   document.addEventListener('touchmove', ssDragMove, { passive:false });
@@ -356,9 +416,11 @@ async function ssDragEnd(){
   if(!d) return;
   const a = staffAssigns.find(x=>x.id===d.id);
   if(!a) return;
-  if(!d.moved){                       // 動かしていないならタップ扱い。中身を直す画面を出す
+  if(!d.moved){
     a.start = d.start; a.end = d.end;
-    ssOpenEdit(d.id);
+    // 長押し（0.5秒以上）なら、その案件の案件情報へ。さっと触っただけなら中身を直す画面
+    if(Date.now() - d.t0 >= SS_LONG_PRESS) ssJumpToAssign(d.id);
+    else ssOpenEdit(d.id);
     return;
   }
   const { error } = await sb.from('staff_assignments')
