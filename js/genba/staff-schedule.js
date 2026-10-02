@@ -10,7 +10,7 @@
 //     （配置は何人かで同時にいじることがあり、1枚で上書きすると消し合うため）
 //   ② 人の行は消せない。いつも9人ぶん並ぶ（空いている人がすぐ分かるように）
 //
-// 置き場所：勤怠日報 → 日報タブの左。見られるのは社員、直せるのは管理者だけ。
+// 置き場所：勤怠日報 → 人員配置タブ（日報の左）。見るのも直すのも、きよかわの社員だけ。
 
 // アカウントの表示名で持つ（js/genba/genba-nippo.js の EMPLOYEE_ORDER と同じ綴り）。
 // 日報の実績と同じ名前にそろえておくと、あとで予定と実績を突き合わせられる。
@@ -55,14 +55,14 @@ let ssD0           = '';     // 左端の日付
 let ssDays         = 0;
 let ssReady        = true;
 
-// 配置を組めるのは管理者だけ。
+// 配置を組めるのは社員（管理者・一般社員）。
 // ただし、ふだんは触っても動かないようにしておき、
 // 「編集」を押している間だけ動かせる（指が当たって勝手にずれるのを防ぐ）
 let ssEditMode = false;
-function ssCanEdit(){ return currentUserRole === 'staff'; }
+function ssCanEdit(){ return currentUserRole === 'staff' || currentUserRole === 'carpenter'; }
 function ssEditing(){ return ssCanEdit() && ssEditMode; }
 function ssToggleEdit(){
-  if(!ssCanEdit()){ showToast('人員配置を組めるのは管理者だけです'); return; }
+  if(!ssCanEdit()){ showToast('人員配置を組めるのはきよかわの社員だけです'); return; }
   ssEditMode = !ssEditMode;
   renderStaffSchedule();
   showToast(ssEditMode ? '編集できます（帯を押して直す・引きずって動かす）' : '編集を終わりました');
@@ -284,7 +284,7 @@ function renderStaffSchedule(){
       </div>`;
     });
 
-    // 足すための1行（管理者だけ）
+    // 足すための1行（編集中だけ）
     if(editable){
       leftRows += `<div class="gantt-row gantt-row-left ss-add-row" onclick="ssOpenNew('${person}')">
         <span style="display:inline-block;width:14px"></span>
@@ -505,7 +505,7 @@ function ssFillPersonSelect(picked){
   if(picked) sel.value = picked;
 }
 function ssOpenNew(person){
-  if(!ssEditing()){ showToast(ssCanEdit()?'「編集」を押してから足してください':'人員配置を組めるのは管理者だけです'); return; }
+  if(!ssEditing()){ showToast(ssCanEdit()?'「編集」を押してから足してください':'人員配置を組めるのはきよかわの社員だけです'); return; }
   ssEditId = null; ssEditPerson = person;
   document.getElementById('ss-modal-title').textContent = person ? person + 'の配置を足す' : '配置を足す';
   ssFillPersonSelect(person || ssRows()[0]);
