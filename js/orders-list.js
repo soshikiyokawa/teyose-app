@@ -290,10 +290,31 @@ function olCloseFilterMenus(){
     if(m){ m.style.display=''; m.style.left=''; m.style.right=''; }
   });
 }
-// 絞り込みの外を触ったら閉じる
-document.addEventListener('click', e=>{
-  if(e.target.closest?.('#ol-filter-status,#ol-filter-type,#ol-filter-fy,#ol-filter-pay')) return;
+// ── 道具をまとめた「絞り込み・編集」 ──
+//
+// 絞り込み・並べ方・印刷・保存は、ふだんは使わない。
+// 上の帯に並べておくと案件を見る場所が狭くなるので、1つのボタンの中にしまってある。
+function olToggleTools(ev){
+  if(ev) ev.stopPropagation();
+  const box = document.getElementById('ol-tools');
+  if(!box) return;
+  const willOpen = !box.classList.contains('open');
   olCloseFilterMenus();
+  box.classList.toggle('open', willOpen);
+}
+function olCloseTools(){
+  document.getElementById('ol-tools')?.classList.remove('open');
+  olCloseFilterMenus();
+}
+
+// 外を触ったら閉じる。中（絞り込みの選び方も含む）を触ったときは開けたままにする
+document.addEventListener('click', e=>{
+  if(e.target.closest?.('#ol-tools')) {
+    // 絞り込みのひとつを開いているとき、その外（同じ道具箱の中）を触ったら畳む
+    if(!e.target.closest('.ol-filter')) olCloseFilterMenus();
+    return;
+  }
+  olCloseTools();
 });
 
 // 一覧から案件を開く（同じ案件タブ内で「案件情報」に切り替えて詳細を表示）
@@ -334,6 +355,10 @@ function renderOrdersList(){
   if(cardWrap)  cardWrap.style.display  = olView==='card'  ? '' : 'none';
   if(tableWrap) tableWrap.style.display = olView==='table' ? '' : 'none';
   document.querySelectorAll('.ol-view-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===olView));
+  // 「直した表を保存」は、表の中で直した完成粗利・備考を書き込むためのもの。
+  // カードのときは直すところが無いので出さない
+  const saveBtn=document.getElementById('ol-save-btn');
+  if(saveBtn) saveBtn.style.display = olView==='table' ? '' : 'none';
   renderOlCards(list);
 
   const el = document.getElementById('orders-list-body');

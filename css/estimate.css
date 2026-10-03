@@ -88,6 +88,29 @@
   #ol-print-frame{min-height:38vh}
 }
 
+/* ── 案件一覧：道具をまとめた「絞り込み・編集」 ── */
+/* 絞り込み・並べ方・印刷・保存は、ふだんは使わない。
+   上の帯に並べると案件を見る場所が狭くなるので、1つのボタンの中にしまう */
+.ol-tools{position:relative}
+.ol-tools-btn{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.ol-tools.open .ol-tools-caret{transform:rotate(180deg)}
+.ol-tools-menu{display:none;position:absolute;top:calc(100% + 4px);right:0;z-index:70;
+  width:232px;max-height:min(72vh,560px);overflow-y:auto;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.18);padding:6px}
+.ol-tools.open .ol-tools-menu{display:block}
+.ol-tools-sec{font-size:10px;font-weight:700;color:var(--text-muted);padding:7px 6px 3px}
+/* 中のボタンは、ぜんぶ横いっぱいに積む（押すところを探さなくて済む） */
+.ol-tools-menu > .btn,
+.ol-tools-menu .ol-filter-btn{display:flex;width:100%;max-width:none;margin:2px 0;
+  justify-content:flex-start;gap:6px}
+.ol-tools-menu .ol-filter-btn{justify-content:space-between}
+.ol-tools-row{display:flex;gap:4px;margin:2px 0}
+.ol-tools-row .btn{flex:1;justify-content:center}
+/* 中の絞り込みは、浮かせずにその場で開く（入れ子で浮くと、どこの話か分かりにくいため） */
+.ol-tools-menu .ol-filter-menu{position:static;min-width:0;max-width:none;max-height:none;
+  background:var(--surface2);border:0;border-radius:8px;box-shadow:none;margin:0 0 4px;padding:2px 0}
+
 .ol-filter{position:relative}
 .ol-filter-btn{display:inline-flex;align-items:center;gap:4px;max-width:220px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}

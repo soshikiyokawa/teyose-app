@@ -25,8 +25,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=465">
-<link rel="stylesheet" href="css/schedule.css?v=465">
+<link rel="stylesheet" href="css/main.css?v=466">
+<link rel="stylesheet" href="css/schedule.css?v=466">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
 <body>
@@ -122,31 +122,51 @@
   <div style="padding:10px 12px 6px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-wrap:wrap">
     <h2 style="margin:0;font-size:15px">案件一覧</h2>
     <span style="font-size:11px;color:var(--text-muted)" id="ol-count"></span>
-    <!-- 絞り込み（それぞれ複数えらべる。選んだ内容は端末に残る） -->
-    <div class="ol-filter staff-only" id="ol-filter-status"></div>
-    <div class="ol-filter" id="ol-filter-type"></div>
-    <div class="ol-filter staff-only" id="ol-filter-fy"></div>
-    <div class="ol-filter admin-only" id="ol-filter-pay"></div>
-    <button class="btn xs" id="ol-clear-filter" onclick="olClearFilter()">絞り込み解除</button>
-    <div class="admin-only" style="display:flex;gap:2px;margin-left:auto">
-      <button class="btn xs ol-view-btn" data-view="card" onclick="olSetView('card')" title="カードで見る">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        カード
+    <!-- 道具はぜんぶこの中にまとめる（上の帯に並べると、案件を見る場所が狭くなるため） -->
+    <div class="ol-tools" id="ol-tools" style="margin-left:auto">
+      <button type="button" class="btn xs ol-tools-btn" onclick="olToggleTools(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+        絞り込み・編集
+        <svg class="ol-tools-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="10" height="10" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      <button class="btn xs ol-view-btn" data-view="table" onclick="olSetView('table')" title="表で見る（金額・入金）">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
-        表
-      </button>
+      <div class="ol-tools-menu">
+        <!-- 絞り込み（それぞれ複数えらべる。選んだ内容は端末に残る） -->
+        <div class="ol-tools-sec">絞り込む</div>
+        <div class="ol-filter staff-only" id="ol-filter-status"></div>
+        <div class="ol-filter" id="ol-filter-type"></div>
+        <div class="ol-filter staff-only" id="ol-filter-fy"></div>
+        <div class="ol-filter admin-only" id="ol-filter-pay"></div>
+        <button class="btn xs" id="ol-clear-filter" onclick="olClearFilter()">絞り込み解除</button>
+
+        <div class="ol-tools-sec admin-only">並べ方</div>
+        <div class="admin-only ol-tools-row">
+          <button class="btn xs ol-view-btn" data-view="card" onclick="olSetView('card')" title="カードで見る">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            カード
+          </button>
+          <button class="btn xs ol-view-btn" data-view="table" onclick="olSetView('table')" title="表で見る（金額・入金）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+            表
+          </button>
+        </div>
+
+        <div class="ol-tools-sec">そのほか</div>
+        <button class="btn xs" onclick="renderOrdersList()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          最新にする
+        </button>
+        <button class="btn xs admin-only" onclick="printOrdersList()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          A3印刷
+        </button>
+        <!-- 保存は「表」で直した完成粗利・備考を書き込むためのもの。表のときだけ出す -->
+        <button class="btn xs primary admin-only" id="ol-save-btn" onclick="saveOrdersList()"
+                title="表で直した「完成粗利」と「備考」をまとめて保存します">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          直した表を保存
+        </button>
+      </div>
     </div>
-    <button class="btn xs" onclick="renderOrdersList()">更新</button>
-    <button class="btn xs admin-only" onclick="printOrdersList()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      A3印刷
-    </button>
-    <button class="btn xs primary admin-only" onclick="saveOrdersList()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="12" height="12" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      保存
-    </button>
   </div>
   <!-- カード表示（写真・ステータス・工事区分が一目で分かる） -->
   <div id="orders-card-wrap" style="padding:12px 16px">
@@ -3367,96 +3387,96 @@
 <!-- Supabase（共有データベース） -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/supabase-client.js?v=465"></script>
+<script src="js/supabase-client.js?v=466"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=465"></script>
+<script src="js/utils.js?v=466"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=465"></script>
+<script src="js/state.js?v=466"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=465"></script>
+<script src="js/data/db.js?v=466"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=465"></script>
-<script src="js/swipe-tabs.js?v=465"></script>
+<script src="js/nav.js?v=466"></script>
+<script src="js/swipe-tabs.js?v=466"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=465"></script>
+<script src="js/talk.js?v=466"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=465"></script>
+<script src="js/push.js?v=466"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=465"></script>
-<script src="js/estimate/estimate-items.js?v=465"></script>
-<script src="js/estimate/quote-import.js?v=465"></script>
-<script src="js/estimate/estimate-master.js?v=465"></script>
-<script src="js/estimate/estimate-summary.js?v=465"></script>
-<script src="js/estimate/estimate-crud.js?v=465"></script>
-<script src="js/estimate/info-view.js?v=465"></script>
-<script src="js/estimate/parking.js?v=465"></script>
-<script src="js/estimate/estimate-pdf.js?v=465"></script>
-<script src="js/estimate/estimate-invoice.js?v=465"></script>
+<script src="js/estimate/estimate-tabs.js?v=466"></script>
+<script src="js/estimate/estimate-items.js?v=466"></script>
+<script src="js/estimate/quote-import.js?v=466"></script>
+<script src="js/estimate/estimate-master.js?v=466"></script>
+<script src="js/estimate/estimate-summary.js?v=466"></script>
+<script src="js/estimate/estimate-crud.js?v=466"></script>
+<script src="js/estimate/info-view.js?v=466"></script>
+<script src="js/estimate/parking.js?v=466"></script>
+<script src="js/estimate/estimate-pdf.js?v=466"></script>
+<script src="js/estimate/estimate-invoice.js?v=466"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=465"></script>
-<script src="js/payment-schedule.js?v=465"></script>
-<script src="js/inspection.js?v=465"></script>
+<script src="js/orders-list.js?v=466"></script>
+<script src="js/payment-schedule.js?v=466"></script>
+<script src="js/inspection.js?v=466"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=465"></script>
+<script src="js/chusho.js?v=466"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=465"></script>
+<script src="js/schedule.js?v=466"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=465"></script>
-<script src="js/order/item-price.js?v=465"></script>
-<script src="js/order/item-master.js?v=465"></script>
-<script src="js/order/invoice.js?v=465"></script>
-<script src="js/order/invoice-lines.js?v=465"></script>
-<script src="js/order/ekrea-price.js?v=465"></script>
-<script src="js/order/order-cart.js?v=465"></script>
-<script src="js/order/order-confirm.js?v=465"></script>
-<script src="js/order/order-price-edit.js?v=465"></script>
-<script src="js/order/order-history.js?v=465"></script>
-<script src="js/cost-budget.js?v=465"></script>
-<script src="js/order/card-match.js?v=465"></script>
-<script src="js/receipt-scan.js?v=465"></script>
-<script src="js/receipt-ledger.js?v=465"></script>
-<script src="js/order/quote-request.js?v=465"></script>
-<script src="js/receipt.js?v=465"></script>
+<script src="js/order/supplier-master.js?v=466"></script>
+<script src="js/order/item-price.js?v=466"></script>
+<script src="js/order/item-master.js?v=466"></script>
+<script src="js/order/invoice.js?v=466"></script>
+<script src="js/order/invoice-lines.js?v=466"></script>
+<script src="js/order/ekrea-price.js?v=466"></script>
+<script src="js/order/order-cart.js?v=466"></script>
+<script src="js/order/order-confirm.js?v=466"></script>
+<script src="js/order/order-price-edit.js?v=466"></script>
+<script src="js/order/order-history.js?v=466"></script>
+<script src="js/cost-budget.js?v=466"></script>
+<script src="js/order/card-match.js?v=466"></script>
+<script src="js/receipt-scan.js?v=466"></script>
+<script src="js/receipt-ledger.js?v=466"></script>
+<script src="js/order/quote-request.js?v=466"></script>
+<script src="js/receipt.js?v=466"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=465"></script>
-<script src="js/genba/supplier-view.js?v=465"></script>
-<script src="js/genba/genba-files.js?v=465"></script>
-<script src="js/genba/genba-photos.js?v=465"></script>
-<script src="js/genba/genba-drawings.js?v=465"></script>
-<script src="js/genba/genba-nippo.js?v=465"></script>
-<script src="js/genba/staff-schedule.js?v=465"></script>
-<script src="js/genba/genba-dezura.js?v=465"></script>
-<script src="js/genba/payroll.js?v=465"></script>
-<script src="js/genba/overtime-pay.js?v=465"></script>
-<script src="js/genba/leave-balance.js?v=465"></script>
-<script src="js/genba/genba-leave.js?v=465"></script>
-<script src="js/genba/genba-holiday.js?v=465"></script>
-<script src="js/genba/license.js?v=465"></script>
-<script src="js/genba/vehicle.js?v=465"></script>
-<script src="js/genba/work-calendar.js?v=465"></script>
-<script src="js/genba/account-perms.js?v=465"></script>
+<script src="js/genba/genba-tabs.js?v=466"></script>
+<script src="js/genba/supplier-view.js?v=466"></script>
+<script src="js/genba/genba-files.js?v=466"></script>
+<script src="js/genba/genba-photos.js?v=466"></script>
+<script src="js/genba/genba-drawings.js?v=466"></script>
+<script src="js/genba/genba-nippo.js?v=466"></script>
+<script src="js/genba/staff-schedule.js?v=466"></script>
+<script src="js/genba/genba-dezura.js?v=466"></script>
+<script src="js/genba/payroll.js?v=466"></script>
+<script src="js/genba/overtime-pay.js?v=466"></script>
+<script src="js/genba/leave-balance.js?v=466"></script>
+<script src="js/genba/genba-leave.js?v=466"></script>
+<script src="js/genba/genba-holiday.js?v=466"></script>
+<script src="js/genba/license.js?v=466"></script>
+<script src="js/genba/vehicle.js?v=466"></script>
+<script src="js/genba/work-calendar.js?v=466"></script>
+<script src="js/genba/account-perms.js?v=466"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=465"></script>
+<script src="js/init.js?v=466"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=465"></script>
-<script src="js/tasks.js?v=465"></script>
-<script src="js/task-templates.js?v=465"></script>
-<script src="js/auth.js?v=465"></script>
-<script src="js/account.js?v=465"></script>
+<script src="js/notifications.js?v=466"></script>
+<script src="js/tasks.js?v=466"></script>
+<script src="js/task-templates.js?v=466"></script>
+<script src="js/auth.js?v=466"></script>
+<script src="js/account.js?v=466"></script>
 </body>
 </html>
