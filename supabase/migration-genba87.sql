@@ -14,8 +14,9 @@ create index if not exists site_photos_url_idx on public.site_photos (url);
 
 -- ── 2. 案件ごとに「日報写真」フォルダを用意する ──
 -- 作った人は入れない（＝変更・削除は管理者のみ。うっかり消されないようにするため）
-insert into public.site_folders (project_id, kind, parent_id, name)
-select distinct r.project_id, 'photo', null, '日報写真'
+-- parent_id は入れない（＝いちばん上の階層。入れないと空のままになる）
+insert into public.site_folders (project_id, kind, name)
+select distinct r.project_id, 'photo'::text, '日報写真'::text
 from public.nippo_photos p
 join public.daily_reports r on r.id = p.report_id
 where r.project_id is not null
@@ -28,7 +29,7 @@ where r.project_id is not null
 -- ── 3. まだ入っていない写真を、そのフォルダに入れる ──
 -- 撮った日は日報の作業日、上げた人は日報に写真を付けた人をそのまま引き継ぐ
 insert into public.site_photos (project_id, folder_id, url, caption, shot_date, uploaded_by, uploader_name)
-select distinct r.project_id, f.id, p.url, '', r.work_date, p.uploaded_by, coalesce(p.uploader_name,'')
+select distinct r.project_id, f.id, p.url, ''::text, r.work_date, p.uploaded_by, coalesce(p.uploader_name,'')
 from public.nippo_photos p
 join public.daily_reports r on r.id = p.report_id
 join public.site_folders f
