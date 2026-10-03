@@ -1065,7 +1065,7 @@ function renderTalkPanelMessages(forceBottom){
         ${isImage
           ? `<a href="${m.fileUrl}" target="_blank" rel="noopener"><img src="${thumbUrl(m.fileUrl,400)}" alt="${esc(m.fileName||'')}" style="max-width:200px;max-height:200px;border-radius:8px;display:block"></a>`
           : `<a href="${m.fileUrl}" target="_blank" rel="noopener" download class="bbl" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:inherit">
-              <span style="font-size:18px">📄</span><span style="word-break:break-all">${esc(m.fileName||'資料')}</span>
+              <span style="font-size:18px">${talkFileIcon(m.fileName, m.fileMime)}</span><span style="word-break:break-all">${esc(m.fileName||'資料')}</span>
             </a>`}
         <div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}${msgMarks(m)}</div>
         ${reactionsHtml(m,isMe)}
@@ -1155,6 +1155,20 @@ function sendTalkPanelMsg(){
       temp.sending = false; temp.failed = true;
       if(thread===activeTalkPanelSupplier) renderTalkPanelMessages(true);
     });
+}
+
+// 添付の種類ごとのしるし。何の資料かがひと目で分かるようにする
+function talkFileIcon(name, mime){
+  const ext = String(name||'').toLowerCase().match(/.([a-z0-9]+)$/)?.[1] || '';
+  const m = String(mime||'').toLowerCase();
+  if(ext==='pdf' || m==='application/pdf')                                  return '📕';
+  if(['doc','docx','dot','dotx','rtf'].includes(ext) || m.includes('word')) return '📘';
+  if(['xls','xlsx','xlsm','xlsb','csv'].includes(ext)
+     || m.includes('excel') || m.includes('spreadsheet') || m==='text/csv') return '📗';
+  if(['ppt','pptx'].includes(ext) || m.includes('powerpoint') || m.includes('presentation')) return '📙';
+  if(['zip','7z','rar'].includes(ext) || m.includes('zip'))                 return '🗜️';
+  if(['txt','md','log'].includes(ext) || m.startsWith('text/'))             return '📝';
+  return '📄';
 }
 
 // 送る前のひと手間。写真は長辺1600pxのJPEGにしてから送る。
