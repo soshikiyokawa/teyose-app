@@ -70,21 +70,32 @@ function renderInfoView(){
     ? `${esc(site)} <a class="iv-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site)}"
          target="_blank" rel="noopener">地図</a>`
     : '');
-  // 契約済み駐車場。住所に加えて、登録してある区画図も開けるようにする
-  //（区画図の一覧は入力欄の中にあり、読むだけの画面では隠れてしまうため、ここに出し直す）
+  // 契約済み駐車場。住所のうしろに「資料」を置く（工事場所の「地図」と同じ形）。
+  // 区画図の一覧は入力欄の中にあり、読むだけの画面では隠れてしまうので、ここに出し直す
   const pid = selectedProject?.id || null;
   const pdocs = pid ? (typeof drawings!=='undefined' ? drawings : [])
                         .filter(d => d.projectId===pid && d.kind==='parking') : [];
   const pAddr = val('est-parking');
   if(pAddr || pdocs.length){
-    const links = pdocs.map(d=>{
-      const isPdf = /pdf/i.test(d.fileMime||'') || /.pdf$/i.test(d.fileName||'');
-      return `<a class="iv-file" href="${esc(d.fileUrl)}" target="_blank" rel="noopener"
-                >${isPdf?'📄':'🖼'} ${esc(d.fileName||'区画図')}</a>`;
-    }).join('');
+    let link = '';
+    if(pdocs.length === 1){
+      // 1件なら、押すとそのまま開く
+      link = `<a class="iv-link" href="${esc(pdocs[0].fileUrl)}" target="_blank" rel="noopener"
+                 title="${esc(pdocs[0].fileName||'')}">資料</a>`;
+    } else if(pdocs.length > 1){
+      // 何件かあるときは、押すと下に並べて出す
+      link = `<a class="iv-link" href="javascript:void(0)" onclick="toggleParkingDocs(this)"
+                 >資料${pdocs.length}件</a>`;
+    }
+    const files = pdocs.length > 1
+      ? `<div class="iv-files" id="iv-parking-files" style="display:none">${pdocs.map(d=>{
+          const isPdf = /pdf/i.test(d.fileMime||'') || /.pdf$/i.test(d.fileName||'');
+          return `<a class="iv-file" href="${esc(d.fileUrl)}" target="_blank" rel="noopener"
+                    >${isPdf?'📄':'🖼'} ${esc(d.fileName||'区画図')}</a>`;
+        }).join('')}</div>`
+      : '';
     add('契約済み駐車場',
-      (pAddr ? esc(pAddr) : '<span class="iv-dim">住所は未入力</span>')
-      + (links ? `<div class="iv-files">${links}</div>` : ''));
+      (pAddr ? esc(pAddr) : '<span class="iv-dim">住所は未入力</span>') + ' ' + link + files);
   }
 
   const clients = text('client-members-summary');
@@ -120,4 +131,13 @@ function renderInfoView(){
     view.insertAdjacentHTML('beforeend',
       '<div class="iv-note">案件情報を直せるのは管理者だけです。</div>');
   }
+}
+
+// 区画図が何件かあるとき、「資料◯件」を押すと下に並べて出す
+function toggleParkingDocs(a){
+  const box = document.getElementById('iv-parking-files');
+  if(!box) return;
+  const open = box.style.display === 'none';
+  box.style.display = open ? '' : 'none';
+  a.classList.toggle('open', open);
 }
