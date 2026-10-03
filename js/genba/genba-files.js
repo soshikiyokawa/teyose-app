@@ -238,19 +238,9 @@ async function fbMoveTo(folderId){
   await refreshGenba();
 }
 
-// ── 案件情報タブのボタン（件数表示） ──
+// ── 案件情報タブ ──
+// ボタンに件数は出さないので、ここでやることは区画図の一覧の描き直しだけ
 function renderInfoGenbaSections(){
-  const pc = document.getElementById('info-photo-count');
-  if(!pc) return;
-  const pid = selectedProject?.id || null;
-  pc.textContent = pid ? sitePhotos.filter(p=>p.projectId===pid).length+'枚' : '—';
-  document.getElementById('info-drawing-count').textContent = pid ? drawings.filter(d=>d.projectId===pid && (d.kind||'drawing')==='drawing').length+'件' : '—';
-  const dc = document.getElementById('info-document-count');
-  if(dc) dc.textContent = pid ? drawings.filter(d=>d.projectId===pid && (d.kind||'drawing')==='document').length+'件' : '—';
-  // メンバーの人数（案件チャットに入る人）
-  const mc = document.getElementById('info-member-count');
-  if(mc) mc.textContent = pid
-    ? ((typeof projectMembers!=='undefined' ? projectMembers : []).length || 0)+'人' : '—';
   renderParkingDocs();
 }
 function openInfoFileBrowser(kind){

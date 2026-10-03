@@ -307,5 +307,4 @@ table.otpay-tbl td.minus{color:#8a2018}
 .info-genba-grid .info-genba-btn > span{
   max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-/* 件数は、塗りつぶしの上でも読めるように薄い白にする */
-.info-genba-grid .info-genba-btn .info-genba-count{ color:rgba(255,255,255,.78); }
+
