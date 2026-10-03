@@ -247,6 +247,10 @@ function renderInfoGenbaSections(){
   document.getElementById('info-drawing-count').textContent = pid ? drawings.filter(d=>d.projectId===pid && (d.kind||'drawing')==='drawing').length+'件' : '—';
   const dc = document.getElementById('info-document-count');
   if(dc) dc.textContent = pid ? drawings.filter(d=>d.projectId===pid && (d.kind||'drawing')==='document').length+'件' : '—';
+  // メンバーの人数（案件チャットに入る人）
+  const mc = document.getElementById('info-member-count');
+  if(mc) mc.textContent = pid
+    ? ((typeof projectMembers!=='undefined' ? projectMembers : []).length || 0)+'人' : '—';
   renderParkingDocs();
 }
 function openInfoFileBrowser(kind){

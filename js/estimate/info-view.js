@@ -79,32 +79,32 @@ function renderInfoView(){
     : '');
   add('契約済み駐車場', esc(val('est-parking')));
 
-  // 日付は「予定」と「実績」を並べて出す
-  const term = (planId, actId, planLbl, actLbl) => {
-    const p = ymd(val(planId)), a = ymd(val(actId));
-    if(!p && !a) return '';
-    return [p ? `${planLbl} ${esc(p)}` : '', a ? `<b>${actLbl} ${esc(a)}</b>` : '']
-      .filter(Boolean).join('　／　');
-  };
-  add('着工', term('est-start-date','est-actual-start','予定','着工日'));
-  add('完工', term('est-end-date','est-handover','予定','引渡日'));
-
-  // 工期（実績があれば実績で、無ければ予定で）
-  const s = val('est-actual-start') || val('est-start-date');
-  const e = val('est-handover')     || val('est-end-date');
-  if(s && e){
-    const n = Math.round((new Date(e+'T00:00:00') - new Date(s+'T00:00:00')) / 86400000) + 1;
-    if(n > 0) add('工期', `${n}日間`);
-  }
-
-  const members = text('proj-members-summary');
-  add('参加メンバー', (members && members!=='未設定') ? esc(members) : '');
   const clients = text('client-members-summary');
   add('お客様チャット', (clients && !/未設定$/.test(clients)) ? esc(clients) : '');
 
-  view.innerHTML = rows.length
-    ? `<dl class="iv-list">${rows.map(r=>
-        `<dt>${esc(r.label)}</dt><dd class="${r.cls||''}">${r.html}</dd>`).join('')}</dl>`
+  // 着工と完工は横に並べる。
+  // 実績（着工日・引渡日）が入っていればそちらを、まだなら予定の日を出す
+  const when = (planId, actId, doneLbl) => {
+    const a = ymd(val(actId)), p = ymd(val(planId));
+    if(a) return { lbl: doneLbl, date: a, done: true };
+    if(p) return { lbl: '予定',   date: p, done: false };
+    return null;
+  };
+  const start = when('est-start-date','est-actual-start','着工日');
+  const end   = when('est-end-date',  'est-handover',    '引渡日');
+  const term = (title, w) => w
+    ? `<div class="iv-term"><div class="iv-term-t">${title}</div>
+         <div class="iv-term-d${w.done?' done':''}">${esc(w.date)}</div>
+         <div class="iv-term-k">${w.lbl}</div></div>`
+    : `<div class="iv-term"><div class="iv-term-t">${title}</div>
+         <div class="iv-term-d none">—</div><div class="iv-term-k">未定</div></div>`;
+  const termsHtml = (start || end)
+    ? `<div class="iv-terms">${term('着工', start)}${term('完工', end)}</div>` : '';
+
+  view.innerHTML = (rows.length || termsHtml)
+    ? (rows.length ? `<dl class="iv-list">${rows.map(r=>
+        `<dt>${esc(r.label)}</dt><dd class="${r.cls||''}">${r.html}</dd>`).join('')}</dl>` : '')
+      + termsHtml
     : '<div class="iv-empty">まだ何も入っていません。右上の「編集」から入力してください。</div>';
 
   // 管理者以外には、編集できないことを添える

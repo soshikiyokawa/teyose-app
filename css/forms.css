@@ -73,3 +73,18 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{
   .iv-list dd{ padding:1px 0 8px; border-top:0; }
   .iv-list dd:first-of-type{ border-top:0; }
 }
+
+/* 着工と完工を横に並べる。実績が入っていれば実績の日、まだなら予定の日 */
+.iv-terms{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+  padding:10px 16px 2px;
+}
+.iv-term{
+  border:0.5px solid var(--border); border-radius:8px;
+  padding:8px 10px; background:var(--surface2);
+}
+.iv-term-t{ font-size:11px; color:var(--text-muted); }
+.iv-term-d{ font-size:17px; font-weight:700; color:var(--text); line-height:1.3; }
+.iv-term-d.done{ color:var(--accent-t); }        /* 実績が入っている */
+.iv-term-d.none{ color:var(--text-muted); font-weight:400; }
+.iv-term-k{ font-size:11px; color:var(--text-muted); }

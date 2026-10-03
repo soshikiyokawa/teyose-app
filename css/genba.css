@@ -291,3 +291,9 @@ table.otpay-tbl td.minus{color:#8a2018}
   background:color-mix(in srgb, var(--accent-bg) 88%, transparent);
   border-radius:10px;pointer-events:none;z-index:5
 }
+
+/* 現場写真・図面・メンバー・保存書類。案件情報カードの中に2段（2×2）で並べる */
+.info-genba-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:4px 16px 14px;
+}
+.info-genba-grid .info-genba-btn{ flex:none; width:100%; }
