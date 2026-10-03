@@ -39,7 +39,7 @@ where r.project_id is not null
   and not exists (select 1 from public.site_photos s where s.url = p.url);
 
 -- ── 4. 入ったか確かめる ──
-select p.name as 案件, count(*) as 枚数
+select p.name as "案件", count(*) as "枚数"
 from public.site_photos s
 join public.site_folders f on f.id = s.folder_id
 join public.projects p on p.id = s.project_id
