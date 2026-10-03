@@ -292,8 +292,20 @@ table.otpay-tbl td.minus{color:#8a2018}
   border-radius:10px;pointer-events:none;z-index:5
 }
 
-/* 現場写真・図面・メンバー・保存書類。案件情報カードの中に2段（2×2）で並べる */
+/* 現場写真・図面・メンバー・保存書類。案件情報カードの中に2段（2×2）で並べる。
+   緑の塗りつぶしにして、押せる入口だとひと目で分かるようにする */
 .info-genba-grid{
   display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:4px 16px 14px;
 }
-.info-genba-grid .info-genba-btn{ flex:none; width:100%; }
+/* しるし・名前・件数を縦に積む。
+   横に並べると狭い画面で入りきらず、ボタンが列をはみ出して
+   上の着工・完工の囲いと幅がずれてしまうため（min-width:0 もそのため） */
+.info-genba-grid .info-genba-btn{
+  flex:none; width:100%; min-width:0;
+  flex-direction:column; gap:3px; padding:11px 8px; line-height:1.3;
+}
+.info-genba-grid .info-genba-btn > span{
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+/* 件数は、塗りつぶしの上でも読めるように薄い白にする */
+.info-genba-grid .info-genba-btn .info-genba-count{ color:rgba(255,255,255,.78); }
