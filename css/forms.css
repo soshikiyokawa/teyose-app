@@ -89,3 +89,14 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{
 .iv-term-d.done{ color:var(--accent-t); }        /* 実績が入っている */
 .iv-term-d.none{ color:var(--text-muted); font-weight:400; }
 .iv-term-k{ font-size:11px; color:var(--text-muted); }
+
+/* 読むだけの画面に出す資料へのリンク（区画図など） */
+.iv-files{ display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; }
+.iv-file{
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:12px; color:var(--accent-t); text-decoration:none;
+  border:0.5px solid var(--border-s); border-radius:6px; padding:3px 8px;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.iv-file:hover{ background:var(--surface2); }
+.iv-dim{ color:var(--text-muted); }

@@ -70,7 +70,22 @@ function renderInfoView(){
     ? `${esc(site)} <a class="iv-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site)}"
          target="_blank" rel="noopener">地図</a>`
     : '');
-  add('契約済み駐車場', esc(val('est-parking')));
+  // 契約済み駐車場。住所に加えて、登録してある区画図も開けるようにする
+  //（区画図の一覧は入力欄の中にあり、読むだけの画面では隠れてしまうため、ここに出し直す）
+  const pid = selectedProject?.id || null;
+  const pdocs = pid ? (typeof drawings!=='undefined' ? drawings : [])
+                        .filter(d => d.projectId===pid && d.kind==='parking') : [];
+  const pAddr = val('est-parking');
+  if(pAddr || pdocs.length){
+    const links = pdocs.map(d=>{
+      const isPdf = /pdf/i.test(d.fileMime||'') || /.pdf$/i.test(d.fileName||'');
+      return `<a class="iv-file" href="${esc(d.fileUrl)}" target="_blank" rel="noopener"
+                >${isPdf?'📄':'🖼'} ${esc(d.fileName||'区画図')}</a>`;
+    }).join('');
+    add('契約済み駐車場',
+      (pAddr ? esc(pAddr) : '<span class="iv-dim">住所は未入力</span>')
+      + (links ? `<div class="iv-files">${links}</div>` : ''));
+  }
 
   const clients = text('client-members-summary');
   add('お客様チャット', (clients && !/未設定$/.test(clients)) ? esc(clients) : '');
