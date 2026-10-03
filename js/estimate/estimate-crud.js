@@ -523,6 +523,8 @@ function fillProjectInfoTab(p){
   if(typeof fillClientChatBox==='function'){
     fillClientChatBox(p);
   }
+  // 案件を入れ直したら、読むだけの形に戻す（うっかり書き換えるのを防ぐ）
+  if(typeof resetInfoMode==='function') resetInfoMode();
 }
 
 // ════ お客様チャット（案件ごと） ════
@@ -870,8 +872,10 @@ function closeEstList(){document.getElementById('est-list-overlay').classList.re
 function updateProjDeleteBtn(){
   const wrap=document.getElementById('proj-delete-wrap');
   if(!wrap) return;
-  // 案件を選んでいて、管理者のときだけ出す
-  const show = !!selectedProject && currentUserRole==='staff';
+  // 案件を選んでいて、管理者で、編集中のときだけ出す
+  // （読むだけの画面に削除ボタンがあると、押し間違いが怖い）
+  const show = !!selectedProject && currentUserRole==='staff'
+            && (typeof infoEditMode==='undefined' || infoEditMode);
   wrap.style.display = show ? 'flex' : 'none';
 }
 async function deleteCurrentProject(){
