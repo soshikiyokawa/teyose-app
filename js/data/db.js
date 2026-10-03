@@ -1748,6 +1748,33 @@ async function dbAddFolder(projectId, kind, parentId, name){
   if(error){showToast('フォルダの作成に失敗しました：'+error.message);throw error;}
   return data.id;
 }
+// 名前で決まっているフォルダ（例：日報写真）を用意する。
+// すでにあればその番号を返し、無ければ作る。
+// 別の端末が先に作っていることもあるので、作る前にもう一度データベースを見る
+async function dbEnsureSiteFolder(projectId, kind, name){
+  const found = (siteFolders||[]).find(f=>f.projectId===projectId && f.kind===kind
+                  && !f.parentId && f.name===name);
+  if(found) return found.id;
+  const { data } = await sb.from('site_folders').select('id')
+    .eq('project_id', projectId).eq('kind', kind).is('parent_id', null).eq('name', name).limit(1);
+  if(data && data.length){
+    siteFolders.push({id:data[0].id, projectId, kind, parentId:null, name, createdBy:null});
+    return data[0].id;
+  }
+  const id = await dbAddFolder(projectId, kind, null, name);
+  siteFolders.push({id, projectId, kind, parentId:null, name, createdBy:currentUserId});
+  return id;
+}
+
+// 日報から写真を消したときに、現場写真へ写してあった分も片付ける。
+// 同じファイル（URL）を指している行を消す。できなくても日報側の操作は止めない
+async function dbDeleteSitePhotosByUrls(urls){
+  const list = [...new Set((urls||[]).filter(Boolean))];
+  if(!list.length) return;
+  const { error } = await sb.from('site_photos').delete().in('url', list);
+  if(error) console.warn('現場写真の片付けに失敗', error.message);
+}
+
 async function dbRenameFolder(id, name){
   const { error } = await sb.from('site_folders').update({name}).eq('id',id);
   if(error){showToast('名前の変更に失敗しました：'+error.message);throw error;}

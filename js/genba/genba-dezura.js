@@ -154,7 +154,11 @@ async function dzeMakeAbsent(s){
     const what = st.workReports.map(n=>n.projectName||'（工事未設定）').join('・');
     if(!confirm(`${name}さんの ${gbDateLabel(s)} の日報（${what}）を削除して、欠勤にします。\nこの操作は元に戻せません。よろしいですか？`)) return;
   } else if(!confirm(`${name}さんの ${gbDateLabel(s)} を欠勤にしますか？`)) return;
-  for(const n of st.workReports) await dbDeleteNippo(n.id);
+  for(const n of st.workReports){
+    const urls = nippoPhotosOf(n.id).map(p=>p.url);
+    await dbDeleteNippo(n.id);
+    await nippoDropSitePhotos(urls);           // 現場写真に写してあった分も消す
+  }
   if(st.restReport) await dbDeleteNippo(st.restReport.id);
   if(!st.absentReport){
     await dbSaveNippo({

@@ -260,7 +260,9 @@ function nippoRemoveNewPhoto(i){
 }
 async function nippoRemoveSavedPhoto(id){
   if(!confirm('この写真を消しますか？')) return;
+  const gone = (nippoPhotos||[]).find(p=>p.id===id);
   try{ await dbDeleteNippoPhoto(id); }catch(_){ return; }
+  await nippoDropSitePhotos([gone?.url]);      // 現場写真に写してあった分も消す
   nippoPhotos = nippoPhotos.filter(p=>p.id!==id);
   nippoRenderPhotos();
   renderNippo();
@@ -288,7 +290,7 @@ function nippoRenderPhotos(){
 }
 
 // 保存のときに、まとめて上げて日報に結び付ける
-async function nippoUploadPhotos(reportId){
+async function nippoUploadPhotos(reportId, projectId, workDate){
   if(!nippoNewPhotos.length) return;
   const n = nippoNewPhotos.length;
   showToast(`写真を${n}枚アップロードしています…`);
@@ -299,6 +301,35 @@ async function nippoUploadPhotos(reportId){
   }
   await dbAddNippoPhotos(reportId, urls);
   nippoClearNewPhotos();
+  await nippoCopyToSitePhotos(projectId, workDate, urls);
+}
+
+// ── 日報の写真を、その案件の現場写真にも残す ──
+//
+// 日報は月ごとに見るものなので、案件の記録としては現場写真に集まっていた方が探しやすい。
+// 「日報写真」フォルダを案件ごとに用意して、その中に入れる。
+// ファイルは上げ直さず同じものを指すので、保存している量は増えない。
+// 工事が案件に紐づいていないとき（職業訓練校・その他・休み）は何もしない。
+const NIPPO_PHOTO_FOLDER = '日報写真';
+
+async function nippoCopyToSitePhotos(projectId, workDate, urls){
+  if(!projectId || !(urls||[]).length) return;
+  try{
+    const folderId = await dbEnsureSiteFolder(projectId, 'photo', NIPPO_PHOTO_FOLDER);
+    for(const url of urls){
+      await dbAddSitePhoto({projectId, folderId, url, caption:'', shotDate:workDate||gbToday()});
+    }
+  }catch(_){
+    // 日報の写真はそのまま残す。現場写真への登録だけ見送る（理由はdb側が知らせている）
+  }
+}
+
+// 日報から消した写真は、現場写真へ写してあった分も消す（残っていると消したつもりが残る）
+async function nippoDropSitePhotos(urls){
+  const list = (urls||[]).filter(Boolean);
+  if(!list.length) return;
+  try{ await dbDeleteSitePhotosByUrls(list); }catch(_){ return; }
+  sitePhotos = (sitePhotos||[]).filter(p=>!list.includes(p.url));
 }
 
 // ════ 写真をあげた日数（社内は全員が全員分を見られる） ════
@@ -741,7 +772,7 @@ async function saveNippo(){
 
   // 写真は日報が保存できてから上げる。ここで失敗しても日報は残す
   if(nippoNewPhotos.length){
-    try{ await nippoUploadPhotos(reportId); }
+    try{ await nippoUploadPhotos(reportId, projectId, workDate); }
     catch(_){ showToast('日報は保存しましたが、写真を上げられませんでした。開き直してもう一度お試しください'); }
   }
 
@@ -834,7 +865,9 @@ function editNippo(id){
 async function deleteNippo(){
   if(!editingNippoId) return;
   if(!confirm('この日報を削除しますか？')) return;
+  const urls = nippoPhotosOf(editingNippoId).map(p=>p.url);
   await dbDeleteNippo(editingNippoId);
+  await nippoDropSitePhotos(urls);             // 現場写真に写してあった分も消す
   showToast('日報を削除しました');
   resetNippoForm();
   await refreshGenba();
