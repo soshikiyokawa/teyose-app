@@ -106,3 +106,16 @@
 .role-client .topbar-staff{display:none !important}
 /* 案件を選ぶ帯は id で display が指定されているので、id を含む書き方で確実に隠す */
 .role-client #est-project-mobile-bar{display:none !important}
+
+/* ── 指で左右に払ってタブを移るときの動き（js/swipe-tabs.js） ── */
+/* 指を離したあと、短い時間で滑らかに収める。
+   動かしている間は .swipe-drag を付けて、追従が遅れないようにする
+   （will-change も動かしている間だけ。いつも付けると、画面の層が増えて重くなる） */
+.sub-page{ transition:transform .22s cubic-bezier(.22,.61,.36,1); }
+.sub-page.swipe-drag{ transition:none; will-change:transform; }
+/* 払っている間に横へはみ出しても、画面の下に横スクロールを出さない */
+body{ overflow-x:hidden; }
+/* 動きを減らす設定の端末では、すっと切り替える */
+@media (prefers-reduced-motion: reduce){
+  .sub-page{ transition:none; }
+}
