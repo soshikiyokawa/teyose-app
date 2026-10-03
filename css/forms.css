@@ -51,7 +51,7 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{
    ふだんはこちらを出し、「編集」を押したときだけ入力欄に切り替える */
 .iv-list{
   display:grid; grid-template-columns:auto 1fr; gap:0;
-  margin:0; padding:2px 16px 14px; font-size:13px;
+  margin:0; padding:2px 0 14px; font-size:13px;
 }
 .iv-list dt{
   padding:7px 14px 7px 0; color:var(--text-muted); font-size:12px;
@@ -64,8 +64,8 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{
 .iv-list dt:first-of-type, .iv-list dd:first-of-type{ border-top:0; }
 .iv-list dd.iv-strong{ font-size:15px; font-weight:700; }
 .iv-link{ color:var(--accent-t); text-decoration:underline; margin-left:6px; font-size:12px; }
-.iv-empty{ padding:18px 16px; color:var(--text-muted); font-size:13px; }
-.iv-note{ padding:0 16px 12px; color:var(--text-muted); font-size:11px; }
+.iv-empty{ padding:18px 0; color:var(--text-muted); font-size:13px; }
+.iv-note{ padding:0 0 12px; color:var(--text-muted); font-size:11px; }
 /* 狭い画面では、見出しの上に項目名を出す（横に並べると窮屈なため） */
 @media (max-width:599px){
   .iv-list{ grid-template-columns:1fr; }
@@ -74,10 +74,11 @@ input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea{
   .iv-list dd:first-of-type{ border-top:0; }
 }
 
-/* 着工と完工を横に並べる。実績が入っていれば実績の日、まだなら予定の日 */
+/* 着工と完工を横に並べる。実績が入っていれば実績の日、まだなら予定の日。
+   下に並ぶボタン（.info-genba-grid）と左右の位置・間隔をそろえる */
 .iv-terms{
-  display:grid; grid-template-columns:1fr 1fr; gap:10px;
-  padding:10px 16px 2px;
+  display:grid; grid-template-columns:1fr 1fr; gap:8px;
+  padding:10px 0 0;
 }
 .iv-term{
   border:0.5px solid var(--border); border-radius:8px;

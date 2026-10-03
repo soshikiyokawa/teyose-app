@@ -60,19 +60,12 @@ function renderInfoView(){
   const val  = id => (document.getElementById(id)?.value || '').trim();
   const text = id => (document.getElementById(id)?.textContent || '').trim();
   const ymd  = s => s ? String(s).replace(/-/g,'/') : '';
-  // 選んでいないとき（「—」「選択...」などの見出し）は、何も無いものとして扱う
-  const sel  = id => {
-    const e = document.getElementById(id);
-    if(!e || !e.value || e.selectedIndex < 0) return '';
-    return (e.options[e.selectedIndex]?.textContent || '').trim();
-  };
 
   const site = val('est-site');
   const rows = [];
   const add = (label, html, cls) => { if(html) rows.push({label, html, cls}); };
 
   add('物件名', esc(val('est-project')), 'iv-strong');
-  add('工事区分', esc(sel('info-type')));
   add('工事場所', site
     ? `${esc(site)} <a class="iv-link" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site)}"
          target="_blank" rel="noopener">地図</a>`

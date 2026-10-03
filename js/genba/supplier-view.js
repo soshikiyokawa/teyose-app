@@ -20,14 +20,23 @@ function applySupplierProjectView(){
       el.readOnly = readOnly;
       el.style.background = readOnly ? 'var(--surface2)' : '';
     });
-  // 保存・新規・見積へ・削除・メンバー編集・区画図の追加は出さない
+  // 保存・新規・見積へ・削除・メンバー編集・区画図の追加は出さない。
+  // ただし「編集」と「案件を保存」は、読むだけ／編集中の切り替え（applyInfoMode）が
+  // 出し入れを持っているので、ここでは出し直さない
+  // （出し直すと、読むだけの画面に「案件を保存」が残ってしまう）
   [...document.querySelectorAll('#estsub-info button')].forEach(b=>{
+    if(b.id==='info-save-btn' || b.id==='info-edit-btn'){
+      if(readOnly) b.style.display='none';
+      return;
+    }
     const t=(b.textContent||'').replace(/\s+/g,'');
     const on=(b.getAttribute('onclick')||'');
     const isEdit = t.includes('案件を保存')||t.includes('見積情報へ')||t.includes('新規')||t==='一覧'
         || t.includes('この案件を削除')||on.includes('openMemberPicker')||b.id==='parking-doc-add-btn';
     if(isEdit) b.style.display = readOnly ? 'none' : '';
   });
+  // 社員のときは、読むだけ／編集中の形に戻しておく
+  if(!readOnly && typeof applyInfoMode==='function') applyInfoMode();
   // 案件の削除欄は社員側の出し分け（updateProjDeleteBtn）に任せる。発注先のときだけ隠す
   const del=document.getElementById('proj-delete-wrap');
   if(del && readOnly) del.style.display='none';
