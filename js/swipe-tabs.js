@@ -17,28 +17,48 @@
 //   ・指で触ったときだけ。マウスでは動かない
 //   ・終わったら必ず transform を消す（残すと中身の貼り付き表示がおかしくなるため）
 
-const SWIPE_MIN_X   = 60;   // この幅より大きく払ったらタブを移る（px）
+const SWIPE_MIN_X   = 45;   // この幅より大きく払ったらタブを移る（px）
 const SWIPE_MAX_Y   = 50;   // 縦にこれ以上動いていたら、縦スクロールと見なす（px）
-const SWIPE_RATIO   = 1.5;  // 横の動きが縦の何倍あれば「横に払った」と見るか
-const SWIPE_MAX_MS  = 800;  // これより長く触っていたら、払ったとは見なさない
-const SWIPE_START_X = 12;   // この幅を越えたら、指に付いて動かし始める（px）
-const SWIPE_DRAG    = 0.45; // 指の動きに対して、どれだけ付いてくるか
-const SWIPE_WALL    = 0.12; // となりが無いときの、ひっかかる程度
+const SWIPE_RATIO   = 1.2;  // 横の動きが縦の何倍あれば「横に払った」と見るか
+const SWIPE_MAX_MS  = 1200; // これより長く触っていたら、払ったとは見なさない
+const SWIPE_START_X = 6;    // この幅を越えたら、指に付いて動かし始める（px）
+const SWIPE_DRAG    = 0.9;  // 指の動きに対して、どれだけ付いてくるか（1に近いほど手に吸い付く）
+const SWIPE_WALL    = 0.14; // となりが無いときの、ひっかかる程度
+// さっと払ったときは、短くてもタブを移す（速さ px/ミリ秒、最低これだけは動かす）
+const SWIPE_FLICK_V = 0.4;
+const SWIPE_FLICK_X = 22;
 
 let _swipe = null;
 
+// いま開いている画面で、払ったときに何が起きるか。
+//   btns … 並んでいるタブ。となりへ移る
+//   back … チャットを開いているとき。右へ払うと一覧へ戻る
+//   pane … 指に付いて動かす中身
+function swipeCtx(){
+  const page = document.querySelector('.page.active');
+  if(!page) return null;
+
+  // チャットはタブの作りが違う（.talk-tab）。
+  // スレッドを開いている間は、右へ払うと一覧へ戻る
+  if(page.id === 'page-talk'){
+    const detail = document.getElementById('talk-panel-detail');
+    const list   = document.getElementById('talk-panel-list');
+    if(detail && getComputedStyle(detail).display !== 'none'){
+      return { pane: detail, btns: [], back: true };
+    }
+    return { pane: list, btns: [...document.querySelectorAll('#talk-list-tabs .talk-tab')]
+                               .filter(b => b.offsetParent !== null) };
+  }
+
+  return { pane: page.querySelector('.sub-page.active'),
+           btns: [...page.querySelectorAll('.sub-tab-bar .sub-tab-btn')]
+                   .filter(b => b.offsetParent !== null) };   // 役割によって隠れているものを除く
+}
+
 // いま開いているページの、押せるタブのボタン（隠れているものは飛ばす）
-function swipeTabButtons(){
-  const page = document.querySelector('.page.active');
-  if(!page) return [];
-  return [...page.querySelectorAll('.sub-tab-bar .sub-tab-btn')]
-    .filter(b => b.offsetParent !== null);   // 役割によって隠れているものを除く
-}
+function swipeTabButtons(){ return swipeCtx()?.btns || []; }
 // いま出ている中身（動かす対象）
-function swipePane(){
-  const page = document.querySelector('.page.active');
-  return page ? page.querySelector('.sub-page.active') : null;
-}
+function swipePane(){ return swipeCtx()?.pane || null; }
 
 // 指を置いたところから上へたどって、横に動かせるものを探す
 function swipeScrollerAt(el){
@@ -58,16 +78,26 @@ function swipeIgnore(el){
   return !!el.closest('input, textarea, select, button, a, [contenteditable=""], [contenteditable="true"]');
 }
 
-// 中身の横のずれを決める。終わったら必ず消す
+// 中身の横のずれを決める。終わったら必ず消す。
+// 指を動かすたびに書き込むと、1回の描き替えに何度も書くことになって重くなるので、
+// 次に描くときにまとめて1回だけ反映する
+let _swipeRaf = 0, _swipePx = 0, _swipePane = null;
+function swipeFlush(){
+  _swipeRaf = 0;
+  if(_swipePane) _swipePane.style.transform = 'translate3d(' + _swipePx + 'px,0,0)';
+}
 function swipeShift(pane, px){
   if(!pane) return;
   if(px === null){
+    if(_swipeRaf){ cancelAnimationFrame(_swipeRaf); _swipeRaf = 0; }
+    _swipePane = null;
     pane.classList.remove('swipe-drag');
     pane.style.transform = '';
     return;
   }
   pane.classList.add('swipe-drag');          // 動かしている間は、なめらかに追従させない
-  pane.style.transform = 'translate3d(' + px + 'px,0,0)';
+  _swipePane = pane; _swipePx = px;
+  if(!_swipeRaf) _swipeRaf = requestAnimationFrame(swipeFlush);
 }
 // 指を離したあと、短い時間で収める。
 // 始まりの位置をいったん確定させてから0へ戻すと、動きとして見える。
@@ -75,6 +105,8 @@ function swipeShift(pane, px){
 //   ずれたまま残ってしまうので使わない）
 function swipeSettle(pane, from){
   if(!pane) return;
+  if(_swipeRaf){ cancelAnimationFrame(_swipeRaf); _swipeRaf = 0; }
+  _swipePane = null;
   pane.classList.remove('swipe-drag');
   if(from){
     pane.style.transition = 'none';
@@ -87,7 +119,7 @@ function swipeSettle(pane, from){
   pane._swipeT = setTimeout(()=>{
     pane.style.transform = '';
     pane.style.transition = '';
-  }, 260);
+  }, 200);
 }
 
 function onSwipeStart(e){
@@ -96,18 +128,21 @@ function onSwipeStart(e){
   const t = e.touches[0];
   const el = e.target;
   if(swipeIgnore(el)) return;
-  const btns = swipeTabButtons();
-  if(!btns.length) return;
+  const ctx = swipeCtx();
+  if(!ctx) return;
+  if(!ctx.back && !ctx.btns.length) return;
 
   // 横に動かせるものの上なら、その端にいるときだけタブを移してよい
   const sc = swipeScrollerAt(el);
   const atLeft  = !sc || sc.scrollLeft <= 1;
   const atRight = !sc || sc.scrollLeft >= sc.scrollWidth - sc.clientWidth - 1;
-  const i = btns.findIndex(b => b.classList.contains('active'));
+  const i = ctx.btns.findIndex(b => b.classList.contains('active'));
 
   _swipe = { x:t.clientX, y:t.clientY, t:Date.now(), atLeft, atRight, ok:true,
-             pane: swipePane(), drag:false,
-             hasPrev: i > 0, hasNext: i >= 0 && i < btns.length - 1 };
+             pane: ctx.pane, drag:false, back: !!ctx.back,
+             // チャットを開いている間は、右へ払う（＝一覧へ戻る）だけができる
+             hasPrev: ctx.back ? true  : i > 0,
+             hasNext: ctx.back ? false : (i >= 0 && i < ctx.btns.length - 1) };
 }
 
 function onSwipeMove(e){
@@ -140,9 +175,16 @@ function onSwipeEnd(e){
   const dx = t ? t.clientX - s.x : 0;
   const dy = t ? t.clientY - s.y : 0;
 
+  // さっと払ったときは、短くても移す（速さで見る）
+  const ms = Math.max(1, Date.now() - s.t);
+  const far = Math.abs(dx) >= SWIPE_MIN_X
+           || (Math.abs(dx) / ms >= SWIPE_FLICK_V && Math.abs(dx) >= SWIPE_FLICK_X);
+  // 行き先があるか。チャットを開いている間は、右へ払ったとき（＝一覧へ戻る）だけ
+  const hasWay = s.back ? (dx > 0) : (dx < 0 ? s.hasNext : s.hasPrev);
   const go = s.ok && t
     && Date.now() - s.t <= SWIPE_MAX_MS
-    && Math.abs(dx) >= SWIPE_MIN_X
+    && far
+    && hasWay
     && Math.abs(dy) <= SWIPE_MAX_Y
     && Math.abs(dx) >= Math.abs(dy) * SWIPE_RATIO
     && (dx < 0 ? s.atRight : s.atLeft);
@@ -154,7 +196,16 @@ function onSwipeEnd(e){
     return;
   }
   swipeShift(s.pane, null);      // 元のタブの中身は、ずらしたまま消さずに戻しておく
+  if(s.back){ swipeGoBack(); return; }
   swipeGoTab(dx < 0 ? 1 : -1);
+}
+
+// チャットのスレッドから、一覧へ戻る
+function swipeGoBack(){
+  if(typeof closeTalkPanelThread !== 'function') return;
+  closeTalkPanelThread();
+  const list = document.getElementById('talk-panel-list');
+  if(list) swipeSettle(list, -44);          // 一覧が左から滑り込む
 }
 
 // となりのタブへ移る。端まで来ていたら、それ以上は動かさない
@@ -171,7 +222,7 @@ function swipeGoTab(dir){
 
   // 新しい中身を、払った向きから滑り込ませる
   const pane = swipePane();
-  if(pane) swipeSettle(pane, dir > 0 ? 60 : -60);
+  if(pane) swipeSettle(pane, dir > 0 ? 44 : -44);
 }
 
 document.addEventListener('touchstart', onSwipeStart, { passive:true });
