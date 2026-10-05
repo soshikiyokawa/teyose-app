@@ -613,6 +613,119 @@ function renderClientChatBox(){
   }
 }
 
+// ════ お客様にご入力いただく画面 ════
+//
+// タブレットをお渡しして、ご本人にお名前とメールアドレスを打っていただく。
+// 打ち間違いが減り、「人に聞いて代わりに入れる」手間も無くなる。
+//
+// ここで触るのは clientRows の控え（ceRows）だけ。
+// 「入力しました」を押したときに初めて本体へ移す（途中でやめても元のまま）。
+let ceRows = [];
+
+function openClientEntry(){
+  if(!selectedProject?.id){ alert('先に案件を保存してください。'); return; }
+  // いま入っているものを引き継ぐ。空の行しか無ければ、まっさらから始める
+  ceRows = clientRows.filter(c=>(c.name||'').trim() || (c.email||'').trim()).map(c=>({...c}));
+  if(!ceRows.length) ceRows = [{id:null, name:'', email:'', userId:null}];
+
+  const lead = document.getElementById('client-entry-lead');
+  if(lead){
+    lead.innerHTML =
+      `<p><b>${esc(selectedProject.name)}</b> の工事につきまして、`
+      + `ありがとうございます。</p>`
+      + `<p>工事中のご連絡は、スマートフォンの<b>チャット</b>でやりとりさせていただきます。`
+      + `工事の進み具合や現場の写真をお送りしたり、ご質問をいつでもお受けできます。</p>`
+      + `<p>ご案内をお送りしますので、<b>お名前</b>と<b>メールアドレス</b>をご入力ください。`
+      + `ご夫婦など、お二方以上でご覧いただくこともできます。</p>`;
+  }
+  renderClientEntry();
+  document.getElementById('client-entry-modal').classList.add('open');
+  // 最初の欄にすぐ打てるようにする
+  setTimeout(()=>document.querySelector('#client-entry-rows .ce-input')?.focus(), 80);
+}
+
+function closeClientEntry(){
+  document.getElementById('client-entry-modal').classList.remove('open');
+}
+
+function clientEntryAdd(){
+  if(ceRows.length >= 4){ return; }
+  ceRows.push({id:null, name:'', email:'', userId:null});
+  renderClientEntry();
+  const list = document.querySelectorAll('#client-entry-rows .ce-input');
+  list[list.length-2]?.focus();
+}
+function clientEntryRemove(i){
+  ceRows.splice(i,1);
+  if(!ceRows.length) ceRows = [{id:null, name:'', email:'', userId:null}];
+  renderClientEntry();
+}
+function setClientEntry(i, field, v){ if(ceRows[i]) ceRows[i][field] = v; }
+
+function renderClientEntry(){
+  const el = document.getElementById('client-entry-rows');
+  if(!el) return;
+  el.innerHTML = ceRows.map((c,i)=>`
+    <div class="ce-row">
+      <div class="ce-row-head">
+        <span class="ce-row-no">${ceRows.length>1 ? (i+1)+'人目' : 'ご入力'}</span>
+        ${ceRows.length>1 ? `<button type="button" class="ce-del" onclick="clientEntryRemove(${i})">消す</button>` : ''}
+      </div>
+      <label class="ce-label" for="ce-name-${i}">お名前</label>
+      <input class="ce-input" id="ce-name-${i}" value="${esc(c.name||'')}"
+             placeholder="例：清川 太郎" autocomplete="name"
+             oninput="setClientEntry(${i},'name',this.value)">
+      <label class="ce-label" for="ce-mail-${i}">メールアドレス</label>
+      <input class="ce-input" id="ce-mail-${i}" type="email" value="${esc(c.email||'')}"
+             placeholder="例：taro@example.com" inputmode="email"
+             autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false"
+             oninput="setClientEntry(${i},'email',this.value)">
+    </div>`).join('');
+  const add = document.querySelector('#client-entry-modal .ce-add');
+  if(add) add.style.display = ceRows.length >= 4 ? 'none' : '';
+}
+
+// 「入力しました」。ここで初めて本体へ移して、保存まで済ませる
+async function saveClientEntry(){
+  const err = document.getElementById('client-entry-err');
+  const show = m => { if(err){ err.textContent = m; err.style.display=''; err.scrollIntoView({block:'nearest'}); } };
+  if(err) err.style.display='none';
+
+  const rows = ceRows
+    .map(c=>({...c, name:String(c.name||'').trim(), email:String(c.email||'').trim()}))
+    .filter(c=>c.name || c.email);
+  if(!rows.length){ show('お名前とメールアドレスをご入力ください。'); return; }
+  for(const c of rows){
+    if(!c.name){  show('お名前が入っていない欄があります。'); return; }
+    if(!c.email){ show(`${c.name} 様のメールアドレスが入っていません。`); return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)){
+      show(`メールアドレスの形をご確認ください：${c.email}`); return;
+    }
+  }
+  const mails = rows.map(c=>c.email.toLowerCase());
+  if(new Set(mails).size !== mails.length){ show('同じメールアドレスが2つ入っています。'); return; }
+
+  // 元から居た方で、今回の入力に出てこなかった行は、そのまま残す（勝手に消さない）
+  const kept = clientRows.filter(c=>c.id && !rows.some(r=>r.id===c.id));
+  clientRows = [...rows, ...kept];
+
+  const btn = document.querySelector('#client-entry-modal .ce-done');
+  if(btn){ btn.disabled = true; btn.textContent = '保存しています…'; }
+  try{
+    const list = await dbSaveProjectClients(selectedProject.id, clientRows);
+    if(list.length) clientRows = list.map(c=>({...c}));
+    if(selectedProject) selectedProject.clients = list;
+  }catch(_){
+    if(btn){ btn.disabled = false; btn.textContent = '入力しました'; }
+    show('保存できませんでした。担当者にお知らせください。');
+    return;
+  }
+  if(btn){ btn.disabled = false; btn.textContent = '入力しました'; }
+  closeClientEntry();
+  renderClientChatBox();
+  showToast('お客様のご入力を保存しました。「チャット案内」を押すとご案内が届きます');
+}
+
 function openClientMemberPicker(){
   renderClientMemberPicker();
   document.getElementById('client-member-modal').classList.add('open');

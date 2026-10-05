@@ -45,6 +45,48 @@
 .member-row.on .member-check{background:var(--accent);border-color:var(--accent)}
 
 /* お客様チャットの1人ぶんの行（お名前・メールアドレス・状態・ご案内ボタン） */
+/* ── お客様にご入力いただく画面（タブレットをお渡しして使う） ── */
+/* 字と押すところを大きく。年配の方でも読めることを第一にする */
+#client-entry-sheet{position:fixed;inset:0;background:var(--surface);
+  display:flex;flex-direction:column;overflow:hidden}
+.ce-head{flex-shrink:0;display:flex;align-items:center;gap:10px;
+  padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface)}
+.ce-title{flex:1;font-size:19px;font-weight:700;color:var(--accent-t)}
+.ce-close{flex-shrink:0;border:1px solid var(--border);background:var(--surface2);color:var(--text-sub);
+  font:inherit;font-size:13px;padding:7px 14px;border-radius:8px;cursor:pointer}
+.ce-body{flex:1;overflow-y:auto;padding:18px;max-width:680px;width:100%;margin:0 auto;
+  -webkit-overflow-scrolling:touch}
+.ce-lead{font-size:17px;line-height:1.95;color:var(--text)}
+.ce-lead p{margin:0 0 12px}
+.ce-row{border:1px solid var(--border);border-radius:14px;padding:16px 16px 18px;
+  margin:18px 0;background:var(--surface2)}
+.ce-row-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ce-row-no{flex:1;font-size:14px;font-weight:700;color:var(--accent-t)}
+.ce-del{border:1px solid var(--border);background:var(--surface);color:var(--text-sub);
+  font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;cursor:pointer}
+.ce-label{display:block;font-size:15px;font-weight:700;color:var(--text-sub);margin:12px 0 6px}
+.ce-input{display:block;width:100%;box-sizing:border-box;
+  font-size:21px;line-height:1.5;padding:14px 14px;border-radius:12px;
+  border:2px solid var(--border);background:var(--surface);color:var(--text)}
+.ce-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+.ce-add{display:block;width:100%;font:inherit;font-size:15px;padding:14px;cursor:pointer;
+  border:1px dashed var(--border);border-radius:12px;background:transparent;color:var(--text-sub)}
+.ce-note{font-size:14px;line-height:1.9;color:var(--text-muted);margin:20px 0 8px;
+  padding:14px 16px;border-radius:12px;background:var(--surface2)}
+.ce-err{font-size:16px;font-weight:700;color:var(--danger);line-height:1.8;
+  margin:14px 0;padding:14px 16px;border-radius:12px;
+  background:var(--danger-bg,#fdecea);border:1px solid var(--danger)}
+.ce-foot{flex-shrink:0;padding:14px 18px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--border);background:var(--surface)}
+.ce-done{display:block;width:100%;max-width:680px;margin:0 auto;
+  font:inherit;font-size:19px;font-weight:700;padding:17px;cursor:pointer;
+  border:none;border-radius:12px;background:var(--accent);color:#fff}
+.ce-done:disabled{opacity:.6;cursor:default}
+@media(max-width:600px){
+  .ce-lead{font-size:16px}
+  .ce-input{font-size:19px}
+}
+
 .client-row{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
 .client-row input{flex:1 1 150px;min-width:0;font-size:13px;padding:7px 9px;border-radius:8px;
   border:1px solid var(--border-s);background:var(--surface);color:var(--text);font-family:inherit}

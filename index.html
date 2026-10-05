@@ -25,8 +25,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=470">
-<link rel="stylesheet" href="css/schedule.css?v=470">
+<link rel="stylesheet" href="css/main.css?v=471">
+<link rel="stylesheet" href="css/schedule.css?v=471">
 <!-- 地図（Leaflet）と Supabase は、よそのCDNではなく自前に置いてある。
      よそから読むとサービスワーカーが素通しするため、毎回ネットを待つことになり、
      その間ずっと真っ白な画面になっていた（2026-10-05） -->
@@ -369,7 +369,14 @@ setTimeout(window.hideBootScreen, 15000);
         <div class="fg full" id="client-chat-box"><label>お客様チャット</label>
           <!-- お客様は何人でも登録できる（ご主人・奥様など）。行ごとに名前とメールアドレス -->
           <div id="client-rows"></div>
-          <button type="button" class="btn sm" onclick="addClientRow()" style="margin-top:6px">＋ お客様を追加</button>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <button type="button" class="btn sm" onclick="addClientRow()">＋ お客様を追加</button>
+            <!-- タブレットをお客様にお渡しして、ご本人に入れていただくための画面 -->
+            <button type="button" class="btn sm primary" onclick="openClientEntry()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+              お客様入力依頼
+            </button>
+          </div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
             <div id="client-members-summary" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;color:var(--text-sub)">きよかわの参加者：未設定</div>
             <button type="button" class="btn sm" onclick="openClientMemberPicker()" style="flex-shrink:0">担当を選ぶ</button>
@@ -1989,6 +1996,41 @@ setTimeout(window.hideBootScreen, 15000);
   </div>
 </div>
 
+<!-- ════ お客様にご入力いただく画面 ════
+     タブレットをお渡しして、ご本人に打っていただくためのもの。
+     ・字を大きく、押すところも大きく
+     ・ほかの画面は見えないよう、画面いっぱいに出す
+     ・なぜ要るのか、どう使うのかを先に書いておく -->
+<div class="modal-overlay" id="client-entry-modal" style="z-index:400">
+  <div id="client-entry-sheet">
+    <div class="ce-head">
+      <div class="ce-title">チャットのご登録</div>
+      <button type="button" class="ce-close" onclick="closeClientEntry()" title="きよかわの担当者が閉じます">とじる</button>
+    </div>
+
+    <div class="ce-body">
+      <div class="ce-lead" id="client-entry-lead"></div>
+
+      <div id="client-entry-rows"></div>
+
+      <button type="button" class="ce-add" onclick="clientEntryAdd()">＋ もうお一方ご入力いただく場合はこちら</button>
+
+      <div class="ce-note">
+        ご入力いただいたメールアドレスは、このチャットのご案内にのみ使います。
+        ほかの目的には使いません。<br>
+        お客様にご覧いただけるのは、担当者とのチャットだけです。
+        ほかの案件やお見積りなどが見えることはありません。
+      </div>
+
+      <div id="client-entry-err" class="ce-err" style="display:none"></div>
+    </div>
+
+    <div class="ce-foot">
+      <button type="button" class="ce-done" onclick="saveClientEntry()">入力しました</button>
+    </div>
+  </div>
+</div>
+
 <!-- ════ 案件一覧のA3印刷（印刷する案件を選んで、刷り上がりを見てから印刷） ════ -->
 <div class="modal-overlay" id="ol-print-modal" style="z-index:300" onclick="if(event.target.id==='ol-print-modal')closeOlPrint()">
   <div class="modal-sheet ol-print-sheet">
@@ -3423,96 +3465,96 @@ setTimeout(window.hideBootScreen, 15000);
 <!-- Supabase（共有データベース） -->
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="js/supabase-client.js?v=470"></script>
+<script src="js/supabase-client.js?v=471"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=470"></script>
+<script src="js/utils.js?v=471"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=470"></script>
+<script src="js/state.js?v=471"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=470"></script>
+<script src="js/data/db.js?v=471"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=470"></script>
-<script src="js/swipe-tabs.js?v=470"></script>
+<script src="js/nav.js?v=471"></script>
+<script src="js/swipe-tabs.js?v=471"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=470"></script>
+<script src="js/talk.js?v=471"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=470"></script>
+<script src="js/push.js?v=471"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=470"></script>
-<script src="js/estimate/estimate-items.js?v=470"></script>
-<script src="js/estimate/quote-import.js?v=470"></script>
-<script src="js/estimate/estimate-master.js?v=470"></script>
-<script src="js/estimate/estimate-summary.js?v=470"></script>
-<script src="js/estimate/estimate-crud.js?v=470"></script>
-<script src="js/estimate/info-view.js?v=470"></script>
-<script src="js/estimate/parking.js?v=470"></script>
-<script src="js/estimate/estimate-pdf.js?v=470"></script>
-<script src="js/estimate/estimate-invoice.js?v=470"></script>
+<script src="js/estimate/estimate-tabs.js?v=471"></script>
+<script src="js/estimate/estimate-items.js?v=471"></script>
+<script src="js/estimate/quote-import.js?v=471"></script>
+<script src="js/estimate/estimate-master.js?v=471"></script>
+<script src="js/estimate/estimate-summary.js?v=471"></script>
+<script src="js/estimate/estimate-crud.js?v=471"></script>
+<script src="js/estimate/info-view.js?v=471"></script>
+<script src="js/estimate/parking.js?v=471"></script>
+<script src="js/estimate/estimate-pdf.js?v=471"></script>
+<script src="js/estimate/estimate-invoice.js?v=471"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=470"></script>
-<script src="js/payment-schedule.js?v=470"></script>
-<script src="js/inspection.js?v=470"></script>
+<script src="js/orders-list.js?v=471"></script>
+<script src="js/payment-schedule.js?v=471"></script>
+<script src="js/inspection.js?v=471"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=470"></script>
+<script src="js/chusho.js?v=471"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=470"></script>
+<script src="js/schedule.js?v=471"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=470"></script>
-<script src="js/order/item-price.js?v=470"></script>
-<script src="js/order/item-master.js?v=470"></script>
-<script src="js/order/invoice.js?v=470"></script>
-<script src="js/order/invoice-lines.js?v=470"></script>
-<script src="js/order/ekrea-price.js?v=470"></script>
-<script src="js/order/order-cart.js?v=470"></script>
-<script src="js/order/order-confirm.js?v=470"></script>
-<script src="js/order/order-price-edit.js?v=470"></script>
-<script src="js/order/order-history.js?v=470"></script>
-<script src="js/cost-budget.js?v=470"></script>
-<script src="js/order/card-match.js?v=470"></script>
-<script src="js/receipt-scan.js?v=470"></script>
-<script src="js/receipt-ledger.js?v=470"></script>
-<script src="js/order/quote-request.js?v=470"></script>
-<script src="js/receipt.js?v=470"></script>
+<script src="js/order/supplier-master.js?v=471"></script>
+<script src="js/order/item-price.js?v=471"></script>
+<script src="js/order/item-master.js?v=471"></script>
+<script src="js/order/invoice.js?v=471"></script>
+<script src="js/order/invoice-lines.js?v=471"></script>
+<script src="js/order/ekrea-price.js?v=471"></script>
+<script src="js/order/order-cart.js?v=471"></script>
+<script src="js/order/order-confirm.js?v=471"></script>
+<script src="js/order/order-price-edit.js?v=471"></script>
+<script src="js/order/order-history.js?v=471"></script>
+<script src="js/cost-budget.js?v=471"></script>
+<script src="js/order/card-match.js?v=471"></script>
+<script src="js/receipt-scan.js?v=471"></script>
+<script src="js/receipt-ledger.js?v=471"></script>
+<script src="js/order/quote-request.js?v=471"></script>
+<script src="js/receipt.js?v=471"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=470"></script>
-<script src="js/genba/supplier-view.js?v=470"></script>
-<script src="js/genba/genba-files.js?v=470"></script>
-<script src="js/genba/genba-photos.js?v=470"></script>
-<script src="js/genba/genba-drawings.js?v=470"></script>
-<script src="js/genba/genba-nippo.js?v=470"></script>
-<script src="js/genba/staff-schedule.js?v=470"></script>
-<script src="js/genba/genba-dezura.js?v=470"></script>
-<script src="js/genba/payroll.js?v=470"></script>
-<script src="js/genba/overtime-pay.js?v=470"></script>
-<script src="js/genba/leave-balance.js?v=470"></script>
-<script src="js/genba/genba-leave.js?v=470"></script>
-<script src="js/genba/genba-holiday.js?v=470"></script>
-<script src="js/genba/license.js?v=470"></script>
-<script src="js/genba/vehicle.js?v=470"></script>
-<script src="js/genba/work-calendar.js?v=470"></script>
-<script src="js/genba/account-perms.js?v=470"></script>
+<script src="js/genba/genba-tabs.js?v=471"></script>
+<script src="js/genba/supplier-view.js?v=471"></script>
+<script src="js/genba/genba-files.js?v=471"></script>
+<script src="js/genba/genba-photos.js?v=471"></script>
+<script src="js/genba/genba-drawings.js?v=471"></script>
+<script src="js/genba/genba-nippo.js?v=471"></script>
+<script src="js/genba/staff-schedule.js?v=471"></script>
+<script src="js/genba/genba-dezura.js?v=471"></script>
+<script src="js/genba/payroll.js?v=471"></script>
+<script src="js/genba/overtime-pay.js?v=471"></script>
+<script src="js/genba/leave-balance.js?v=471"></script>
+<script src="js/genba/genba-leave.js?v=471"></script>
+<script src="js/genba/genba-holiday.js?v=471"></script>
+<script src="js/genba/license.js?v=471"></script>
+<script src="js/genba/vehicle.js?v=471"></script>
+<script src="js/genba/work-calendar.js?v=471"></script>
+<script src="js/genba/account-perms.js?v=471"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=470"></script>
+<script src="js/init.js?v=471"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=470"></script>
-<script src="js/tasks.js?v=470"></script>
-<script src="js/task-templates.js?v=470"></script>
-<script src="js/auth.js?v=470"></script>
-<script src="js/account.js?v=470"></script>
+<script src="js/notifications.js?v=471"></script>
+<script src="js/tasks.js?v=471"></script>
+<script src="js/task-templates.js?v=471"></script>
+<script src="js/auth.js?v=471"></script>
+<script src="js/account.js?v=471"></script>
 </body>
 </html>
