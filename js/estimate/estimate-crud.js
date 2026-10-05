@@ -628,13 +628,22 @@ function openClientEntry(){
   ceRows = clientRows.filter(c=>(c.name||'').trim() || (c.email||'').trim()).map(c=>({...c}));
   if(!ceRows.length) ceRows = [{id:null, name:'', email:'', userId:null}];
 
+  // 案件名は、担当者が「開いている案件で合っているか」を確かめるためのもの。
+  // ご契約前の初回来場でもお見せするので、お客様向けの文には入れない
+  const sub = document.getElementById('client-entry-sub');
+  if(sub) sub.textContent = selectedProject.name || '';
+
+  // ご案内文。ご契約前のお打合せの段から使っていただく前提で書いてある。
+  // 工事を前提にした言い方にすると、初回来場のお客様に押しつけがましくなるため
   const lead = document.getElementById('client-entry-lead');
   if(lead){
     lead.innerHTML =
-      `<p><b>${esc(selectedProject.name)}</b> の工事につきまして、`
-      + `ありがとうございます。</p>`
-      + `<p>工事中のご連絡は、スマートフォンの<b>チャット</b>でやりとりさせていただきます。`
-      + `工事の進み具合や現場の写真をお送りしたり、ご質問をいつでもお受けできます。</p>`
+      `<p>本日は、お打合せのお時間をいただきありがとうございます。</p>`
+      + `<p>きよかわでは、お打合せのご連絡に<b>チャット</b>をお使いいただいています。`
+      + `間取りやお見積りのご質問、次回のお約束など、お気づきになったときに`
+      + `いつでもお送りいただけます。お電話がつながらないときも、お待たせしません。</p>`
+      + `<p>そのあと工事をご用命いただいた際は、同じチャットのまま、`
+      + `進み具合のご報告や現場の写真をお届けします。</p>`
       + `<p>ご案内をお送りしますので、<b>お名前</b>と<b>メールアドレス</b>をご入力ください。`
       + `ご夫婦など、お二方以上でご覧いただくこともできます。</p>`;
   }
