@@ -69,6 +69,9 @@ const CLIENT_THREAD_PREFIX = 'お客様：';
 let clientThreadIds = {};    // {スレッド名: projectId}
 let clientChats = [];        // 自分が入っているお客様チャット {projectId,projectName,memberNames}
 let chatReads = [];          // 既読管理（{userId,userName,thread,lastReadAt}）
+// 開いたときに読むのは、スレッドごとの直近だけ（やりとりは消えずに積み上がるため）。
+// まだ前があるスレッドは true。「もっと前を読む」を出す目印に使う
+let chatOlder = {};          // {スレッド名: まだ前がある}
 let quotingMsg = null;       // 引用中のメッセージ
 let editingMsgId = null;     // 編集中のメッセージID
 let menuMsgId = null;        // 長押しメニューの対象メッセージID

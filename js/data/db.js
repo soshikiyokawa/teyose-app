@@ -2271,9 +2271,16 @@ function applyClientChatMembership(res){
 // チャットの読み込みは「通信（fetchChatRows）」と「組み立て（buildChatData）」に分けてある。
 // 起動時は、ほかの読み込みと一緒に通信だけ先に走らせ、案件と名簿がそろってから組み立てる。
 // こうしないと、案件チャット・お客様チャットの名前が「（削除された案件）」になってしまう
+// ── 開いたときに読むチャットの量 ──
+//
+// やりとりは消えずに積み上がるので、全部取りに行くと使うほど立ち上がりが遅くなる。
+// スレッドごとに直近だけを読み、古いところは「もっと前を読む」で足す。
+const CHAT_FIRST_LOAD = 100;   // 開いたときに、スレッドごとに読む件数
+const CHAT_MORE_LOAD  = 100;   // 「もっと前を読む」で足す件数
+
 async function fetchChatRows(){
   const [msgs, groups, reads, mine] = await Promise.all([
-    sb.from('chat_messages').select('*').order('created_at'),
+    fetchChatMessageRows(),
     sb.from('chat_groups').select('*').order('created_at'),
     sb.from('chat_reads').select('*'),
     // お客様チャットの持ち主。お客様は案件そのものを見られないので、専用の手続きから受け取る
@@ -2281,6 +2288,31 @@ async function fetchChatRows(){
   ]);
   if(msgs.error) throw msgs.error;
   return { msgs, groups, reads, mine };
+}
+
+// スレッドごとの直近だけを読む。
+// データベース側の手続き（migration-genba89.sql）がまだ入っていない環境では、
+// これまでどおり全部読む（入れ替えの途中でも使えなくならないようにするため）
+let _chatRecentRpcOk = true;
+async function fetchChatMessageRows(){
+  if(_chatRecentRpcOk){
+    const res = await sb.rpc('app_recent_chat', { p_per_thread: CHAT_FIRST_LOAD });
+    if(!res.error) return res;
+    // 手続きが無い（42883／PGRST202）ときだけ、これまでのやり方に戻す
+    const code = String(res.error.code||'');
+    if(code!=='42883' && code!=='PGRST202') return res;
+    console.warn('app_recent_chat がまだ無いので、全件読みます（supabase/migration-genba89.sql）');
+    _chatRecentRpcOk = false;
+  }
+  return sb.from('chat_messages').select('*').order('created_at');
+}
+
+// 「もっと前を読む」。いま持っているいちばん古い1件より前を、同じスレッドから取る
+async function dbOlderChatRows(anchorId){
+  const { data, error } = await sb.rpc('app_chat_older',
+    { p_anchor_id: anchorId, p_limit: CHAT_MORE_LOAD });
+  if(error){ showToast('前のやりとりを読めませんでした：'+error.message); throw error; }
+  return data || [];
 }
 
 async function fetchChatData(prefetched){
@@ -2315,6 +2347,7 @@ function buildChatData(raw){
   else chatGroups = (raw.groups?.data||[]).map(g=>({id:g.id, name:g.name, memberIds:g.member_ids||[], memberNames:g.member_names||[], createdBy:g.created_by||null}));
   groupThreadIds = {};
   talkThreads = {};
+  chatOlder = {};
   chatRows.forEach(r=>{
     const name = chatThreadNameOfRow(r);
     // 行き先の分からないものは置かない。
@@ -2323,6 +2356,13 @@ function buildChatData(raw){
     if(!talkThreads[name]) talkThreads[name]=[];
     talkThreads[name].push(chatRowToMsg(r));
   });
+  // 読める上限いっぱいまで来たスレッドは、まだ前がある見込み。
+  // （全件読みに落ちているときは、前はもう無い）
+  if(_chatRecentRpcOk){
+    for(const name in talkThreads){
+      if(talkThreads[name].length >= CHAT_FIRST_LOAD) chatOlder[name] = true;
+    }
+  }
   // まだやりとりの無いグループ・お客様チャットも一覧に出す
   chatGroups.forEach(g=>{ const n=groupThreadName(g.id); if(!talkThreads[n]) talkThreads[n]=[]; });
   clientChats.forEach(c=>{ const n=clientThreadName(c.projectId); if(!talkThreads[n]) talkThreads[n]=[]; });

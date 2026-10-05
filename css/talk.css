@@ -24,6 +24,9 @@
 .talk-date-sep{text-align:center;font-size:var(--fs1);color:var(--text-muted);margin:var(--sp3) 0;display:flex;align-items:center;gap:var(--sp3)}
 .talk-date-sep::before,.talk-date-sep::after{content:'';flex:1;height:1px;background:var(--border)}
 /* 開いたときの「ここから未読」の境目。日付の区切りと同じ形で、色だけ変える */
+/* 開いたときはスレッドごとの直近だけを読む。その続きを足すボタン */
+.talk-more{display:flex;justify-content:center;padding:var(--sp2) 0 var(--sp3)}
+.talk-more button{min-width:140px}
 .talk-unread-sep{text-align:center;font-size:var(--fs1);font-weight:700;color:var(--accent-t);margin:var(--sp2) 0;display:flex;align-items:center;gap:var(--sp3)}
 .talk-unread-sep::before,.talk-unread-sep::after{content:'';flex:1;height:1px;background:var(--accent-t);opacity:.5}
 

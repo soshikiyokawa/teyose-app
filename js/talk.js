@@ -924,8 +924,52 @@ function chatScrollToBottom(){
 // 描き直しても同じ中身になるなら、そのまま置いておく。
 // 毎回 innerHTML を作り直すと写真が読み込み直しになって画面がチカチカするため。
 let _chatRenderSig = '';
+// ════ もっと前を読む ════
+//
+// 開いたときに読むのは、スレッドごとの直近だけ（js/data/db.js の CHAT_FIRST_LOAD）。
+// 上まで戻ったら、このボタンでその続きを足す。
+// 足したぶん中身が上に伸びるので、読んでいたところが動かないように位置を直す。
+let _chatLoadingOlder = false;
+
+async function loadOlderChat(){
+  const thread = activeTalkPanelSupplier;
+  const list = talkThreads[thread] || [];
+  if(_chatLoadingOlder || !list.length) return;
+  const oldest = list.find(m=>typeof m.id === 'number');   // 送信中（tmp-…）は数字でない
+  if(!oldest){ chatOlder[thread] = false; return; }
+
+  _chatLoadingOlder = true;
+  const btn = document.querySelector('.talk-more button');
+  if(btn){ btn.disabled = true; btn.textContent = '読んでいます…'; }
+  const el = document.getElementById('talk-panel-messages');
+  const h0 = el ? el.scrollHeight : 0, t0 = el ? el.scrollTop : 0;
+
+  let rows;
+  try{ rows = await dbOlderChatRows(oldest.id); }
+  catch(_){ _chatLoadingOlder = false; renderTalkPanelMessages(); return; }
+  _chatLoadingOlder = false;
+
+  // 返ってきた数が頼んだ数より少なければ、もう前は無い
+  if(rows.length < CHAT_MORE_LOAD) chatOlder[thread] = false;
+  const have = new Set(list.map(m=>m.id));
+  const add = rows.map(chatRowToMsg).filter(m=>!have.has(m.id));
+  if(add.length){
+    talkThreads[thread] = add.concat(talkThreads[thread]||[]).sort((a,b)=>a.ts-b.ts);
+  }
+  resetChatRenderSignature();
+  renderTalkPanelMessages();
+  // 増えた高さのぶんだけ下へ送り、さっきまで読んでいたところに戻す
+  if(el) chatSetScrollTop(el, t0 + (el.scrollHeight - h0));
+}
+
+function chatMoreHtml(){
+  if(chatBookmarkFilter || !chatOlder[activeTalkPanelSupplier]) return '';
+  return '<div class="talk-more"><button type="button" class="btn xs" onclick="loadOlderChat()">もっと前を読む</button></div>';
+}
+
 function chatRenderSignature(supplier, msgs){
-  return supplier + '|' + (chatBookmarkFilter?'bm':'') + '|' + (chatUnreadMarkId()??'') + '|' + msgs.map(m=>[
+  return supplier + '|' + (chatBookmarkFilter?'bm':'') + '|' + (chatOlder[supplier]?'o':'')
+    + '|' + (chatUnreadMarkId()??'') + '|' + msgs.map(m=>[
     m.id, m.ts, m.type, m.text, m.editedAt, m.fileUrl,
     JSON.stringify(m.reactions||{}), (m.bookmarks||[]).join(','),
     m.sending?'s':'', m.failed?'f':''
@@ -963,7 +1007,7 @@ function renderTalkPanelMessages(forceBottom){
   }
   let lastDate='';
   const unreadId = chatUnreadMarkId();
-  el.innerHTML=msgs.map(m=>{
+  el.innerHTML=chatMoreHtml()+msgs.map(m=>{
     const dLabel=dateLabel(m.ts);
     const dsep=dLabel!==lastDate?`<div class="talk-date-sep">${dLabel}</div>`:'';
     lastDate=dLabel;
