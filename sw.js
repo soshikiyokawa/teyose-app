@@ -1,9 +1,29 @@
-const CACHE_NAME = 'teyose-v466';
-const ASSETS = [
+const CACHE_NAME = 'teyose-v467';
+
+// ── 手元に置いておくもの ──
+//
+// だいじなのは「画面が読みに行く名前」と「ここに入れる名前」をそろえること。
+// index.html は js や main.css を ?v=467 を付けて読む。
+// 付けずに入れておくと、名前がちがうので見つけられず、
+// せっかく手元にあっても毎回ネットから取り直しになる。
+// 電波が弱いところだと、これが「立ち上がりが遅いときがある」の元になる。
+//
+// 版は CACHE_NAME から取る。上の1か所を直せば、下は自動でついてくる。
+const V = CACHE_NAME.split('-v')[1] || '';
+
+// ?v= を付けずに読むもの
+//   ・画面そのもの（index.html）
+//   ・絵（アイコン・ロゴ）
+//   ・main.css の中から読むCSS（@import には ?v= が付かない）
+const PLAIN = [
   './',
   './index.html',
   './manifest.json',
-  './css/main.css',
+  './icon-180.png',
+  './icon-192.png',
+  './icon-512.png',
+  './favicon.png',
+  './logo.png',
   './css/tokens.css',
   './css/layout.css',
   './css/buttons.css',
@@ -13,76 +33,88 @@ const ASSETS = [
   './css/order.css',
   './css/talk.css',
   './css/overlay.css',
-  './css/tasks.css',
-  './css/schedule.css',
   './css/genba.css',
-  './js/supabase-client.js',
-  './js/utils.js',
-  './js/state.js',
-  './js/data/db.js',
-  './js/nav.js',
-  './js/talk.js',
-  './js/notifications.js',
-  './js/tasks.js',
-  './js/task-templates.js',
-  './js/init.js',
-  './js/auth.js',
-  './js/account.js',
-  './js/cost-budget.js',
-  './js/payment-schedule.js',
-  './js/estimate/quote-import.js',
-  './js/genba/supplier-view.js',
-  './js/order/ekrea-price.js',
-  './js/order/invoice.js',
-  './js/order/item-price.js',
-  './js/estimate/estimate-tabs.js',
-  './js/estimate/estimate-items.js',
-  './js/estimate/estimate-master.js',
-  './js/estimate/estimate-summary.js',
-  './js/estimate/estimate-crud.js',
-  './js/estimate/parking.js',
-  './js/estimate/estimate-pdf.js',
-  './js/estimate/estimate-invoice.js',
-  './js/order/supplier-master.js',
-  './js/order/item-master.js',
-  './js/order/order-cart.js',
-  './js/order/order-confirm.js',
-  './js/order/order-history.js',
-  './js/order/order-price-edit.js',
-  './js/order/invoice-lines.js',
-  './js/order/card-match.js',
-  './js/orders-list.js',
-  './js/inspection.js',
-  './js/chusho.js',
-  './js/receipt-scan.js',
-  './js/receipt-ledger.js',
-  './js/order/quote-request.js',
-  './js/receipt.js',
-  './js/schedule.js',
-  './js/genba/genba-tabs.js',
-  './js/genba/genba-files.js',
-  './js/genba/genba-photos.js',
-  './js/genba/genba-drawings.js',
-  './js/genba/genba-nippo.js',
-  './js/genba/genba-dezura.js',
-  './js/genba/payroll.js',
-  './js/genba/overtime-pay.js',
-  './js/genba/genba-leave.js',
-  './js/genba/leave-balance.js',
-  './js/genba/genba-holiday.js',
-  './js/genba/license.js',
-  './js/genba/vehicle.js',
-  './js/genba/work-calendar.js',
-  './js/genba/account-perms.js',
-  './js/push.js',
-  './icon-192.png',
-  './icon-512.png',
-  './favicon.png',
-  './logo.png'
+  './css/tasks.css'
 ];
 
+// index.html から ?v= 付きで読むもの
+const VERSIONED = [
+  'css/main.css',
+  'css/schedule.css',
+  'js/supabase-client.js',
+  'js/utils.js',
+  'js/state.js',
+  'js/data/db.js',
+  'js/nav.js',
+  'js/talk.js',
+  'js/swipe-tabs.js',
+  'js/notifications.js',
+  'js/tasks.js',
+  'js/task-templates.js',
+  'js/init.js',
+  'js/auth.js',
+  'js/account.js',
+  'js/cost-budget.js',
+  'js/payment-schedule.js',
+  'js/estimate/quote-import.js',
+  'js/estimate/estimate-tabs.js',
+  'js/estimate/estimate-items.js',
+  'js/estimate/estimate-master.js',
+  'js/estimate/estimate-summary.js',
+  'js/estimate/estimate-crud.js',
+  'js/estimate/info-view.js',
+  'js/estimate/parking.js',
+  'js/estimate/estimate-pdf.js',
+  'js/estimate/estimate-invoice.js',
+  'js/genba/supplier-view.js',
+  'js/genba/genba-tabs.js',
+  'js/genba/genba-files.js',
+  'js/genba/genba-photos.js',
+  'js/genba/genba-drawings.js',
+  'js/genba/genba-nippo.js',
+  'js/genba/genba-dezura.js',
+  'js/genba/staff-schedule.js',
+  'js/genba/payroll.js',
+  'js/genba/overtime-pay.js',
+  'js/genba/genba-leave.js',
+  'js/genba/leave-balance.js',
+  'js/genba/genba-holiday.js',
+  'js/genba/license.js',
+  'js/genba/vehicle.js',
+  'js/genba/work-calendar.js',
+  'js/genba/account-perms.js',
+  'js/order/ekrea-price.js',
+  'js/order/invoice.js',
+  'js/order/item-price.js',
+  'js/order/supplier-master.js',
+  'js/order/item-master.js',
+  'js/order/order-cart.js',
+  'js/order/order-confirm.js',
+  'js/order/order-history.js',
+  'js/order/order-price-edit.js',
+  'js/order/invoice-lines.js',
+  'js/order/card-match.js',
+  'js/order/quote-request.js',
+  'js/orders-list.js',
+  'js/inspection.js',
+  'js/chusho.js',
+  'js/receipt-scan.js',
+  'js/receipt-ledger.js',
+  'js/receipt.js',
+  'js/schedule.js',
+  'js/push.js'
+];
+
+const ASSETS = PLAIN.concat(VERSIONED.map(p => `./${p}?v=${V}`));
+
 self.addEventListener('install', e=>{
-  e.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
+  e.waitUntil((async ()=>{
+    const cache = await caches.open(CACHE_NAME);
+    // まとめて入れると、1つでも取りそこねたときに全部入らない（電波の弱いところで起きる）。
+    // 1つずつ入れて、取りそこねたものだけ諦める。残りは次に開いたときに入る
+    await Promise.all(ASSETS.map(u => cache.add(u).catch(()=>{})));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', e=>{
@@ -110,7 +142,19 @@ self.addEventListener('fetch', e=>{
   try{ sameOrigin = new URL(req.url).origin === self.location.origin; }catch(_){}
   if(!sameOrigin) return;
 
-  e.respondWith(caches.match(req).then(cached => cached || fetch(req)));
+  // 手元にあればそれを使う（ネットを待たないので速い）。
+  // 無ければ取りに行き、そのとき手元にも入れておく
+  //（入れそこねた分が、次に開いたときには手元から出せるようになる）
+  e.respondWith((async ()=>{
+    const cached = await caches.match(req);
+    if(cached) return cached;
+    const res = await fetch(req);
+    if(res && res.ok && res.type === 'basic'){
+      const copy = res.clone();
+      caches.open(CACHE_NAME).then(c=>c.put(req, copy)).catch(()=>{});
+    }
+    return res;
+  })());
 });
 
 // ── 通知の設定（バナー・サウンド・バッジ）。アプリ側から受け取って保持する ──
