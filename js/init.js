@@ -14,7 +14,17 @@ if('serviceWorker' in navigator){
       }
     });
     navigator.serviceWorker.addEventListener('message', e=>{
-      if(e.data?.type==='SW_UPDATED') location.reload();
+      // 新しい版が入ったら読み込み直す。
+      // ただし同じ版で何度もやらない（読み直し→また通知→読み直し、で待たされるため）
+      if(e.data?.type==='SW_UPDATED'){
+        const v = String(e.data.version||'1');
+        let done = '';
+        try{ done = sessionStorage.getItem('teyose-reloaded')||''; }catch(_){}
+        if(done !== v){
+          try{ sessionStorage.setItem('teyose-reloaded', v); }catch(_){}
+          location.reload();
+        }
+      }
       if(e.data?.type==='OPEN_TAB') appOpenTab(e.data.tab); // 通知タップ→該当タブへ
     });
     // アクティブなSWからバージョンを取得して表示

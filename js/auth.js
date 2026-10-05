@@ -37,7 +37,7 @@ async function bootstrapApp(){
       errEl.style.display='block';
       history.replaceState(null,'',location.pathname+location.search);
     }
-    document.getElementById('login-overlay').classList.add('open');
+    document.getElementById('login-overlay').classList.add('open'); hideBootScreen();
     return;
   }
 
@@ -48,7 +48,7 @@ async function bootstrapApp(){
     const errEl = document.getElementById('login-error');
     errEl.textContent = 'しばらくご利用が無かったため、安全のため再度ログインをお願いします';
     errEl.style.display='block';
-    document.getElementById('login-overlay').classList.add('open');
+    document.getElementById('login-overlay').classList.add('open'); hideBootScreen();
     return;
   }
 
@@ -56,7 +56,7 @@ async function bootstrapApp(){
   if(profErr || !profile){
     document.getElementById('login-error').textContent = 'このアカウントには権限が設定されていません。管理者に連絡してください。';
     document.getElementById('login-error').style.display='block';
-    document.getElementById('login-overlay').classList.add('open');
+    document.getElementById('login-overlay').classList.add('open'); hideBootScreen();
     await sb.auth.signOut();
     return;
   }
@@ -72,11 +72,12 @@ async function bootstrapApp(){
   try{
     await fetchAllData();
   }catch(e){
+    hideBootScreen();
     alert('データの取得に失敗しました：'+e.message);
     return;
   }
 
-  document.getElementById('login-overlay').classList.remove('open');
+  document.getElementById('login-overlay').classList.remove('open'); hideBootScreen();
   document.getElementById('app-shell').style.display='';
   document.getElementById('app-nav').style.display='';
 

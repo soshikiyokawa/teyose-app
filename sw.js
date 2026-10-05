@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v469';
+const CACHE_NAME = 'teyose-v470';
 
 // ── 手元に置いておくもの ──
 //
@@ -15,6 +15,26 @@ const V = CACHE_NAME.split('-v')[1] || '';
 //   ・画面そのもの（index.html）
 //   ・絵（アイコン・ロゴ）
 //   ・main.css の中から読むCSS（@import には ?v= が付かない）
+// ── 外から持ってきた部品（地図・Supabase） ──
+//
+// 以前はCDN（unpkg / jsdelivr）から読んでいたが、別のあて先は下の fetch で素通しするため、
+// 開くたびにネットを待っていた。とくに leaflet.css は <head> にあるので、
+// これが返ってくるまで画面に何も出ない（真っ白のまま待つ）元になっていた。
+//
+// 中身は変わらないので、手寄の版を上げても取り直さなくてよい。
+// そのため、ふだんの保管庫とは分けてある（版を上げても消さない）
+const LIB_CACHE = 'teyose-lib-1';
+const LIB_ASSETS = [
+  './vendor/supabase.js',
+  './vendor/leaflet/leaflet.js',
+  './vendor/leaflet/leaflet.css',
+  './vendor/leaflet/images/marker-icon.png',
+  './vendor/leaflet/images/marker-icon-2x.png',
+  './vendor/leaflet/images/marker-shadow.png',
+  './vendor/leaflet/images/layers.png',
+  './vendor/leaflet/images/layers-2x.png'
+];
+
 const PLAIN = [
   './',
   './index.html',
@@ -113,13 +133,21 @@ self.addEventListener('install', e=>{
     // まとめて入れると、1つでも取りそこねたときに全部入らない（電波の弱いところで起きる）。
     // 1つずつ入れて、取りそこねたものだけ諦める。残りは次に開いたときに入る
     await Promise.all(ASSETS.map(u => cache.add(u).catch(()=>{})));
+    // 外から持ってきた部品は、まだ入っていないものだけ入れる（版を上げても取り直さない）
+    const lib = await caches.open(LIB_CACHE);
+    await Promise.all(LIB_ASSETS.map(async u => {
+      if(await lib.match(u)) return;
+      await lib.add(u).catch(()=>{});
+    }));
     await self.skipWaiting();
   })());
 });
 
 self.addEventListener('activate', e=>{
   e.waitUntil(
-    caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k))))
+    // 古い版の保管庫だけ消す。外から持ってきた部品（LIB_CACHE）は残す
+    caches.keys().then(keys=>Promise.all(
+      keys.filter(k=>k!==CACHE_NAME && k!==LIB_CACHE).map(k=>caches.delete(k))))
       .then(()=>self.clients.claim())
       .then(()=>self.clients.matchAll({type:'window'}))
       .then(clients=>clients.forEach(c=>c.postMessage({type:'SW_UPDATED',version:CACHE_NAME})))
