@@ -384,9 +384,9 @@ function renderOrdersList(){
     const pl = olPaymentsByLabel(e);
     const kaishuu = pays.reduce((s2,p)=>s2+(Number(p?.actualAmount)||0),0);
     const mishuu  = ca - kaishuu;
-    const secs = e.sections||[];
-    const sectTotal = secs.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
-    const sectCost  = secs.reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.cost,0),0);
+    // 明細は、その案件を開くまで読まない。合計はデータベース側で足したものを使う
+    const sectTotal = estWorkTotal(e);
+    const sectCost  = estWorkCost(e);
     const epAmt= sectTotal - sectCost;
     const epr  = sectTotal > 0 ? epAmt/sectTotal*100 : 0;
     const apAmt= e.actualProfit||0;
@@ -461,16 +461,8 @@ function olTotalsRowHtml(list, dekiOverride){
     : list.reduce((s,e)=>s+Math.round((e.contractAmount||0)*(e.completion||0)/100),0);
   const totKai    = list.reduce((s,e)=>(s+(e.payments||[]).reduce((s2,p)=>s2+(p.actualAmount||0),0)),0);
   const totMi     = totCa - totKai;
-  const totEpAmt  = list.reduce((s,e)=>{
-    const secs=e.sections||[];
-    const t=secs.reduce((t2,sec)=>t2+sec.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
-    const c=secs.reduce((t2,sec)=>t2+sec.items.reduce((s2,i)=>s2+i.qty*i.cost,0),0);
-    return s+(t-c);
-  },0);
-  const totSectTotal = list.reduce((s,e)=>{
-    const secs=e.sections||[];
-    return s+secs.reduce((t,sec)=>t+sec.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
-  },0);
+  const totEpAmt    = list.reduce((s,e)=>s+(estWorkTotal(e)-estWorkCost(e)),0);
+  const totSectTotal= list.reduce((s,e)=>s+estWorkTotal(e),0);
   const totEpRate = totSectTotal ? (totEpAmt/totSectTotal*100).toFixed(1) : '—';
   const totApAmt  = list.reduce((s,e)=>s+(e.actualProfit||0),0);
   const totApRate = totCa ? (totApAmt/totCa*100).toFixed(1) : '—';

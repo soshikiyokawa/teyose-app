@@ -20,8 +20,19 @@ function budgetEstimateOf(projectName){
 
 // 見積の原価合計（＝予算）
 function budgetOfEstimate(est){
-  return (est?.sections||[]).reduce((t,s)=>t+(s.items||[]).reduce((t2,i)=>t2+(i.qty*i.cost||0),0),0);
+  return estWorkCost(est);
 }
+
+// 明細は、その案件を開いたときに読む（js/data/db.js）。
+// まだ読めていないときは、読んでから描き直してもらう。
+// 読めていないまま数えると ¥0 と出てしまい、お金の数字を見誤るため
+function cbSectionsReady(projectName, redraw){
+  const est = budgetEstimateOf(projectName);
+  if(!est || estSectionsReady(est)) return true;
+  ensureEstimateSections(est).then(()=>redraw && redraw()).catch(()=>{});
+  return false;
+}
+const CB_LOADING = '<div class="empty" style="padding:18px">見積の明細を読み込んでいます…</div>';
 
 // 予実の数字をまとめる
 function costBudgetData(projectName){
@@ -46,6 +57,7 @@ function renderCostBudget(){
   const target = ((typeof costViewStock!=='undefined' && costViewStock) || (typeof costViewExpense!=='undefined' && costViewExpense)) ? null : (selectedProject?.name||null);
   if(!target){ el.style.display='none'; return; }
   el.style.display='';
+  if(!cbSectionsReady(target, renderCostBudget)){ el.innerHTML=CB_LOADING; return; }
 
   const d=costBudgetData(target);
   const rateBox = currentUserRole==='staff' ? `
@@ -189,6 +201,7 @@ function renderEstVsOrder(){
   const target=((typeof costViewStock!=='undefined' && costViewStock) || (typeof costViewExpense!=='undefined' && costViewExpense)) ? null : (selectedProject?.name||null);
   if(!target){ el.style.display='none'; return; }
   el.style.display='';
+  if(!cbSectionsReady(target, renderEstVsOrder)){ el.innerHTML=CB_LOADING; return; }
 
   const d=estVsOrderRows(target);
   if(!d.est){ el.innerHTML=''; return; }   // 見積が無い場合は「予算と実績」側の案内に任せる

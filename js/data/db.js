@@ -135,7 +135,7 @@ async function fetchAllData(){
       get('estCats',     ()=>sb.from('estimate_categories').select('*').order('sort_order').order('id')),
       get('estPresets',  ()=>sb.from('estimate_presets').select('*').order('sort_order').order('id')),
       get('estDefaults', ()=>sb.from('estimate_defaults').select('*')),
-      get('estimates',   ()=>sb.from('estimates').select('*').order('updated_at',{ascending:false})),
+      get('estimates',   fetchEstimateRows),
       get('orders',      ()=>sb.from('orders').select('*').order('created_at',{ascending:false})),
       get('costs',       ()=>sb.from('cost_entries').select('*').order('created_at',{ascending:false})),
       soft(fetchGenbaData),
@@ -227,11 +227,64 @@ function orderRowTo(r){
     deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||''};
 }
 
+// ── 見積の明細は、その案件を開いたときに読む ──
+//
+// 見積1件の明細は数百行になることもある。開くたびに全件ぶん取りに行くと、
+// 件数が増えるほど立ち上がりが遅くなるので、ふだんは明細を除いたものだけ読む。
+// 一覧に出す「見積総額」「原価」は、データベース側で足した数字を受け取る。
+//
+// 読み込んであるかどうかは sectionsLoaded で見る。
+//   true      … 明細まで持っている（計算も保存もできる）
+//   false     … まだ。合計の数字（sectionsTotal / sectionsCost）だけ持っている
+//   undefined … 画面で組み立てたもの（明細を持っている）
+function estSectionsReady(e){
+  return !!e && (e.sectionsLoaded === true
+              || (e.sectionsLoaded === undefined && Array.isArray(e.sections)));
+}
+function estSectionsSum(e, field){
+  if(estSectionsReady(e)){
+    return (e.sections||[]).reduce((t,s)=>
+      t + (s.items||[]).reduce((t2,i)=>t2 + (Number(i.qty)||0)*(Number(i[field])||0), 0), 0);
+  }
+  return Number(field==='price' ? e?.sectionsTotal : e?.sectionsCost) || 0;
+}
+function estWorkTotal(e){ return estSectionsSum(e,'price'); }   // 明細の売価合計
+function estWorkCost(e){  return estSectionsSum(e,'cost');  }   // 明細の原価合計
+
+// その見積の明細を読み込む（すでに持っていれば何もしない）
+async function ensureEstimateSections(est){
+  if(!est || estSectionsReady(est)) return est;
+  const { data, error } = await sb.from('estimates').select('sections').eq('id', est.id).single();
+  if(error){ showToast('明細を読み込めませんでした：'+error.message); throw error; }
+  est.sections = data?.sections || [];
+  est.sectionsLoaded = true;
+  return est;
+}
+
+// 開いたときの読み込み。明細を除いた estimates_lite を使う。
+// まだ無い環境（migration-genba90.sql が未実行）では、これまでどおり明細ごと読む
+let _estLiteOk = true;
+async function fetchEstimateRows(){
+  if(_estLiteOk){
+    const res = await sb.from('estimates_lite').select('*').order('updated_at',{ascending:false});
+    if(!res.error) return res;
+    const code = String(res.error.code||'');
+    if(code!=='42P01' && code!=='PGRST205' && code!=='PGRST202') return res;
+    console.warn('estimates_lite がまだ無いので、明細ごと読みます（supabase/migration-genba90.sql）');
+    _estLiteOk = false;
+  }
+  return sb.from('estimates').select('*').order('updated_at',{ascending:false});
+}
+
 function rowToEstimate(r){
   const ci=r.contract_info||{};
   return {id:r.id,title:r.title,no:r.no,date:r.date,expire:r.expire,status:r.status,type:r.type,
     startDate:r.start_date,endDate:r.end_date,clientName:r.client_name,projectName:r.project_name,siteName:r.site_name,
-    note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],sections:r.sections||[],
+    note:r.note,discountAmount:Number(r.discount_amount),taxRate:Number(r.tax_rate),payments:r.payments||[],
+    sections:r.sections||[],
+    sectionsLoaded: r.sections !== undefined,
+    sectionsTotal: Number(r.sections_total)||0,
+    sectionsCost:  Number(r.sections_cost)||0,
     contractDate:ci.contractDate||'',contractAmount:ci.contractAmount||0,extras:ci.extras||[],
     completion:ci.completion||0,actualProfit:ci.actualProfit||0,ordersMemo:ci.ordersMemo||'',clientAddress:ci.clientAddress||'',tantou:ci.tantou||'',clientTel:ci.clientTel||'',clientEmail:ci.clientEmail||'',mapLat:ci.mapLat||null,mapLng:ci.mapLng||null,
     updatedAt:r.updated_at};
@@ -450,7 +503,7 @@ async function dbSaveEstimate(data){
     title:data.title,no:data.no,date:data.date||null,expire:data.expire||null,status:data.status,type:data.type,
     start_date:data.startDate||null,end_date:data.endDate||null,
     client_name:data.clientName,project_name:data.projectName,site_name:data.siteName,note:data.note,
-    discount_amount:data.discountAmount,tax_rate:data.taxRate,payments:data.payments,sections:data.sections,
+    discount_amount:data.discountAmount,tax_rate:data.taxRate,payments:data.payments,
     contract_info:{
       contractDate:data.contractDate||null,contractAmount:data.contractAmount||0,
       extras:data.extras||[],
@@ -458,6 +511,11 @@ async function dbSaveEstimate(data){
     },
     updated_at:new Date().toISOString()
   };
+  // 明細は、手元に持っているものだけ書き戻す。
+  // 読み込んでいない見積（案件一覧から金額だけ直したときなど）に空を書くと、
+  // データベースの明細が消えてしまうため
+  if(estSectionsReady(data)) row.sections = data.sections;
+
   if(typeof data.id==='number' && estimates.some(e=>e.id===data.id)){
     const { error } = await sb.from('estimates').update(row).eq('id',data.id);
     if(error){showToast('保存に失敗しました：'+error.message);throw error;}

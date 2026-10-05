@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v468';
+const CACHE_NAME = 'teyose-v469';
 
 // ── 手元に置いておくもの ──
 //

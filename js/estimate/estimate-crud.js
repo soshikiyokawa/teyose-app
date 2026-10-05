@@ -351,7 +351,9 @@ async function saveCurrentAsDefault(){
   showToast(`「${type}」のデフォルトを保存しました`);
 }
 
-function loadEstimate(est){
+// 見積を開く。明細はここで読む（ふだんは明細を持たずに一覧だけ出しているため）
+async function loadEstimate(est){
+  try{ await ensureEstimateSections(est); }catch(_){ return; }
   editingEstId=est.id;
   const sv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   sv('est-title',est.title);sv('est-no',est.no);sv('est-date',est.date);sv('est-expire',est.expire);sv('est-status',est.status);sv('est-type',est.type);
@@ -382,7 +384,8 @@ function loadEstimate(est){
 }
 
 function calcEstTotal(e){
-  const w=(e.sections||[]).reduce((t,s)=>t+s.items.reduce((s2,i)=>s2+i.qty*i.price,0),0);
+  // 明細をまだ読んでいない見積は、データベース側で足した合計を使う
+  const w=estWorkTotal(e);
   const sub=Math.max(0,w-(e.discountAmount||0));
   return sub+Math.round(sub*(e.taxRate||10)/100);
 }
@@ -463,12 +466,13 @@ function selectProjectSidebarMobile(val){
 function selectProjectSidebar(id){
   confirmEstDiscard(()=>_selectProjectSidebarGo(id));
 }
-function _selectProjectSidebarGo(id){
+async function _selectProjectSidebarGo(id){
   selectedProject=projects.find(p=>p.id===id)||null;
   selectedProjectName=selectedProject?.name||null;
   const matches=estimates.filter(e=>e.projectName===selectedProject?.name);
   matches.sort((a,b)=>new Date(b.updatedAt||0)-new Date(a.updatedAt||0));
-  if(matches.length) loadEstimate(matches[0]);
+  // 明細の読み込みを待ってから先へ進む（原価ページの予実が、明細を使うため）
+  if(matches.length) await loadEstimate(matches[0]);
   else newEstimate(); // 見積が無い案件：案件情報を表示（見積書は任意）
   renderEstListBody();
   onProjectChanged && onProjectChanged();
