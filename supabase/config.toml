@@ -39,3 +39,7 @@ verify_jwt = false
 # pg_cron から呼ぶので verify_jwt は false（x-remind-secret で守る）
 [functions.flush-notifications]
 verify_jwt = false
+
+# 未読が続いているチャットの再通知。pg_cron から叩くので、合い言葉で守る
+[functions.chat-remind]
+verify_jwt = false

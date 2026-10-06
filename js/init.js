@@ -26,6 +26,8 @@ if('serviceWorker' in navigator){
         }
       }
       if(e.data?.type==='OPEN_TAB') appOpenTab(e.data.tab); // 通知タップ→該当タブへ
+      // ブラウザが通知の登録を入れ替えた → 届け先を入れ直す
+      if(e.data?.type==='PUSH_RESUBSCRIBE' && typeof syncPushSubscription==='function') syncPushSubscription();
     });
     // アクティブなSWからバージョンを取得して表示
     navigator.serviceWorker.ready.then(reg=>{

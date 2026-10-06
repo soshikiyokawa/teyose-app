@@ -41,6 +41,68 @@ async function enablePushNotifications(){
   }
 }
 
+// ════ 端末の登録を、開くたびに合わせ直す ════
+//
+// 届かなくなる原因でいちばん多いのが、これだった。
+//   ① 送信に失敗すると、サーバー側は登録（push_subscriptions）の行を消す
+//   ② ところが端末の中には登録が残ったままなので、設定画面は「登録済み」と出る
+//   ③ すると「この端末で通知を有効にする」が出ないので、直しようが無い
+// 一度こうなると、その端末には二度と届かない。
+//
+// そこで、アプリを開くたびに端末の登録をデータベースへ入れ直す。
+// 許可済みのときだけ動くので、勝手に許可を求めることはない。
+async function syncPushSubscription(){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if(!('Notification' in window) || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    // 端末の登録そのものが無くなっていたら、作り直す（許可済みなので画面は出ない）
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    await dbSavePushSubscription(sub, true);
+  }catch(e){
+    console.warn('通知の登録を合わせられませんでした', e?.message||e);
+  }
+}
+
+// 端末の登録を、いったん捨てて作り直す。
+// 届かなくなった登録は、同じものを入れ直しても直らないため
+async function repairPushSubscription(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)){
+    showToast('この端末は通知に対応していません'); return false;
+  }
+  const perm = await Notification.requestPermission();
+  if(perm!=='granted'){
+    showToast('通知が許可されていません。ブラウザの設定から許可してください');
+    renderNotifySettings(); return false;
+  }
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const old = await reg.pushManager.getSubscription();
+    if(old){
+      try{ await dbDeletePushSubscription(old.endpoint); }catch(_){}
+      await old.unsubscribe();
+    }
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+    });
+    await dbSavePushSubscription(sub);
+    showToast('通知を登録し直しました');
+    renderNotifySettings();
+    return true;
+  }catch(e){
+    showToast('登録し直せませんでした：'+(e?.message||e));
+    renderNotifySettings();
+    return false;
+  }
+}
+
 // ════ 通知の設定（バナー・サウンド・バッジ。端末ごとに保存） ════
 
 const NOTIFY_PREF_KEY = 'teyose-notify-pref';
@@ -113,10 +175,14 @@ async function renderNotifySettings(){
 
   const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
-  let subscribed=false;
+  // 「端末に登録がある」ことと「サーバーに届け先が残っている」ことは別物。
+  // 片方だけ生きている状態（これが届かなくなる元）が分かるよう、別々に出す
+  let subscribed=false, onServer=false;
   try{
     const reg = await navigator.serviceWorker?.getRegistration();
-    subscribed = !!(await reg?.pushManager.getSubscription());
+    const sub = await reg?.pushManager.getSubscription();
+    subscribed = !!sub;
+    if(sub) onServer = await dbHasPushSubscription(sub.endpoint);
   }catch(_){}
   const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -148,8 +214,10 @@ async function renderNotifySettings(){
     `<div class="section-lbl" style="margin-top:0">この端末の状態</div>`+
     row('通知の許可', permLabel, perm==='granted',
         perm==='denied' ? 'ブラウザの設定（サイトの設定→通知）から許可し直してください' : '')+
-    row('この端末の登録', subscribed?'登録済み（プッシュが届きます）':'未登録', subscribed,
+    row('この端末の登録', subscribed?'登録済み':'未登録', subscribed,
         subscribed?'':'下の「この端末で通知を有効にする」を押してください')+
+    row('届け先の控え', onServer?'残っています（プッシュが届きます）':'ありません', onServer,
+        onServer?'':'下の「通知を登録し直す」を押すと直ります')+
     (isIOS ? row('ホーム画面への追加', standalone?'追加済み':'未追加', standalone,
         standalone?'':'iPhoneは、ホーム画面に追加したアプリからでないと通知を受け取れません') : '')+
     row('バッジ（アイコンの数字）', badgeOk?'この端末は対応しています':'この端末は非対応です', badgeOk,
@@ -163,7 +231,9 @@ async function renderNotifySettings(){
 
     `<div style="display:flex;flex-direction:column;gap:6px;margin-top:14px">
       ${perm!=='granted'||!subscribed ? `<button class="btn primary" style="width:100%;justify-content:center" onclick="enablePushNotifications()">この端末で通知を有効にする</button>`:''}
+      ${subscribed&&!onServer ? `<button class="btn primary" style="width:100%;justify-content:center" onclick="repairPushSubscription()">通知を登録し直す</button>`:''}
       <button class="btn" style="width:100%;justify-content:center" onclick="sendTestNotification()">テスト通知を送る</button>
+      ${subscribed&&onServer ? `<button class="btn" style="width:100%;justify-content:center" onclick="repairPushSubscription()">通知が届かないときは、登録し直す</button>`:''}
      </div>`+
     `<div style="font-size:11px;color:var(--text-muted);line-height:1.7;margin-top:10px">
        ※ 端末側の「おやすみモード」「集中モード」がオンだと、バナーや音が出ないことがあります。<br>

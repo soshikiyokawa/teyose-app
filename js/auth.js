@@ -103,6 +103,7 @@ async function bootstrapApp(){
   updateNotificationBadge();  // 通知履歴の未読件数
   updateTaskBadge();          // 自分あての未済タスクの件数
   pushNotifyPrefToSW();      // 通知の設定（バナー・サウンド）をService Workerへ
+  syncPushSubscription();    // この端末の通知の登録を入れ直す（切れていても開けば直る）
 
   // パスワード設定を求める場面は2つ。
   //   ① 招待メール・再設定メールのリンクから来たとき

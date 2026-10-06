@@ -2026,14 +2026,30 @@ async function dbDeleteHolidayRequest(id){
 }
 
 // ── プッシュ通知 ──
-async function dbSavePushSubscription(sub){
+// quiet=true のときは、失敗しても画面に出さない（起動時の自動の作り直しで使う）
+async function dbSavePushSubscription(sub, quiet){
   const { data: userData } = await sb.auth.getUser();
-  if(!userData?.user) return;
+  if(!userData?.user) throw new Error('ログインが確認できませんでした');
   const json = sub.toJSON();
   const { error } = await sb.from('push_subscriptions').upsert({
     user_id: userData.user.id, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth
   }, { onConflict: 'endpoint' });
-  if(error){showToast('通知設定の保存に失敗しました：'+error.message);throw error;}
+  if(error){ if(!quiet) showToast('通知設定の保存に失敗しました：'+error.message); throw error; }
+}
+
+async function dbDeletePushSubscription(endpoint){
+  if(!endpoint) return;
+  const { error } = await sb.from('push_subscriptions').delete().eq('endpoint', endpoint);
+  if(error) console.warn('古い登録を消せませんでした', error.message);
+}
+
+// この端末の登録が、データベースに残っているか
+async function dbHasPushSubscription(endpoint){
+  if(!endpoint || !currentUserId) return false;
+  const { data, error } = await sb.from('push_subscriptions')
+    .select('id').eq('user_id', currentUserId).eq('endpoint', endpoint).limit(1);
+  if(error) return false;
+  return !!(data && data.length);
 }
 // tab: 通知タップ時に開く画面（例 'genba/nippo'。省略時はアプリを開くだけ）
 async function dbSendPush(targetRole, targetSupplierId, title, body, excludeUserId, tab){

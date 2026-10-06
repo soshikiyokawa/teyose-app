@@ -60,7 +60,8 @@ const NOTIF_SOURCE_LABEL = {
   employee:'社内チャット', supplier:'発注先チャット', staff:'事務あて', user:'お知らせ', names:'お知らせ',
   chatwork:'ChatWork', 'nippo-remind':'日報リマインド', 'nippo-check':'日報の確認',
   'ot-remind':'承認待ち', 'license-remind':'免許・保険', 'vehicle-remind':'車両',
-  'payment-remind':'入金', 'inspection-remind':'定期点検', 'ekrea-price':'エクレア単価'
+  'payment-remind':'入金', 'inspection-remind':'定期点検', 'ekrea-price':'エクレア単価',
+  'chat-remind':'未読のお知らせ'
 };
 
 function openNotifications(){

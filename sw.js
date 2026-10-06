@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v476';
+const CACHE_NAME = 'teyose-v477';
 
 // ── 手元に置いておくもの ──
 //
@@ -224,6 +224,16 @@ self.addEventListener('push', e=>{
         if(self.navigator?.setAppBadge) await self.navigator.setAppBadge(list.length || 1);
       }catch(_){}
     }
+  })());
+});
+
+// ── ブラウザが登録を入れ替えたとき ──
+// 黙って入れ替わると、サーバーが持っている届け先が古いままになり、通知が届かなくなる。
+// 開いている画面に知らせて、入れ直してもらう。開いていなければ、次に開いたときに直る
+self.addEventListener('pushsubscriptionchange', e=>{
+  e.waitUntil((async ()=>{
+    const list = await self.clients.matchAll({type:'window', includeUncontrolled:true});
+    list.forEach(c=>c.postMessage({type:'PUSH_RESUBSCRIBE'}));
   })());
 });
 
