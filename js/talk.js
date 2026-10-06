@@ -680,6 +680,36 @@ function threadKeyOf(name){
   return 'supplier:'+(supplierIdByName(name)||'?');
 }
 
+// 通知から戻ってくるときの、合い印（threadKeyOf）→ スレッド名。
+// スレッド名そのものを持ち回らないのは、個別チャットの名前が
+// 見る人によって変わる（相手の名前が入る）ため。番号で持てば、どちらの端末でも引ける
+function threadNameOfKey(key){
+  const s = String(key||'');
+  const i = s.indexOf(':');
+  const kind = i<0 ? s : s.slice(0,i);
+  const rest = i<0 ? '' : s.slice(i+1);
+  const num  = Number(rest);
+  if(kind==='internal') return INTERNAL_THREAD;
+  if(kind==='direct')   return rest ? directThreadName(rest) : null;
+  if(kind==='group')    return groupById(num) ? groupThreadName(num) : null;
+  if(kind==='client')   return clientChatOf(num) ? clientThreadName(num) : null;
+  if(kind==='project')  return projectThreadName(num);
+  if(kind==='supplier') return supplierNameById(num);
+  return null;
+}
+
+// 通知をタップして、そのスレッドを開く。
+// 開けないとき（もう入っていない案件・消えたグループなど）は一覧のまま
+function openTalkThreadByKey(key){
+  const name = threadNameOfKey(key);
+  if(!name || !visibleThreadNames().includes(name)){
+    renderTalkPanelList();
+    if(name) showToast('そのやりとりは、いまは開けません');
+    return;
+  }
+  openTalkPanelThread(name);
+}
+
 // ════ 未読件数（自分が最後にスレッドを開いた時刻より後の、他人のメッセージ） ════
 
 function myLastReadAt(threadName){

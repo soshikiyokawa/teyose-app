@@ -2,9 +2,25 @@
 
 // 通知タップからの画面遷移（'genba/nippo' 形式。ログイン前に届いた場合は復元後に開く）
 let _pendingOpenTab = null;
+// 通知から画面を開く。
+//   'genba/nippo'        … そのタブまで
+//   'talk:supplier:3'    … そのやりとりまで（: のうしろが行き先の合い印）
+//   'task:12'            … そのタスクまで
 function appOpenTab(spec){
   if(!spec) return;
-  const [page, sub] = String(spec).split('/');
+  const s = String(spec);
+  const c = s.indexOf(':');
+  const head   = c<0 ? s : s.slice(0, c);
+  const target = c<0 ? '' : s.slice(c+1);
+  const [page, sub] = head.split('/');
+
+  // チャット。お客様もここだけは開ける
+  if(page === 'talk'){
+    if(!currentUserRole){ _pendingOpenTab = spec; return; }
+    mainTab('talk');
+    if(target && typeof openTalkThreadByKey==='function') openTalkThreadByKey(target);
+    return;
+  }
   // 案件タブのサブタブ（定期点検など）
   if(page === 'estimate'){
     if(!currentUserRole || currentUserRole === 'supplier'){ _pendingOpenTab = spec; return; }
@@ -22,6 +38,9 @@ function appOpenTab(spec){
   if(page === 'task'){
     if(!currentUserRole){ _pendingOpenTab = spec; return; }
     mainTab('task');
+    // そのタスクまで開く（消されていたら一覧のまま）
+    const id = Number(target);
+    if(id && typeof openTaskEdit==='function' && (tasks||[]).some(t=>t.id===id)) openTaskEdit(id);
     return;
   }
   if(page !== 'genba') return;

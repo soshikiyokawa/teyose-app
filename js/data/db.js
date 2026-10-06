@@ -962,6 +962,15 @@ async function dbAddChatMessage(supplierName, msg){
   const picked = Array.isArray(msg.notifyNames)
     ? msg.notifyNames.filter(n=>n && n!==currentUserDisplayName) : [];
 
+  // 通知をタップしたときの行き先。スレッド名ではなく番号で持つ（js/talk.js の threadNameOfKey）。
+  // 個別チャットだけは、受け取った人から見た相手＝送った自分になる
+  const goTalk = isClient   ? 'talk:client:'+client_project_id
+               : isGroup    ? 'talk:group:'+group_id
+               : isDirect   ? 'talk:direct:'+currentUserId
+               : isProject  ? 'talk:project:'+project_id
+               : isInternal ? 'talk:internal'
+               : supplier_id ? 'talk:supplier:'+supplier_id : 'talk';
+
   if(isClient){
     const proj = (projects||[]).find(p=>p.id===client_project_id);
     const chat = clientChatOf(client_project_id);
@@ -969,41 +978,41 @@ async function dbAddChatMessage(supplierName, msg){
     if(isClientUser()){
       // お客様 → きよかわの担当者へ
       const names = (chat?.memberNames||[]).filter(Boolean);
-      if(names.length) dbSendPushToNames(names, `${label}（お客様）`, preview, null).catch(()=>{});
+      if(names.length) dbSendPushToNames(names, `${label}（お客様）`, preview, goTalk).catch(()=>{});
     } else {
       // きよかわ → その案件のお客様（ご主人・奥様など、ご登録済みの方みなさん）へ
       const ids = (proj?.clients||[]).map(c=>c.userId).filter(Boolean);
       if(!ids.length && proj?.clientUserId) ids.push(proj.clientUserId);
-      ids.forEach(uid=>dbSendPushToUser(uid, 'きよかわ より', preview, null).catch(()=>{}));
+      ids.forEach(uid=>dbSendPushToUser(uid, 'きよかわ より', preview, goTalk).catch(()=>{}));
     }
   } else if(isGroup){
     const g = groupById(group_id);
     const names = picked.length ? picked
       : (g?.memberNames||[]).filter(n=>n && n!==currentUserDisplayName);
-    if(names.length) dbSendPushToNames(names, `${g?.name||'グループ'} ${currentUserDisplayName||''}`, preview, null).catch(()=>{});
+    if(names.length) dbSendPushToNames(names, `${g?.name||'グループ'} ${currentUserDisplayName||''}`, preview, goTalk).catch(()=>{});
   } else if(isDirect){
     // 個別チャット：相手ひとりに知らせる
     const other=(allProfiles||[]).find(p=>p.id===otherId);
     if(other?.displayName){
-      dbSendPushToNames([other.displayName], `個別 ${currentUserDisplayName||''}`, preview, null).catch(()=>{});
+      dbSendPushToNames([other.displayName], `個別 ${currentUserDisplayName||''}`, preview, goTalk).catch(()=>{});
     }
   } else if(isProject){
     // 案件チャット：指定があればその人、無ければ参加メンバー（自分以外）へ
     const proj = projects.find(p=>p.id===project_id);
     const names = picked.length ? picked : otherMemberNames(proj?.members);
-    if(names.length) dbSendPushToNames(names, `${supplierName} ${currentUserDisplayName||''}`, preview, null).catch(()=>{});
+    if(names.length) dbSendPushToNames(names, `${supplierName} ${currentUserDisplayName||''}`, preview, goTalk).catch(()=>{});
   } else if(isInternal){
     const title = `${INTERNAL_THREAD} ${currentUserDisplayName||''}`;
     if(picked.length){
-      dbSendPushToNames(picked, title, preview).catch(()=>{});
+      dbSendPushToNames(picked, title, preview, goTalk).catch(()=>{});
     } else {
       // 既定：自分以外の社員全員（staff＋carpenter）へ
-      dbSendPush('employee', null, title, preview, currentUserId).catch(()=>{});
+      dbSendPush('employee', null, title, preview, currentUserId, goTalk).catch(()=>{});
     }
   } else if(msg.role==='me'){
     // きよかわ→発注先。宛先を選んでいればその人だけ（発注先の担当者でも社員でも指名できる）
-    if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview).catch(()=>{});
-    else dbSendPush('supplier', supplier_id, supplierName, preview).catch(()=>{});
+    if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview, goTalk).catch(()=>{});
+    else dbSendPush('supplier', supplier_id, supplierName, preview, null, goTalk).catch(()=>{});
     // ChatWorkルームが設定されていれば転送。宛先の指定にかかわらず送る。
     // 写真・資料はファイルそのものを添える。発注書は dbSendOrderToSupplier が
     // PDFを添えて送るため、ここでは送らない（noChatwork）
@@ -1015,8 +1024,8 @@ async function dbAddChatMessage(supplierName, msg){
   } else {
     // 発注先→きよかわ。宛先を選んでいればその人だけ、
     // 指定なし（ALL）なら社員全員（管理者＋一般社員）へ。発注先チャットは大工も見られるため
-    if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview).catch(()=>{});
-    else dbSendPush('employee', null, supplierName, preview, currentUserId).catch(()=>{});
+    if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview, goTalk).catch(()=>{});
+    else dbSendPush('employee', null, supplierName, preview, currentUserId, goTalk).catch(()=>{});
   }
 }
 

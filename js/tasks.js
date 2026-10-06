@@ -198,7 +198,7 @@ function notifyTaskDone(t){
   const pn=taskProjectName(t);
   const by=currentUserDisplayName ? currentUserDisplayName+'さんが' : '';
   dbSendPushToUser(t.createdById, 'タスクが完了しました',
-    `${by}「${t.title}」を済にしました${pn?'（'+pn+'）':''}`, 'task').catch(()=>{});
+    `${by}「${t.title}」を済にしました${pn?'（'+pn+'）':''}`, 'task:'+t.id).catch(()=>{});
 }
 
 // ── 作る・直す ──
@@ -622,7 +622,7 @@ async function doTaskHandoff(){
     const fileTxt = files.length ? `　資料${files.length}件` : '';
     dbSendPushToNames(notify, ret?'タスクが返ってきました':'タスクを引き継ぎました',
       `${t.title}（${[dueTxt, prog].filter(Boolean).join('・')}）${fileTxt}${currentUserDisplayName?' — '+currentUserDisplayName:''}${note?'：'+note:''}`,
-      'task').catch(()=>{});
+      'task:'+t.id).catch(()=>{});
   }
 
   closeTaskHandoff();
@@ -677,7 +677,7 @@ async function saveTask(){
     const due = row.due_date ? `期限 ${row.due_date.replace(/-/g,'/')}` : '期限なし';
     const pn = row.project_id ? ((projects||[]).find(p=>p.id===row.project_id)?.name||'') : '';
     dbSendPushToNames(added, 'タスクが割り当てられました',
-      `${title}（${due}${pn?'・'+pn:''}）${currentUserDisplayName?' — '+currentUserDisplayName:''}`, 'task').catch(()=>{});
+      `${title}（${due}${pn?'・'+pn:''}）${currentUserDisplayName?' — '+currentUserDisplayName:''}`, 'task:'+(saved?.id||'')).catch(()=>{});
   }
 
   closeTaskModal();
