@@ -60,10 +60,21 @@ Deno.serve(async (req) => {
       .select("id, name, client_name, client_user_id").eq("id", projectId).single();
     if (projErr || !project) return json({ error: "案件が見つかりません" }, 404);
 
-    // 画面に出す名前。指定が無ければ案件の施主名から作る
-    // その案件に登録済みのお客様の行（あれば、お名前を引き継ぐ）
-    const { data: clientRow } = await admin.from("project_clients")
-      .select("id, name, user_id").eq("project_id", projectId).ilike("email", email).maybeSingle();
+    // その案件に登録済みのお客様の行（あれば、お名前を引き継ぎ、その行に紐づける）
+    //
+    // 以前は ilike で1件だけ引いていたが、ilike は _ と % を「どんな字でもよい」と見るため、
+    // taro_k@… のようなアドレスだと別の方の行を拾ってしまうことがあった。
+    // また2件に当たったときは黙って「無い」と同じ扱いになり、
+    // 新しい行を足そうとして（同じ案件に同じアドレスは1つまでなので）失敗していた。
+    // その案件の行をすべて受け取って、こちらで突き合わせる（1案件に数人なので軽い）
+    const { data: rowsOfProject, error: rowsErr } = await admin.from("project_clients")
+      .select("id, name, user_id, email").eq("project_id", projectId);
+    if (rowsErr) return json({ error: "お客様の登録を読めませんでした：" + rowsErr.message });
+    const want = String(email).trim().toLowerCase();
+    const clientRow = (rowsOfProject || [])
+      .find((r: any) => String(r.email || "").trim().toLowerCase() === want) || null;
+
+    // 画面に出す名前。指定が無ければ、登録してある行のお名前、それも無ければ案件の施主名から作る
     const name = String(displayName || "").trim() || String(clientRow?.name || "").trim()
       || (project.client_name ? `${project.client_name} 様` : "お客様");
 
