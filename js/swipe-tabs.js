@@ -160,6 +160,11 @@ function onSwipeMove(e){
   if(!s.ok) return;
   if(Math.abs(dx) < SWIPE_START_X || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
 
+  // ここから先は「横に払っている」と判断した状態。
+  // この間は、指が少し縦に動いても画面が上下にスクロールしないようにする。
+  // （止めないと、横に払うたびに中身が上下にずれて読みにくい）
+  if(e.cancelable) e.preventDefault();
+
   // タブを変えられない向きなら、少しだけ動かして「ここが端」と分かるようにする
   const toNext = dx < 0;
   const canGo = toNext ? (s.hasNext && s.atRight) : (s.hasPrev && s.atLeft);
@@ -208,6 +213,17 @@ function swipeGoBack(){
   if(list) swipeSettle(list, -44);          // 一覧が左から滑り込む
 }
 
+// 移った先のタブを、タブの帯の中で見えるところまで送る（横だけ。上下は動かさない）
+function swipeRevealTab(btn){
+  const bar = btn.parentElement;
+  if(!bar || bar.scrollWidth <= bar.clientWidth + 2) return;   // 送る必要がない
+  const want = btn.offsetLeft - (bar.clientWidth - btn.offsetWidth) / 2;
+  const max  = bar.scrollWidth - bar.clientWidth;
+  const left = Math.max(0, Math.min(max, want));
+  if(Math.abs(bar.scrollLeft - left) < 2) return;
+  try{ bar.scrollTo({ left, behavior:'smooth' }); }catch(_){ bar.scrollLeft = left; }
+}
+
 // となりのタブへ移る。端まで来ていたら、それ以上は動かさない
 function swipeGoTab(dir){
   const btns = swipeTabButtons();
@@ -217,8 +233,10 @@ function swipeGoTab(dir){
   if(j < 0 || j >= btns.length) return;
 
   btns[j].click();
-  // 移った先のタブが隠れていたら、見えるところまで送る
-  btns[j].scrollIntoView({ block:'nearest', inline:'center' });
+  // 移った先のタブが隠れていたら、見えるところまで送る。
+  // scrollIntoView を使うと、タブの帯だけでなく画面そのものが上下に動いてしまうので、
+  // タブの帯の中を横に送るだけにする
+  swipeRevealTab(btns[j]);
 
   // 新しい中身を、払った向きから滑り込ませる
   const pane = swipePane();
@@ -226,6 +244,8 @@ function swipeGoTab(dir){
 }
 
 document.addEventListener('touchstart', onSwipeStart, { passive:true });
-document.addEventListener('touchmove',  onSwipeMove,  { passive:true });
+// touchmove だけは passive にしない。
+// 横に払っていると分かったあと、縦スクロールを止める（preventDefault）ために要る
+document.addEventListener('touchmove',  onSwipeMove,  { passive:false });
 document.addEventListener('touchend',   onSwipeEnd,   { passive:true });
 document.addEventListener('touchcancel', ()=>{ if(_swipe) swipeShift(_swipe.pane, null); _swipe = null; }, { passive:true });
