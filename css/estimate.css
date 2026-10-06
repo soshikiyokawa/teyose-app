@@ -67,6 +67,15 @@
 .ce-del{border:1px solid var(--border);background:var(--surface);color:var(--text-sub);
   font:inherit;font-size:13px;padding:5px 12px;border-radius:8px;cursor:pointer}
 .ce-label{display:block;font-size:15px;font-weight:700;color:var(--text-sub);margin:12px 0 6px}
+.ce-label-sub{font-weight:400;font-size:13px;color:var(--text-muted)}
+/* パスワードは、打ち間違いにご自分で気づけるよう、文字を出せるようにする */
+.ce-pw-wrap{display:flex;gap:8px;align-items:stretch}
+.ce-pw-wrap .ce-input{flex:1;min-width:0}
+.ce-pw-btn{flex-shrink:0;font:inherit;font-size:14px;padding:0 14px;cursor:pointer;
+  border:2px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text-sub);
+  white-space:nowrap}
+.ce-done-note{font-size:14px;line-height:1.8;color:var(--accent-t);margin-top:12px;
+  padding:12px 14px;border-radius:10px;background:var(--accent-bg)}
 .ce-input{display:block;width:100%;box-sizing:border-box;
   font-size:21px;line-height:1.5;padding:14px 14px;border-radius:12px;
   border:2px solid var(--border);background:var(--surface);color:var(--text)}

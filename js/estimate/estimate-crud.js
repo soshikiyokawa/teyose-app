@@ -624,9 +624,18 @@ let ceRows = [];
 
 function openClientEntry(){
   if(!selectedProject?.id){ alert('先に案件を保存してください。'); return; }
+  // 担当が決まっていないと、お客様が書き込んでも、きよかわ側の誰にも見えない。
+  // タブレットをお渡しする前に、ここで気づけるようにしておく
+  if(!clientChatMemberIds.length){
+    alert('先に「担当を選ぶ」から、きよかわ側の担当者を1人以上選んでください。\n'
+        + '選んでいないと、お客様の書き込みが誰にも届きません。');
+    return;
+  }
   // いま入っているものを引き継ぐ。空の行しか無ければ、まっさらから始める
-  ceRows = clientRows.filter(c=>(c.name||'').trim() || (c.email||'').trim()).map(c=>({...c}));
-  if(!ceRows.length) ceRows = [{id:null, name:'', email:'', userId:null}];
+  // パスワードは引き継がない（画面にも残さない）
+  ceRows = clientRows.filter(c=>(c.name||'').trim() || (c.email||'').trim())
+                     .map(c=>({...c, password:''}));
+  if(!ceRows.length) ceRows = [{id:null, name:'', email:'', userId:null, password:''}];
 
   // 案件名は、担当者が「開いている案件で合っているか」を確かめるためのもの。
   // ご契約前の初回来場でもお見せするので、お客様向けの文には入れない
@@ -644,7 +653,8 @@ function openClientEntry(){
       + `いつでもお送りいただけます。お電話がつながらないときも、お待たせしません。</p>`
       + `<p>そのあと工事をご用命いただいた際は、同じチャットのまま、`
       + `進み具合のご報告や現場の写真をお届けします。</p>`
-      + `<p>ご案内をお送りしますので、<b>お名前</b>と<b>メールアドレス</b>をご入力ください。`
+      + `<p><b>お名前</b>と<b>メールアドレス</b>、そしてログインに使う<b>パスワード</b>を`
+      + `ご入力ください。この場でお使いいただけるようになります。`
       + `ご夫婦など、お二方以上でご覧いただくこともできます。</p>`;
   }
   renderClientEntry();
@@ -655,19 +665,30 @@ function openClientEntry(){
 
 function closeClientEntry(){
   document.getElementById('client-entry-modal').classList.remove('open');
+  // 閉じたら、お決めいただいたパスワードは手元に残さない
+  ceRows.forEach(c=>{ c.password = ''; });
 }
 
 function clientEntryAdd(){
   if(ceRows.length >= 4){ return; }
-  ceRows.push({id:null, name:'', email:'', userId:null});
+  ceRows.push({id:null, name:'', email:'', userId:null, password:''});
   renderClientEntry();
   const list = document.querySelectorAll('#client-entry-rows .ce-input');
   list[list.length-2]?.focus();
 }
 function clientEntryRemove(i){
   ceRows.splice(i,1);
-  if(!ceRows.length) ceRows = [{id:null, name:'', email:'', userId:null}];
+  if(!ceRows.length) ceRows = [{id:null, name:'', email:'', userId:null, password:''}];
   renderClientEntry();
+}
+// 打ち間違いにご自分で気づけるよう、文字を出せるようにする（既定は隠す）
+function toggleClientEntryPw(i){
+  const el = document.getElementById('ce-pw-'+i);
+  const btn = document.getElementById('ce-pw-btn-'+i);
+  if(!el) return;
+  const show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  if(btn) btn.textContent = show ? '文字を隠す' : '文字を表示';
 }
 function setClientEntry(i, field, v){ if(ceRows[i]) ceRows[i][field] = v; }
 
@@ -689,6 +710,19 @@ function renderClientEntry(){
              placeholder="例：taro@example.com" inputmode="email"
              autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false"
              oninput="setClientEntry(${i},'email',this.value)">
+      ${c.userId ? `
+      <div class="ce-done-note">このメールアドレスは、すでにご登録いただいています。</div>`
+      : `
+      <label class="ce-label" for="ce-pw-${i}">パスワード
+        <span class="ce-label-sub">（8文字以上。次回からのログインに使います）</span></label>
+      <div class="ce-pw-wrap">
+        <input class="ce-input" id="ce-pw-${i}" type="password" value="${esc(c.password||'')}"
+               placeholder="お好きな文字で8文字以上" autocomplete="new-password"
+               autocapitalize="off" autocorrect="off" spellcheck="false"
+               oninput="setClientEntry(${i},'password',this.value)">
+        <button type="button" class="ce-pw-btn" id="ce-pw-btn-${i}"
+                onclick="toggleClientEntryPw(${i})">文字を表示</button>
+      </div>`}
     </div>`).join('');
   const add = document.querySelector('#client-entry-modal .ce-add');
   if(add) add.style.display = ceRows.length >= 4 ? 'none' : '';
@@ -710,29 +744,65 @@ async function saveClientEntry(){
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)){
       show(`メールアドレスの形をご確認ください：${c.email}`); return;
     }
+    // すでにご登録済みの方には、パスワードの欄を出していない
+    if(!c.userId){
+      const pw = String(c.password||'');
+      if(!pw){ show(`${c.name} 様のパスワードが入っていません。8文字以上でお決めください。`); return; }
+      if(pw.length < 8){ show(`${c.name} 様のパスワードが短いようです。8文字以上でお願いします。`); return; }
+      if(pw.length > 72){ show(`${c.name} 様のパスワードが長すぎます。72文字までです。`); return; }
+    }
   }
   const mails = rows.map(c=>c.email.toLowerCase());
   if(new Set(mails).size !== mails.length){ show('同じメールアドレスが2つ入っています。'); return; }
 
-  // 元から居た方で、今回の入力に出てこなかった行は、そのまま残す（勝手に消さない）
+  // 元から居た方で、今回の入力に出てこなかった行は、そのまま残す（勝手に消さない）。
+  // パスワードは、アカウントを作るときにだけ使う。
+  // 案件のお客様の控え（clientRows）には持ち込まない
   const kept = clientRows.filter(c=>c.id && !rows.some(r=>r.id===c.id));
-  clientRows = [...rows, ...kept];
+  clientRows = [...rows.map(({password, ...rest})=>rest), ...kept];
 
   const btn = document.querySelector('#client-entry-modal .ce-done');
-  if(btn){ btn.disabled = true; btn.textContent = '保存しています…'; }
+  const back = () => { if(btn){ btn.disabled = false; btn.textContent = '入力しました'; } };
+  if(btn){ btn.disabled = true; btn.textContent = '登録しています…'; }
   try{
     const list = await dbSaveProjectClients(selectedProject.id, clientRows);
     if(list.length) clientRows = list.map(c=>({...c}));
     if(selectedProject) selectedProject.clients = list;
   }catch(_){
-    if(btn){ btn.disabled = false; btn.textContent = '入力しました'; }
+    back();
     show('保存できませんでした。担当者にお知らせください。');
     return;
   }
-  if(btn){ btn.disabled = false; btn.textContent = '入力しました'; }
+
+  // パスワードをお決めいただいた方は、その場で使える状態にする（ご案内メールは送らない）。
+  // ここで作ると、メールが届かずに止まる、ということが起きない
+  const made = [];
+  for(const r of rows){
+    if(r.userId || !r.password) continue;
+    try{
+      await dbInviteClient(selectedProject.id, r.email, r.name, r.password);
+      made.push(r.name);
+    }catch(e){
+      back();
+      show(`${r.name} 様のご登録ができませんでした。${String(e?.message||'')}`);
+      return;
+    }finally{
+      r.password = '';            // 用が済んだら手元に残さない
+    }
+  }
+  ceRows.forEach(c=>{ c.password = ''; });
+  back();
   closeClientEntry();
+
+  // 作った分を手元にも反映して、画面の「登録済み」表示を合わせる
+  try{
+    const fresh = await dbFetchProjectClients(selectedProject.id);
+    if(fresh){ clientRows = fresh.map(c=>({...c})); selectedProject.clients = fresh; }
+  }catch(_){}
   renderClientChatBox();
-  showToast('お客様のご入力を保存しました。「チャット案内」を押すとご案内が届きます');
+  showToast(made.length
+    ? `${made.join('、')} 様のご登録が終わりました。そのままログインしてお使いいただけます`
+    : 'お客様のご入力を保存しました。「チャット案内」を押すとご案内が届きます');
 }
 
 function openClientMemberPicker(){

@@ -1061,10 +1061,13 @@ async function dbDeleteChatGroup(id){
 //
 // 案件情報の「チャット案内」から呼ぶ。作られるのは「チャットだけ」のお客様アカウント。
 // displayName は、そのお客様のお名前。チャットの発言者名になる（ご主人・奥様の見分けに使う）
-async function dbInviteClient(projectId, email, displayName){
-  const { data, error } = await sb.functions.invoke('invite-client', {
-    body: { projectId, email, displayName: displayName||'', redirectTo: location.origin + location.pathname }
-  });
+// password を渡すと、ご案内メールを送らずにその場で使える状態にする
+// （タブレットをお渡しして、お客様ご自身に決めていただいたとき）
+async function dbInviteClient(projectId, email, displayName, password){
+  const body = { projectId, email, displayName: displayName||'',
+                 redirectTo: location.origin + location.pathname };
+  if(password) body.password = password;
+  const { data, error } = await sb.functions.invoke('invite-client', { body });
   let detail = '';
   if(error){ try{ detail = (await error.context?.json?.())?.error || ''; }catch(_){} }
   const msg = data?.error || detail || (error ? error.message : '');

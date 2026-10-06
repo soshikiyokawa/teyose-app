@@ -52,9 +52,18 @@ Deno.serve(async (req) => {
       return json({ error: "お客様のご案内はきよかわの社員のみ行えます" }, 403);
     }
 
-    const { projectId, email, displayName, redirectTo: wantRedirect } = await req.json();
+    const { projectId, email, displayName, password, redirectTo: wantRedirect } = await req.json();
     if (!projectId) return json({ error: "案件が指定されていません" });
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "メールアドレスが正しくありません" });
+
+    // パスワードは任意。
+    // お渡ししたタブレットでお客様ご自身に決めていただいたときだけ入ってくる。
+    // そのときはご案内メールを送らず、その場でお使いいただける状態にする
+    // （メールが届かずに止まる、ということが起きないようにするため）
+    const wantPassword = typeof password === "string" ? password : "";
+    if (wantPassword && (wantPassword.length < 8 || wantPassword.length > 72)) {
+      return json({ error: "パスワードは8文字以上72文字までにしてください" });
+    }
 
     const { data: project, error: projErr } = await admin.from("projects")
       .select("id, name, client_name, client_user_id").eq("id", projectId).single();
@@ -90,19 +99,42 @@ Deno.serve(async (req) => {
     let created = false;
 
     if (userId) {
-      const { data: prof } = await admin.from("profiles").select("role").eq("id", userId).single();
+      const { data: prof } = await admin.from("profiles").select("role, password_set").eq("id", userId).single();
       if (prof && prof.role !== "client") {
         return json({ error: "このメールアドレスは、きよかわの社員または業者のアカウントで使われています" });
       }
-      mailNote = "このメールアドレスのお客様アカウントは既にあります。案件に紐づけ、ご案内メールを送り直しました。";
-      // 既にある人には「パスワード再設定」のリンクを送る（招待リンクは新規のみ）
-      const link = await makeLink(admin, "recovery", email, redirectTo);
-      if (link.error) return json({ error: link.error });
-      const sent = await sendClientMail(email, name, project.name, link.url, true);
-      if (sent.error) mailNote = `ご案内メールを送れませんでした（${sent.error}）。`;
+      if (wantPassword) {
+        // すでにご自分でパスワードをお決めの方のものは、黙って書き換えない。
+        // 打ち間違いで他のお客様のアカウントを上書きしてしまうのを防ぐため
+        if (prof && prof.password_set !== false) {
+          return json({ error: "このメールアドレスは、すでにご登録済みです。"
+            + "パスワードをお忘れの場合は、きよかわの担当者が「アカウント権限 → お客様アカウント」から設定し直せます" });
+        }
+        const { error: pwErr } = await admin.auth.admin.updateUserById(userId, {
+          password: wantPassword, email_confirm: true,
+        });
+        if (pwErr) return json({ error: "パスワードを設定できませんでした：" + pwErr.message });
+        mailNote = "その場でパスワードをお決めいただきました。すぐにお使いいただけます。";
+      } else {
+        mailNote = "このメールアドレスのお客様アカウントは既にあります。案件に紐づけ、ご案内メールを送り直しました。";
+        // 既にある人には「パスワード再設定」のリンクを送る（招待リンクは新規のみ）
+        const link = await makeLink(admin, "recovery", email, redirectTo);
+        if (link.error) return json({ error: link.error });
+        const sent = await sendClientMail(email, name, project.name, link.url, true);
+        if (sent.error) mailNote = `ご案内メールを送れませんでした（${sent.error}）。`;
+      }
     } else {
       created = true;
-      if (RESEND_API_KEY && MAIL_FROM) {
+      if (wantPassword) {
+        // その場でお決めいただいたパスワードでアカウントを作る。メールは送らない
+        const { data: made, error: mkErr } = await admin.auth.admin.createUser({
+          email, password: wantPassword, email_confirm: true,
+        });
+        if (mkErr) return json({ error: inviteErrorMessage(mkErr.message) });
+        userId = made.user?.id || "";
+        if (!userId) return json({ error: "アカウントを作れませんでした" });
+        mailNote = "その場でパスワードをお決めいただきました。すぐにお使いいただけます。";
+      } else if (RESEND_API_KEY && MAIL_FROM) {
         const link = await makeLink(admin, "invite", email, redirectTo);
         if (link.error) return json({ error: link.error });
         userId = link.userId;
@@ -124,7 +156,8 @@ Deno.serve(async (req) => {
     // 新しくお作りしたアカウントは、ご自分でパスワードを決めるまで false。
     // false の間は、アプリを開くとパスワード設定の画面が出る（migration-genba72.sql）
     const prof: Record<string, unknown> = { id: userId, role: "client", display_name: name, supplier_id: null, work_group: "" };
-    if (created) prof.password_set = false;
+    if (wantPassword) prof.password_set = true;        // その場でお決めいただいた
+    else if (created) prof.password_set = false;       // メールのリンクから決めていただく
     const { error: profErr } = await admin.from("profiles").upsert(prof);
     if (profErr) return json({ error: "お客様の登録に失敗しました：" + profErr.message });
 
