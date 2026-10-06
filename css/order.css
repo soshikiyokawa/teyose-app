@@ -241,6 +241,14 @@ body.drag-sorting .drag-handle{cursor:grabbing}
   .inv-more-menu .btn{width:auto;margin:0}
 }
 
+/* まだOneDriveに入れていない請求書があるときのお知らせ */
+.inv-od-note{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-bottom:10px;padding:10px 12px;border-radius:10px;
+  background:var(--accent-bg);border:1px solid var(--accent)}
+.inv-od-txt{flex:1;min-width:180px;font-size:13px;line-height:1.7;color:var(--accent-t)}
+.inv-od-txt span{display:block;font-size:11px;color:var(--text-sub)}
+.inv-od-btns{display:flex;gap:6px;flex-shrink:0}
+
 /* 絞り込みの帯。選ぶところ・合計・印刷を、上から1段ずつ */
 #invoice-filter{flex-direction:column;align-items:stretch!important;gap:8px!important}
 .inv-f-sel{display:flex;gap:6px;flex-wrap:wrap}

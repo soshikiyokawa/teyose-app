@@ -115,6 +115,63 @@ function invOneDrivePlan(){
   });
 }
 
+// ════ まだ入れていないものを、ページを開いたときに知らせる ════
+//
+// フォルダの中を見るには、そのつど許可を求める決まりになっている（勝手には覗けない）。
+// 開くたびに許可を求めるのは煩わしいので、
+// 「この端末で、どの請求書を入れ終えたか」を手元に覚えておいて、それと見比べる。
+const INV_OD_DONE = 'teyose-invoice-saved';
+const INV_OD_HIDE = 'teyose-invoice-saved-hide';
+
+function invOdIds(key){
+  try{ const a = JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(a)?a:[]; }
+  catch(_){ return []; }
+}
+function invOdAddIds(key, ids){
+  const set = new Set(invOdIds(key).concat(ids));
+  try{ localStorage.setItem(key, JSON.stringify([...set].slice(-2000))); }catch(_){}
+}
+
+// まだ入れていないもの
+function invOdPending(){
+  const done = new Set(invOdIds(INV_OD_DONE));
+  return invOneDrivePlan().filter(p=>!done.has(p.v.id));
+}
+
+// 「あとで」を押したぶんは、次に新しいものが増えるまで出さない
+function invOdDismiss(){
+  invOdAddIds(INV_OD_HIDE, invOdPending().map(p=>p.v.id));
+  renderInvoiceOneDriveNote();
+}
+
+async function renderInvoiceOneDriveNote(){
+  const el = document.getElementById('invoice-od-note');
+  if(!el) return;
+  el.innerHTML = '';
+  if(!invIsStaff() || !invFsSupported()) return;
+  // 保存先をまだ決めていない人には出さない（催促にならないように）
+  const root = await invFsRoot(false).catch(()=>null) || await invFsGet().catch(()=>null);
+  if(!root) return;
+
+  const pending = invOdPending();
+  if(!pending.length) return;
+  const hidden = new Set(invOdIds(INV_OD_HIDE));
+  if(pending.every(p=>hidden.has(p.v.id))) return;   // 「あとで」のまま、新しいものも無い
+
+  const folders = [...new Set(pending.map(p=>p.folder))].sort();
+  el.innerHTML = `
+    <div class="inv-od-note">
+      <div class="inv-od-txt">
+        業者から届いた請求書が<b>${pending.length}件</b>、まだOneDriveに入っていません
+        <span>入れ先：${folders.join('・')}</span>
+      </div>
+      <div class="inv-od-btns">
+        <button class="btn sm primary" onclick="saveInvoicesToOneDrive()">保存する</button>
+        <button class="btn sm" onclick="invOdDismiss()">あとで</button>
+      </div>
+    </div>`;
+}
+
 // ── 保存する ──
 async function saveInvoicesToOneDrive(){
   if(!invIsStaff()){ showToast('管理者のみです'); return; }
@@ -133,6 +190,7 @@ async function saveInvoicesToOneDrive(){
     + `すでに入っているものは飛ばします。よろしいですか？`)) return;
 
   let saved=0, skipped=0, failed=0;
+  const done = [];              // 入れ終えたもの（次からお知らせに出さない）
   const dirs = {};
   for(let i=0;i<plan.length;i++){
     const { v, folder, name } = plan[i];
@@ -142,7 +200,7 @@ async function saveInvoicesToOneDrive(){
       // すでにあるものは触らない
       let exists = false;
       try{ await dirs[folder].getFileHandle(name); exists = true; }catch(_){}
-      if(exists){ skipped++; continue; }
+      if(exists){ skipped++; done.push(v.id); continue; }
 
       const url = await dbInvoiceUrl(v.filePath);
       const res = await fetch(url);
@@ -153,13 +211,15 @@ async function saveInvoicesToOneDrive(){
       const w  = await fh.createWritable();
       await w.write(blob);
       await w.close();
-      saved++;
+      saved++; done.push(v.id);
     }catch(e){
       console.warn('保存できませんでした', name, e?.message||e);
       failed++;
     }
   }
+  invOdAddIds(INV_OD_DONE, done);
   showToast(`${saved}件を保存しました`
     + (skipped?`　すでにあった ${skipped}件`:'')
     + (failed ?`　できなかった ${failed}件`:''), 8000);
+  renderInvoiceOneDriveNote();
 }

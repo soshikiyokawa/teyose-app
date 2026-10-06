@@ -170,6 +170,9 @@ function renderInvoices(){
   }
 
 
+  // まだOneDriveに入れていないものがあれば、上にお知らせを出す
+  if(typeof renderInvoiceOneDriveNote==='function') renderInvoiceOneDriveNote();
+
   el.innerHTML = list.length
     ? `<div class="card" style="padding:0;overflow:hidden">${list.map(invRowHtml).join('')}</div>`
     : `<div class="card"><div class="empty" style="padding:20px">${
