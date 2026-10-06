@@ -195,7 +195,67 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .ope-mst-note{font-size:10px;color:var(--text-muted);margin-top:5px;line-height:1.6}
 
 /* ── 請求書（発注額との突き合わせ・支払・インボイス） ── */
-.inv-tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;margin-left:5px;vertical-align:middle}
+/* ── 請求書の一覧（1件ぶん） ── */
+/* 以前は、名前とボタン6つを横一列に並べていた。
+   スマホだとボタンが縮まないぶん名前の列が潰れ、業者名が縦1文字ずつになっていた。
+   いまは上から「名前 → 状態 → 金額 → ファイル → ボタン」と積む */
+.inv-row{padding:12px;border-bottom:0.5px solid var(--border)}
+.inv-row:last-child{border-bottom:none}
+.inv-ttl{font-size:14px;font-weight:700;line-height:1.5;word-break:break-word}
+.inv-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:5px}
+.inv-when{font-size:11px;color:var(--text-sub)}
+
+/* 金額。いちばん見たいのは請求額と、発注額との差 */
+.inv-money{margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--surface2)}
+.inv-amt{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;font-size:16px;line-height:1.6}
+.inv-amt.sub{font-size:13px;color:var(--text-sub);margin-top:2px}
+.inv-amt-l{flex-shrink:0;font-size:11px;font-weight:700;color:var(--text-muted);
+  min-width:30px;letter-spacing:.08em}
+.inv-amt b{font-variant-numeric:tabular-nums}
+.inv-amt i{font-style:normal;font-size:11px;color:var(--text-muted)}
+.inv-diff{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:13px}
+.inv-diff .inv-ok{color:var(--ok-t);font-weight:700}
+.inv-diff .inv-ng{color:var(--danger);font-weight:700}
+.inv-diff .inv-warn{color:var(--warn-t);font-weight:700}
+
+.inv-meta{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:7px;font-size:11px;color:var(--text-sub);
+  word-break:break-all}
+.inv-meta span{color:var(--text-muted)}
+.inv-note{margin-top:4px;font-size:11px;color:var(--text-muted);line-height:1.6}
+
+/* ボタンは1行ぶんだけ。ふだん使わないものは「ほかの操作」に畳む */
+.inv-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.inv-more{position:relative}
+.inv-more-btn{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.inv-more.open .inv-more-btn svg{transform:rotate(180deg)}
+.inv-more-menu{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:50;
+  min-width:190px;padding:6px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.inv-more.open .inv-more-menu{display:block}
+.inv-more-menu .btn{display:flex;width:100%;justify-content:flex-start;margin:2px 0;white-space:nowrap}
+/* 画面が広いときは畳まず、そのまま横に並べる */
+@media(min-width:700px){
+  .inv-more-btn{display:none}
+  .inv-more-menu{display:flex;position:static;gap:6px;padding:0;min-width:0;
+    background:none;border:none;box-shadow:none}
+  .inv-more-menu .btn{width:auto;margin:0}
+}
+
+/* 絞り込みの帯。選ぶところ・合計・印刷を、上から1段ずつ */
+#invoice-filter{flex-direction:column;align-items:stretch!important;gap:8px!important}
+.inv-f-sel{display:flex;gap:6px;flex-wrap:wrap}
+.inv-f-sel select{flex:1 1 150px;min-width:0;width:auto;font-size:12px;padding:5px 8px}
+.inv-sum{font-size:12px;color:var(--text-sub)}
+.inv-sum .inv-warn{color:var(--warn-t)}
+.inv-sum .inv-ng{color:var(--danger)}
+#inv-tools{align-self:flex-start}
+@media(min-width:700px){
+  #invoice-filter{flex-direction:row;align-items:center!important;flex-wrap:wrap}
+  .inv-f-sel select{flex:0 0 auto}
+  .inv-sum{order:9}
+}
+
+.inv-tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;vertical-align:middle}
 .inv-tag.inv-ok{background:var(--ok-bg);color:var(--ok-t)}
 .inv-tag.inv-ng{background:var(--danger-bg,#fbe9e7);color:var(--danger)}
 .inv-tag.inv-warn{background:var(--warn-bg);color:var(--warn-t)}

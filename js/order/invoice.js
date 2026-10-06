@@ -133,28 +133,39 @@ function renderInvoices(){
       const unpaid= list.filter(v=>!invIsPaid(v)).reduce((s,v)=>s+(v.amount||0),0);
       const diffN = list.filter(v=>{ const d=invDiff(v); return d!==null && d!==0; }).length;
       fw.innerHTML=`
-        <select onchange="invFilterSupplier=this.value;renderInvoices()" style="width:auto;font-size:12px;padding:4px 8px">
-          <option value="">発注先：すべて</option>
-          ${sups.map(s=>`<option value="${esc(s)}"${invFilterSupplier===s?' selected':''}>${esc(s)}</option>`).join('')}
-        </select>
-        <select onchange="invFilterMonth=this.value;renderInvoices()" style="width:auto;font-size:12px;padding:4px 8px">
-          <option value="">請求月：すべて</option>
-          ${months.map(m=>`<option value="${m}"${invFilterMonth===m?' selected':''}>${invMonthLabel(m)}</option>`).join('')}
-        </select>
-        <select onchange="invFilterState=this.value;renderInvoices()" style="width:auto;font-size:12px;padding:4px 8px">
-          <option value=""${invFilterState===''?' selected':''}>状態：すべて</option>
-          <option value="unpaid"${invFilterState==='unpaid'?' selected':''}>未払いのみ</option>
-          <option value="diff"${invFilterState==='diff'?' selected':''}>差額があるもの</option>
-        </select>
-        <button class="btn sm" onclick="printPayPlan()" title="今月ふりこむ会社と金額の一覧。銀行での手続きやチェックに使えます">今月の振込予定を印刷</button>
-        <button class="btn sm" onclick="printInvoiceList()">支払一覧を印刷</button>
-        <button class="btn sm" onclick="openInvoiceHints()" title="手で入れた金額から覚えた、請求書の読み取りのコツ">AIの読み取りメモ${
-          (invoiceHints||[]).length?`（${(invoiceHints||[]).length}）`:''}</button>
-        <span style="font-size:11px;color:var(--text-sub)">${list.length}件　請求 ¥${fmt(sum)}${
-          unpaid?`　<b style="color:var(--warn-t)">未払い ¥${fmt(unpaid)}</b>`:''}${
-          diffN?`　<b style="color:var(--danger)">差額あり ${diffN}件</b>`:''}</span>`;
+        <div class="inv-f-sel">
+          <select onchange="invFilterSupplier=this.value;renderInvoices()">
+            <option value="">発注先：すべて</option>
+            ${sups.map(s=>`<option value="${esc(s)}"${invFilterSupplier===s?' selected':''}>${esc(s)}</option>`).join('')}
+          </select>
+          <select onchange="invFilterMonth=this.value;renderInvoices()">
+            <option value="">請求月：すべて</option>
+            ${months.map(m=>`<option value="${m}"${invFilterMonth===m?' selected':''}>${invMonthLabel(m)}</option>`).join('')}
+          </select>
+          <select onchange="invFilterState=this.value;renderInvoices()">
+            <option value=""${invFilterState===''?' selected':''}>状態：すべて</option>
+            <option value="unpaid"${invFilterState==='unpaid'?' selected':''}>未払いのみ</option>
+            <option value="diff"${invFilterState==='diff'?' selected':''}>差額があるもの</option>
+          </select>
+        </div>
+        <div class="inv-sum">${list.length}件　請求 ¥${fmt(sum)}${
+          unpaid?`　<b class="inv-warn">未払い ¥${fmt(unpaid)}</b>`:''}${
+          diffN?`　<b class="inv-ng">差額あり ${diffN}件</b>`:''}</div>
+        <div class="inv-more" id="inv-tools">
+          <button type="button" class="btn sm inv-more-btn" onclick="invToggleTools(event)">
+            印刷・メモ
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="10" height="10" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="inv-more-menu">
+            <button class="btn sm" onclick="printPayPlan()" title="今月ふりこむ会社と金額の一覧。銀行での手続きやチェックに使えます">今月の振込予定を印刷</button>
+            <button class="btn sm" onclick="printInvoiceList()">支払一覧を印刷</button>
+            <button class="btn sm" onclick="openInvoiceHints()" title="手で入れた金額から覚えた、請求書の読み取りのコツ">AIの読み取りメモ${
+              (invoiceHints||[]).length?`（${(invoiceHints||[]).length}）`:''}</button>
+          </div>
+        </div>`;
     }
   }
+
 
   el.innerHTML = list.length
     ? `<div class="card" style="padding:0;overflow:hidden">${list.map(invRowHtml).join('')}</div>`
@@ -167,50 +178,96 @@ function invRowHtml(v){
   const diff=invDiff(v);
   const reg=invRegState(v);
   const pay=invPayState(v);
-  const PAY={paid:['支払済み','inv-ok'], over:['支払予定日を過ぎています','inv-ng'], unpaid:['未払い','inv-warn']};
+  const PAY={paid:['支払済み','inv-ok'], over:['支払日を過ぎています','inv-ng'], unpaid:['未払い','inv-warn']};
   const REG={ok:['登録番号 一致','inv-ok'], ng:['登録番号が違います','inv-ng'], none:['登録番号なし','inv-warn']};
 
-  // 発注額との突き合わせ（社内だけに出す。発注先には他社の情報が混ざらないよう出さない）
-  const compare = invIsStaff() ? `
-    <div class="inv-cmp">
-      <span>発注 ¥${fmt(ord.total)}<i>（${ord.list.length}件・${invPeriodLabel(ord.period)}）</i></span>
-      <span>請求 ${v.amount!=null?`¥${fmt(v.amount)}`:'—'}</span>
-      ${diff===null ? `<span class="inv-warn">請求額が未入力</span>
-            <button class="btn xs primary" onclick="openInvoiceAmount(${v.id})">金額を入力</button>`
-        : diff===0  ? '<span class="inv-ok">一致</span>'
-        : `<span class="inv-ng">差額 ${diff>0?'＋':'−'}¥${fmt(Math.abs(diff))}</span>`}
-      ${ord.list.length?`<button class="btn xs" onclick="showInvoiceOrders(${v.id})">発注の内訳</button>`:''}
+  // 金額のまとまり。いちばん見たいのは「請求額」と「発注額との差」なので、先に大きく出す。
+  // 発注額との突き合わせは社内だけ（発注先に他社の情報が混ざらないようにするため）
+  const money = invIsStaff() ? `
+    <div class="inv-money">
+      <div class="inv-amt">
+        <span class="inv-amt-l">請求</span>
+        <b>${v.amount!=null?`¥${fmt(v.amount)}`:'—'}</b>
+        ${v.amountByHand?'<i>手入力</i>':''}
+      </div>
+      <div class="inv-amt sub">
+        <span class="inv-amt-l">発注</span>
+        <b>¥${fmt(ord.total)}</b>
+        <i>${ord.list.length}件・${invPeriodLabel(ord.period)}</i>
+        ${ord.list.length?`<button class="btn xs" onclick="showInvoiceOrders(${v.id})">内訳</button>`:''}
+      </div>
+      <div class="inv-diff">${
+        diff===null ? `<span class="inv-warn">請求額が未入力</span>
+                       <button class="btn xs primary" onclick="openInvoiceAmount(${v.id})">金額を入力</button>`
+        : diff===0  ? '<span class="inv-ok">発注額と一致</span>'
+        : `<span class="inv-ng">差額 ${diff>0?'＋':'−'}¥${fmt(Math.abs(diff))}</span>`}</div>
+    </div>` : `
+    <div class="inv-money">
+      <div class="inv-amt"><span class="inv-amt-l">請求</span>
+        <b>${v.amount!=null?`¥${fmt(v.amount)}`:'—'}</b></div>
+    </div>`;
+
+  // ふだん使うのは「開く」だけ。ほかは畳んでおく（スマホで横に並べると名前が潰れるため）
+  const rest = invIsStaff() ? `
+    <div class="inv-more">
+      <button type="button" class="btn xs inv-more-btn" onclick="invToggleMore(${v.id}, event)">
+        ほかの操作
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="10" height="10" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="inv-more-menu">
+        <button class="btn xs" onclick="openInvoiceLines(${v.id})">明細を現場に${
+          ilLineCount(v.id) ? (ilUnassignedCount(v.id)
+            ? `（<b style="color:var(--danger)">残${ilUnassignedCount(v.id)}</b>）` : '（済）') : ''}</button>
+        <button class="btn xs" onclick="readInvoiceWithAi(${v.id})">AIで読む</button>
+        <button class="btn xs" onclick="openInvoiceAmount(${v.id})">金額を入力</button>
+        <button class="btn xs" onclick="openInvoicePay(${v.id})">支払</button>
+        <button class="btn xs danger" onclick="deleteInvoice(${v.id})">削除</button>
+      </div>
     </div>` : '';
 
-  return `<div class="leave-row" style="display:block">
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700">${esc(v.title||invTitle(v.supplierName,v.month))}
-          <span class="inv-tag ${PAY[pay][1]}">${PAY[pay][0]}</span>
-          ${reg?`<span class="inv-tag ${REG[reg][1]}">${REG[reg][0]}</span>`:''}
-        </div>
-        <div style="font-size:11px;color:var(--text-sub)">
-          ${esc(v.fileName||'ファイル')}${v.amount!=null?`　<b>¥${fmt(v.amount)}</b>${
-            v.amountByHand?'<span style="color:var(--text-muted)">（手入力）</span>':''}`:''}
-          <span style="color:var(--text-muted)">　送信 ${(v.createdAt||'').slice(0,10).replace(/-/g,'/')}${v.uploadedBy?'（'+esc(v.uploadedBy)+'）':''}</span>
-        </div>
-        ${v.note?`<div style="font-size:11px;color:var(--text-muted)">${esc(v.note)}</div>`:''}
-      </div>
-      <button class="btn xs primary" onclick="openInvoice(${v.id})">開く</button>
-      ${invIsStaff()?`<button class="btn xs" onclick="openInvoiceLines(${v.id})">明細を現場に${
-        ilLineCount(v.id) ? (ilUnassignedCount(v.id)
-          ? `（<b style="color:var(--danger)">残${ilUnassignedCount(v.id)}</b>）` : '（済）') : ''}</button>
-      <button class="btn xs" onclick="readInvoiceWithAi(${v.id})">AIで読む</button>
-      <button class="btn xs" onclick="openInvoiceAmount(${v.id})">金額を入力</button>
-      <button class="btn xs" onclick="openInvoicePay(${v.id})">支払</button>
-      <button class="btn xs danger" onclick="deleteInvoice(${v.id})">削除</button>`:''}
+  const when = invIsPaid(v)
+    ? `支払 ${String(v.paidOn).replace(/-/g,'/')}${v.paidAmount!=null?`　¥${fmt(v.paidAmount)}`:''}`
+    : v.dueOn ? `支払予定 ${String(v.dueOn).replace(/-/g,'/')}` : '';
+
+  return `<div class="inv-row" data-inv="${v.id}">
+    <div class="inv-ttl">${esc(v.title||invTitle(v.supplierName,v.month))}</div>
+    <div class="inv-tags">
+      <span class="inv-tag ${PAY[pay][1]}">${PAY[pay][0]}</span>
+      ${reg?`<span class="inv-tag ${REG[reg][1]}">${REG[reg][0]}</span>`:''}
+      ${when?`<span class="inv-when">${when}</span>`:''}
     </div>
-    ${compare}
-    ${invIsPaid(v)?`<div class="inv-paid">支払 ${String(v.paidOn).replace(/-/g,'/')}${
-      v.paidAmount!=null?`　¥${fmt(v.paidAmount)}`:''}</div>`
-      : v.dueOn?`<div class="inv-paid">支払予定 ${String(v.dueOn).replace(/-/g,'/')}</div>`:''}
+    ${money}
+    <div class="inv-meta">${esc(v.fileName||'ファイル')}<span>送信 ${
+      (v.createdAt||'').slice(0,10).replace(/-/g,'/')}${v.uploadedBy?'（'+esc(v.uploadedBy)+'）':''}</span></div>
+    ${v.note?`<div class="inv-note">${esc(v.note)}</div>`:''}
+    <div class="inv-acts">
+      <button class="btn sm primary" onclick="openInvoice(${v.id})">請求書を開く</button>
+      ${rest}
+    </div>
   </div>`;
 }
+
+// 「印刷・メモ」の開け閉め
+function invToggleTools(ev){
+  if(ev) ev.stopPropagation();
+  const box=document.getElementById('inv-tools');
+  const willOpen = box && !box.classList.contains('open');
+  document.querySelectorAll('.inv-more.open').forEach(b=>b.classList.remove('open'));
+  if(willOpen) box.classList.add('open');
+}
+
+// 「ほかの操作」の開け閉め。開くのは1つだけ
+function invToggleMore(id, ev){
+  if(ev) ev.stopPropagation();
+  const box=document.querySelector(`.inv-row[data-inv="${id}"] .inv-more`);
+  const willOpen=box && !box.classList.contains('open');
+  document.querySelectorAll('.inv-more.open').forEach(b=>b.classList.remove('open'));
+  if(willOpen) box.classList.add('open');
+}
+document.addEventListener('click', e=>{
+  if(e.target.closest?.('.inv-more')) return;
+  document.querySelectorAll('.inv-more.open').forEach(b=>b.classList.remove('open'));
+});
 
 // 突き合わせのもとになった発注を見せる
 function showInvoiceOrders(id){
