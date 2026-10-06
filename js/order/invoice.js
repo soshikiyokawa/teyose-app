@@ -161,6 +161,9 @@ function renderInvoices(){
             <button class="btn sm" onclick="printInvoiceList()">支払一覧を印刷</button>
             <button class="btn sm" onclick="openInvoiceHints()" title="手で入れた金額から覚えた、請求書の読み取りのコツ">AIの読み取りメモ${
               (invoiceHints||[]).length?`（${(invoiceHints||[]).length}）`:''}</button>
+            ${invFsSupported() ? `
+            <button class="btn sm" onclick="saveInvoicesToOneDrive()" title="業者から届いた請求書を、請求月ごとのフォルダ（202609 など）に入れます">OneDriveに保存</button>
+            <button class="btn sm" onclick="invPickOneDriveFolder()" title="保存先のフォルダを選び直します">保存先を選ぶ</button>` : ''}
           </div>
         </div>`;
     }

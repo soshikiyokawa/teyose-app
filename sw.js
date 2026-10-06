@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v477';
+const CACHE_NAME = 'teyose-v478';
 
 // ── 手元に置いておくもの ──
 //
@@ -105,6 +105,7 @@ const VERSIONED = [
   'js/genba/account-perms.js',
   'js/order/ekrea-price.js',
   'js/order/invoice.js',
+  'js/order/invoice-onedrive.js',
   'js/order/item-price.js',
   'js/order/supplier-master.js',
   'js/order/item-master.js',
