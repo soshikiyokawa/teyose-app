@@ -174,7 +174,10 @@ async function fetchAllData(){
   master = (R.master.data||[]).map(r=>({id:r.id,cat:r.cat,name:r.name,unit:r.unit,price:Number(r.price),cost:Number(r.cost),supplier:supplierNameById(r.supplier_id),sortOrder:r.sort_order,
     makerCode:r.maker_code||'', webPrice:(r.web_price==null?null:Number(r.web_price)), webPriceAt:r.web_price_at||'',
     shipping:Number(r.shipping)||0, shippingPer:(r.shipping_per==='unit'?'unit':'order'),
-    perBundle:Number(r.per_bundle)||0}));
+    perBundle:Number(r.per_bundle)||0,
+    // 寸法は品目名とは別に持つ（migration-genba93.sql）。列がまだ無い環境では undefined のまま
+    baseName:r.base_name||'', noDims:!!r.no_dims,
+    dim1:(r.dim1==null?null:Number(r.dim1)), dim2:(r.dim2==null?null:Number(r.dim2)), dim3:(r.dim3==null?null:Number(r.dim3))}));
   masterIdSeq = Math.max(0,...master.map(m=>m.id))+1;
 
   if(isEmployee){
@@ -431,21 +434,46 @@ async function dbReorderSuppliers(orderedSuppliers){
 }
 
 // ── 品目マスタ ──
-// 品番の列（migration-genba32.sql）が未適用でも動くよう、失敗したら品番なしで保存し直す
+// あとから足した列（品番＝migration-genba32.sql／寸法＝migration-genba93.sql）が
+// まだ無い環境でも保存できるよう、その列で弾かれたら、その列を外して保存し直す
 let makerCodeColumnReady = true;
+let dimsColumnReady = true;
 function stripMakerCode(payload){
   const {maker_code, ...rest} = payload;
   return rest;
 }
+function stripDims(payload){
+  const {base_name, dim1, dim2, dim3, no_dims, ...rest} = payload;
+  return rest;
+}
+// 品目の寸法まわりを、保存する形にする
+function masterDimsRow(item){
+  // 寸法まわりを何も持っていない品目（分ける前に読み込んだままのもの）は、触らない。
+  // 空で上書きして、すでに入っている品目名・寸法を消してしまわないため
+  if(!item.baseName && item.dim1==null && item.dim2==null && item.dim3==null && !item.noDims) return {};
+  const none = !!item.noDims;
+  const n = v => (v==null || v==='' || none) ? null : Number(v);
+  return { base_name:item.baseName||'', dim1:n(item.dim1), dim2:n(item.dim2), dim3:n(item.dim3), no_dims:none };
+}
+// send(payload) を呼び、足りない列で弾かれたらその列を外してやり直す
+async function masterSaveWithFallback(payload, send){
+  let res = await send(payload);
+  for(let i=0; i<2 && res.error; i++){
+    const msg = res.error.message||'';
+    if(/maker_code/.test(msg)){ makerCodeColumnReady = false; payload = stripMakerCode(payload); }
+    else if(/base_name|dim1|dim2|dim3|no_dims/.test(msg)){ dimsColumnReady = false; payload = stripDims(payload); }
+    else break;
+    res = await send(payload);
+  }
+  return res;
+}
 async function dbAddMasterItem(item){
   const supplier_id = supplierIdByName(item.supplier);
   const row = {cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id,maker_code:item.makerCode||'',
-    shipping:item.shipping||0, shipping_per:item.shippingPer||'order', per_bundle:item.perBundle||0};
-  let { data, error } = await sb.from('master_items').insert(row).select().single();
-  if(error && /maker_code/.test(error.message||'')){
-    makerCodeColumnReady = false;
-    ({ data, error } = await sb.from('master_items').insert(stripMakerCode(row)).select().single());
-  }
+    shipping:item.shipping||0, shipping_per:item.shippingPer||'order', per_bundle:item.perBundle||0,
+    ...masterDimsRow(item)};
+  const { data, error } = await masterSaveWithFallback(row,
+    r => sb.from('master_items').insert(r).select().single());
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
   master.push({id:data.id,...item,sortOrder:data.sort_order,webPrice:null,webPriceAt:''});
 }
@@ -453,18 +481,15 @@ async function dbUpdateMasterItem(id,item){
   const supplier_id = supplierIdByName(item.supplier);
   const payload = currentUserRole!=='supplier'
     ? {cat:item.cat,name:item.name,unit:item.unit,price:item.price,cost:item.cost,supplier_id,maker_code:item.makerCode||'',
-       shipping:item.shipping||0, shipping_per:item.shippingPer||'order', per_bundle:item.perBundle||0}
-    // 発注先は原価とメーカー送料だけ更新できる（品目名などはDB側のトリガーでも止めている）
+       shipping:item.shipping||0, shipping_per:item.shippingPer||'order', per_bundle:item.perBundle||0,
+       ...masterDimsRow(item)}
+    // 発注先は原価とメーカー送料だけ更新できる（品目名・寸法などはDB側のトリガーでも止めている）
     : {price:item.price,cost:item.cost, shipping:item.shipping||0, shipping_per:item.shippingPer||'order',
        per_bundle:item.perBundle||0};
-  let { error } = await sb.from('master_items').update(payload).eq('id',id);
-  if(error && /maker_code/.test(error.message||'')){
-    makerCodeColumnReady = false;
-    ({ error } = await sb.from('master_items').update(stripMakerCode(payload)).eq('id',id));
-  }
+  const { error } = await masterSaveWithFallback(payload,
+    r => sb.from('master_items').update(r).eq('id',id));
   if(error){showToast('保存に失敗しました：'+error.message);throw error;}
 }
-// エクレアパーツの単価を取りにいく（Edge Function：ekrea-price）
 async function dbCheckEkreaPrices(){
   const { data, error } = await sb.functions.invoke('ekrea-price', {body:{}});
   if(error){

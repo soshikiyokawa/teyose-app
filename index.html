@@ -25,8 +25,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=481">
-<link rel="stylesheet" href="css/schedule.css?v=481">
+<link rel="stylesheet" href="css/main.css?v=482">
+<link rel="stylesheet" href="css/schedule.css?v=482">
 <!-- 地図（Leaflet）と Supabase は、よそのCDNではなく自前に置いてある。
      よそから読むとサービスワーカーが素通しするため、毎回ネットを待つことになり、
      その間ずっと真っ白な画面になっていた（2026-10-05） -->
@@ -3405,7 +3405,23 @@ setTimeout(window.hideBootScreen, 15000);
       </div>
       <div class="fg"><label>単位</label><input id="m-unit" placeholder="本・枚・袋"></div>
     </div>
-    <div class="fg" style="margin-top:10px"><label>品目名</label><input id="m-name" placeholder="例：杉 KD材 105×105×3000" oninput="masterMakerCodeSync()"></div>
+    <div class="fg" style="margin-top:10px"><label>品目名<span style="font-weight:400;color:var(--text-muted)">（寸法は下の欄に入れます）</span></label><input id="m-name" placeholder="例：杉 KD材" oninput="masterMakerCodeSync();masterDimsSync()"></div>
+    <!-- 寸法。品目名とは別に、3つの数字で持つ（必須。寸法のない品目はチェックを入れる） -->
+    <div class="fg" id="m-dims-wrap" style="margin-top:10px">
+      <label>寸法（mm）<span class="m-req">必須</span></label>
+      <div class="m-dims">
+        <input type="text" inputmode="decimal" id="m-dim1" placeholder="105"  onfocus="this.select()" oninput="masterDimsSync()" autocomplete="off">
+        <span>×</span>
+        <input type="text" inputmode="decimal" id="m-dim2" placeholder="105"  onfocus="this.select()" oninput="masterDimsSync()" autocomplete="off">
+        <span>×</span>
+        <input type="text" inputmode="decimal" id="m-dim3" placeholder="3000" onfocus="this.select()" oninput="masterDimsSync()" autocomplete="off">
+      </div>
+      <label class="m-nodims">
+        <input type="checkbox" id="m-nodims" onchange="masterDimsSync()">
+        <span>寸法のない品目（金物・設備など）</span>
+      </label>
+      <div id="m-fullname" class="m-fullname"></div>
+    </div>
     <div class="fg" style="margin-top:10px"><label>原価（円）</label><input type="number" id="m-cost" placeholder="0" oninput="masterAskSync();masterPriceFromSync()"><input type="hidden" id="m-price" value="0"></div>
     <div class="form-row2" style="margin-top:10px">
       <div class="fg"><label>メーカー送料（円・任意）</label>
@@ -3503,98 +3519,98 @@ setTimeout(window.hideBootScreen, 15000);
 <!-- Supabase（共有データベース） -->
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="js/supabase-client.js?v=481"></script>
+<script src="js/supabase-client.js?v=482"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=481"></script>
+<script src="js/utils.js?v=482"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=481"></script>
+<script src="js/state.js?v=482"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=481"></script>
+<script src="js/data/db.js?v=482"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=481"></script>
-<script src="js/swipe-tabs.js?v=481"></script>
+<script src="js/nav.js?v=482"></script>
+<script src="js/swipe-tabs.js?v=482"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=481"></script>
+<script src="js/talk.js?v=482"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=481"></script>
+<script src="js/push.js?v=482"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=481"></script>
-<script src="js/estimate/estimate-items.js?v=481"></script>
-<script src="js/estimate/quote-import.js?v=481"></script>
-<script src="js/estimate/estimate-master.js?v=481"></script>
-<script src="js/estimate/estimate-summary.js?v=481"></script>
-<script src="js/estimate/estimate-crud.js?v=481"></script>
-<script src="js/estimate/info-view.js?v=481"></script>
-<script src="js/estimate/parking.js?v=481"></script>
-<script src="js/estimate/estimate-pdf.js?v=481"></script>
-<script src="js/estimate/estimate-invoice.js?v=481"></script>
+<script src="js/estimate/estimate-tabs.js?v=482"></script>
+<script src="js/estimate/estimate-items.js?v=482"></script>
+<script src="js/estimate/quote-import.js?v=482"></script>
+<script src="js/estimate/estimate-master.js?v=482"></script>
+<script src="js/estimate/estimate-summary.js?v=482"></script>
+<script src="js/estimate/estimate-crud.js?v=482"></script>
+<script src="js/estimate/info-view.js?v=482"></script>
+<script src="js/estimate/parking.js?v=482"></script>
+<script src="js/estimate/estimate-pdf.js?v=482"></script>
+<script src="js/estimate/estimate-invoice.js?v=482"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=481"></script>
-<script src="js/payment-schedule.js?v=481"></script>
-<script src="js/inspection.js?v=481"></script>
+<script src="js/orders-list.js?v=482"></script>
+<script src="js/payment-schedule.js?v=482"></script>
+<script src="js/inspection.js?v=482"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=481"></script>
+<script src="js/chusho.js?v=482"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=481"></script>
+<script src="js/schedule.js?v=482"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=481"></script>
-<script src="js/order/item-price.js?v=481"></script>
-<script src="js/order/item-master.js?v=481"></script>
-<script src="js/order/invoice.js?v=481"></script>
-<script src="js/order/invoice-viewer.js?v=481"></script>
-<script src="js/order/invoice-onedrive.js?v=481"></script>
-<script src="js/order/invoice-lines.js?v=481"></script>
-<script src="js/order/ekrea-price.js?v=481"></script>
-<script src="js/order/order-cart.js?v=481"></script>
-<script src="js/order/order-confirm.js?v=481"></script>
-<script src="js/order/order-price-edit.js?v=481"></script>
-<script src="js/order/order-history.js?v=481"></script>
-<script src="js/cost-budget.js?v=481"></script>
-<script src="js/order/card-match.js?v=481"></script>
-<script src="js/receipt-scan.js?v=481"></script>
-<script src="js/receipt-ledger.js?v=481"></script>
-<script src="js/order/quote-request.js?v=481"></script>
-<script src="js/receipt.js?v=481"></script>
+<script src="js/order/supplier-master.js?v=482"></script>
+<script src="js/order/item-price.js?v=482"></script>
+<script src="js/order/item-master.js?v=482"></script>
+<script src="js/order/invoice.js?v=482"></script>
+<script src="js/order/invoice-viewer.js?v=482"></script>
+<script src="js/order/invoice-onedrive.js?v=482"></script>
+<script src="js/order/invoice-lines.js?v=482"></script>
+<script src="js/order/ekrea-price.js?v=482"></script>
+<script src="js/order/order-cart.js?v=482"></script>
+<script src="js/order/order-confirm.js?v=482"></script>
+<script src="js/order/order-price-edit.js?v=482"></script>
+<script src="js/order/order-history.js?v=482"></script>
+<script src="js/cost-budget.js?v=482"></script>
+<script src="js/order/card-match.js?v=482"></script>
+<script src="js/receipt-scan.js?v=482"></script>
+<script src="js/receipt-ledger.js?v=482"></script>
+<script src="js/order/quote-request.js?v=482"></script>
+<script src="js/receipt.js?v=482"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=481"></script>
-<script src="js/genba/supplier-view.js?v=481"></script>
-<script src="js/genba/genba-files.js?v=481"></script>
-<script src="js/genba/genba-photos.js?v=481"></script>
-<script src="js/genba/genba-drawings.js?v=481"></script>
-<script src="js/genba/genba-nippo.js?v=481"></script>
-<script src="js/genba/staff-schedule.js?v=481"></script>
-<script src="js/genba/genba-dezura.js?v=481"></script>
-<script src="js/genba/payroll.js?v=481"></script>
-<script src="js/genba/overtime-pay.js?v=481"></script>
-<script src="js/genba/leave-balance.js?v=481"></script>
-<script src="js/genba/genba-leave.js?v=481"></script>
-<script src="js/genba/genba-holiday.js?v=481"></script>
-<script src="js/genba/license.js?v=481"></script>
-<script src="js/genba/vehicle.js?v=481"></script>
-<script src="js/genba/work-calendar.js?v=481"></script>
-<script src="js/genba/account-perms.js?v=481"></script>
+<script src="js/genba/genba-tabs.js?v=482"></script>
+<script src="js/genba/supplier-view.js?v=482"></script>
+<script src="js/genba/genba-files.js?v=482"></script>
+<script src="js/genba/genba-photos.js?v=482"></script>
+<script src="js/genba/genba-drawings.js?v=482"></script>
+<script src="js/genba/genba-nippo.js?v=482"></script>
+<script src="js/genba/staff-schedule.js?v=482"></script>
+<script src="js/genba/genba-dezura.js?v=482"></script>
+<script src="js/genba/payroll.js?v=482"></script>
+<script src="js/genba/overtime-pay.js?v=482"></script>
+<script src="js/genba/leave-balance.js?v=482"></script>
+<script src="js/genba/genba-leave.js?v=482"></script>
+<script src="js/genba/genba-holiday.js?v=482"></script>
+<script src="js/genba/license.js?v=482"></script>
+<script src="js/genba/vehicle.js?v=482"></script>
+<script src="js/genba/work-calendar.js?v=482"></script>
+<script src="js/genba/account-perms.js?v=482"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=481"></script>
+<script src="js/init.js?v=482"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=481"></script>
-<script src="js/tasks.js?v=481"></script>
-<script src="js/task-templates.js?v=481"></script>
-<script src="js/auth.js?v=481"></script>
-<script src="js/account.js?v=481"></script>
+<script src="js/notifications.js?v=482"></script>
+<script src="js/tasks.js?v=482"></script>
+<script src="js/task-templates.js?v=482"></script>
+<script src="js/auth.js?v=482"></script>
+<script src="js/account.js?v=482"></script>
 </body>
 </html>

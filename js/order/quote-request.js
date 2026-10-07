@@ -339,9 +339,14 @@ async function saveQuoteAnswer(){
             updated++;
           }
         }else{
+          // 名前に「105×105×3000」の形が入っていれば、寸法として分けて登録する。
+          // 入っていなければ、品目マスタの一覧に「寸法未入力」と出るので、あとで入れられる
+          const dm = (typeof masterSplitDims==='function') ? masterSplitDims(r.name) : {base:r.name, dims:null};
           await dbAddMasterItem({
             cat: String(r.cat||'').trim() || 'その他',
             name: r.name, unit: r.unit,
+            baseName: dm.dims ? dm.base : '', noDims:false,
+            dim1: dm.dims ? dm.dims[0] : null, dim2: dm.dims ? dm.dims[1] : null, dim3: dm.dims ? dm.dims[2] : null,
             cost: Number(r.price), price: Number(r.price),
             supplier: q.supplierName,
             makerCode: r.spec || '',

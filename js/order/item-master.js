@@ -52,6 +52,8 @@ function renderMaster(){
           <div class="mi-meta">
             <span>原価 ¥${fmt(itemCurrentCost(m))}/${m.unit}</span>
             ${m.makerCode?`<span style="color:var(--text-muted)">品番 ${esc(m.makerCode)}</span>`:''}
+            ${(currentUserRole!=='supplier' && (()=>{ const d=masterDimsOf(m); return !d.dims && !d.none; })())
+              ? '<span class="mi-nodim" title="編集から寸法を入れるか、「寸法のない品目」にチェックを入れてください">寸法未入力</span>' : ''}
             ${(m.webPrice!=null && m.webPrice!==itemCurrentCost(m))
               ? `<span style="color:var(--danger);font-weight:700">HP ¥${fmt(m.webPrice)}</span>` : ''}
             ${(()=>{const n=itemNextPriceChange(m);
@@ -103,6 +105,80 @@ function renderMasterCatList(){
   el.innerHTML=list.map(c=>`<option value="${esc(c)}">`).join('');
 }
 
+// ════ 寸法（品目名とは別に、3つの数字で持つ） ════
+//
+// 以前は「杉 KD材 105×105×3000」のように、寸法を品目名の中に書いていた。
+// いまは「品目名（杉 KD材）」と「寸法（105 / 105 / 3000）」に分けて入れる。
+// 発注書や発注履歴に出す名前（name）は、この2つから「杉 KD材 105×105×3000」と組み立てる。
+// 出来上がる名前の形はこれまでと同じなので、発注・請求の突き合わせはそのまま動く。
+
+// 名前の中の「数字×数字×数字」を取り出す（分ける前に登録した品目のため）
+function masterSplitDims(name){
+  const str = String(name||'');
+  const m = str.match(/(\d+(?:\.\d+)?)\s*[×xX＊*]\s*(\d+(?:\.\d+)?)\s*[×xX＊*]\s*(\d+(?:\.\d+)?)/);
+  if(!m) return { base: str.trim(), dims: null };
+  const base = (str.slice(0, m.index) + ' ' + str.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim();
+  return { base, dims: [Number(m[1]), Number(m[2]), Number(m[3])] };
+}
+// その品目の、品目名と寸法。分けて保存してあればそれを、まだなら名前から読み取る
+function masterDimsOf(m){
+  if(!m) return { base:'', dims:null, none:false };
+  if(m.dim1!=null && m.dim2!=null && m.dim3!=null){
+    return { base: m.baseName || masterSplitDims(m.name).base, dims:[m.dim1, m.dim2, m.dim3], none:false };
+  }
+  if(m.noDims) return { base: m.baseName || m.name, dims:null, none:true };
+  const sp = masterSplitDims(m.name);
+  return { base: sp.base, dims: sp.dims, none:false };
+}
+// 入力された1つぶんを数にする。全角・カンマ・「mm」が付いていても受け取る。だめなら null
+function masterDimNum(raw){
+  const t = String(raw==null?'':raw)
+    .replace(/[０-９．]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/[,，\s]/g, '').replace(/(mm|ｍｍ|㎜)$/i, '');
+  if(!/^\d+(\.\d+)?$/.test(t)) return null;
+  const n = Number(t);
+  return (isFinite(n) && n > 0 && n < 1000000) ? n : null;
+}
+function masterDimText(n){ return String(Number(n)); }        // 3000 / 12.5（余計な0は付けない）
+// 発注書などに出す名前を組み立てる
+function masterFullName(base, dims){
+  const b = String(base||'').replace(/\s+/g, ' ').trim();
+  return dims ? (b + ' ' + dims.map(masterDimText).join('×')).trim() : b;
+}
+// 入力欄から、いまの寸法を読む
+function masterDimsFromForm(){
+  const none = !!document.getElementById('m-nodims')?.checked;
+  const raw = [1,2,3].map(i=>document.getElementById('m-dim'+i)?.value ?? '');
+  const nums = raw.map(masterDimNum);
+  return { none, raw, nums, ok: none || nums.every(n=>n!=null) };
+}
+// 入力欄に入れる
+function masterDimsToForm(base, dims, none){
+  document.getElementById('m-name').value = base||'';
+  [1,2,3].forEach((i,k)=>{ document.getElementById('m-dim'+i).value = dims ? masterDimText(dims[k]) : ''; });
+  document.getElementById('m-nodims').checked = !!none;
+  masterDimsSync();
+}
+// 入力のたびに、出来上がる名前と、足りないところを出す
+function masterDimsSync(){
+  const f = masterDimsFromForm();
+  const supplierOnly = currentUserRole==='supplier';
+  [1,2,3].forEach((i,k)=>{
+    const el = document.getElementById('m-dim'+i);
+    el.disabled = f.none || supplierOnly;
+    // 何か入っているのに数として読めないものだけ、赤くする
+    el.classList.toggle('bad', !f.none && String(f.raw[k]).trim()!=='' && f.nums[k]==null);
+  });
+  const base = document.getElementById('m-name').value;
+  const out = document.getElementById('m-fullname');
+  if(!out) return;
+  if(!String(base).trim()){ out.textContent = ''; out.classList.remove('need'); return; }
+  out.textContent = f.ok
+    ? '発注書などには「' + masterFullName(base, f.none ? null : f.nums) + '」と出ます'
+    : '寸法を3つとも入れてください';
+  out.classList.toggle('need', !f.ok);
+}
+
 function openMasterEdit(id){
   editingMasterId = (id===-1||id==='-1') ? -1 : Number(id);
   // 発注先セレクトを最新状態に更新
@@ -111,6 +187,7 @@ function openMasterEdit(id){
   renderMasterCatList();
   if(editingMasterId===-1){
     ['m-name','m-unit','m-maker-code','m-shipping','m-bundle'].forEach(i=>document.getElementById(i).value='');
+    masterDimsToForm('', null, false);
     document.getElementById('m-shipping-per').value='order';
     ['m-price','m-cost'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('m-cat').value='木材';
@@ -119,7 +196,8 @@ function openMasterEdit(id){
     const m=master.find(x=>x.id===editingMasterId);
     if(!m)return;
     document.getElementById('m-cat').value=m.cat;
-    document.getElementById('m-name').value=m.name;
+    // 品目名と寸法に分けて出す。分ける前に登録した品目は、名前から寸法を読み取って入れておく
+    { const d=masterDimsOf(m); masterDimsToForm(d.base, d.dims, d.none); }
     document.getElementById('m-unit').value=m.unit;
     document.getElementById('m-cost').value=m.cost;
     document.getElementById('m-supplier-sel').value=m.supplier;
@@ -139,7 +217,8 @@ function openMasterEdit(id){
   masterPriceFromSync();
   // 発注先ロールは原価のみ編集可（管理者・一般社員は全項目編集可）
   const supplierOnly = currentUserRole==='supplier';
-  ['m-cat','m-name','m-unit','m-supplier-sel','m-maker-code'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
+  ['m-cat','m-name','m-unit','m-supplier-sel','m-maker-code','m-nodims'].forEach(id=>document.getElementById(id).disabled=supplierOnly);
+  masterDimsSync();
   document.getElementById('master-delete-btn').style.display = (supplierOnly||editingMasterId===-1) ? 'none' : 'inline-flex';
   document.getElementById('master-modal').classList.add('open');
 }
@@ -207,7 +286,8 @@ function duplicateMasterItem(id){
   document.getElementById('master-modal-title').textContent='品目を追加（複製）';
   document.getElementById('master-delete-btn').style.display='none';
   document.getElementById('m-cat').value=m.cat;
-  document.getElementById('m-name').value=m.name;
+  ['m-cat','m-name','m-unit','m-supplier-sel','m-maker-code','m-nodims'].forEach(id=>document.getElementById(id).disabled=false);
+  { const d=masterDimsOf(m); masterDimsToForm(d.base, d.dims, d.none); }
   document.getElementById('m-unit').value=m.unit;
   document.getElementById('m-cost').value=m.cost;
   document.getElementById('m-supplier-sel').value=m.supplier;
@@ -218,10 +298,13 @@ function duplicateMasterItem(id){
   if(dupAskBox) delete dupAskBox.dataset.touched;
   masterAskSync();
   document.getElementById('master-modal').classList.add('open');
+  // 複製は「長さ違いを続けて足す」使い方が多いので、寸法の3つ目（長さ）にカーソルを置く。
+  // 寸法のない品目なら、これまでどおり品目名に置く
   setTimeout(()=>{
-    const nameInput=document.getElementById('m-name');
-    nameInput.focus();
-    nameInput.select();
+    const el = document.getElementById('m-nodims').checked
+      ? document.getElementById('m-name') : document.getElementById('m-dim3');
+    el.focus();
+    el.select();
   },100);
 }
 
@@ -261,10 +344,21 @@ async function askSupplierForPrice(item){
   }
 }
 async function saveMasterItem(){
+  const supplierOnly = currentUserRole==='supplier';
+  const editingPrev = editingMasterId===-1 ? null : master.find(x=>x.id===editingMasterId);
+  const baseName = document.getElementById('m-name').value.replace(/\s+/g,' ').trim();
+  const dimsForm = masterDimsFromForm();
+  // 発注先は単価だけを直す。品目名・寸法は触らないので、いまのものをそのまま使う
+  const keep = !!(supplierOnly && editingPrev);
   const item={
     // 空のままだと一覧の見出しが作れないので「その他」に寄せる
     cat: document.getElementById('m-cat').value.trim() || 'その他',
-    name: document.getElementById('m-name').value.trim(),
+    name: keep ? editingPrev.name : masterFullName(baseName, (dimsForm.none || !dimsForm.ok) ? null : dimsForm.nums),
+    baseName: keep ? (editingPrev.baseName||'') : baseName,
+    noDims:   keep ? !!editingPrev.noDims : dimsForm.none,
+    dim1: keep ? editingPrev.dim1 : (dimsForm.none ? null : dimsForm.nums[0]),
+    dim2: keep ? editingPrev.dim2 : (dimsForm.none ? null : dimsForm.nums[1]),
+    dim3: keep ? editingPrev.dim3 : (dimsForm.none ? null : dimsForm.nums[2]),
     unit: document.getElementById('m-unit').value.trim()||'式',
     cost: parseInt(document.getElementById('m-cost').value)||0,
     price: parseInt(document.getElementById('m-cost').value)||0,
@@ -274,7 +368,16 @@ async function saveMasterItem(){
     shippingPer: document.getElementById('m-shipping-per').value==='unit' ? 'unit' : 'order',
     perBundle: masterBundleValue()
   };
-  if(!item.name){alert('品目名を入力してください');return;}
+  if(!keep){
+    if(!baseName){alert('品目名を入力してください');return;}
+    // 寸法は必須。寸法のない品目は、そのことをチェックで示してもらう
+    if(!dimsForm.ok){
+      alert('寸法を3つとも入力してください（例：105 × 105 × 3000）。\n\n金物・設備など寸法のない品目は、「寸法のない品目」にチェックを入れてください。');
+      const i = dimsForm.nums.findIndex(n=>n==null);
+      document.getElementById('m-dim'+((i<0?0:i)+1))?.focus();
+      return;
+    }
+  }
 
   const btn = document.getElementById('master-save-btn');
   btn.disabled = true;
