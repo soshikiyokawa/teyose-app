@@ -25,8 +25,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=482">
-<link rel="stylesheet" href="css/schedule.css?v=482">
+<link rel="stylesheet" href="css/main.css?v=483">
+<link rel="stylesheet" href="css/schedule.css?v=483">
 <!-- 地図（Leaflet）と Supabase は、よそのCDNではなく自前に置いてある。
      よそから読むとサービスワーカーが素通しするため、毎回ネットを待つことになり、
      その間ずっと真っ白な画面になっていた（2026-10-05） -->
@@ -42,15 +42,23 @@
      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
      font-family:system-ui,-apple-system,'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;color:#415e2e">
   <div style="font-size:22px;font-weight:700;letter-spacing:.14em">手寄</div>
-  <div style="width:26px;height:26px;border:3px solid #dfe5d8;border-top-color:#415e2e;
-              border-radius:50%;animation:boot-spin .8s linear infinite"></div>
+  <!-- きよかわのロゴを、カクカクと回す。
+       このロゴは90度回すと元と同じ形に重なるので、30度ずつ（1周12コマ）で刻んでいる。
+       絵は小さくしてここに埋め込んである（外のファイルを待たずに、すぐ出せるように） -->
+  <img id="boot-mark" alt="" width="52" height="52"
+       style="width:52px;height:52px;display:block;animation:boot-spin 1.8s steps(12) infinite"
+       src="data:image/png;base64,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">
   <div id="boot-msg" style="font-size:12px;color:#7a8470">読み込んでいます…</div>
   <style>
     @keyframes boot-spin{to{transform:rotate(360deg)}}
+    /* 暗い画面。上の style="…" に書いた白い背景のほうが強いので、!important で上書きする
+       （これが無いと、暗い画面でも背景が白のままになる） */
     @media (prefers-color-scheme:dark){
-      :root:not([data-theme="light"]) #boot-screen{background:#1b1b20;color:#cfe0c0}
+      :root:not([data-theme="light"]) #boot-screen{background:#1b1b20!important;color:#cfe0c0!important}
+      :root:not([data-theme="light"]) #boot-mark{filter:invert(1)}      /* 線を白く */
     }
-    :root[data-theme="dark"] #boot-screen{background:#1b1b20;color:#cfe0c0}
+    :root[data-theme="dark"] #boot-screen{background:#1b1b20!important;color:#cfe0c0!important}
+    :root[data-theme="dark"] #boot-mark{filter:invert(1)}
   </style>
 </div>
 <script>
@@ -3519,98 +3527,98 @@ setTimeout(window.hideBootScreen, 15000);
 <!-- Supabase（共有データベース） -->
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="js/supabase-client.js?v=482"></script>
+<script src="js/supabase-client.js?v=483"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=482"></script>
+<script src="js/utils.js?v=483"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=482"></script>
+<script src="js/state.js?v=483"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=482"></script>
+<script src="js/data/db.js?v=483"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=482"></script>
-<script src="js/swipe-tabs.js?v=482"></script>
+<script src="js/nav.js?v=483"></script>
+<script src="js/swipe-tabs.js?v=483"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=482"></script>
+<script src="js/talk.js?v=483"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=482"></script>
+<script src="js/push.js?v=483"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=482"></script>
-<script src="js/estimate/estimate-items.js?v=482"></script>
-<script src="js/estimate/quote-import.js?v=482"></script>
-<script src="js/estimate/estimate-master.js?v=482"></script>
-<script src="js/estimate/estimate-summary.js?v=482"></script>
-<script src="js/estimate/estimate-crud.js?v=482"></script>
-<script src="js/estimate/info-view.js?v=482"></script>
-<script src="js/estimate/parking.js?v=482"></script>
-<script src="js/estimate/estimate-pdf.js?v=482"></script>
-<script src="js/estimate/estimate-invoice.js?v=482"></script>
+<script src="js/estimate/estimate-tabs.js?v=483"></script>
+<script src="js/estimate/estimate-items.js?v=483"></script>
+<script src="js/estimate/quote-import.js?v=483"></script>
+<script src="js/estimate/estimate-master.js?v=483"></script>
+<script src="js/estimate/estimate-summary.js?v=483"></script>
+<script src="js/estimate/estimate-crud.js?v=483"></script>
+<script src="js/estimate/info-view.js?v=483"></script>
+<script src="js/estimate/parking.js?v=483"></script>
+<script src="js/estimate/estimate-pdf.js?v=483"></script>
+<script src="js/estimate/estimate-invoice.js?v=483"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=482"></script>
-<script src="js/payment-schedule.js?v=482"></script>
-<script src="js/inspection.js?v=482"></script>
+<script src="js/orders-list.js?v=483"></script>
+<script src="js/payment-schedule.js?v=483"></script>
+<script src="js/inspection.js?v=483"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=482"></script>
+<script src="js/chusho.js?v=483"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=482"></script>
+<script src="js/schedule.js?v=483"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=482"></script>
-<script src="js/order/item-price.js?v=482"></script>
-<script src="js/order/item-master.js?v=482"></script>
-<script src="js/order/invoice.js?v=482"></script>
-<script src="js/order/invoice-viewer.js?v=482"></script>
-<script src="js/order/invoice-onedrive.js?v=482"></script>
-<script src="js/order/invoice-lines.js?v=482"></script>
-<script src="js/order/ekrea-price.js?v=482"></script>
-<script src="js/order/order-cart.js?v=482"></script>
-<script src="js/order/order-confirm.js?v=482"></script>
-<script src="js/order/order-price-edit.js?v=482"></script>
-<script src="js/order/order-history.js?v=482"></script>
-<script src="js/cost-budget.js?v=482"></script>
-<script src="js/order/card-match.js?v=482"></script>
-<script src="js/receipt-scan.js?v=482"></script>
-<script src="js/receipt-ledger.js?v=482"></script>
-<script src="js/order/quote-request.js?v=482"></script>
-<script src="js/receipt.js?v=482"></script>
+<script src="js/order/supplier-master.js?v=483"></script>
+<script src="js/order/item-price.js?v=483"></script>
+<script src="js/order/item-master.js?v=483"></script>
+<script src="js/order/invoice.js?v=483"></script>
+<script src="js/order/invoice-viewer.js?v=483"></script>
+<script src="js/order/invoice-onedrive.js?v=483"></script>
+<script src="js/order/invoice-lines.js?v=483"></script>
+<script src="js/order/ekrea-price.js?v=483"></script>
+<script src="js/order/order-cart.js?v=483"></script>
+<script src="js/order/order-confirm.js?v=483"></script>
+<script src="js/order/order-price-edit.js?v=483"></script>
+<script src="js/order/order-history.js?v=483"></script>
+<script src="js/cost-budget.js?v=483"></script>
+<script src="js/order/card-match.js?v=483"></script>
+<script src="js/receipt-scan.js?v=483"></script>
+<script src="js/receipt-ledger.js?v=483"></script>
+<script src="js/order/quote-request.js?v=483"></script>
+<script src="js/receipt.js?v=483"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=482"></script>
-<script src="js/genba/supplier-view.js?v=482"></script>
-<script src="js/genba/genba-files.js?v=482"></script>
-<script src="js/genba/genba-photos.js?v=482"></script>
-<script src="js/genba/genba-drawings.js?v=482"></script>
-<script src="js/genba/genba-nippo.js?v=482"></script>
-<script src="js/genba/staff-schedule.js?v=482"></script>
-<script src="js/genba/genba-dezura.js?v=482"></script>
-<script src="js/genba/payroll.js?v=482"></script>
-<script src="js/genba/overtime-pay.js?v=482"></script>
-<script src="js/genba/leave-balance.js?v=482"></script>
-<script src="js/genba/genba-leave.js?v=482"></script>
-<script src="js/genba/genba-holiday.js?v=482"></script>
-<script src="js/genba/license.js?v=482"></script>
-<script src="js/genba/vehicle.js?v=482"></script>
-<script src="js/genba/work-calendar.js?v=482"></script>
-<script src="js/genba/account-perms.js?v=482"></script>
+<script src="js/genba/genba-tabs.js?v=483"></script>
+<script src="js/genba/supplier-view.js?v=483"></script>
+<script src="js/genba/genba-files.js?v=483"></script>
+<script src="js/genba/genba-photos.js?v=483"></script>
+<script src="js/genba/genba-drawings.js?v=483"></script>
+<script src="js/genba/genba-nippo.js?v=483"></script>
+<script src="js/genba/staff-schedule.js?v=483"></script>
+<script src="js/genba/genba-dezura.js?v=483"></script>
+<script src="js/genba/payroll.js?v=483"></script>
+<script src="js/genba/overtime-pay.js?v=483"></script>
+<script src="js/genba/leave-balance.js?v=483"></script>
+<script src="js/genba/genba-leave.js?v=483"></script>
+<script src="js/genba/genba-holiday.js?v=483"></script>
+<script src="js/genba/license.js?v=483"></script>
+<script src="js/genba/vehicle.js?v=483"></script>
+<script src="js/genba/work-calendar.js?v=483"></script>
+<script src="js/genba/account-perms.js?v=483"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=482"></script>
+<script src="js/init.js?v=483"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=482"></script>
-<script src="js/tasks.js?v=482"></script>
-<script src="js/task-templates.js?v=482"></script>
-<script src="js/auth.js?v=482"></script>
-<script src="js/account.js?v=482"></script>
+<script src="js/notifications.js?v=483"></script>
+<script src="js/tasks.js?v=483"></script>
+<script src="js/task-templates.js?v=483"></script>
+<script src="js/auth.js?v=483"></script>
+<script src="js/account.js?v=483"></script>
 </body>
 </html>
