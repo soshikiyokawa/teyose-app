@@ -25,8 +25,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="手寄">
-<link rel="stylesheet" href="css/main.css?v=479">
-<link rel="stylesheet" href="css/schedule.css?v=479">
+<link rel="stylesheet" href="css/main.css?v=480">
+<link rel="stylesheet" href="css/schedule.css?v=480">
 <!-- 地図（Leaflet）と Supabase は、よそのCDNではなく自前に置いてある。
      よそから読むとサービスワーカーが素通しするため、毎回ネットを待つことになり、
      その間ずっと真っ白な画面になっていた（2026-10-05） -->
@@ -2146,33 +2146,50 @@ setTimeout(window.hideBootScreen, 15000);
 </div>
 
 <!-- ════ 請求額を手で入れる（AIで読めなかったとき・読み違えたとき） ════ -->
+<!-- 請求書を見ながら、金額を確かめる・入れる画面。
+     左（スマホでは上）に請求書そのもの、右（下）に入力欄。
+     AIで読んだあとも、手で入れるときも、この画面を使う -->
 <div class="modal-overlay" id="invamt-modal" onclick="if(event.target.id==='invamt-modal')closeInvoiceAmount()">
-  <div class="modal-sheet" style="max-width:420px">
-    <div style="font-size:15px;font-weight:800" id="invamt-title"></div>
-    <div style="font-size:11px;color:var(--text-muted);margin:2px 0 12px" id="invamt-sub"></div>
-    <div class="fg"><label>請求額（税込）</label>
-      <div style="display:flex;gap:6px;align-items:center">
-        <input type="text" inputmode="numeric" id="invamt-amount" placeholder="0"
-          onfocus="this.select()" oninput="invAmountLearnSync()" style="flex:1;text-align:right;font-size:16px;font-weight:700">
-        <button class="btn sm" id="invamt-copy" onclick="invAmountCopyOrders()"></button>
+  <div class="modal-sheet invamt-sheet">
+    <div class="invamt-viewcol">
+      <div class="invv-bar">
+        <span class="invv-bar-t">請求書</span>
+        <button type="button" class="btn xs" id="invv-out" onclick="invViewZoom(-1)" title="小さく">−</button>
+        <span id="invv-zoom">100%</span>
+        <button type="button" class="btn xs" id="invv-in" onclick="invViewZoom(1)" title="大きく">＋</button>
+        <button type="button" class="btn xs" onclick="invViewOpenTab()" title="別の画面で開く">別画面</button>
       </div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:2px">請求書に書かれている「ご請求金額」をそのまま入れてください</div>
+      <div id="invamt-view" class="invv-box"></div>
     </div>
-    <div class="fg" style="margin-top:8px"><label>登録番号（任意）</label>
-      <input id="invamt-reg" placeholder="T1234567890123" style="font-size:13px"></div>
-    <div class="fg" style="margin-top:8px"><label>支払期限（任意）</label>
-      <input type="date" id="invamt-due"></div>
-    <!-- AIが読み違えた／読めなかったときだけ出す -->
-    <div id="invamt-learn-wrap" style="display:none;background:var(--accent-bg);border-radius:8px;padding:9px 11px;margin-top:12px">
-      <label style="display:flex;align-items:flex-start;gap:7px;font-size:12px;font-weight:700;color:var(--accent-t);cursor:pointer;margin:0">
-        <input type="checkbox" id="invamt-learn" checked style="width:auto;margin:2px 0 0">
-        <span>この金額から、AIに読み取り方を覚えさせる</span>
-      </label>
-      <div id="invamt-learn-note" style="font-size:10px;color:var(--text-sub);margin-top:4px;line-height:1.6;padding-left:20px"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn" onclick="closeInvoiceAmount()">やめる</button>
-      <button class="btn primary" id="invamt-save" onclick="saveInvoiceAmount()">この金額で登録</button>
+    <div class="invamt-formcol">
+      <div style="font-size:15px;font-weight:800" id="invamt-title"></div>
+      <div style="font-size:11px;color:var(--text-muted);margin:2px 0 10px" id="invamt-sub"></div>
+      <!-- AIが読んだ内容（AIで読んだ直後だけ出す） -->
+      <div id="invamt-ai" class="invamt-ai" style="display:none"></div>
+      <div class="fg"><label>請求額（税込）</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" inputmode="numeric" id="invamt-amount" placeholder="0"
+            onfocus="this.select()" oninput="invAmountLearnSync()" style="flex:1;text-align:right;font-size:16px;font-weight:700">
+          <button class="btn sm" id="invamt-copy" onclick="invAmountCopyOrders()"></button>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:2px">請求書に書かれている「ご請求金額」をそのまま入れてください</div>
+      </div>
+      <div class="fg" style="margin-top:8px"><label>登録番号（任意）</label>
+        <input id="invamt-reg" placeholder="T1234567890123" style="font-size:13px"></div>
+      <div class="fg" style="margin-top:8px"><label>支払期限（任意）</label>
+        <input type="date" id="invamt-due"></div>
+      <!-- AIが読み違えた／読めなかったときだけ出す -->
+      <div id="invamt-learn-wrap" style="display:none;background:var(--accent-bg);border-radius:8px;padding:9px 11px;margin-top:12px">
+        <label style="display:flex;align-items:flex-start;gap:7px;font-size:12px;font-weight:700;color:var(--accent-t);cursor:pointer;margin:0">
+          <input type="checkbox" id="invamt-learn" checked style="width:auto;margin:2px 0 0">
+          <span>この金額から、AIに読み取り方を覚えさせる</span>
+        </label>
+        <div id="invamt-learn-note" style="font-size:10px;color:var(--text-sub);margin-top:4px;line-height:1.6;padding-left:20px"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeInvoiceAmount()">やめる</button>
+        <button class="btn primary" id="invamt-save" onclick="saveInvoiceAmount()">この金額で登録</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3471,97 +3488,98 @@ setTimeout(window.hideBootScreen, 15000);
 <!-- Supabase（共有データベース） -->
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="vendor/supabase.js"></script>
-<script src="js/supabase-client.js?v=479"></script>
+<script src="js/supabase-client.js?v=480"></script>
 
 
 <!-- 共通ユーティリティ -->
-<script src="js/utils.js?v=479"></script>
+<script src="js/utils.js?v=480"></script>
 
 <!-- グローバル状態 -->
-<script src="js/state.js?v=479"></script>
+<script src="js/state.js?v=480"></script>
 
 <!-- データ層（Supabase取得・保存・リアルタイム同期） -->
-<script src="js/data/db.js?v=479"></script>
+<script src="js/data/db.js?v=480"></script>
 
 <!-- 画面共通ナビゲーション -->
-<script src="js/nav.js?v=479"></script>
-<script src="js/swipe-tabs.js?v=479"></script>
+<script src="js/nav.js?v=480"></script>
+<script src="js/swipe-tabs.js?v=480"></script>
 
 <!-- やり取り（LINE風チャット） -->
-<script src="js/talk.js?v=479"></script>
+<script src="js/talk.js?v=480"></script>
 
 <!-- プッシュ通知 -->
-<script src="js/push.js?v=479"></script>
+<script src="js/push.js?v=480"></script>
 
 <!-- 見積 -->
-<script src="js/estimate/estimate-tabs.js?v=479"></script>
-<script src="js/estimate/estimate-items.js?v=479"></script>
-<script src="js/estimate/quote-import.js?v=479"></script>
-<script src="js/estimate/estimate-master.js?v=479"></script>
-<script src="js/estimate/estimate-summary.js?v=479"></script>
-<script src="js/estimate/estimate-crud.js?v=479"></script>
-<script src="js/estimate/info-view.js?v=479"></script>
-<script src="js/estimate/parking.js?v=479"></script>
-<script src="js/estimate/estimate-pdf.js?v=479"></script>
-<script src="js/estimate/estimate-invoice.js?v=479"></script>
+<script src="js/estimate/estimate-tabs.js?v=480"></script>
+<script src="js/estimate/estimate-items.js?v=480"></script>
+<script src="js/estimate/quote-import.js?v=480"></script>
+<script src="js/estimate/estimate-master.js?v=480"></script>
+<script src="js/estimate/estimate-summary.js?v=480"></script>
+<script src="js/estimate/estimate-crud.js?v=480"></script>
+<script src="js/estimate/info-view.js?v=480"></script>
+<script src="js/estimate/parking.js?v=480"></script>
+<script src="js/estimate/estimate-pdf.js?v=480"></script>
+<script src="js/estimate/estimate-invoice.js?v=480"></script>
 
 <!-- 受注一覧 -->
-<script src="js/orders-list.js?v=479"></script>
-<script src="js/payment-schedule.js?v=479"></script>
-<script src="js/inspection.js?v=479"></script>
+<script src="js/orders-list.js?v=480"></script>
+<script src="js/payment-schedule.js?v=480"></script>
+<script src="js/inspection.js?v=480"></script>
 
 <!-- 注文書・注文請書 -->
-<script src="js/chusho.js?v=479"></script>
+<script src="js/chusho.js?v=480"></script>
 
 <!-- 工程表 -->
-<script src="js/schedule.js?v=479"></script>
+<script src="js/schedule.js?v=480"></script>
 
 <!-- 受発注 -->
-<script src="js/order/supplier-master.js?v=479"></script>
-<script src="js/order/item-price.js?v=479"></script>
-<script src="js/order/item-master.js?v=479"></script>
-<script src="js/order/invoice.js?v=479"></script>
-<script src="js/order/invoice-onedrive.js?v=479"></script>
-<script src="js/order/invoice-lines.js?v=479"></script>
-<script src="js/order/ekrea-price.js?v=479"></script>
-<script src="js/order/order-cart.js?v=479"></script>
-<script src="js/order/order-confirm.js?v=479"></script>
-<script src="js/order/order-price-edit.js?v=479"></script>
-<script src="js/order/order-history.js?v=479"></script>
-<script src="js/cost-budget.js?v=479"></script>
-<script src="js/order/card-match.js?v=479"></script>
-<script src="js/receipt-scan.js?v=479"></script>
-<script src="js/receipt-ledger.js?v=479"></script>
-<script src="js/order/quote-request.js?v=479"></script>
-<script src="js/receipt.js?v=479"></script>
+<script src="js/order/supplier-master.js?v=480"></script>
+<script src="js/order/item-price.js?v=480"></script>
+<script src="js/order/item-master.js?v=480"></script>
+<script src="js/order/invoice.js?v=480"></script>
+<script src="js/order/invoice-viewer.js?v=480"></script>
+<script src="js/order/invoice-onedrive.js?v=480"></script>
+<script src="js/order/invoice-lines.js?v=480"></script>
+<script src="js/order/ekrea-price.js?v=480"></script>
+<script src="js/order/order-cart.js?v=480"></script>
+<script src="js/order/order-confirm.js?v=480"></script>
+<script src="js/order/order-price-edit.js?v=480"></script>
+<script src="js/order/order-history.js?v=480"></script>
+<script src="js/cost-budget.js?v=480"></script>
+<script src="js/order/card-match.js?v=480"></script>
+<script src="js/receipt-scan.js?v=480"></script>
+<script src="js/receipt-ledger.js?v=480"></script>
+<script src="js/order/quote-request.js?v=480"></script>
+<script src="js/receipt.js?v=480"></script>
 
 <!-- 現場（写真・図面・日報・有給） -->
-<script src="js/genba/genba-tabs.js?v=479"></script>
-<script src="js/genba/supplier-view.js?v=479"></script>
-<script src="js/genba/genba-files.js?v=479"></script>
-<script src="js/genba/genba-photos.js?v=479"></script>
-<script src="js/genba/genba-drawings.js?v=479"></script>
-<script src="js/genba/genba-nippo.js?v=479"></script>
-<script src="js/genba/staff-schedule.js?v=479"></script>
-<script src="js/genba/genba-dezura.js?v=479"></script>
-<script src="js/genba/payroll.js?v=479"></script>
-<script src="js/genba/overtime-pay.js?v=479"></script>
-<script src="js/genba/leave-balance.js?v=479"></script>
-<script src="js/genba/genba-leave.js?v=479"></script>
-<script src="js/genba/genba-holiday.js?v=479"></script>
-<script src="js/genba/license.js?v=479"></script>
-<script src="js/genba/vehicle.js?v=479"></script>
-<script src="js/genba/work-calendar.js?v=479"></script>
-<script src="js/genba/account-perms.js?v=479"></script>
+<script src="js/genba/genba-tabs.js?v=480"></script>
+<script src="js/genba/supplier-view.js?v=480"></script>
+<script src="js/genba/genba-files.js?v=480"></script>
+<script src="js/genba/genba-photos.js?v=480"></script>
+<script src="js/genba/genba-drawings.js?v=480"></script>
+<script src="js/genba/genba-nippo.js?v=480"></script>
+<script src="js/genba/staff-schedule.js?v=480"></script>
+<script src="js/genba/genba-dezura.js?v=480"></script>
+<script src="js/genba/payroll.js?v=480"></script>
+<script src="js/genba/overtime-pay.js?v=480"></script>
+<script src="js/genba/leave-balance.js?v=480"></script>
+<script src="js/genba/genba-leave.js?v=480"></script>
+<script src="js/genba/genba-holiday.js?v=480"></script>
+<script src="js/genba/license.js?v=480"></script>
+<script src="js/genba/vehicle.js?v=480"></script>
+<script src="js/genba/work-calendar.js?v=480"></script>
+<script src="js/genba/account-perms.js?v=480"></script>
 
 <!-- 初期化 -->
-<script src="js/init.js?v=479"></script>
+<script src="js/init.js?v=480"></script>
 
 <!-- 認証（ログイン・ログアウト・権限） -->
-<script src="js/notifications.js?v=479"></script>
-<script src="js/tasks.js?v=479"></script>
-<script src="js/task-templates.js?v=479"></script>
-<script src="js/auth.js?v=479"></script>
-<script src="js/account.js?v=479"></script>
+<script src="js/notifications.js?v=480"></script>
+<script src="js/tasks.js?v=480"></script>
+<script src="js/task-templates.js?v=480"></script>
+<script src="js/auth.js?v=480"></script>
+<script src="js/account.js?v=480"></script>
 </body>
 </html>

@@ -453,39 +453,20 @@ async function readInvoiceWithAi(id){
     return;
   }
 
-  const want=(suppliers||[]).find(s=>s.name===v.supplierName)?.invoiceRegNo || '';
-  const lines=[
-    `請求金額　¥${fmt(r.total)}${v.amount!=null&&v.amount!==r.total?`（いまの登録 ¥${fmt(v.amount)}）`:''}`,
-    r.regNo?`登録番号　${r.regNo}${want?(r.regNo===want?'（登録と一致）':'（登録は '+want+'）'):''}`:'登録番号　見つかりません',
-    r.dueOn?`支払期限　${r.dueOn.replace(/-/g,'/')}`:'',
-    r.month&&r.month!==v.month?`請求書の対象月は ${invMonthLabel(r.month)} と読めました（登録は ${invMonthLabel(v.month)}）`:'',
-    r.issuer?`発行元　${r.issuer}`:'',
-    r.hintsUsed?`（この発注先について覚えた読み取りのコツ ${r.hintsUsed}件を使いました）`:'',
-  ].filter(Boolean).join('\n');
-  if(!confirm(`次のとおり読み取りました。この内容で登録しますか？\n\n${lines}\n\n違っていれば「キャンセル」→「金額を入力」で直せます。`)){
-    // 断ったということは読み違えている見込みが高い。AIが読んだ額だけ覚えておく
-    try{ await dbSetInvoiceAmount(id, {amount:v.amount, aiTotal:r.total, readByAi:true}); }catch(_){}
-    Object.assign(v, { aiTotal:r.total, readByAi:true });
-    return;
-  }
+  // 読んだ額は、登録するかどうかにかかわらず覚えておく
+  // （あとで違う額を入れたときに「読み違い」と分かり、AIに覚えさせられる）
+  try{ await dbSetInvoiceAmount(id, {amount:v.amount, aiTotal:r.total, readByAi:true}); }catch(_){}
+  Object.assign(v, { aiTotal:r.total, readByAi:true });
 
-  try{
-    await dbSetInvoiceAmount(id, { amount:r.total, regNo:r.regNo||'', dueOn:v.dueOn||r.dueOn||'',
-      aiTotal:r.total, byHand:false, readByAi:true });
-  }catch(_){ return; }
-
-  Object.assign(v, { amount:r.total, regNo:r.regNo||'', readByAi:true,
-    dueOn:v.dueOn||r.dueOn||'', aiTotal:r.total, amountByHand:false });
-  renderInvoices();
-  const st=invRegState(v);
-  showToast(st==='ng' ? '読み取りました。登録番号が発注先マスタと違います'
-          : st==='none' ? '読み取りました。請求書に登録番号が見つかりません'
-          : '読み取って登録しました');
+  // 請求書そのものを横に出して、数字が合っているかを確かめてもらう。
+  // 以前は小さな確認窓（OK／キャンセル）だけで、請求書を見られなかった
+  openInvoiceAmount(id, r);
 }
 
 // ════ 金額を手で入れる（AIで読めなかったとき・読み違えたとき） ════
 let invAmountId = null;
-function openInvoiceAmount(id){
+// ai … AIで読んだ直後に渡す読み取り結果。渡されたら、その内容を欄に入れておく
+function openInvoiceAmount(id, ai){
   if(!invIsStaff()){ showToast('請求額の入力は管理者のみです'); return; }
   const v=(invoices||[]).find(x=>x.id===id); if(!v) return;
   invAmountId=id;
@@ -495,19 +476,48 @@ function openInvoiceAmount(id){
     `発注額 ¥${fmt(ord.total)}（${ord.list.length}件・${invPeriodLabel(ord.period)}）`
     + (v.aiTotal!=null ? `　／　AIの読み取り <b>¥${fmt(v.aiTotal)}</b>`
        : v.readByAi ? '　／　AIは金額を見つけられませんでした' : '');
-  document.getElementById('invamt-amount').value = v.amount!=null ? v.amount : '';
-  document.getElementById('invamt-reg').value = v.regNo||'';
-  document.getElementById('invamt-due').value = v.dueOn||'';
+  document.getElementById('invamt-amount').value = ai ? ai.total : (v.amount!=null ? v.amount : '');
+  document.getElementById('invamt-reg').value = (ai && ai.regNo) || v.regNo || '';
+  document.getElementById('invamt-due').value = v.dueOn || (ai && ai.dueOn) || '';
+  invAmountAiNote(v, ai);
+  document.getElementById('invamt-save').textContent = ai ? 'この内容で登録' : 'この金額で登録';
   // 「発注額を入れる」のボタンは、突き合わせる相手があるときだけ意味がある
   const cp=document.getElementById('invamt-copy');
   if(cp){ cp.style.display = ord.total ? '' : 'none'; cp.textContent = `発注額 ¥${fmt(ord.total)} を入れる`; }
   invAmountLearnSync();
   document.getElementById('invamt-modal').classList.add('open');
-  setTimeout(()=>document.getElementById('invamt-amount')?.focus(),100);
+  // 請求書そのものを出す（中で送れる・拡大できる）
+  if(typeof invViewOpen==='function') invViewOpen(v);
+  // AIで読んだ直後は、まず請求書と見比べてもらいたいので、入力欄にカーソルを置かない
+  // （スマホでキーボードが出て、請求書が隠れてしまうため）
+  if(!ai) setTimeout(()=>document.getElementById('invamt-amount')?.focus(),100);
 }
 function closeInvoiceAmount(){
   document.getElementById('invamt-modal').classList.remove('open');
+  if(typeof invViewClose==='function') invViewClose();
   invAmountId=null;
+}
+
+// AIが読んだ内容を、入力欄の上にまとめて出す
+function invAmountAiNote(v, ai){
+  const el=document.getElementById('invamt-ai');
+  if(!el) return;
+  if(!ai){ el.style.display='none'; el.innerHTML=''; return; }
+  const want=(suppliers||[]).find(s=>s.name===v.supplierName)?.invoiceRegNo || '';
+  const rows=[
+    ['請求金額', `<b>¥${fmt(ai.total)}</b>${v.amount!=null&&v.amount!==ai.total?`<i>いまの登録は ¥${fmt(v.amount)}</i>`:''}`],
+    ['登録番号', ai.regNo
+      ? `${esc(ai.regNo)}${want?(ai.regNo===want?'<i class="ok">登録と一致</i>':`<i class="ng">登録は ${esc(want)}</i>`):''}`
+      : '<i class="ng">見つかりません</i>'],
+    ai.dueOn ? ['支払期限', esc(ai.dueOn.replace(/-/g,'/'))] : null,
+    ai.issuer ? ['発行元', esc(ai.issuer)] : null,
+  ].filter(Boolean);
+  const warn = (ai.month && ai.month!==v.month)
+    ? `<div class="invamt-ai-warn">請求書の対象月は ${invMonthLabel(ai.month)} と読めました（登録は ${invMonthLabel(v.month)}）</div>` : '';
+  el.innerHTML = `<div class="invamt-ai-t">AIはこう読みました。請求書と見比べてください</div>
+    <dl>${rows.map(([k,h])=>`<dt>${k}</dt><dd>${h}</dd>`).join('')}</dl>${warn}${
+    ai.hintsUsed?`<div class="invamt-ai-sub">この発注先について覚えた読み取りのコツ ${ai.hintsUsed}件を使いました</div>`:''}`;
+  el.style.display='';
 }
 function invAmountValue(){
   return invParseAmount(document.getElementById('invamt-amount')?.value);
@@ -543,20 +553,25 @@ async function saveInvoiceAmount(){
   const learn = document.getElementById('invamt-learn')?.checked
     && document.getElementById('invamt-learn-wrap')?.style.display!=='none';
   const aiTotal=v.aiTotal, filePath=v.filePath, supplierId=v.supplierId, month=v.month;
+  // AIが読んだ額のまま登録したなら、手入力ではない
+  const byHand = !(v.readByAi && v.aiTotal!=null && amount===v.aiTotal);
 
   const btn=document.getElementById('invamt-save');
   btn.disabled=true; btn.textContent='保存中…';
   try{
-    await dbSetInvoiceAmount(v.id, { amount, regNo, dueOn, byHand:true });
+    await dbSetInvoiceAmount(v.id, { amount, regNo, dueOn, byHand });
   }catch(_){
     btn.disabled=false; btn.textContent='この金額で登録'; return;
   }finally{
     btn.disabled=false; btn.textContent='この金額で登録';
   }
-  Object.assign(v, { amount, regNo, dueOn, amountByHand:true });
+  Object.assign(v, { amount, regNo, dueOn, amountByHand:byHand });
   closeInvoiceAmount();
   renderInvoices();
-  showToast('請求額を登録しました');
+  const st=invRegState(v);
+  showToast(st==='ng' ? '登録しました。登録番号が発注先マスタと違います'
+          : (st==='none' && !byHand) ? '登録しました。請求書に登録番号が見つかりません'
+          : '請求額を登録しました');
 
   if(learn) invLearnFromHand({filePath, supplierId, month, rightTotal:amount, aiTotal});
 }

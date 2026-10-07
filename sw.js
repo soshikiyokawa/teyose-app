@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v479';
+const CACHE_NAME = 'teyose-v480';
 
 // ── 手元に置いておくもの ──
 //
@@ -105,6 +105,7 @@ const VERSIONED = [
   'js/genba/account-perms.js',
   'js/order/ekrea-price.js',
   'js/order/invoice.js',
+  'js/order/invoice-viewer.js',
   'js/order/invoice-onedrive.js',
   'js/order/item-price.js',
   'js/order/supplier-master.js',
@@ -180,7 +181,10 @@ self.addEventListener('fetch', e=>{
     const res = await fetch(req);
     if(res && res.ok && res.type === 'basic'){
       const copy = res.clone();
-      caches.open(CACHE_NAME).then(c=>c.put(req, copy)).catch(()=>{});
+      // 外から持ってきた部品（vendor/。PDFの表示に使う pdf.js など）は中身が変わらないので、
+      // 手寄の版を上げても消さない保管庫に入れる。初めて使ったときにだけ取りに行けば済む
+      const lib = new URL(req.url).pathname.includes('/vendor/');
+      caches.open(lib ? LIB_CACHE : CACHE_NAME).then(c=>c.put(req, copy)).catch(()=>{});
     }
     return res;
   })());
