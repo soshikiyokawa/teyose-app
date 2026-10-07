@@ -13,7 +13,8 @@
 
 const INV_VIEW_ZOOMS = [1, 1.5, 2, 3];
 const INV_VIEW_MAX_PAGES = 30;
-let invView = { token:0, pdf:null, url:'', kind:'', zoom:1 };
+// root … 請求書を出す場所（.invamt-viewcol）。金額の確認と、明細の割り当ての2か所で使う
+let invView = { token:0, pdf:null, url:'', kind:'', zoom:1, root:null };
 
 // 部品の置き場。pdf.js は相対の場所を「いま開いているページ」から数えるので、
 // ずれないように、はじめから完全な場所にして渡す
@@ -40,17 +41,19 @@ function invLoadPdfJs(){
 function invViewIsPdf(v){
   return /pdf/i.test(v.fileMime||'') || /\.pdf$/i.test(v.fileName||'') || /\.pdf$/i.test(v.filePath||'');
 }
-function invViewBox(){ return document.getElementById('invamt-view'); }
+function invViewBox(){ return invView.root ? invView.root.querySelector('.invv-box') : null; }
 function invViewMsg(html){
   const box = invViewBox();
   if(box) box.innerHTML = `<div class="invv-msg">${html}</div>`;
 }
 
-// 請求書を出す
-async function invViewOpen(v){
+// 請求書を出す。root は出す場所（省くと、金額を確かめる画面）
+async function invViewOpen(v, root){
+  invViewClose();                        // 前に出していた場所を片付けてから、場所を替える
+  invView.root = root || document.querySelector('#invamt-modal .invamt-viewcol');
   const box = invViewBox();
   if(!box) return;
-  invViewClose();
+  invView.root.classList.remove('invv-collapsed');
   const token = ++invView.token;
   invView.zoom = 1;
   invViewSyncZoom();
@@ -152,12 +155,22 @@ function invViewZoom(dir){
   invViewDraw();
 }
 function invViewSyncZoom(){
-  const lbl = document.getElementById('invv-zoom');
+  const r = invView.root; if(!r) return;
+  const lbl = r.querySelector('.invv-zoom');
   if(lbl) lbl.textContent = Math.round(invView.zoom*100) + '%';
   const i = INV_VIEW_ZOOMS.indexOf(invView.zoom);
-  const out = document.getElementById('invv-out'), inn = document.getElementById('invv-in');
+  const out = r.querySelector('.invv-out'), inn = r.querySelector('.invv-in');
   if(out) out.disabled = i <= 0;
   if(inn) inn.disabled = i >= INV_VIEW_ZOOMS.length-1;
+}
+
+// スマホで入力欄を広く使いたいとき、請求書をたたむ（もう一度押すと出る）
+function invViewToggle(){
+  const r = invView.root; if(!r) return;
+  const hide = r.classList.toggle('invv-collapsed');
+  const b = r.querySelector('.invv-fold');
+  if(b) b.textContent = hide ? '出す' : 'たたむ';
+  if(!hide) invViewDraw();               // たたんでいる間に幅が変わっていても、出したときに合わせる
 }
 
 function invViewOpenTab(){

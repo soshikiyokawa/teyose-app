@@ -487,7 +487,7 @@ function openInvoiceAmount(id, ai){
   invAmountLearnSync();
   document.getElementById('invamt-modal').classList.add('open');
   // 請求書そのものを出す（中で送れる・拡大できる）
-  if(typeof invViewOpen==='function') invViewOpen(v);
+  if(typeof invViewOpen==='function') invViewOpen(v, document.querySelector('#invamt-modal .invamt-viewcol'));
   // AIで読んだ直後は、まず請求書と見比べてもらいたいので、入力欄にカーソルを置かない
   // （スマホでキーボードが出て、請求書が隠れてしまうため）
   if(!ai) setTimeout(()=>document.getElementById('invamt-amount')?.focus(),100);

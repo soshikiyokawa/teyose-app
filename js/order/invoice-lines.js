@@ -76,10 +76,13 @@ async function openInvoiceLines(id){
     + '<option value="共通">共通（現場に紐づかない）</option>';
   ilRender();
   document.getElementById('il-modal').classList.add('open');
+  // 請求書そのものを横に出す。読み取った明細と見比べられるように（中で送れる・拡大できる）
+  if(typeof invViewOpen==='function') invViewOpen(v, document.querySelector('#il-modal .invamt-viewcol'));
   if(!saved.length) ilReadWithAi();     // まだ読んでいなければ、開いた時点で読む
 }
 function closeInvoiceLines(){
   document.getElementById('il-modal').classList.remove('open');
+  if(typeof invViewClose==='function') invViewClose();
   ilInvoiceId=null; ilRows=[]; ilAiSnapshot=null; ilEditRows=new Set();
 }
 
