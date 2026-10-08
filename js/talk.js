@@ -105,33 +105,34 @@ let reactingMsgId = null;
 function orderReceiveHtml(o){
   const ord=(orders||[]).find(x=>x.no===o.no);
   const received = ord ? ord.status==='received' : false;
+  const canEdit = currentUserRole==='supplier' || currentUserRole==='staff' || currentUserRole==='carpenter';
   if(received){
-    return `<div style="padding:6px 10px 8px;font-size:11px;color:var(--ok-t);font-weight:700;text-align:center">
-      ✓ 受領済み${ord?.receivedAt?`（${String(ord.receivedAt).slice(0,10).replace(/-/g,'/')}）`:''}</div>`;
+    // 受領済み：受領した日と、納品予定日（品目で違えば「10/14〜10/16」）。押すと品目ごとの日付が見られる
+    const days = (typeof orderDeliveryLabel==='function') ? orderDeliveryLabel(ord) : '';
+    const late = (typeof orderDeliveryLate==='function') && orderDeliveryLate(ord);
+    const no = esc(o.no);
+    return `<div class="ord-recv done">
+      <div>✓ 受領済み${ord?.receivedAt?`（${String(ord.receivedAt).slice(0,10).replace(/-/g,'/')}）`:''}</div>
+      ${days
+        ? `<button type="button" class="ord-recv-days${late?' late':''}" onclick="openOrderReceive('${no}','change')">
+             納品予定 ${days}${late?'（希望日より後）':''}<span>${canEdit?'変える':'見る'}</span></button>`
+        : (canEdit && !ord?.paymentMethod
+            ? `<button type="button" class="ord-recv-days need" onclick="openOrderReceive('${no}','change')">
+                 納品予定日が入っていません<span>入れる</span></button>` : '')}
+    </div>`;
   }
   if(currentUserRole!=='supplier') return '';
   return `<div style="padding:4px 10px 10px">
     <button class="btn sm primary" style="width:100%;justify-content:center" onclick="receiveOrderFromChat('${esc(o.no)}')">
-      受領しました
+      受領する（納品予定日を入れる）
     </button>
   </div>`;
 }
 
-// 発注先が発注書を受領する
-async function receiveOrderFromChat(orderNo){
-  const ord=(orders||[]).find(x=>x.no===orderNo);
-  if(!confirm(`発注書 ${orderNo} を受領しましたと伝えます。よろしいですか？`)) return;
-  try{
-    await dbMarkOrderReceived(orderNo, ord?.suppliers || currentUserDisplayName);
-    if(ord){ ord.status='received'; ord.receivedAt=new Date().toISOString(); }
-    renderTalkPanelMessages();
-    showToast('受領しました。きよかわに伝わります');
-    // 社内へ通知＋チャットにも残す
-    dbSendPushToRole('staff', '発注書が受領されました',
-      `${currentUserDisplayName||''} ${orderNo}`, 'order/history').catch(()=>{});
-    dbAddChatMessage(activeTalkPanelSupplier, {role:'them', type:'text',
-      text:`発注書 ${orderNo} を受領しました`}).catch(()=>{});
-  }catch(_){}
+// 発注先が発注書を受領する。品目ごとの納品予定日を入れてもらう画面を開く
+// （日付がすべて入るまで受領できない。js/order/order-receive.js）
+function receiveOrderFromChat(orderNo){
+  openOrderReceive(orderNo, 'receive');
 }
 
 // 発注書の吹き出しに出す「単価を直す」。発注先ときよかわの管理者だけ

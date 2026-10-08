@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v484';
+const CACHE_NAME = 'teyose-v485';
 
 // ── 手元に置いておくもの ──
 //
@@ -113,6 +113,7 @@ const VERSIONED = [
   'js/order/order-cart.js',
   'js/order/order-confirm.js',
   'js/order/order-history.js',
+  'js/order/order-receive.js',
   'js/order/order-price-edit.js',
   'js/order/invoice-lines.js',
   'js/order/card-match.js',

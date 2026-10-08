@@ -227,7 +227,10 @@ function orderRowTo(r){
     paymentMethod:r.payment_method||'',suppliers:supplierNameById(r.supplier_id),items:r.items,
     subtotal:Number(r.subtotal),tax:Number(r.tax),total:Number(r.total),status:r.status,receivedAt:r.received_at||'',
     priceEdits:r.price_edits||[],createdByName:r.created_by_name||'',
-    deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||''};
+    deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||'',
+    // 業者さんが受領のときに入れる納品予定日（migration-genba95.sql）。
+    // deliveryDates は品目ごと、deliveryOn はそのうちいちばん遅い日
+    deliveryOn:r.delivery_on||'', deliveryDates:Array.isArray(r.delivery_dates)?r.delivery_dates:[]};
 }
 
 // ── 見積の明細は、その案件を開いたときに読む ──
@@ -637,16 +640,42 @@ async function dbConfirmOrder(order){
   await dbSendOrderToSupplier(order);
   return orderRow;
 }
-async function dbMarkOrderReceived(orderNo, supplierName){
+// 納品予定日の列がまだ無いときの案内（migration-genba95.sql）
+function orderDeliveryColumnMissing(error){
+  return /delivery_on|delivery_dates/.test(error?.message||'') && /column|schema cache|does not exist/i.test(error?.message||'');
+}
+// delivery … {deliveryOn, deliveryDates}。業者さんが受領のときに入れる納品予定日（品目ごと）。
+//            きよかわの社員が日付なしで受領済みにするときは null
+async function dbMarkOrderReceived(orderNo, supplierName, delivery){
   const supplier_id = supplierIdByName(supplierName);
   const row = {status:'received'};
+  const dates = delivery ? { delivery_on: delivery.deliveryOn||null, delivery_dates: delivery.deliveryDates||[] } : {};
   // 誰がいつ受領したか（列が無い環境でも動くよう、失敗したら status だけで更新し直す）
   let { error } = await sb.from('orders')
-    .update({...row, received_at:new Date().toISOString(), received_by:currentUserDisplayName||''})
+    .update({...row, ...dates, received_at:new Date().toISOString(), received_by:currentUserDisplayName||''})
     .eq('no',orderNo).eq('supplier_id',supplier_id);
-  if(error) ({ error } = await sb.from('orders').update(row).eq('no',orderNo).eq('supplier_id',supplier_id));
-  if(error){ showToast('受領の記録に失敗しました：'+error.message); throw error; }
+  // 納品予定日は必須なので、その列が無いときは黙って捨てずに止める
+  if(error && delivery && orderDeliveryColumnMissing(error)){
+    showToast('データベースの準備が必要です。supabase/migration-genba95.sql を実行してください', 7000);
+    throw error;
+  }
+  if(error && !/納品予定日/.test(error.message||''))
+    ({ error } = await sb.from('orders').update({...row, ...dates}).eq('no',orderNo).eq('supplier_id',supplier_id));
+  if(error){ showToast('受領の記録に失敗しました：'+error.message, 7000); throw error; }
   await sb.from('cost_entries').update(row).eq('order_no',orderNo).eq('supplier_id',supplier_id);
+}
+// 受領したあとで、納品予定日だけを変える
+async function dbSetOrderDelivery(orderNo, supplierName, delivery){
+  const supplier_id = supplierIdByName(supplierName);
+  const { error } = await sb.from('orders')
+    .update({ delivery_on: delivery.deliveryOn||null, delivery_dates: delivery.deliveryDates||[] })
+    .eq('no',orderNo).eq('supplier_id',supplier_id);
+  if(error){
+    showToast(orderDeliveryColumnMissing(error)
+      ? 'データベースの準備が必要です。supabase/migration-genba95.sql を実行してください'
+      : '納品予定日を保存できませんでした：'+error.message, 7000);
+    throw error;
+  }
 }
 
 // ── 単価の変更履歴（いつからの単価か。migration-genba40.sql） ──

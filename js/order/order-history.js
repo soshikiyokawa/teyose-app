@@ -9,10 +9,14 @@ function renderOrders(){
         ${orderHasPriceEdit(o)?'<span class="badge price-edited">単価変更あり</span>':''}
       </div>
       <div class="order-meta"><span>📅 ${o.date}</span><span>🏪 ${o.suppliers}</span><span>📦 ${o.items.length}品目</span>${o.costType?`<span>🏷️ ${o.costType}</span>`:''}${
-        o.dueAsap?'<span style="color:var(--accent-t);font-weight:700">🚚 最短</span>':(o.dueDate?`<span>🚚 ${o.dueDate}</span>`:'')}<span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
+        o.dueAsap?'<span style="color:var(--accent-t);font-weight:700">🚚 希望 最短</span>':(o.dueDate?`<span>🚚 希望 ${o.dueDate}</span>`:'')}${
+        // 業者さんが答えた納品予定日。きよかわの希望日より後なら赤くする
+        orderDeliveryLabel(o) ? `<span class="ord-deliv${orderDeliveryLate(o)?' late':''}">📦 納品予定 ${orderDeliveryLabel(o)}</span>` : ''
+        }<span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
       <div class="order-actions">
         <button class="btn sm" onclick="reShowOrder(${i})"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 発注書</button>
-        ${o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`:''}
+        ${o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`
+          : (o.paymentMethod ? '' : `<button class="btn sm" onclick="openOrderReceive('${esc(o.no)}','change')">納品予定日</button>`)}
         <button class="btn sm" onclick="openOrderPriceEdit('${esc(o.no)}')">単価・送料を直す</button>
         <button class="btn sm danger" onclick="deleteOrderFromHistory(${i})">削除</button>
       </div>
@@ -43,6 +47,12 @@ function reShowOrder(i){
   document.getElementById('order-pdf-overlay').classList.add('open');
 }
 async function markReceived(i){
+  // これから届く発注は、品目ごとの納品予定日を入れる画面を通す。
+  // レシートから取り込んだ発注（支払済み・もう手元にある）は、これまでどおりそのまま受領済みにする
+  if(orders[i] && !orders[i].paymentMethod && typeof openOrderReceive==='function'){
+    openOrderReceive(orders[i].no, 'receive');
+    return;
+  }
   try{
     await dbMarkOrderReceived(orders[i].no, orders[i].suppliers);
   }catch(e){return;}

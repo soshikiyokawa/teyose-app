@@ -504,3 +504,44 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .m-fullname.need{color:var(--danger);font-weight:700}
 /* 一覧：寸法がまだ入っていない品目の印 */
 .mi-nodim{color:var(--warn-t);font-weight:700}
+
+/* ── 発注書の受領と、品目ごとの納品予定日 ── */
+.modal-sheet.ordrecv-sheet{max-width:560px;display:flex;flex-direction:column;max-height:92vh}
+.orv-tools{flex-shrink:0;padding:10px;border-radius:10px;background:var(--surface2);margin-bottom:8px}
+.orv-all{display:inline-flex!important;align-items:center;gap:7px;margin:0!important;font-size:13px;font-weight:700;cursor:pointer}
+.orv-all input,.orv-ck{width:20px;height:20px;margin:0;flex:none;accent-color:var(--accent)}
+.orv-selcount{margin-left:10px;font-size:11px;color:var(--text-sub)}
+.orv-bulk{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px}
+.orv-bulk input[type=date]{flex:1 1 150px;min-width:0;width:auto;margin:0}
+/* 品目の一覧。ここだけが送れる（行が多くても、下のボタンが逃げない） */
+.orv-list{flex:1 1 auto;min-height:90px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  border:0.5px solid var(--border);border-radius:10px}
+.orv-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:0.5px solid var(--border)}
+.orv-row:last-child{border-bottom:none}
+.orv-row.sel{background:var(--accent-bg)}
+.orv-row.need .orv-date{border-color:var(--warn-t)}
+.orv-main{flex:1;min-width:0;cursor:pointer}
+.orv-name{font-size:13px;font-weight:600;line-height:1.5;overflow-wrap:anywhere}
+.orv-meta{font-size:11px;color:var(--text-sub);margin-top:1px}
+.orv-late{margin-left:8px;color:var(--danger);font-weight:700}
+.orv-date{flex:0 0 auto;width:148px;margin:0;font-size:13px}
+.orv-note{flex-shrink:0;margin-top:8px;font-size:12px;color:var(--ok-t);font-weight:700;min-height:1.5em}
+.orv-note.need{color:var(--warn-t)}
+.orv-skip{flex-shrink:0;display:block;margin:10px auto 0;border:none;background:none;cursor:pointer;
+  font:inherit;font-size:11px;color:var(--text-muted);text-decoration:underline}
+@media(max-width:520px){
+  /* スマホ：品目名の下に日付を置く（横に並べると品目名が潰れるため） */
+  .orv-row{flex-wrap:wrap}
+  .orv-date{flex:1 1 100%;width:auto;margin-left:30px}
+  .orv-bulk .btn{flex:1 1 auto;justify-content:center}
+}
+/* チャットの発注書の吹き出し：受領済みの表示 */
+.ord-recv.done{padding:6px 10px 9px;font-size:11px;color:var(--ok-t);font-weight:700;text-align:center}
+.ord-recv-days{display:inline-flex;align-items:center;gap:8px;margin-top:5px;padding:4px 10px;cursor:pointer;
+  font:inherit;font-size:12px;font-weight:700;color:var(--text);border:1px solid var(--border);border-radius:99px;background:var(--surface)}
+.ord-recv-days span{font-size:10px;font-weight:400;color:var(--text-muted);text-decoration:underline}
+.ord-recv-days.late{color:var(--danger);border-color:var(--danger)}
+.ord-recv-days.need{color:var(--warn-t);border-color:var(--warn-t)}
+/* 発注履歴：業者さんが答えた納品予定日 */
+.ord-deliv{font-weight:700;color:var(--ok-t)}
+.ord-deliv.late{color:var(--danger)}
