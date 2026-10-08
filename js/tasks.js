@@ -147,11 +147,32 @@ function renderTaskPage(){
           ${t.assignees.length
             ? `<span class="task-asg${mine?' mine':''}">${t.assignees.map(esc).join('、')}</span>`
             : '<span class="task-asg none">担当者なし</span>'}
-          ${(!mine && isMyCreatedTask(t)) ? '<span class="task-made">自分が出した</span>' : ''}
+          ${taskCreatorHtml(t)}
         </div>
       </div>
     </div>`;
   }).join('');
+}
+
+// ── 作成者 ──
+// だれが出したタスクかを、一覧にも、開いた画面にも出す。
+// 自分が出したものは「自分」と書く（名前を探さなくても、ひと目で分かるように）
+function taskCreatorName(t){
+  if(isMyCreatedTask(t)) return '自分';
+  return t?.createdBy || '';
+}
+function taskCreatorHtml(t){
+  const name = taskCreatorName(t);
+  if(!name) return '';      // 作成者の記録が無い古いタスク
+  return `<span class="task-by${isMyCreatedTask(t)?' me':''}" title="このタスクを作った人">作成：${esc(name)}</span>`;
+}
+// 開いた画面に出す1行。「作成：清川太視　2026/10/08」
+function taskCreatorLine(t){
+  const name = isMyCreatedTask(t) ? `${t.createdBy||currentUserDisplayName||''}（自分）` : (t?.createdBy||'');
+  if(!name) return '';
+  const d = t.createdAt ? new Date(t.createdAt) : null;
+  const when = (d && !isNaN(d)) ? `　${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}` : '';
+  return `作成：${name}${when}`;
 }
 
 function renderTaskFilters(){
@@ -203,6 +224,7 @@ function notifyTaskDone(t){
 
 // ── 作る・直す ──
 function openTaskNew(){
+  { const by=document.getElementById('task-created-by'); if(by){ by.textContent=''; by.style.display='none'; } }
   if(!taskCanEdit()){ showToast('タスクを作れるのはきよかわの社員だけです'); return; }
   editingTodoId=null;
   taskAssignees=[]; taskChecklist=[]; taskHandoffs=[];
@@ -233,6 +255,8 @@ function openTaskEdit(id){
   taskChecklist=(t.checklist||[]).map(c=>({...c}));
   taskHandoffs=(t.handoffs||[]).map(h=>({...h}));
   document.getElementById('task-modal-title').textContent = taskCanEdit() ? 'タスクを直す' : 'タスク';
+  { const by=document.getElementById('task-created-by');
+    if(by){ const line=taskCreatorLine(t); by.textContent=line; by.style.display=line?'':'none'; } }
   document.getElementById('task-title').value=t.title;
   document.getElementById('task-detail').value=t.detail;
   document.getElementById('task-due').value=t.dueDate;

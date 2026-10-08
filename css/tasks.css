@@ -107,3 +107,8 @@
 }
 .tt-move-btn:hover:not(:disabled){ background:var(--accent-bg); color:var(--accent-t); }
 .tt-move-btn:disabled{ opacity:.3; cursor:default; }
+
+/* ── 作成者（だれが出したタスクか） ── */
+.task-by{ font-size:11px; color:var(--text-sub); white-space:nowrap; }
+.task-by.me{ color:var(--accent-t); font-weight:700; }
+.task-created-by{ font-size:11px; color:var(--text-sub); margin:-6px 0 10px; }
