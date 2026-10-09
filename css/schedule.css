@@ -25,6 +25,8 @@ body.sch-preview:not(.sch-edit) .gantt-drag-hdl { display: none; }
 body.sch-preview:not(.sch-edit) .sch-empty button { display: none; }
 /* 「編集」ボタンだけは表示のみの状態でも出す */
 body.sch-preview .sch-toolbar button.sch-edit-btn { display: inline-flex; }
+/* 「今日」も、表示のみの状態で出す（発注先にも出る） */
+body.sch-preview .sch-toolbar button.sch-today-btn { display: inline-flex; }
 body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border-color: var(--wood); color: #fff; }
 
 .sch-toolbar {
