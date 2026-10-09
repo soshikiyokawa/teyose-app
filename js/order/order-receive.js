@@ -22,7 +22,8 @@ function orderDeliverableItems(o){
 // その品目の納品予定日（無ければ ''）。
 // 並び順と品目名の両方が合うものを使う。あとから送料の行が足されるなどして
 // 並びがずれていたら、品目名で探す
-function orderDeliveryOf(o, i){
+// （名前に注意：orderDeliveryOf は「納品場所」を返すもので、js/order/order-cart.js にある）
+function orderPlanDateOf(o, i){
   const list = Array.isArray(o?.deliveryDates) ? o.deliveryDates : [];
   const name = o?.items?.[i]?.name;
   const hit = list.find(d=>d && d.i===i && d.name===name) || list.find(d=>d && d.name===name);
@@ -30,18 +31,20 @@ function orderDeliveryOf(o, i){
 }
 // 入っている納品予定日（重なりを除いて、早い順）
 function orderDeliveryDays(o){
-  const days = orderDeliverableItems(o).map(x=>orderDeliveryOf(o, x.i)).filter(Boolean);
+  const days = orderDeliverableItems(o).map(x=>orderPlanDateOf(o, x.i)).filter(Boolean);
   if(!days.length && o?.deliveryOn) return [o.deliveryOn];
   return [...new Set(days)].sort();
 }
 // すべての品目に入っているか
 function orderDeliveryComplete(o){
   const items = orderDeliverableItems(o);
-  return items.length>0 && items.every(x=>orderDeliveryOf(o, x.i));
+  return items.length>0 && items.every(x=>orderPlanDateOf(o, x.i));
 }
 function orderMd(ymd){ const p=String(ymd||'').split('-'); return p.length===3 ? `${Number(p[1])}/${Number(p[2])}` : ''; }
 // 一覧に出す短い書き方。「10/14」または「10/14〜10/16」
-function orderDeliveryLabel(o){
+// （名前に注意：orderDeliveryLabel は「納品場所」の書き方で、js/order/order-cart.js にある。
+//   同じ名前を付けると後から読んだほうが勝ち、発注書の納品場所が空になる）
+function orderDeliveryDaysLabel(o){
   const days = orderDeliveryDays(o);
   if(!days.length) return '';
   return days.length===1 ? orderMd(days[0]) : `${orderMd(days[0])}〜${orderMd(days[days.length-1])}`;
@@ -69,7 +72,7 @@ function openOrderReceive(orderNo, mode){
   if(!o){ showToast('発注が見つかりません。画面を更新してからお試しください'); return; }
   const items = orderDeliverableItems(o);
   const rows = items.map(({it,i})=>({ i, name: it.name||'', qty: it.qty, unit: it.unit||'',
-                                      on: orderDeliveryOf(o, i), sel: false }));
+                                      on: orderPlanDateOf(o, i), sel: false }));
   // たいていは全部同じ日に納めるので、まだ日付の無い品目をはじめから選んでおく。
   // 日付を1つ選んで「選んだ品目に入れる」を押すだけで済む
   rows.forEach(r=>{ r.sel = !r.on; });
@@ -209,7 +212,7 @@ async function saveOrderReceive(skipDates){
 
   const btn = document.getElementById('ordrecv-save');
   btn.disabled = true;
-  const before = orderDeliveryLabel(o);
+  const before = orderDeliveryDaysLabel(o);
   try{
     if(st.mode==='receive'){
       await dbMarkOrderReceived(o.no, o.suppliers, skipDates ? null : { deliveryOn:last, deliveryDates:dates });
@@ -242,7 +245,7 @@ async function saveOrderReceive(skipDates){
     }
   } else {
     showToast('納品予定日を保存しました');
-    const after = orderDeliveryLabel(o);
+    const after = orderDeliveryDaysLabel(o);
     if(supplier && after!==before){
       dbSendPushToRole('staff', '納品予定日が変わりました',
         `${currentUserDisplayName||''} ${o.no}　${before||'未定'} → ${after}`, 'order/history').catch(()=>{});

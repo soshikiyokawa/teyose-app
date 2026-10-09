@@ -11,7 +11,7 @@ function renderOrders(){
       <div class="order-meta"><span>📅 ${o.date}</span><span>🏪 ${o.suppliers}</span><span>📦 ${o.items.length}品目</span>${o.costType?`<span>🏷️ ${o.costType}</span>`:''}${
         o.dueAsap?'<span style="color:var(--accent-t);font-weight:700">🚚 希望 最短</span>':(o.dueDate?`<span>🚚 希望 ${o.dueDate}</span>`:'')}${
         // 業者さんが答えた納品予定日。きよかわの希望日より後なら赤くする
-        orderDeliveryLabel(o) ? `<span class="ord-deliv${orderDeliveryLate(o)?' late':''}">📦 納品予定 ${orderDeliveryLabel(o)}</span>` : ''
+        orderDeliveryDaysLabel(o) ? `<span class="ord-deliv${orderDeliveryLate(o)?' late':''}">📦 納品予定 ${orderDeliveryDaysLabel(o)}</span>` : ''
         }${
         // 業者さんが「納品完了」にした品目の数（業者さんからの報告。現場での受け取りの確認とは別）
         (typeof orderDeliveredLabel==='function' && orderDeliveredLabel(o)) ? `<span class="ord-delivd" title="業者さんからの報告です">✓ ${orderDeliveredLabel(o)}（業者報告）</span>` : ''

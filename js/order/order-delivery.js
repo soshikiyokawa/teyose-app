@@ -52,7 +52,7 @@ function delivRows(){
     if(!o || o.paymentMethod) return;                   // レシートから取り込んだ発注
     orderDeliverableItems(o).forEach(({it,i})=>{
       out.push({ key:delivKey(o,i), o, i, it,
-        plan: orderDeliveryOf(o, i), done: orderDeliveredOf(o, i) });
+        plan: orderPlanDateOf(o, i), done: orderDeliveredOf(o, i) });
     });
   });
   return out;

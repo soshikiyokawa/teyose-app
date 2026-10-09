@@ -135,7 +135,7 @@ function renderTaskPage(){
     <div class="task-row${done?' done':''}">
       <button type="button" class="task-check${done?' on':''}" onclick="toggleTaskDone(${t.id})"
         title="${done?'未済に戻す':'済にする'}">${done?'✓':''}</button>
-      <div class="task-main" onclick="openTaskEdit(${t.id})">
+      <div class="task-main" onclick="openTodoEdit(${t.id})">
         <div class="task-title">${esc(t.title)}</div>
         <div class="task-meta">
           <span class="task-due ${due.cls}">${due.text}</span>
@@ -247,7 +247,8 @@ function openTaskNew(){
   setTimeout(()=>document.getElementById('task-title').focus(),100);
 }
 
-function openTaskEdit(id){
+// （名前に注意：openTaskEdit は工程表の工程を開くもので、js/schedule.js にある）
+function openTodoEdit(id){
   const t=tasks.find(x=>x.id===id);
   if(!t) return;
   editingTodoId=id;

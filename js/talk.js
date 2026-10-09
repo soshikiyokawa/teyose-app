@@ -108,7 +108,7 @@ function orderReceiveHtml(o){
   const canEdit = currentUserRole==='supplier' || currentUserRole==='staff' || currentUserRole==='carpenter';
   if(received){
     // 受領済み：受領した日と、納品予定日（品目で違えば「10/14〜10/16」）。押すと品目ごとの日付が見られる
-    const days = (typeof orderDeliveryLabel==='function') ? orderDeliveryLabel(ord) : '';
+    const days = (typeof orderDeliveryDaysLabel==='function') ? orderDeliveryDaysLabel(ord) : '';
     const late = (typeof orderDeliveryLate==='function') && orderDeliveryLate(ord);
     const no = esc(o.no);
     return `<div class="ord-recv done">

@@ -40,7 +40,7 @@ function appOpenTab(spec){
     mainTab('task');
     // そのタスクまで開く（消されていたら一覧のまま）
     const id = Number(target);
-    if(id && typeof openTaskEdit==='function' && (tasks||[]).some(t=>t.id===id)) openTaskEdit(id);
+    if(id && typeof openTodoEdit==='function' && (tasks||[]).some(t=>t.id===id)) openTodoEdit(id);
     return;
   }
   if(page !== 'genba') return;
