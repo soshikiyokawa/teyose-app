@@ -545,3 +545,33 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 /* 発注履歴：業者さんが答えた納品予定日 */
 .ord-deliv{font-weight:700;color:var(--ok-t)}
 .ord-deliv.late{color:var(--danger)}
+
+/* ── 納品（業者さん。js/order/order-delivery.js） ── */
+.dlv-head{display:flex;align-items:center;gap:var(--sp3);flex-wrap:wrap}
+.dlv-head h2{font-size:16px;font-weight:800;margin:0}
+.dlv-tabs{display:flex;gap:6px;margin-left:auto}
+.dlv-tab{border:1px solid var(--border);background:var(--surface);color:var(--text-sub);border-radius:999px;padding:7px 14px;font-size:var(--fs2);cursor:pointer}
+.dlv-tab.on{background:var(--wood);border-color:var(--wood);color:#fff;font-weight:700}
+.dlv-help{font-size:var(--fs1);color:var(--text-muted);line-height:1.7;margin:8px 0 10px}
+.dlv-list{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.dlv-row{display:flex;align-items:center;gap:12px;padding:12px;border-bottom:0.5px solid var(--border)}
+.dlv-row:last-child{border-bottom:none}
+.dlv-row.sel{background:var(--accent-bg)}
+.dlv-row.off .dlv-main{opacity:.6}
+.dlv-ck,.dlv-all input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
+.dlv-main{flex:1;min-width:0;cursor:pointer}
+.dlv-row.off .dlv-main,.dlv-row.done .dlv-main{cursor:default}
+.dlv-name{font-size:var(--fs3);font-weight:700;line-height:1.5;overflow-wrap:anywhere}
+.dlv-meta{font-size:var(--fs1);color:var(--text-sub);margin-top:1px;overflow-wrap:anywhere}
+.dlv-plan{display:inline-block;margin-top:3px;font-size:var(--fs1);color:var(--text-sub)}
+.dlv-plan.late{color:var(--danger);font-weight:700}
+.dlv-plan.wait{color:var(--warn-t);font-weight:700}
+.dlv-plan.ok{color:var(--ok-t);font-weight:700}
+/* 下のメニューのすぐ上に貼り付ける。一覧が長くても、いつも押せる */
+.dlv-bar{position:sticky;bottom:calc(68px + env(safe-area-inset-bottom));z-index:20;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:0 -2px 12px rgba(0,0,0,.10)}
+.dlv-all{display:inline-flex!important;align-items:center;gap:7px;margin:0!important;font-size:var(--fs2);font-weight:700;cursor:pointer}
+.dlv-on{display:inline-flex!important;align-items:center;gap:6px;margin:0 0 0 auto!important;font-size:var(--fs2);color:var(--text-sub)}
+.dlv-on input{width:150px;margin:0;font-size:16px}
+.dlv-bar .btn{flex:1 1 100%;justify-content:center;padding:12px;font-size:var(--fs3)}
+.ord-delivd{color:var(--ok-t);font-weight:700}

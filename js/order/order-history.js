@@ -12,6 +12,9 @@ function renderOrders(){
         o.dueAsap?'<span style="color:var(--accent-t);font-weight:700">🚚 希望 最短</span>':(o.dueDate?`<span>🚚 希望 ${o.dueDate}</span>`:'')}${
         // 業者さんが答えた納品予定日。きよかわの希望日より後なら赤くする
         orderDeliveryLabel(o) ? `<span class="ord-deliv${orderDeliveryLate(o)?' late':''}">📦 納品予定 ${orderDeliveryLabel(o)}</span>` : ''
+        }${
+        // 業者さんが「納品完了」にした品目の数（業者さんからの報告。現場での受け取りの確認とは別）
+        (typeof orderDeliveredLabel==='function' && orderDeliveredLabel(o)) ? `<span class="ord-delivd" title="業者さんからの報告です">✓ ${orderDeliveredLabel(o)}（業者報告）</span>` : ''
         }<span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
       <div class="order-actions">
         <button class="btn sm" onclick="reShowOrder(${i})"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 発注書</button>

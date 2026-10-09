@@ -230,7 +230,9 @@ function orderRowTo(r){
     deliveryPlace:r.delivery_place||'',deliveryAddress:r.delivery_address||'',note:r.note||'',
     // 業者さんが受領のときに入れる納品予定日（migration-genba95.sql）。
     // deliveryDates は品目ごと、deliveryOn はそのうちいちばん遅い日
-    deliveryOn:r.delivery_on||'', deliveryDates:Array.isArray(r.delivery_dates)?r.delivery_dates:[]};
+    deliveryOn:r.delivery_on||'', deliveryDates:Array.isArray(r.delivery_dates)?r.delivery_dates:[],
+    // 業者さんが「納品完了」にした品目（migration-genba96.sql）
+    deliveredDates:Array.isArray(r.delivered_dates)?r.delivered_dates:[]};
 }
 
 // ── 見積の明細は、その案件を開いたときに読む ──
@@ -2218,6 +2220,9 @@ async function refetchAndRerender(table){
       }
     }
   }
+  // 納品タブ（業者さん）。選んでいる品目は覚えてあるので、描き直しても消えない
+  if(table==='orders' && document.getElementById('page-delivery')?.classList.contains('active')
+     && typeof renderDeliveryPage==='function') renderDeliveryPage();
   if((table==='orders'||table==='cost_entries') && (currentUserRole==='staff'||currentUserRole==='carpenter')){
     if(document.getElementById('ordersub-history')?.classList.contains('active')) renderOrders();
     if(document.getElementById('page-cost')?.classList.contains('active')) renderCost();

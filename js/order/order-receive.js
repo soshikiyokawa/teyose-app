@@ -234,8 +234,9 @@ async function saveOrderReceive(skipDates){
       // 社内へ通知＋チャットにも残す
       dbSendPushToRole('staff', '発注書が受領されました',
         `${currentUserDisplayName||''} ${o.no}　納品予定 ${text}`, 'order/history').catch(()=>{});
-      if(typeof activeTalkPanelSupplier!=='undefined' && activeTalkPanelSupplier){
-        dbAddChatMessage(activeTalkPanelSupplier, {role:'them', type:'text',
+      // チャットを開いていないとき（納品タブから受領したとき）も、その発注先とのチャットに残す
+      if(o.suppliers){
+        dbAddChatMessage(o.suppliers, {role:'them', type:'text',
           text:`発注書 ${o.no} を受領しました\n納品予定：${text}`}).catch(()=>{});
       }
     }
@@ -245,8 +246,8 @@ async function saveOrderReceive(skipDates){
     if(supplier && after!==before){
       dbSendPushToRole('staff', '納品予定日が変わりました',
         `${currentUserDisplayName||''} ${o.no}　${before||'未定'} → ${after}`, 'order/history').catch(()=>{});
-      if(typeof activeTalkPanelSupplier!=='undefined' && activeTalkPanelSupplier){
-        dbAddChatMessage(activeTalkPanelSupplier, {role:'them', type:'text',
+      if(o.suppliers){
+        dbAddChatMessage(o.suppliers, {role:'them', type:'text',
           text:`発注書 ${o.no} の納品予定日を変更しました\n納品予定：${text}`}).catch(()=>{});
       }
     }
@@ -263,5 +264,6 @@ function orderRecvRefresh(){
     }
   }catch(_){}
   try{ if(document.getElementById('orders-list') && typeof renderOrders==='function') renderOrders(); }catch(_){}
+  try{ if(document.getElementById('page-delivery')?.classList.contains('active') && typeof renderDeliveryPage==='function') renderDeliveryPage(); }catch(_){}
   try{ if(typeof renderCost==='function' && document.getElementById('page-cost')?.classList.contains('active')) renderCost(); }catch(_){}
 }

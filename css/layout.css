@@ -82,6 +82,8 @@
 /* 現場（写真・図面・日報・有給）は社内だけ */
 .role-supplier .employee-only{display:none !important}
 .role-staff .carpenter-only{display:none !important}
+/* 業者さんにだけ出すもの（納品タブ）。役割が決まる前も隠しておく */
+body:not(.role-supplier) .supplier-only{display:none !important}
 
 /* ── スマホの案件選択バー（サイドバーの代わり） ── */
 #est-project-mobile-bar{

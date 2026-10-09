@@ -57,7 +57,7 @@ function mainTab(t){
   _mainTabGo(t);
 }
 function _mainTabGo(t){
-  ['estimate','cost','order','schedule','genba','task','talk'].forEach(n=>{
+  ['estimate','cost','order','delivery','schedule','genba','task','talk'].forEach(n=>{
     document.getElementById('page-'+n)?.classList.toggle('active',n===t);
     document.getElementById('nav-'+n)?.classList.toggle('active',n===t);
   });
@@ -69,5 +69,6 @@ function _mainTabGo(t){
   if(t==='schedule'){ loadScheduleForProject(); applySupplierScheduleView && applySupplierScheduleView(); }
   if(t==='genba') renderGenbaPage();
   if(t==='task') renderTaskPage();
+  if(t==='delivery' && typeof renderDeliveryPage==='function') renderDeliveryPage();
   window.scrollTo(0,0);
 }
