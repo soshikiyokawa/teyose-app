@@ -583,3 +583,9 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .ocb-row.cxl span:last-child{color:var(--danger);font-weight:700;font-size:11px}
 .ord-recv.cxl{padding:8px 10px 10px;color:var(--danger);font-weight:700;font-size:12px}
 .ord-recv-cxl{padding:4px 10px 0;color:var(--danger);font-weight:700;font-size:11px}
+
+/* キャンセル品の指定（業者さん）と、確認待ち（きよかわ） */
+.dlv-plan.cxl{color:var(--danger);font-weight:700}
+.dlv-bar .dlv-cxl-btn{flex:1 1 100%;padding:9px;font-size:var(--fs2);color:var(--danger);border-color:var(--danger);background:transparent}
+.dlv-bar .dlv-cxl-btn:disabled{opacity:.45}
+.badge.cancel-wait{background:var(--warn-bg);color:var(--warn-t);border:1px solid var(--warn-t)}

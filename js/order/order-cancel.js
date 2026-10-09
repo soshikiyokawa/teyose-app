@@ -1,18 +1,23 @@
 // ════ 発注のキャンセル（発注したあとで、やめる品目が出たとき） ════
 //
-// きよかわの管理者が、発注履歴の「キャンセル」から行う。
-//   ・品目ごとに選べる（ぜんぶ選べば、発注まるごとのキャンセル）
-//   ・キャンセルした品目は、業者さんの「納品」タブと、受領のときの納品予定日の入力から消える
+// 流れ：
+//   1. きよかわが、電話などで業者さんにキャンセルを伝える
+//   2. 業者さんが「納品」タブで、その品目を「キャンセル品」に指定する（js/order/order-delivery.js）
+//   3. きよかわの管理者が、発注履歴の「キャンセル品を確認」から承認する（このファイル）
+//      → 承認して、はじめてキャンセルになる。ちがっていれば差し戻す
+//
+// キャンセルになった品目は、
+//   ・業者さんの「納品」タブと、受領のときの納品予定日の入力から消える
 //   ・原価管理からも、その品目の金額が消える
-//   ・その業者さんとのチャットに1通入り、通知も行く
 //
-// 品目そのもの（items）は消さずに残し、「どれをキャンセルしたか」を別の列に持つ
-// （orders.cancelled_items。migration-genba96.sql）。発注書に何を頼んでいたかが、あとから分かるように。
-// すでに「納品完了」になっている品目は、キャンセルできない（先に納品完了を取り消す）。
+// 品目そのもの（items）は消さずに残し、別の列に持つ（migration-genba96.sql）。
+//   orders.cancel_requests … 業者さんが指定して、確認を待っているもの
+//   orders.cancelled_items … 承認して、キャンセルになったもの
+// 発注書に何を頼んでいたかが、あとから分かるように。
 //
-// キャンセルの取り消しは無い。まちがえたときは、その品目を発注し直す。
+// 承認したキャンセルの取り消しは無い。まちがえたときは、その品目を発注し直す。
 
-let orderCxl = null;   // {no, rows:[{i,name,qty,unit,state:''|'cancelled'|'delivered', sel}]}
+let orderCxl = null;   // {no, rows:[{i,name,qty,unit,by,sel}]}
 
 // ── 読み出し ──
 
@@ -26,6 +31,15 @@ function orderCancelState(o){
   const c = orderCancelCount(o);
   if(!c.cancelled) return '';
   return c.cancelled >= c.all ? 'all' : 'part';
+}
+// 業者さんが「キャンセル品」に指定して、確認を待っている品目
+function orderCancelPending(o){
+  return (o?.items||[]).map((it,i)=>({it,i}))
+    .filter(x=>!x.it.isShipping && !orderItemCancelled(o, x.i) && orderCancelRequested(o, x.i));
+}
+// 確認待ちが1つでもある発注の数（管理者に知らせるのに使う）
+function orderCancelPendingTotal(){
+  return (orders||[]).filter(o=>orderCancelPending(o).length).length;
 }
 // いまも生きている品目。まるごとキャンセルなら、送料の行も数えない
 function orderLiveItems(o){
@@ -42,10 +56,11 @@ function orderLiveTotal(o){
 // 一覧に出す札
 function orderCancelBadge(o){
   const st = orderCancelState(o);
-  if(!st) return '';
   const c = orderCancelCount(o);
-  return st==='all' ? '<span class="badge cancelled">キャンセル</span>'
-                    : `<span class="badge cancelled">一部キャンセル ${c.cancelled}/${c.all}</span>`;
+  const wait = orderCancelPending(o).length;
+  return (st==='all' ? '<span class="badge cancelled">キャンセル</span>'
+        : st==='part' ? `<span class="badge cancelled">一部キャンセル ${c.cancelled}/${c.all}</span>` : '')
+       + (wait ? `<span class="badge cancel-wait">キャンセル品の確認待ち ${wait}</span>` : '');
 }
 // 合計の書き方。キャンセルがあれば、もとの合計に線を引いて添える
 function orderTotalHtml(o){
@@ -53,20 +68,19 @@ function orderTotalHtml(o){
   return `<span class="ope-old">¥${fmt(o.total)}</span> ¥${fmt(orderLiveTotal(o))}`;
 }
 
-// ── 開く ──
+// ── 開く（業者さんが指定したキャンセル品を確認する） ──
 
 function openOrderCancel(orderNo){
   const o = (orders||[]).find(x=>x.no===orderNo);
   if(!o){ showToast('発注が見つかりません。画面を更新してからお試しください'); return; }
-  if(currentUserRole!=='staff'){ showToast('キャンセルできるのは、きよかわの管理者だけです'); return; }
-  const rows = (o.items||[]).map((it,i)=>({it,i})).filter(x=>!x.it.isShipping).map(({it,i})=>({
-    i, name: it.name||'', qty: it.qty, unit: it.unit||'',
-    state: orderItemCancelled(o, i) ? 'cancelled'
-         : (typeof orderDeliveredOf==='function' && orderDeliveredOf(o, i)) ? 'delivered' : '',
-    sel: false }));
+  if(currentUserRole!=='staff'){ showToast('キャンセル品を確認できるのは、きよかわの管理者だけです'); return; }
+  const rows = orderCancelPending(o).map(({it,i})=>{
+    const req = orderCancelRequestOf(o, i);
+    return { i, name: it.name||'', qty: it.qty, unit: it.unit||'', by: req?.by||'', at: req?.at||'', sel: true };
+  });
+  if(!rows.length){ showToast('確認を待っているキャンセル品はありません'); if(typeof renderOrders==='function') renderOrders(); return; }
   orderCxl = { no: orderNo, rows };
   document.getElementById('ordcxl-sub').textContent = `${o.no}　${o.project||''}　${o.suppliers||''}`;
-  document.getElementById('ordcxl-reason').value = '';
   orderCxlRender();
   document.getElementById('ordcxl-modal').classList.add('open');
 }
@@ -77,62 +91,67 @@ function closeOrderCancel(){
 
 function orderCxlRender(){
   const st = orderCxl; if(!st) return;
-  document.getElementById('ordcxl-list').innerHTML = st.rows.map((r,k)=>{
-    const off = !!r.state;
-    return `<div class="orv-row${r.sel?' sel':''}${r.state==='cancelled'?' cxl':''}">
-      <input type="checkbox" class="orv-ck" ${r.sel?'checked':''} ${off?'disabled':''}
-        onchange="orderCxlSelect(${k}, this.checked)" aria-label="この品目をキャンセルする">
-      <div class="orv-main" ${off?'':`onclick="orderCxlSelect(${k})"`}>
+  document.getElementById('ordcxl-list').innerHTML = st.rows.map((r,k)=>`
+    <div class="orv-row${r.sel?' sel':''}">
+      <input type="checkbox" class="orv-ck" ${r.sel?'checked':''}
+        onchange="orderCxlSelect(${k}, this.checked)" aria-label="この品目を選ぶ">
+      <div class="orv-main" onclick="orderCxlSelect(${k})">
         <div class="orv-name">${esc(r.name)}</div>
-        <div class="orv-meta">${esc(String(r.qty??''))}${esc(r.unit)}${
-          r.state==='cancelled' ? '<span class="orv-late">キャンセル済み</span>'
-          : r.state==='delivered' ? '<span class="orv-late">納品済み（キャンセルできません）</span>' : ''}</div>
+        <div class="orv-meta">${esc(String(r.qty??''))}${esc(r.unit)}${r.by?`　指定：${esc(r.by)}`:''}${
+          r.at?`（${esc(String(r.at).slice(5,10).replace('-','/'))}）`:''}</div>
       </div>
-    </div>`;
-  }).join('') || '<div class="empty" style="padding:18px">キャンセルできる品目がありません</div>';
-
-  const can  = st.rows.filter(r=>!r.state);
-  const nSel = can.filter(r=>r.sel).length;
+    </div>`).join('');
+  const nSel = st.rows.filter(r=>r.sel).length;
   const all = document.getElementById('ordcxl-all');
-  all.checked = can.length>0 && nSel===can.length;
-  all.indeterminate = nSel>0 && nSel<can.length;
-  all.disabled = !can.length;
-  // 残っている品目をぜんぶ選んだら、発注まるごとのキャンセルになる
-  const whole = nSel>0 && nSel===can.length && !st.rows.some(r=>r.state==='delivered');
-  document.getElementById('ordcxl-note').textContent =
-    !nSel ? 'キャンセルする品目を選んでください'
-    : whole ? 'この発注は、すべてキャンセルになります（送料もなくなります）'
-    : `${nSel}品目をキャンセルします。残りの品目は、そのまま発注が続きます`;
-  const btn = document.getElementById('ordcxl-save');
-  btn.disabled = !nSel;
-  btn.textContent = nSel ? `キャンセルする（${nSel}品目）` : 'キャンセルする';
+  all.checked = nSel===st.rows.length;
+  all.indeterminate = nSel>0 && nSel<st.rows.length;
+  document.getElementById('ordcxl-note').textContent = nSel
+    ? `${nSel}品目を選んでいます。承認するとキャンセルになり、原価管理からも金額が消えます`
+    : '品目を選んでください';
+  document.getElementById('ordcxl-save').disabled = !nSel;
+  document.getElementById('ordcxl-reject').disabled = !nSel;
+  document.getElementById('ordcxl-save').textContent = nSel ? `承認する（${nSel}品目をキャンセル）` : '承認する';
 }
 function orderCxlSelect(k, on){
-  const r = orderCxl?.rows[k]; if(!r || r.state) return;
+  const r = orderCxl?.rows[k]; if(!r) return;
   r.sel = (on===undefined) ? !r.sel : !!on;
   orderCxlRender();
 }
 function orderCxlSelectAll(on){
   if(!orderCxl) return;
-  orderCxl.rows.forEach(r=>{ if(!r.state) r.sel = !!on; });
+  orderCxl.rows.forEach(r=>{ r.sel = !!on; });
   orderCxlRender();
 }
 
-// ── 保存 ──
+function orderCxlNotReady(error){
+  const code = String(error?.code||''), msg = String(error?.message||'');
+  return code==='PGRST202' || code==='42883'
+    || /app_cancel_order_items|app_withdraw_cancel|app_request_cancel|cancelled_items|cancel_requests/.test(msg) && /find|exist|schema cache/i.test(msg);
+}
+function orderCxlFail(error, what){
+  showToast(orderCxlNotReady(error)
+    ? 'データベースの準備が必要です。supabase/migration-genba96.sql を実行してください'
+    : `${what}：${error?.message||'通信できませんでした'}`, 7000);
+}
+function orderCxlButtons(off){
+  ['ordcxl-save','ordcxl-reject'].forEach(id=>{ const b=document.getElementById(id); if(b) b.disabled = off; });
+}
+
+// ── 承認する（キャンセルにする） ──
 
 async function saveOrderCancel(){
   const st = orderCxl; if(!st) return;
   const o = (orders||[]).find(x=>x.no===st.no);
   if(!o){ closeOrderCancel(); return; }
-  const picked = st.rows.filter(r=>r.sel && !r.state);
-  if(!picked.length){ showToast('キャンセルする品目を選んでください'); return; }
-  const reason = document.getElementById('ordcxl-reason').value.trim();
-  const left = st.rows.filter(r=>!r.state && !r.sel).length + st.rows.filter(r=>r.state==='delivered').length;
+  const picked = st.rows.filter(r=>r.sel);
+  if(!picked.length){ showToast('品目を選んでください'); return; }
+  // 承認すると、生きている品目がひとつも残らないか（＝発注まるごとのキャンセル）
+  const left = orderDeliverableItems(o).filter(x=>!picked.some(r=>r.i===x.i)).length;
   const whole = left===0;
-  if(!confirm(`${o.suppliers||''} への発注 ${o.no} の、次の品目をキャンセルします。\n\n`
+  if(!confirm(`${o.suppliers||''} への発注 ${o.no} の、次の品目をキャンセルにします。\n\n`
     + picked.map(r=>`・${r.name} × ${r.qty??''}${r.unit}`).join('\n')
-    + `\n\n${whole?'この発注は、すべてキャンセルになります。':'残りの品目は、そのまま発注が続きます。'}`
-    + `\n業者さんのチャットに伝わり、原価管理からも金額が消えます。元には戻せません。よろしいですか？`)) return;
+    + `\n\n${whole?'この発注は、すべてキャンセルになります（送料もなくなります）。':'残りの品目は、そのまま発注が続きます。'}`
+    + `\n原価管理からも金額が消えます。元には戻せません。よろしいですか？`)) return;
 
   // まるごとキャンセルのときは、送料の行もいっしょにキャンセルする（原価からも消すため）
   const items = picked.map(r=>({ i:r.i, name:r.name }));
@@ -140,21 +159,12 @@ async function saveOrderCancel(){
     (o.items||[]).forEach((it,i)=>{ if(it.isShipping && !orderItemCancelled(o, i)) items.push({ i, name: it.name||'' }); });
   }
 
-  const btn = document.getElementById('ordcxl-save');
-  btn.disabled = true;
-  const { data, error } = await sb.rpc('app_cancel_order_items',
-    { p_order_id: o.id, p_items: items, p_reason: reason });
-  if(error){
-    btn.disabled = false;
-    const code = String(error.code||''), msg = String(error.message||'');
-    showToast((code==='PGRST202' || code==='42883' || /app_cancel_order_items|cancelled_items/.test(msg) && /find|exist|schema cache/i.test(msg))
-      ? 'データベースの準備が必要です。supabase/migration-genba96.sql を実行してください'
-      : 'キャンセルできませんでした：'+msg, 7000);
-    return;
-  }
+  orderCxlButtons(true);
+  const { data, error } = await sb.rpc('app_cancel_order_items', { p_order_id: o.id, p_items: items, p_reason: '' });
+  if(error){ orderCxlButtons(false); orderCxlFail(error, '承認できませんでした'); return; }
   if(Array.isArray(data?.cancelled_items)) o.cancelledItems = data.cancelled_items;
   const changed = Array.isArray(data?.changed) ? data.changed : [];
-  // 今回あらたにキャンセルになった品目だけを知らせる（ほかの人が先にキャンセルしていた分は入れない）
+  // 今回あらたにキャンセルになった品目だけを知らせる（ほかの人が先に承認していた分は入れない）
   const told = picked.filter(r=>changed.some(c=>Number(c.i)===r.i));
   closeOrderCancel();
   // 原価は消えているので、取り直して画面に反映する
@@ -163,16 +173,51 @@ async function saveOrderCancel(){
   if(!told.length){ showToast('選んだ品目は、もうキャンセルになっていました'); return; }
 
   const now = (orders||[]).find(x=>x.no===o.no) || o;
-  const lines = [`【キャンセル】発注書 ${o.no}（${o.project||''}）`,
-    '次の品目をキャンセルします。',
+  const lines = [`【キャンセル確定】発注書 ${o.no}（${o.project||''}）`,
+    'キャンセル品のご指定を確認しました。次の品目はキャンセルです。',
     ...told.map(r=>`・${r.name} × ${r.qty??''}${r.unit}`)];
-  if(reason) lines.push(`理由：${reason}`);
   lines.push(orderCancelState(now)==='all'
     ? 'この発注は、すべてキャンセルです。'
     : `残り ${orderDeliverableItems(now).length}品目は、そのままお願いします。`);
   let sent = true;
   try{ await dbAddChatMessage(o.suppliers, { role:'me', type:'text', text: lines.join('\n') }); }
   catch(_){ sent = false; }
-  showToast(sent ? `${told.length}品目をキャンセルしました。業者さんに伝わります`
-                 : `${told.length}品目をキャンセルしましたが、チャットに送れませんでした。業者さんへ直接お伝えください`, sent?3000:8000);
+  showToast(sent ? `${told.length}品目をキャンセルにしました。業者さんに伝わります`
+                 : `${told.length}品目をキャンセルにしましたが、チャットに送れませんでした`, sent?3000:8000);
+}
+
+// ── 差し戻す（キャンセルではない。納品してもらう） ──
+
+async function rejectOrderCancel(){
+  const st = orderCxl; if(!st) return;
+  const o = (orders||[]).find(x=>x.no===st.no);
+  if(!o){ closeOrderCancel(); return; }
+  const picked = st.rows.filter(r=>r.sel);
+  if(!picked.length){ showToast('品目を選んでください'); return; }
+  if(!confirm(`次の品目は、キャンセルにしません（業者さんの指定を差し戻します）。\n\n`
+    + picked.map(r=>`・${r.name} × ${r.qty??''}${r.unit}`).join('\n')
+    + `\n\n業者さんのチャットに伝わります。よろしいですか？`)) return;
+
+  orderCxlButtons(true);
+  const told = [];
+  let failed = null;
+  for(const r of picked){
+    const { data, error } = await sb.rpc('app_withdraw_cancel', { p_order_id: o.id, p_i: r.i, p_name: r.name });
+    if(error){ failed = error; break; }
+    if(Array.isArray(data?.cancel_requests)) o.cancelRequests = data.cancel_requests;
+    if(data?.changed) told.push(r);
+  }
+  closeOrderCancel();
+  if(typeof orderRecvRefresh==='function') orderRecvRefresh();
+  if(failed) orderCxlFail(failed, '差し戻せませんでした');
+  if(!told.length) return;
+  let sent = true;
+  try{
+    await dbAddChatMessage(o.suppliers, { role:'me', type:'text', text:
+      [`【キャンセル品の差し戻し】発注書 ${o.no}（${o.project||''}）`,
+       '次の品目は、キャンセルではありません。そのまま納品をお願いします。',
+       ...told.map(r=>`・${r.name} × ${r.qty??''}${r.unit}`)].join('\n') });
+  }catch(_){ sent = false; }
+  showToast(sent ? `${told.length}品目を差し戻しました。業者さんに伝わります`
+                 : `${told.length}品目を差し戻しましたが、チャットに送れませんでした`, sent?3000:8000);
 }

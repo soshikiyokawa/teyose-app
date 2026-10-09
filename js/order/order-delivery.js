@@ -7,7 +7,9 @@
 //   ・「納品予定日」（受領のときに入れる日。js/order/order-receive.js）とは別に、
 //     実際に納めた日を持つ（orders.delivered_dates。migration-genba96.sql）
 //   ・記録はデータベースの手続きで行う。2台から同時に押しても、片方が消えない
-//   ・受領がまだの発注は並べるが、選べない（先に受領してもらう）
+//   ・受領がまだの発注も並べる。納品完了にはできない（先に受領してもらう）
+//   ・きよかわからキャンセルの連絡があった品目は、選んで「キャンセル品にする」を押す。
+//     きよかわが確認（承認）すると、キャンセルになって、ここから消える（js/order/order-cancel.js）
 //   ・送料の行と、レシートから取り込んだ発注（もう手元にある）は並べない
 //
 // この機能を入れる前の発注まで「未納」に並ぶと探しにくいので、
@@ -52,7 +54,7 @@ function delivRows(){
     if(!o || o.paymentMethod) return;                   // レシートから取り込んだ発注
     orderDeliverableItems(o).forEach(({it,i})=>{
       out.push({ key:delivKey(o,i), o, i, it,
-        plan: orderPlanDateOf(o, i), done: orderDeliveredOf(o, i) });
+        plan: orderPlanDateOf(o, i), done: orderDeliveredOf(o, i), req: orderCancelRequested(o, i) });
     });
   });
   return out;
@@ -71,8 +73,10 @@ function delivDoneRows(){
       || String(b.done.at||'').localeCompare(String(a.done.at||''))
       || String(a.o.no||'').localeCompare(String(b.o.no||'')) || a.i-b.i);
 }
-// 選べる品目か（受領済みの発注だけ）
-function delivCanPick(r){ return r.o.status==='received'; }
+// 選べる品目か（キャンセル品に指定して確認待ちのものは、選べない）
+function delivCanPick(r){ return !r.req; }
+// 納品完了にできる品目か（受領済みの発注だけ）
+function delivCanDeliver(r){ return !r.req && r.o.status==='received'; }
 
 // ── 描く ──
 
@@ -117,9 +121,11 @@ function renderDeliveryPage(){
 
   list.innerHTML = todo.length ? todo.map(r=>{
     const can = delivCanPick(r);
+    const recv = r.o.status==='received';
     const sel = delivState.sel.has(r.key);
     const late = !!(r.plan && r.plan < today);
-    const plan = !can ? '<span class="dlv-plan wait">受領がまだです</span>'
+    const plan = r.req ? '<span class="dlv-plan cxl">キャンセル品に指定済み（きよかわの確認待ち）</span>'
+      : !recv ? '<span class="dlv-plan wait">受領がまだです</span>'
       : r.plan ? `<span class="dlv-plan${late?' late':''}">納品予定 ${orderMd(r.plan)}${late?'（過ぎています）':r.plan===today?'（今日）':''}</span>`
       : '<span class="dlv-plan wait">納品予定日が入っていません</span>';
     return `<div class="dlv-row${sel?' sel':''}${can?'':' off'}">
@@ -130,7 +136,8 @@ function renderDeliveryPage(){
         <div class="dlv-meta">${esc(String(r.it.qty??''))}${esc(r.it.unit||'')}　${esc(r.o.project||'')}　${esc(r.o.no||'')}</div>
         <div>${plan}</div>
       </div>
-      ${can ? '' : `<button type="button" class="btn xs primary" onclick="openOrderReceive('${esc(r.o.no)}','receive')">受領する</button>`}
+      ${r.req ? `<button type="button" class="btn xs" onclick="delivWithdrawCancel('${esc(r.key)}')">指定を取り消す</button>`
+        : recv ? '' : `<button type="button" class="btn xs primary" onclick="openOrderReceive('${esc(r.o.no)}','receive')">受領する</button>`}
     </div>`;
   }).join('') : '<div class="empty">これから納める品目はありません</div>';
 
@@ -146,6 +153,8 @@ function renderDeliveryPage(){
   const btn = document.getElementById('deliv-save');
   btn.textContent = nSel ? `納品完了（${nSel}品目）` : '納品完了';
   btn.disabled = !nSel || delivState.busy;
+  const cxl = document.getElementById('deliv-cxl');
+  if(cxl) cxl.disabled = !nSel || delivState.busy;
 }
 
 // ── 選ぶ ──
@@ -168,7 +177,7 @@ function delivSetOn(ymd){
 // データベースの準備（migration-genba96.sql）がまだのときの案内
 function delivNotReady(error){
   const code = String(error?.code||''), msg = String(error?.message||'');
-  return code==='PGRST202' || code==='42883' || /app_(un)?mark_delivered|delivered_dates/.test(msg) && /find|exist|schema cache/i.test(msg);
+  return code==='PGRST202' || code==='42883' || /app_(un)?mark_delivered|app_request_cancel|app_withdraw_cancel|delivered_dates|cancel_requests/.test(msg) && /find|exist|schema cache/i.test(msg);
 }
 function delivFail(error, what){
   showToast(delivNotReady(error)
@@ -183,6 +192,8 @@ async function saveDelivery(){
   if(on > delivToday()){ showToast('納品日に、先の日付は入れられません'); return; }
   const picked = delivTodoRows().filter(r=>delivCanPick(r) && delivState.sel.has(r.key));
   if(!picked.length){ showToast('納品が済んだ品目を選んでください'); return; }
+  const wait = picked.find(r=>!delivCanDeliver(r));
+  if(wait){ showToast(`「${wait.it.name}」は、発注書の受領がまだです。先に「受領する」から受領してください`, 6000); return; }
   const early = picked.find(r=>r.o.date && on < r.o.date);
   if(early){ showToast(`「${early.it.name}」は、納品日が発注日（${orderMd(early.o.date)}）より前になっています`, 6000); return; }
 
@@ -219,6 +230,92 @@ async function saveDelivery(){
   const sent = await delivNotify(saved, on, false);
   showToast(sent ? `${saved.length}品目を納品済みにしました。きよかわに伝わります`
                  : `${saved.length}品目を納品済みにしましたが、チャットに送れませんでした。お手数ですが、チャットでお知らせください`, sent?3000:8000);
+}
+
+// ── キャンセル品にする ──
+//
+// きよかわから電話などでキャンセルの連絡があった品目を、業者さんが指定する。
+// これだけではキャンセルにならず、きよかわが確認（承認）して、はじめてキャンセルになる
+
+async function requestCancelItems(){
+  if(delivState.busy) return;
+  const picked = delivTodoRows().filter(r=>delivCanPick(r) && delivState.sel.has(r.key));
+  if(!picked.length){ showToast('キャンセル品にする品目を選んでください'); return; }
+  if(!confirm(`次の${picked.length}品目を「キャンセル品」として、きよかわに知らせます。\n\n`
+    + picked.slice(0,12).map(r=>`・${r.it.name} × ${r.it.qty??''}${r.it.unit||''}`).join('\n')
+    + (picked.length>12 ? `\nほか ${picked.length-12}品目` : '')
+    + `\n\nきよかわが確認すると、キャンセルになります。よろしいですか？`)) return;
+
+  const byOrder = new Map();
+  picked.forEach(r=>{ if(!byOrder.has(r.o.id)) byOrder.set(r.o.id, {o:r.o, rows:[]}); byOrder.get(r.o.id).rows.push(r); });
+  delivState.busy = true;
+  renderDeliveryPage();
+  const saved = [];
+  let failed = null;
+  for(const {o, rows} of byOrder.values()){
+    const { data, error } = await sb.rpc('app_request_cancel',
+      { p_order_id:o.id, p_items:rows.map(r=>({i:r.i, name:r.it.name||''})) });
+    if(error){ failed = error; break; }
+    if(Array.isArray(data?.cancel_requests)) o.cancelRequests = data.cancel_requests;
+    const changed = Array.isArray(data?.changed) ? data.changed : [];
+    rows.forEach(r=>{
+      delivState.sel.delete(r.key);
+      if(changed.some(c=>Number(c.i)===r.i)) saved.push(r);
+    });
+  }
+  delivState.busy = false;
+  renderDeliveryPage();
+  delivRefreshOthers();
+  if(failed) delivFail(failed, 'キャンセル品に指定できませんでした');
+  if(!saved.length){
+    if(!failed) showToast('選んだ品目は、もうキャンセル品に指定されていました');
+    return;
+  }
+  const sent = await delivNotifyCancel(saved, 'request');
+  showToast(sent ? `${saved.length}品目をキャンセル品に指定しました。きよかわの確認をお待ちください`
+                 : `${saved.length}品目をキャンセル品に指定しましたが、チャットに送れませんでした。お手数ですが、チャットでお知らせください`, sent?4000:8000);
+}
+
+// 指定を取り消す（押しまちがい用）。きよかわが確認する前なら、いつでも戻せる
+async function delivWithdrawCancel(key){
+  const r = delivTodoRows().find(x=>x.key===key);
+  if(!r || !r.req || delivState.busy) return;
+  if(!confirm(`「${r.it.name}」の、キャンセル品の指定を取り消しますか？`)) return;
+  delivState.busy = true;
+  const { data, error } = await sb.rpc('app_withdraw_cancel',
+    { p_order_id:r.o.id, p_i:r.i, p_name:r.it.name||'' });
+  delivState.busy = false;
+  if(error){ delivFail(error, '取り消せませんでした'); return; }
+  if(Array.isArray(data?.cancel_requests)) r.o.cancelRequests = data.cancel_requests;
+  renderDeliveryPage();
+  delivRefreshOthers();
+  if(!data?.changed){ showToast('もう取り消されていました'); return; }
+  const sent = await delivNotifyCancel([r], 'withdraw');
+  showToast(sent ? 'キャンセル品の指定を取り消しました' : '取り消しましたが、チャットに送れませんでした', sent?3000:7000);
+}
+
+// キャンセル品の指定・取り消しを、チャットに知らせる
+async function delivNotifyCancel(rows, kind){
+  const bySup = new Map();
+  rows.forEach(r=>{ const n=r.o.suppliers; if(!n) return; if(!bySup.has(n)) bySup.set(n, []); bySup.get(n).push(r); });
+  if(!bySup.size) return false;
+  let ok = true;
+  for(const [name, rs] of bySup){
+    const byOrder = new Map();
+    rs.forEach(r=>{ if(!byOrder.has(r.o.id)) byOrder.set(r.o.id, {o:r.o, rows:[]}); byOrder.get(r.o.id).rows.push(r); });
+    const lines = [kind==='request'
+      ? 'キャンセル品として指定しました。ご確認をお願いします。'
+      : 'キャンセル品の指定を取り消しました（キャンセルではありません）。'];
+    for(const {o, rows:list} of byOrder.values()){
+      lines.push(`■ ${o.project||'（案件名なし）'}（${o.no||''}）`);
+      list.slice(0,30).forEach(r=>lines.push(`・${r.it.name||''} × ${r.it.qty??''}${r.it.unit||''}`));
+      if(list.length>30) lines.push(`ほか ${list.length-30}品目`);
+    }
+    try{
+      await dbAddChatMessage(name, { role: currentUserRole==='supplier' ? 'them' : 'me', type:'text', text: lines.join('\n') });
+    }catch(_){ ok = false; }
+  }
+  return ok;
 }
 
 // ── 取り消し ──

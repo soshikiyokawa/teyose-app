@@ -19,6 +19,13 @@ let orderRecv = null;   // {no, mode:'receive'|'change', rows:[{i,name,qty,unit,
 function orderDeliverableItems(o){
   return (o?.items||[]).map((it,i)=>({it,i})).filter(x=>!x.it.isShipping && !orderItemCancelled(o, x.i));
 }
+// その品目は、業者さんが「キャンセル品」に指定して、きよかわの確認を待っているか
+function orderCancelRequestOf(o, i){
+  const name = o?.items?.[i]?.name;
+  return (Array.isArray(o?.cancelRequests) ? o.cancelRequests : [])
+    .find(c=>c && Number(c.i)===i && (c.name||'')===(name||'')) || null;
+}
+function orderCancelRequested(o, i){ return !!orderCancelRequestOf(o, i); }
 // その品目は、発注のあとでキャンセルになったか（js/order/order-cancel.js）
 function orderItemCancelled(o, i){
   const name = o?.items?.[i]?.name;

@@ -21,6 +21,14 @@ alter table public.orders add column if not exists delivered_dates jsonb not nul
 --   [{ "i":0, "name":"品目名", "reason":"理由", "by":"記録した人", "by_id":"<アカウント>", "at":"<時刻>" }, …]
 alter table public.orders add column if not exists cancelled_items jsonb not null default '[]'::jsonb;
 
+-- 業者さんが「キャンセル品」に指定して、きよかわの確認（承認）を待っている品目
+--   [{ "i":0, "name":"品目名", "by":"指定した人", "by_id":"<アカウント>", "at":"<時刻>" }, …]
+-- きよかわが承認すると cancelled_items に移り、差し戻すとここから消える
+alter table public.orders add column if not exists cancel_requests jsonb not null default '[]'::jsonb;
+
+comment on column public.orders.cancel_requests is
+  '業者がキャンセル品に指定し、きよかわの確認を待っている品目。[{i, name, by, by_id, at}]';
+
 comment on column public.orders.cancelled_items is
   '発注後にキャンセルした品目。[{i:品目の並び順, name:品目名, reason, by, by_id, at}]。items は消さずに残す';
 
@@ -41,10 +49,16 @@ begin
      and coalesce(current_setting('app.delivered_rpc', true), '') <> '1' then
     raise exception '納品の記録は、納品タブから行ってください';
   end if;
-  -- キャンセルは、きよかわだけ
+  -- キャンセルの確定は、きよかわだけ
   if app_user_role() = 'supplier'
      and new.cancelled_items is distinct from old.cancelled_items then
-    raise exception 'キャンセルの記録は、きよかわが行います';
+    raise exception 'キャンセルの確定は、きよかわが行います';
+  end if;
+  -- 「キャンセル品」の指定も、手続きからだけ
+  if app_user_role() = 'supplier'
+     and new.cancel_requests is distinct from old.cancel_requests
+     and coalesce(current_setting('app.delivered_rpc', true), '') <> '1' then
+    raise exception 'キャンセル品の指定は、納品タブから行ってください';
   end if;
   return new;
 end
@@ -122,6 +136,12 @@ begin
                 where c->>'i' = idx::text) then
       raise exception '「%」はキャンセルになっています。画面を更新してください', nm;
     end if;
+    -- 「キャンセル品」に指定してあるあいだは、納品済みにできない
+    if exists (select 1 from jsonb_array_elements(
+                 case when jsonb_typeof(o.cancel_requests) = 'array' then o.cancel_requests else '[]'::jsonb end) c
+                where c->>'i' = idx::text) then
+      raise exception '「%」はキャンセル品に指定されています。納品するときは、先に指定を取り消してください', nm;
+    end if;
     -- もう記録してあるものは飛ばす
     if exists (select 1 from jsonb_array_elements(cur) d
                 where d->>'i' = idx::text and coalesce(d->>'name', '') = nm) then
@@ -188,7 +208,126 @@ begin
 end
 $$;
 
--- ── 発注の品目をキャンセルする（きよかわの管理者だけ） ──
+-- ── 業者さんが、品目を「キャンセル品」に指定する ──
+-- きよかわから電話などでキャンセルの連絡を受けた品目を、業者さんが納品タブで指定する。
+-- これだけではキャンセルにならない。きよかわが確認（承認）して、はじめてキャンセルになる
+--   p_items … [{ "i":0, "name":"品目名" }, …]
+-- 返すもの … { cancel_requests:いまの全体, changed:今回あらたに指定した品目 }
+create or replace function public.app_request_cancel(p_order_id bigint, p_items jsonb)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  o       public.orders%rowtype;
+  my_role text := app_user_role();
+  who     text;
+  cur     jsonb;
+  list    jsonb;
+  it      jsonb;
+  src     jsonb;
+  idx     int;
+  nm      text;
+  done    jsonb := '[]'::jsonb;
+begin
+  if my_role is null or my_role not in ('supplier', 'staff') then
+    raise exception 'キャンセル品を指定する権限がありません';
+  end if;
+
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception '発注が見つかりません。画面を更新してからお試しください';
+  end if;
+
+  select display_name into who from public.profiles where id = auth.uid();
+  cur  := case when jsonb_typeof(o.cancel_requests) = 'array' then o.cancel_requests else '[]'::jsonb end;
+  list := case when jsonb_typeof(p_items) = 'array' then p_items else '[]'::jsonb end;
+
+  for it in select value from jsonb_array_elements(list) loop
+    idx := (it->>'i')::int;
+    nm  := coalesce(it->>'name', '');
+    src := case when jsonb_typeof(o.items) = 'array' then o.items -> idx else null end;
+    if idx is null or idx < 0
+       or src is null
+       or coalesce(src->>'name', '') <> nm
+       or coalesce(src->>'isShipping', 'false') = 'true' then
+      raise exception '品目が見つかりません（%）。画面を更新してからお試しください', nm;
+    end if;
+    -- もう指定してある・もうキャンセルになっているものは飛ばす
+    if exists (select 1 from jsonb_array_elements(cur) c where c->>'i' = idx::text)
+       or exists (select 1 from jsonb_array_elements(
+                    case when jsonb_typeof(o.cancelled_items) = 'array' then o.cancelled_items else '[]'::jsonb end) c
+                   where c->>'i' = idx::text) then
+      continue;
+    end if;
+    if exists (select 1 from jsonb_array_elements(
+                 case when jsonb_typeof(o.delivered_dates) = 'array' then o.delivered_dates else '[]'::jsonb end) d
+                where d->>'i' = idx::text) then
+      raise exception '「%」は納品済みになっています。キャンセル品にするには、先に納品完了を取り消してください', nm;
+    end if;
+    cur := cur || jsonb_build_array(jsonb_build_object(
+      'i', idx, 'name', nm, 'by', coalesce(who, ''), 'by_id', auth.uid(), 'at', now()));
+    done := done || jsonb_build_array(jsonb_build_object('i', idx, 'name', nm));
+  end loop;
+
+  if jsonb_array_length(done) > 0 then
+    perform set_config('app.delivered_rpc', '1', true);
+    update public.orders set cancel_requests = cur where id = p_order_id;
+    perform set_config('app.delivered_rpc', '', true);
+  end if;
+
+  return jsonb_build_object('cancel_requests', cur, 'changed', done);
+end
+$$;
+
+-- ── 「キャンセル品」の指定を外す ──
+-- 業者さんが押しまちがいを取り消すとき、または、きよかわが差し戻すとき
+-- 返すもの … { cancel_requests:いまの全体, changed:外したかどうか }
+create or replace function public.app_withdraw_cancel(p_order_id bigint, p_i int, p_name text)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  o       public.orders%rowtype;
+  my_role text := app_user_role();
+  cur     jsonb;
+  nxt     jsonb;
+begin
+  if my_role is null or my_role not in ('supplier', 'staff') then
+    raise exception 'キャンセル品の指定を変える権限がありません';
+  end if;
+
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception '発注が見つかりません。画面を更新してからお試しください';
+  end if;
+
+  cur := case when jsonb_typeof(o.cancel_requests) = 'array' then o.cancel_requests else '[]'::jsonb end;
+  select coalesce(jsonb_agg(t.r order by t.ord), '[]'::jsonb) into nxt
+    from jsonb_array_elements(cur) with ordinality as t(r, ord)
+   where not (t.r->>'i' = p_i::text and coalesce(t.r->>'name', '') = coalesce(p_name, ''));
+
+  if jsonb_array_length(nxt) = jsonb_array_length(cur) then
+    return jsonb_build_object('cancel_requests', cur, 'changed', false);
+  end if;
+
+  perform set_config('app.delivered_rpc', '1', true);
+  update public.orders set cancel_requests = nxt where id = p_order_id;
+  perform set_config('app.delivered_rpc', '', true);
+
+  return jsonb_build_object('cancel_requests', nxt, 'changed', true);
+end
+$$;
+
+revoke all on function public.app_request_cancel(bigint, jsonb) from public, anon;
+revoke all on function public.app_withdraw_cancel(bigint, int, text) from public, anon;
+grant execute on function public.app_request_cancel(bigint, jsonb) to authenticated;
+grant execute on function public.app_withdraw_cancel(bigint, int, text) to authenticated;
+
+-- ── きよかわが承認して、品目をキャンセルにする（管理者だけ） ──
 --   p_items  … [{ "i":0, "name":"品目名" }, …]（まるごとキャンセルのときは、送料の行も入れて呼ぶ）
 --   p_reason … 理由（空でもよい）
 -- 返すもの … { cancelled_items:いまの全体, changed:今回あらたにキャンセルした品目 }
@@ -259,7 +398,16 @@ begin
   end loop;
 
   if jsonb_array_length(done) > 0 then
-    update public.orders set cancelled_items = cur where id = p_order_id;
+    -- キャンセルになった品目は、確認待ち（cancel_requests）からも外す
+    update public.orders
+       set cancelled_items = cur,
+           cancel_requests = (
+             select coalesce(jsonb_agg(t.r order by t.ord), '[]'::jsonb)
+               from jsonb_array_elements(
+                      case when jsonb_typeof(o.cancel_requests) = 'array' then o.cancel_requests else '[]'::jsonb end)
+                    with ordinality as t(r, ord)
+              where not exists (select 1 from jsonb_array_elements(cur) c where c->>'i' = t.r->>'i'))
+     where id = p_order_id;
   end if;
 
   return jsonb_build_object('cancelled_items', cur, 'changed', done);
@@ -333,7 +481,13 @@ select 'キャンセルの列（cancelled_items）',
                           where table_schema = 'public' and table_name = 'orders' and column_name = 'cancelled_items')
             then 'ある' else '無い' end
 union all
-select 'キャンセルする手続き（app_cancel_order_items）',
+select 'キャンセル品に指定する手続き（app_request_cancel）',
+       case when to_regprocedure('public.app_request_cancel(bigint, jsonb)') is not null then 'ある' else '無い' end
+union all
+select '指定を外す手続き（app_withdraw_cancel）',
+       case when to_regprocedure('public.app_withdraw_cancel(bigint, int, text)') is not null then 'ある' else '無い' end
+union all
+select '承認してキャンセルにする手続き（app_cancel_order_items）',
        case when to_regprocedure('public.app_cancel_order_items(bigint, jsonb, text)') is not null then 'ある' else '無い' end
 union all
 select '業者が直接書けない見張り',

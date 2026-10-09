@@ -234,7 +234,9 @@ function orderRowTo(r){
     // 業者さんが「納品完了」にした品目（migration-genba96.sql）
     deliveredDates:Array.isArray(r.delivered_dates)?r.delivered_dates:[],
     // 発注したあとでキャンセルした品目（同じく migration-genba96.sql）
-    cancelledItems:Array.isArray(r.cancelled_items)?r.cancelled_items:[]};
+    cancelledItems:Array.isArray(r.cancelled_items)?r.cancelled_items:[],
+    // 業者さんが「キャンセル品」に指定して、きよかわの確認を待っているもの
+    cancelRequests:Array.isArray(r.cancel_requests)?r.cancel_requests:[]};
 }
 
 // ── 見積の明細は、その案件を開いたときに読む ──

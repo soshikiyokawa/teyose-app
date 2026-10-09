@@ -21,7 +21,7 @@ function renderOrders(){
         ${orderCancelState(o)==='all' ? '' : o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`
           : (o.paymentMethod ? '' : `<button class="btn sm" onclick="openOrderReceive('${esc(o.no)}','change')">納品予定日</button>`)}
         <button class="btn sm" onclick="openOrderPriceEdit('${esc(o.no)}')">単価・送料を直す</button>
-        ${(o.paymentMethod || orderCancelState(o)==='all') ? '' : `<button class="btn sm" onclick="openOrderCancel('${esc(o.no)}')">キャンセル</button>`}
+        ${orderCancelPending(o).length ? `<button class="btn sm danger" onclick="openOrderCancel('${esc(o.no)}')">キャンセル品を確認（${orderCancelPending(o).length}）</button>` : ''}
         <button class="btn sm danger" onclick="deleteOrderFromHistory(${i})">削除</button>
       </div>
     </div>`).join(''):'<div class="empty">発注履歴はありません</div>';
