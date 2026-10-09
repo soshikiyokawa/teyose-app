@@ -232,7 +232,9 @@ function orderRowTo(r){
     // deliveryDates は品目ごと、deliveryOn はそのうちいちばん遅い日
     deliveryOn:r.delivery_on||'', deliveryDates:Array.isArray(r.delivery_dates)?r.delivery_dates:[],
     // 業者さんが「納品完了」にした品目（migration-genba96.sql）
-    deliveredDates:Array.isArray(r.delivered_dates)?r.delivered_dates:[]};
+    deliveredDates:Array.isArray(r.delivered_dates)?r.delivered_dates:[],
+    // 発注したあとでキャンセルした品目（同じく migration-genba96.sql）
+    cancelledItems:Array.isArray(r.cancelled_items)?r.cancelled_items:[]};
 }
 
 // ── 見積の明細は、その案件を開いたときに読む ──

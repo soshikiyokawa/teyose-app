@@ -226,7 +226,7 @@ function cardFindOrder(row){
   const cands = orders.filter(o=>{
     if(used.has(o.no)) return false;                       // すでに他の明細と照合済み
     if(o.paymentMethod && o.paymentMethod!==brand) return false;  // 別の支払方法の発注は対象外
-    if(Math.round(o.total)!==row.amount) return false;     // 合計（税込）が一致
+    if(Math.round(typeof orderLiveTotal==='function' ? orderLiveTotal(o) : o.total)!==row.amount) return false;     // 合計（税込）が一致
     const d=Math.abs((new Date(o.date)-new Date(row.useDate))/86400000);
     return d<=CARD_MATCH_DAYS;
   });

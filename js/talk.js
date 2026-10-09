@@ -106,12 +106,16 @@ function orderReceiveHtml(o){
   const ord=(orders||[]).find(x=>x.no===o.no);
   const received = ord ? ord.status==='received' : false;
   const canEdit = currentUserRole==='supplier' || currentUserRole==='staff' || currentUserRole==='carpenter';
+  // 発注まるごとキャンセルになったものは、受領も納品予定日も要らない
+  const cxl = (ord && typeof orderCancelState==='function') ? orderCancelState(ord) : '';
+  if(cxl==='all') return '<div class="ord-recv cxl">この発注は、キャンセルになりました</div>';
+  const cxlNote = cxl==='part' ? `<div class="ord-recv-cxl">一部キャンセル（${orderCancelCount(ord).cancelled}品目）</div>` : '';
   if(received){
     // 受領済み：受領した日と、納品予定日（品目で違えば「10/14〜10/16」）。押すと品目ごとの日付が見られる
     const days = (typeof orderDeliveryDaysLabel==='function') ? orderDeliveryDaysLabel(ord) : '';
     const late = (typeof orderDeliveryLate==='function') && orderDeliveryLate(ord);
     const no = esc(o.no);
-    return `<div class="ord-recv done">
+    return `${cxlNote}<div class="ord-recv done">
       <div>✓ 受領済み${ord?.receivedAt?`（${String(ord.receivedAt).slice(0,10).replace(/-/g,'/')}）`:''}</div>
       ${days
         ? `<button type="button" class="ord-recv-days${late?' late':''}" onclick="openOrderReceive('${no}','change')">
@@ -121,8 +125,8 @@ function orderReceiveHtml(o){
                  納品予定日が入っていません<span>入れる</span></button>` : '')}
     </div>`;
   }
-  if(currentUserRole!=='supplier') return '';
-  return `<div style="padding:4px 10px 10px">
+  if(currentUserRole!=='supplier') return cxlNote;
+  return `${cxlNote}<div style="padding:4px 10px 10px">
     <button class="btn sm primary" style="width:100%;justify-content:center" onclick="receiveOrderFromChat('${esc(o.no)}')">
       受領する（納品予定日を入れる）
     </button>
@@ -1052,8 +1056,12 @@ function renderTalkPanelMessages(forceBottom){
       // 発注のいまの中身は orders 側が正しい（発注先が単価を直すことがあるため）
       const liveOrder = (typeof orderByNo==='function') ? orderByNo(o.no) : null;
       const showItems = liveOrder?.items || o.items;
-      const showTotal = liveOrder ? liveOrder.total : o.total;
-      const itemRows=showItems.slice(0,4).map(i=>{
+      const showTotal = liveOrder ? (typeof orderLiveTotal==='function' ? orderLiveTotal(liveOrder) : liveOrder.total) : o.total;
+      const itemRows=showItems.slice(0,4).map((i,idx)=>{
+        // 発注のあとでキャンセルした品目は、線を引いて残す
+        if(liveOrder && typeof orderItemCancelled==='function' && orderItemCancelled(liveOrder, idx)){
+          return `<div class="ocb-row cxl"><span>${i.name}×${Number(i.qty)||0}${i.unit}</span><span>キャンセル</span></div>`;
+        }
         const now=Math.round(Number(i.cost ?? i.price)||0);
         const orig=(i.origPrice===undefined||i.origPrice===null)?now:Math.round(Number(i.origPrice)||0);
         const q=Number(i.qty)||0;

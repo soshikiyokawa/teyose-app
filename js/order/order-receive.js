@@ -17,7 +17,13 @@ let orderRecv = null;   // {no, mode:'receive'|'change', rows:[{i,name,qty,unit,
 
 // 日付を入れる品目（送料の行は除く）。i は発注の品目の並び順
 function orderDeliverableItems(o){
-  return (o?.items||[]).map((it,i)=>({it,i})).filter(x=>!x.it.isShipping);
+  return (o?.items||[]).map((it,i)=>({it,i})).filter(x=>!x.it.isShipping && !orderItemCancelled(o, x.i));
+}
+// その品目は、発注のあとでキャンセルになったか（js/order/order-cancel.js）
+function orderItemCancelled(o, i){
+  const name = o?.items?.[i]?.name;
+  return (Array.isArray(o?.cancelledItems) ? o.cancelledItems : [])
+    .some(c=>c && Number(c.i)===i && (c.name||'')===(name||''));
 }
 // その品目の納品予定日（無ければ ''）。
 // 並び順と品目名の両方が合うものを使う。あとから送料の行が足されるなどして

@@ -575,3 +575,11 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .dlv-on input{width:150px;margin:0;font-size:16px}
 .dlv-bar .btn{flex:1 1 100%;justify-content:center;padding:12px;font-size:var(--fs3)}
 .ord-delivd{color:var(--ok-t);font-weight:700}
+
+/* ── 発注のキャンセル（js/order/order-cancel.js） ── */
+.badge.cancelled{background:var(--danger);color:#fff}
+.orv-row.cxl .orv-name{text-decoration:line-through;color:var(--text-muted)}
+.ocb-row.cxl span:first-child{text-decoration:line-through;opacity:.6}
+.ocb-row.cxl span:last-child{color:var(--danger);font-weight:700;font-size:11px}
+.ord-recv.cxl{padding:8px 10px 10px;color:var(--danger);font-weight:700;font-size:12px}
+.ord-recv-cxl{padding:4px 10px 0;color:var(--danger);font-weight:700;font-size:11px}

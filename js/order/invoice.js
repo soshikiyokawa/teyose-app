@@ -74,7 +74,7 @@ function invOrdersOf(v){
   const p = invPeriod(v.month, invClosingDay(v.supplierName));
   if(!p) return { period:null, list:[], total:0 };
   const list=(orders||[]).filter(o=>o.suppliers===v.supplierName && o.date>=p.from && o.date<=p.to);
-  return { period:p, list, total:list.reduce((s,o)=>s+(Number(o.total)||0), 0) };
+  return { period:p, list, total:list.reduce((s,o)=>s+(typeof orderLiveTotal==='function' ? orderLiveTotal(o) : (Number(o.total)||0)), 0) };
 }
 // 請求額と発注額の差。請求額が入っていないときは null
 function invDiff(v){
@@ -279,7 +279,7 @@ document.addEventListener('click', e=>{
 function showInvoiceOrders(id){
   const v=(invoices||[]).find(x=>x.id===id); if(!v) return;
   const ord=invOrdersOf(v);
-  const lines=ord.list.map(o=>`${o.date.replace(/-/g,'/')}　${o.no}　${o.project}　¥${fmt(o.total)}`).join('\n');
+  const lines=ord.list.map(o=>`${o.date.replace(/-/g,'/')}　${o.no}　${o.project}　¥${fmt(typeof orderLiveTotal==='function' ? orderLiveTotal(o) : o.total)}`).join('\n');
   alert(`${v.title||invTitle(v.supplierName,v.month)}\n対象期間 ${invPeriodLabel(ord.period)}\n\n`+
     (lines||'この期間の発注はありません')+`\n\n発注の合計 ¥${fmt(ord.total)}\n請求額 ${v.amount!=null?'¥'+fmt(v.amount):'未入力'}`);
 }

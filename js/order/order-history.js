@@ -6,7 +6,7 @@ function renderOrders(){
     <div class="order-item">
       <div class="order-hd"><span class="order-no">${o.no}</span><span class="order-name">${o.project}</span>
         <span class="badge ${o.status==='received'?'received':'pending'}">${o.status==='received'?'受領済み':'発注済み'}</span>
-        ${orderHasPriceEdit(o)?'<span class="badge price-edited">単価変更あり</span>':''}
+        ${orderHasPriceEdit(o)?'<span class="badge price-edited">単価変更あり</span>':''}${orderCancelBadge(o)}
       </div>
       <div class="order-meta"><span>📅 ${o.date}</span><span>🏪 ${o.suppliers}</span><span>📦 ${o.items.length}品目</span>${o.costType?`<span>🏷️ ${o.costType}</span>`:''}${
         o.dueAsap?'<span style="color:var(--accent-t);font-weight:700">🚚 希望 最短</span>':(o.dueDate?`<span>🚚 希望 ${o.dueDate}</span>`:'')}${
@@ -15,12 +15,13 @@ function renderOrders(){
         }${
         // 業者さんが「納品完了」にした品目の数（業者さんからの報告。現場での受け取りの確認とは別）
         (typeof orderDeliveredLabel==='function' && orderDeliveredLabel(o)) ? `<span class="ord-delivd" title="業者さんからの報告です">✓ ${orderDeliveredLabel(o)}（業者報告）</span>` : ''
-        }<span style="font-weight:700;color:var(--wood-t)">¥${fmt(o.total)}</span></div>
+        }<span style="font-weight:700;color:var(--wood-t)">${orderTotalHtml(o)}</span></div>
       <div class="order-actions">
         <button class="btn sm" onclick="reShowOrder(${i})"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> 発注書</button>
-        ${o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`
+        ${orderCancelState(o)==='all' ? '' : o.status!=='received'?`<button class="btn sm primary" onclick="markReceived(${i})">✓ 受領済み</button>`
           : (o.paymentMethod ? '' : `<button class="btn sm" onclick="openOrderReceive('${esc(o.no)}','change')">納品予定日</button>`)}
         <button class="btn sm" onclick="openOrderPriceEdit('${esc(o.no)}')">単価・送料を直す</button>
+        ${(o.paymentMethod || orderCancelState(o)==='all') ? '' : `<button class="btn sm" onclick="openOrderCancel('${esc(o.no)}')">キャンセル</button>`}
         <button class="btn sm danger" onclick="deleteOrderFromHistory(${i})">削除</button>
       </div>
     </div>`).join(''):'<div class="empty">発注履歴はありません</div>';

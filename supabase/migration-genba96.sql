@@ -1,4 +1,4 @@
--- ════ マイグレーション96：業者さんが「納品完了」を品目ごとに記録する ════
+-- ════ マイグレーション96：業者さんが「納品完了」を品目ごとに記録する／発注をあとからキャンセルする ════
 -- Supabaseダッシュボード → SQL Editor に全文貼り付けて実行してください。
 -- （再実行しても安全です）
 --
@@ -17,6 +17,13 @@
 
 alter table public.orders add column if not exists delivered_dates jsonb not null default '[]'::jsonb;
 
+-- 発注したあとでキャンセルした品目。品目そのもの（items）は消さずに残し、どれをやめたかをここに持つ
+--   [{ "i":0, "name":"品目名", "reason":"理由", "by":"記録した人", "by_id":"<アカウント>", "at":"<時刻>" }, …]
+alter table public.orders add column if not exists cancelled_items jsonb not null default '[]'::jsonb;
+
+comment on column public.orders.cancelled_items is
+  '発注後にキャンセルした品目。[{i:品目の並び順, name:品目名, reason, by, by_id, at}]。items は消さずに残す';
+
 comment on column public.orders.delivered_dates is
   '納品が済んだ品目（業者の報告）。[{i:品目の並び順, name:品目名, on:納品日, by:記録した人, by_id, at}]。送料の行には付けない';
 
@@ -33,6 +40,11 @@ begin
      and new.delivered_dates is distinct from old.delivered_dates
      and coalesce(current_setting('app.delivered_rpc', true), '') <> '1' then
     raise exception '納品の記録は、納品タブから行ってください';
+  end if;
+  -- キャンセルは、きよかわだけ
+  if app_user_role() = 'supplier'
+     and new.cancelled_items is distinct from old.cancelled_items then
+    raise exception 'キャンセルの記録は、きよかわが行います';
   end if;
   return new;
 end
@@ -104,6 +116,12 @@ begin
        or coalesce(src->>'isShipping', 'false') = 'true' then
       raise exception '品目が見つかりません（%）。画面を更新してからお試しください', nm;
     end if;
+    -- キャンセルになった品目は、納品済みにできない
+    if exists (select 1 from jsonb_array_elements(
+                 case when jsonb_typeof(o.cancelled_items) = 'array' then o.cancelled_items else '[]'::jsonb end) c
+                where c->>'i' = idx::text) then
+      raise exception '「%」はキャンセルになっています。画面を更新してください', nm;
+    end if;
     -- もう記録してあるものは飛ばす
     if exists (select 1 from jsonb_array_elements(cur) d
                 where d->>'i' = idx::text and coalesce(d->>'name', '') = nm) then
@@ -170,6 +188,126 @@ begin
 end
 $$;
 
+-- ── 発注の品目をキャンセルする（きよかわの管理者だけ） ──
+--   p_items  … [{ "i":0, "name":"品目名" }, …]（まるごとキャンセルのときは、送料の行も入れて呼ぶ）
+--   p_reason … 理由（空でもよい）
+-- 返すもの … { cancelled_items:いまの全体, changed:今回あらたにキャンセルした品目 }
+--   ・納品済みの品目はキャンセルできない（先に納品完了を取り消す）
+--   ・原価（cost_entries）から、その品目の行を1つ消す
+create or replace function public.app_cancel_order_items(p_order_id bigint, p_items jsonb, p_reason text)
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  o     public.orders%rowtype;
+  who   text;
+  cur   jsonb;
+  dlv   jsonb;
+  list  jsonb;
+  it    jsonb;
+  src   jsonb;
+  idx   int;
+  nm    text;
+  q     numeric;
+  done  jsonb := '[]'::jsonb;
+begin
+  if app_user_role() is distinct from 'staff' then
+    raise exception 'キャンセルできるのは、きよかわの管理者だけです';
+  end if;
+
+  select * into o from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception '発注が見つかりません。画面を更新してからお試しください';
+  end if;
+
+  select display_name into who from public.profiles where id = auth.uid();
+  cur  := case when jsonb_typeof(o.cancelled_items) = 'array' then o.cancelled_items else '[]'::jsonb end;
+  dlv  := case when jsonb_typeof(o.delivered_dates) = 'array' then o.delivered_dates else '[]'::jsonb end;
+  list := case when jsonb_typeof(p_items) = 'array' then p_items else '[]'::jsonb end;
+
+  for it in select value from jsonb_array_elements(list) loop
+    idx := (it->>'i')::int;
+    nm  := coalesce(it->>'name', '');
+    src := case when jsonb_typeof(o.items) = 'array' then o.items -> idx else null end;
+    if idx is null or idx < 0 or src is null or coalesce(src->>'name', '') <> nm then
+      raise exception '品目が見つかりません（%）。画面を更新してからお試しください', nm;
+    end if;
+    -- もうキャンセルしてあるものは飛ばす
+    if exists (select 1 from jsonb_array_elements(cur) c where c->>'i' = idx::text) then
+      continue;
+    end if;
+    if exists (select 1 from jsonb_array_elements(dlv) d where d->>'i' = idx::text) then
+      raise exception '「%」は納品済みになっています。キャンセルするには、先に納品完了を取り消してください', nm;
+    end if;
+
+    cur := cur || jsonb_build_array(jsonb_build_object(
+      'i', idx, 'name', nm, 'reason', coalesce(p_reason, ''),
+      'by', coalesce(who, ''), 'by_id', auth.uid(), 'at', now()));
+    done := done || jsonb_build_array(jsonb_build_object('i', idx, 'name', nm));
+
+    -- 原価から、その品目の行を1つ消す。同じ名前の行がいくつかあるときは、数量が合うものを先に選ぶ
+    q := case when coalesce(src->>'qty', '') ~ '^-?[0-9]+(\.[0-9]+)?$' then (src->>'qty')::numeric else null end;
+    delete from public.cost_entries
+     where id = (select ce.id from public.cost_entries ce
+                  where ce.order_no = o.no
+                    and ce.supplier_id is not distinct from o.supplier_id
+                    and ce.name = nm
+                  order by (case when q is not null and ce.qty = q then 0 else 1 end), ce.id
+                  limit 1);
+  end loop;
+
+  if jsonb_array_length(done) > 0 then
+    update public.orders set cancelled_items = cur where id = p_order_id;
+  end if;
+
+  return jsonb_build_object('cancelled_items', cur, 'changed', done);
+end
+$$;
+
+-- ── 受領のときの「納品予定日は必須」から、キャンセルした品目を外す ──
+-- （migration-genba95.sql の決まりを、キャンセルに合わせて入れ直す）
+create or replace function public.orders_delivery_required()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  need int;   -- 日付が要る品目の数（送料の行と、キャンセルした品目を除く）
+  have int;   -- 日付が入っている品目の数
+begin
+  if app_user_role() = 'supplier'
+     and new.status = 'received'
+     and old.status is distinct from 'received' then
+
+    select count(*) into need
+      from jsonb_array_elements(case when jsonb_typeof(new.items) = 'array' then new.items else '[]'::jsonb end)
+           with ordinality as t(it, ord)
+     where coalesce(t.it->>'isShipping', 'false') <> 'true'
+       and not exists (select 1 from jsonb_array_elements(
+                         case when jsonb_typeof(new.cancelled_items) = 'array' then new.cancelled_items else '[]'::jsonb end) c
+                        where c->>'i' = (t.ord - 1)::text);
+
+    select count(*) into have
+      from jsonb_array_elements(case when jsonb_typeof(new.delivery_dates) = 'array' then new.delivery_dates else '[]'::jsonb end) d
+     where coalesce(d->>'on', '') ~ '^\d{4}-\d{2}-\d{2}$'
+       -- キャンセルした品目に付いている日付は数えない
+       and not exists (select 1 from jsonb_array_elements(
+                         case when jsonb_typeof(new.cancelled_items) = 'array' then new.cancelled_items else '[]'::jsonb end) c
+                        where c->>'i' = d->>'i');
+
+    if need > 0 and (new.delivery_on is null or have < need) then
+      raise exception '納品予定日を、すべての品目に入れてください。入力欄が出ない場合は、アプリを更新（右上の⟳）してからお試しください';
+    end if;
+  end if;
+  return new;
+end
+$$;
+
+revoke all on function public.app_cancel_order_items(bigint, jsonb, text) from public, anon;
+grant execute on function public.app_cancel_order_items(bigint, jsonb, text) to authenticated;
 revoke all on function public.app_mark_delivered(bigint, jsonb, date) from public, anon;
 revoke all on function public.app_unmark_delivered(bigint, int, text, date, text) from public, anon;
 grant execute on function public.app_mark_delivered(bigint, jsonb, date) to authenticated;
@@ -189,6 +327,14 @@ select '記録する手続き（app_mark_delivered）',
 union all
 select '取り消す手続き（app_unmark_delivered）',
        case when to_regprocedure('public.app_unmark_delivered(bigint, int, text, date, text)') is not null then 'ある' else '無い' end
+union all
+select 'キャンセルの列（cancelled_items）',
+       case when exists (select 1 from information_schema.columns
+                          where table_schema = 'public' and table_name = 'orders' and column_name = 'cancelled_items')
+            then 'ある' else '無い' end
+union all
+select 'キャンセルする手続き（app_cancel_order_items）',
+       case when to_regprocedure('public.app_cancel_order_items(bigint, jsonb, text)') is not null then 'ある' else '無い' end
 union all
 select '業者が直接書けない見張り',
        case when exists (select 1 from pg_trigger where tgname = 'orders_delivered_guard_trg' and not tgisinternal)
