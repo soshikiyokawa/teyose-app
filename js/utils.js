@@ -136,6 +136,59 @@ function thumbUrl(url, width, quality){
 // 日付を、端末の暦のまま YYYY-MM-DD にする（省略すると今日）。
 // new Date().toISOString().slice(0,10) は世界標準時の日付になるため、日本では
 // 朝9時前は「前日」になり、0時ちょうどの日付は1日戻る。暦の日付を作るときはこれを使う
+// ════ 国民の祝日 ════
+//
+// 年ごとの一覧を持たずに、暦の決まりから求める（工程表は何年も先まで伸びるため）。
+//   ・日にちが決まっているもの（元日・建国記念の日・昭和の日 など）
+//   ・第◯月曜のもの（成人の日・海の日・敬老の日・スポーツの日）
+//   ・春分の日・秋分の日（太陽の動きから出す式。1980〜2099年で合う）
+//   ・振替休日（祝日が日曜なら、そのあとの最初の平日）
+//   ・国民の休日（祝日と祝日にはさまれた平日。敬老の日と秋分の日の間など）
+// いまの決まり（2022年以降）に合わせてある。それより前の年は、当時の決まりと違う日がある。
+const _jpHolidayCache = {};
+function _jpHolidaysOfYear(y){
+  if(_jpHolidayCache[y]) return _jpHolidayCache[y];
+  const map = {};
+  const key = (m,d)=> y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+  const nthMon = (m,n)=>{                                   // m月の第n月曜
+    const first = new Date(y, m-1, 1).getDay();
+    return 1 + ((8-first)%7) + (n-1)*7;
+  };
+  const shunbun = Math.floor(20.8431 + 0.242194*(y-1980) - Math.floor((y-1980)/4));
+  const shubun  = Math.floor(23.2488 + 0.242194*(y-1980) - Math.floor((y-1980)/4));
+  [[1,1,'元日'],[1,nthMon(1,2),'成人の日'],[2,11,'建国記念の日'],[2,23,'天皇誕生日'],
+   [3,shunbun,'春分の日'],[4,29,'昭和の日'],[5,3,'憲法記念日'],[5,4,'みどりの日'],[5,5,'こどもの日'],
+   [7,nthMon(7,3),'海の日'],[8,11,'山の日'],[9,nthMon(9,3),'敬老の日'],[9,shubun,'秋分の日'],
+   [10,nthMon(10,2),'スポーツの日'],[11,3,'文化の日'],[11,23,'勤労感謝の日']
+  ].forEach(([m,d,n])=>{ map[key(m,d)] = n; });
+
+  const ymd = dt => key(dt.getMonth()+1, dt.getDate());
+  // 振替休日：祝日が日曜なら、そのあとの最初の「祝日でない日」
+  Object.keys(map).forEach(k=>{
+    const [yy,mm,dd] = k.split('-').map(Number);
+    const dt = new Date(yy, mm-1, dd);
+    if(dt.getDay() !== 0) return;
+    do{ dt.setDate(dt.getDate()+1); }while(map[ymd(dt)]);
+    if(dt.getFullYear()===y) map[ymd(dt)] = '振替休日';
+  });
+  // 国民の休日：前の日も次の日も祝日の、平日（日曜と祝日は除く）
+  for(let dt=new Date(y,0,2); dt.getFullYear()===y; dt.setDate(dt.getDate()+1)){
+    const k = ymd(dt);
+    if(map[k] || dt.getDay()===0) continue;
+    const prev = new Date(dt); prev.setDate(dt.getDate()-1);
+    const next = new Date(dt); next.setDate(dt.getDate()+1);
+    const isHol = d => { const n = map[ymd(d)]; return !!n && n!=='振替休日' && n!=='国民の休日'; };
+    if(prev.getFullYear()===y && next.getFullYear()===y && isHol(prev) && isHol(next)) map[k] = '国民の休日';
+  }
+  return (_jpHolidayCache[y] = map);
+}
+// その日が祝日なら、その名前。祝日でなければ ''（'2026-10-12' の形で渡す）
+function jpHolidayName(ymd){
+  const m = /^(\d{4})-\d{2}-\d{2}$/.exec(String(ymd||''));
+  if(!m) return '';
+  return _jpHolidaysOfYear(Number(m[1]))[ymd] || '';
+}
+
 function localYmd(d){
   d = d || new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');

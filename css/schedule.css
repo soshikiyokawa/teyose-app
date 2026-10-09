@@ -151,6 +151,8 @@ body.sch-edit .sch-toolbar button.sch-edit-btn { background: var(--wood); border
 .gantt-we.gantt-day-cell, .gantt-we.gantt-wd-cell { color: var(--danger); opacity: 0.75; }
 .gantt-td { background: rgba(59,130,246,.10) !important; }
 .gantt-td.gantt-day-cell, .gantt-td.gantt-wd-cell { color: var(--accent-t, #3b82f6); font-weight: 700; opacity: 1; }
+/* 今日が祝日のとき。今日の色のままだと祝日だと分からないので、字だけ赤くする */
+.gantt-td.gantt-hol.gantt-day-cell, .gantt-td.gantt-hol.gantt-wd-cell { color: var(--danger); }
 
 /* ─ Rows ─ */
 .gantt-row {

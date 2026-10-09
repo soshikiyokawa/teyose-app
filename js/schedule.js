@@ -780,10 +780,13 @@ function renderGantt() {
   const c2 = new Date(d0);
   let dayRow='', wdRow='';
   for (let i=0; i<totalDays; i++) {
-    const wd=c2.getDay(), isWE=wd===0||wd===6, isTD=localYmd(c2)===todayS;
+    // 土日と同じく、祝日も赤い字にする（祝日の名前は、長押し・マウスを乗せると出る）
+    const ymd2=localYmd(c2), hol=jpHolidayName(ymd2);
+    const wd=c2.getDay(), isWE=wd===0||wd===6||!!hol, isTD=ymd2===todayS;
     const cls=isTD?'gantt-td':isWE?'gantt-we':'';
-    dayRow += `<div class="gantt-day-cell ${cls}" style="width:${GANTT_CELL_W}px">${c2.getDate()}</div>`;
-    wdRow  += `<div class="gantt-wd-cell ${cls}" style="width:${GANTT_CELL_W}px">${['日','月','火','水','木','金','土'][wd]}</div>`;
+    const tip=hol?` title="${hol}"`:'';
+    dayRow += `<div class="gantt-day-cell ${cls}${hol?' gantt-hol':''}"${tip} style="width:${GANTT_CELL_W}px">${c2.getDate()}</div>`;
+    wdRow  += `<div class="gantt-wd-cell ${cls}${hol?' gantt-hol':''}"${tip} style="width:${GANTT_CELL_W}px">${['日','月','火','水','木','金','土'][wd]}</div>`;
     c2.setDate(c2.getDate()+1);
   }
 
@@ -791,7 +794,8 @@ function renderGantt() {
   const c3 = new Date(d0);
   let stripes='';
   for (let i=0; i<totalDays; i++) {
-    if (c3.getDay()===0||c3.getDay()===6)
+    // 祝日の列にも、土日と同じ薄い色を敷く
+    if (c3.getDay()===0||c3.getDay()===6||jpHolidayName(localYmd(c3)))
       stripes += `<div class="gantt-we-stripe" style="left:${i*GANTT_CELL_W}px;width:${GANTT_CELL_W}px"></div>`;
     c3.setDate(c3.getDate()+1);
   }
