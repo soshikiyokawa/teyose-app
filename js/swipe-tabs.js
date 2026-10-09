@@ -160,13 +160,24 @@ function onSwipeMove(e){
   if(!s.ok) return;
   if(Math.abs(dx) < SWIPE_START_X || Math.abs(dx) < Math.abs(dy) * SWIPE_RATIO) return;
 
-  // ここから先は「横に払っている」と判断した状態。
+  const toNext = dx < 0;
+
+  // 横に送れるもの（工程表・人員配置・幅の広い表）の中を送っているときは、いっさい手を出さない。
+  // 指を置いたところが、払った向きの端でなければ「中を送っている」と見る。
+  // ここで下の preventDefault まで進むと、中の横スクロールごと止めてしまい、
+  // 工程表が横に送れなくなる（2026-10-09 に起きた不具合）
+  if(!(toNext ? s.atRight : s.atLeft)){
+    if(s.drag){ swipeShift(s.pane, null); s.drag = false; }
+    s.ok = false;            // この指の動きでは、もうタブを変えない
+    return;
+  }
+
+  // ここから先は「横に払ってタブを変えようとしている」と判断した状態。
   // この間は、指が少し縦に動いても画面が上下にスクロールしないようにする。
   // （止めないと、横に払うたびに中身が上下にずれて読みにくい）
   if(e.cancelable) e.preventDefault();
 
   // タブを変えられない向きなら、少しだけ動かして「ここが端」と分かるようにする
-  const toNext = dx < 0;
   const canGo = toNext ? (s.hasNext && s.atRight) : (s.hasPrev && s.atLeft);
   s.drag = true;
   swipeShift(s.pane, dx * (canGo ? SWIPE_DRAG : SWIPE_WALL));
