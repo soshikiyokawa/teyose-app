@@ -633,11 +633,26 @@ async function doTaskHandoff(){
       p_id: editingTodoId, p_note: note, p_checklist: taskChecklist, p_files: files
     }));
   } else {
-    ({ error } = await sb.from('tasks')
-      .update({assignees:next, due_date:due, checklist:taskChecklist, handoffs})
-      .eq('id',editingTodoId));
+    // 引き継ぐと、自分が担当から外れて「自分には見えない行」になる。
+    // ふつうの更新では、自分が作ったタスクでない限りデータベースに断られるので、
+    // 返すときと同じく手続きを通す（migration-genba97.sql）
+    ({ error } = await sb.rpc('task_handoff', {
+      p_id: editingTodoId, p_to: [...handoffTo], p_keep_me: keepMe, p_due: due,
+      p_note: note, p_checklist: taskChecklist, p_files: files
+    }));
+    // 手続きがまだ入っていない環境では、これまでのやり方で書く（自分が作ったタスクなら通る）
+    const code = String(error?.code||'');
+    if(error && (code==='PGRST202' || code==='42883')){
+      ({ error } = await sb.from('tasks')
+        .update({assignees:next, due_date:due, checklist:taskChecklist, handoffs})
+        .eq('id',editingTodoId));
+      if(error && /row-level security/i.test(error.message||'')){
+        showToast('引き継ぎには、データベースの準備が必要です。supabase/migration-genba97.sql を実行してください', 8000);
+        return;
+      }
+    }
   }
-  if(error){ showToast((ret?'返すのに失敗しました：':'引き継ぎに失敗しました：')+error.message); return; }
+  if(error){ showToast((ret?'返すのに失敗しました：':'引き継ぎに失敗しました：')+error.message, 7000); return; }
 
   // 引き継ぎ先（返す先）に知らせる（自分あてには送らない）
   const notify=handoffTo.filter(n=>!mine.includes(n));
