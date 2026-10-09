@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teyose-v489';
+const CACHE_NAME = 'teyose-v490';
 
 // ── 手元に置いておくもの ──
 //
@@ -67,6 +67,7 @@ const VERSIONED = [
   'js/data/db.js',
   'js/nav.js',
   'js/talk.js',
+  'js/talk-search.js',
   'js/swipe-tabs.js',
   'js/notifications.js',
   'js/tasks.js',

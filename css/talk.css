@@ -133,3 +133,28 @@
 .talk-group-meta span{flex-shrink:0;font-size:var(--fs1);color:var(--accent-t);text-decoration:underline}
 /* お客様が読んだことを、きよかわ側の吹き出しに出す */
 .read-mark{margin-left:5px;font-size:10px;color:var(--accent-t)}
+
+/* ── チャットの検索（js/talk-search.js） ── */
+#talk-page-wrap{position:relative}
+#talk-search{display:none;position:absolute;inset:0;z-index:5;flex-direction:column;background:var(--surface)}
+#talk-search.open{display:flex}
+.tsr-head{display:flex;align-items:center;gap:var(--sp2);padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.tsr-back{border:none;background:none;cursor:pointer;padding:2px 8px;color:var(--text-sub);font-size:22px;line-height:1}
+/* 16px より小さいと、iPhone は打つときに画面を勝手に広げる */
+#talk-search-q{flex:1;min-width:0;font-size:16px;padding:9px 12px;border:1px solid var(--border);border-radius:999px;background:var(--surface2);color:var(--text)}
+.tsr-scope{display:flex;gap:var(--sp2);padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.tsr-chip{flex:1;border:1px solid var(--border);background:var(--surface);color:var(--text-sub);border-radius:999px;padding:7px 10px;font-size:var(--fs2);cursor:pointer}
+.tsr-chip.on{background:var(--wood);border-color:var(--wood);color:#fff;font-weight:700}
+#talk-search-results{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tsr-count{padding:8px 16px;font-size:var(--fs1);color:var(--text-muted);border-bottom:1px solid var(--border)}
+.tsr-row{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer}
+.tsr-row:hover{background:var(--surface2)}
+.tsr-top{display:flex;justify-content:space-between;gap:var(--sp2);font-size:var(--fs1);color:var(--text-muted)}
+.tsr-who{font-weight:700;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tsr-when{flex-shrink:0}
+.tsr-body{margin-top:3px;font-size:var(--fs3);line-height:1.5;word-break:break-word}
+.tsr-body mark{background:#ffe58a;color:#222;border-radius:2px;padding:0 1px}
+.tsr-thread{margin-top:3px;font-size:var(--fs1);color:var(--accent-t)}
+/* 検索から飛んできた吹き出し。しばらく色を付けて、どれか分かるようにする */
+.talk-bubble.talk-hit{animation:talk-hit 2.6s ease-out}
+@keyframes talk-hit{0%,55%{background:rgba(255,214,64,.45);box-shadow:0 0 0 6px rgba(255,214,64,.45)}100%{background:transparent;box-shadow:0 0 0 6px transparent}}

@@ -609,7 +609,7 @@ function renderTalkPanelList(){
   }).join('');
 }
 
-function openTalkPanelThread(supName){
+function openTalkPanelThread(supName, opt){
   activeTalkPanelSupplier=supName;
   talkListTab=talkThreadKind(supName);   // 戻ったときに同じ種類の一覧が出るように
   resetChatRenderSignature();   // スレッドを開いたら必ず描き直す
@@ -668,7 +668,8 @@ function openTalkPanelThread(supName){
   dbMarkThreadRead(threadKeyOf(supName)).then(updateChatBadge).catch(()=>{});
   updateChatBadge();
   // 未読から読み始めるときは、キーボードを出さない（画面が縮んで読む位置がずれる）
-  if(!chatUnreadMark) setTimeout(()=>document.getElementById('talk-panel-input').focus(),200);
+  // 検索から飛んできたときも出さない（見つけたところを読むのが先）
+  if(!chatUnreadMark && !opt?.noFocus) setTimeout(()=>document.getElementById('talk-panel-input').focus(),200);
 }
 
 // スレッド名 → 既読管理のキー

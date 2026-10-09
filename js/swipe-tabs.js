@@ -75,6 +75,7 @@ function swipeScrollerAt(el){
 function swipeIgnore(el){
   if(document.querySelector('.modal-overlay.open')) return true;     // 何か開いている
   if(document.querySelector('#est-list-overlay.open')) return true;
+  if(document.querySelector('#talk-search.open')) return true;       // チャットの検索を開いている
   return !!el.closest('input, textarea, select, button, a, [contenteditable=""], [contenteditable="true"]');
 }
 
