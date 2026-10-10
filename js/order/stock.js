@@ -144,12 +144,26 @@ function renderStockPage(){
     el.innerHTML = `<div class="empty">${(q||stkState.cat||stkState.sup)?'見つかりませんでした':'いま在庫のある品目はありません（「在庫が0の品目も出す」で、登録してある品目が出ます）'}</div>`;
     return;
   }
+  // カテゴリごとにまとめて並べる。順番は、よく使うカテゴリ（STOCK_CATS）→ そのほか → カテゴリなし。
+  // カテゴリの中は品目名の順
+  const catRank = c => { if(!c) return 9999; const i = STOCK_CATS.indexOf(c); return i>=0 ? i : 500; };
+  list.sort((a,b)=> catRank(a.info.cat)-catRank(b.info.cat)
+    || String(a.info.cat).localeCompare(String(b.info.cat),'ja')
+    || a.name.localeCompare(b.name,'ja'));
+  let lastCat = null;
   el.innerHTML = list.map(s=>{
     const nm = stkArg(s.name);
-    return `<div class="stk-row${s.qty<=0?' zero':''}">
+    // カテゴリが変わるところに見出しを入れる（その中の品目数つき）
+    let head = '';
+    if(s.info.cat !== lastCat){
+      lastCat = s.info.cat;
+      const n = list.filter(x=>x.info.cat===s.info.cat).length;
+      head = `<div class="stk-cat-head">${esc(s.info.cat||'カテゴリなし')}<span>${n}品目</span></div>`;
+    }
+    return `${head}<div class="stk-row${s.qty<=0?' zero':''}">
       <div class="stk-main" onclick="openStockHistory('${nm}')">
         <div class="stk-name">${esc(s.name)}</div>
-        ${(s.info.cat||s.info.supplier) ? `<div class="stk-tags">${s.info.cat?`<span class="stk-cat">${esc(s.info.cat)}</span>`:''}${s.info.supplier?`<span class="stk-sup">${esc(s.info.supplier)}</span>`:''}</div>` : ''}
+        ${s.info.supplier ? `<div class="stk-tags"><span class="stk-sup">${esc(s.info.supplier)}</span></div>` : ''}
         <div class="stk-meta">${s.avgCost ? `平均 ¥${fmt(s.avgCost)}/${esc(s.unit||'')}　在庫金額 ¥${fmt(s.value)}` : '<span class="stk-nocost">単価が入っていません</span>'}${
           s.pending ? `<span class="stk-pend">うち納品待ち ${stkNum(s.pending)}${esc(s.unit||'')}</span>` : ''}</div>
       </div>

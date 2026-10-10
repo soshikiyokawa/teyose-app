@@ -639,3 +639,7 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 /* 絞り込みが3つ並ぶ。狭い画面では折り返す */
 .stk-filters{flex-wrap:wrap}
 .stk-filters select{flex:1 1 30%;min-width:108px}
+
+/* 在庫：カテゴリの見出し */
+.stk-cat-head{padding:6px 12px;background:var(--surface2);font-size:var(--fs2);font-weight:800;color:var(--accent-t);border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.stk-cat-head span{font-size:var(--fs1);font-weight:400;color:var(--text-muted)}
