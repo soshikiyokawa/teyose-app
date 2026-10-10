@@ -886,7 +886,7 @@ function chatUnreadAnchorY(el, sep){
   // 未読より前に吹き出しがあるか。あるなら前の話が少し見えるところに置き、
   // 無いなら（ぜんぶ未読）いちばん上から出す（日付の見出しを欠けさせない）
   for(let p=sep.previousElementSibling; p; p=p.previousElementSibling){
-    if(p.classList.contains('talk-bubble')) return Math.max(0, chatAnchorTop(el,sep) - CHAT_UNREAD_TOP);
+    if(p.classList.contains('talk-bubble') || p.classList.contains('talk-album')) return Math.max(0, chatAnchorTop(el,sep) - CHAT_UNREAD_TOP);
   }
   return 0;
 }
@@ -1003,6 +1003,31 @@ function chatMoreHtml(){
   return '<div class="talk-more"><button type="button" class="btn xs" onclick="loadOlderChat()">もっと前を読む</button></div>';
 }
 
+// ── 続けて送った写真をまとめる ──
+//
+// 同じ人が、間を空けずに続けて送った写真は、1つのまとまりとして並べる。
+// まとまりにするのは写真だけ。日付が変わるところ・「ここから未読」のところ・引用つきのものでは切る。
+// 返すもの … msgs と同じ並びで、まとまりに入るものは {first, last, count}、入らないものは null
+const CHAT_ALBUM_GAP = 120000;   // 前の写真からこの時間（ミリ秒）以内なら、同じまとまり
+function chatAlbumPlan(msgs, unreadId){
+  const isPhoto = m => m && m.type==='file' && String(m.fileMime||'').startsWith('image/') && !m.replyToText;
+  const joins = (a,b) => isPhoto(a) && isPhoto(b)
+    && (a.senderName||'')===(b.senderName||'') && a.role===b.role
+    && Math.abs(b.ts-a.ts) <= CHAT_ALBUM_GAP
+    && dateLabel(a.ts)===dateLabel(b.ts)
+    && !(unreadId!=null && b.id===unreadId);
+  const plan = msgs.map(()=>null);
+  for(let i=0;i<msgs.length;){
+    let j=i;
+    while(j+1<msgs.length && joins(msgs[j], msgs[j+1])) j++;
+    if(j>i){
+      for(let k=i;k<=j;k++) plan[k] = { first:k===i, last:k===j, count:j-i+1 };
+    }
+    i=j+1;
+  }
+  return plan;
+}
+
 function chatRenderSignature(supplier, msgs){
   return supplier + '|' + (chatBookmarkFilter?'bm':'') + '|' + (chatOlder[supplier]?'o':'')
     + '|' + (chatUnreadMarkId()??'') + '|' + msgs.map(m=>[
@@ -1043,7 +1068,8 @@ function renderTalkPanelMessages(forceBottom){
   }
   let lastDate='';
   const unreadId = chatUnreadMarkId();
-  el.innerHTML=chatMoreHtml()+msgs.map(m=>{
+  const album = chatAlbumPlan(msgs, unreadId);
+  el.innerHTML=chatMoreHtml()+msgs.map((m,mi)=>{
     const dLabel=dateLabel(m.ts);
     const dsep=dLabel!==lastDate?`<div class="talk-date-sep">${dLabel}</div>`:'';
     lastDate=dLabel;
@@ -1144,6 +1170,16 @@ function renderTalkPanelMessages(forceBottom){
     const isMe = internalThread ? m.senderName===currentUserDisplayName : m.role==='me';
     if(m.type==='file'){
       const isImage=(m.fileMime||'').startsWith('image/');
+      // 続けて送った写真は、小さく並べて1つにまとめる（1枚ずつ縦に並ぶと、画面が写真で埋まる）
+      const ap = album[mi];
+      if(ap){
+        const cell = `<div class="talk-bubble ${isMe?'me':'them'} in-album" data-mid="${m.id}">
+          <a href="${m.fileUrl}" target="_blank" rel="noopener"><img class="talk-album-img" src="${thumbUrl(m.fileUrl,240)}" alt="${esc(m.fileName||'')}"></a>
+          ${reactionsHtml(m,isMe)}</div>`;
+        return (ap.first ? `${sep}<div class="talk-album ${isMe?'me':'them'}"><div class="talk-album-grid" style="--n:${Math.min(ap.count,3)}">` : '')
+          + cell
+          + (ap.last ? `</div><div class="ts">${m.senderName||( isMe?'きよかわ':activeTalkPanelSupplier)}　${time}　写真${ap.count}枚${msgMarks(m)}</div></div>` : '');
+      }
       return `${sep}<div class="talk-bubble ${isMe?'me':'them'}" data-mid="${m.id}">
         ${replyRefHtml(m)}
         ${isImage
@@ -1273,6 +1309,12 @@ async function talkPrepareFile(file){
   return {body,name,mime};
 }
 
+// まとめて送ったときの通知の文面。「📷 写真5枚」／写真以外が混ざれば「📎 ファイル5件」
+function talkBatchPreview(mimes){
+  const n = mimes.length;
+  return mimes.every(m=>String(m||'').startsWith('image/')) ? `📷 写真${n}枚` : `📎 ファイル${n}件`;
+}
+
 async function sendTalkPanelFile(fileInput){
   const files=[...(fileInput.files||[])];
   fileInput.value='';
@@ -1285,6 +1327,7 @@ async function sendTalkPanelFile(fileInput){
   // 選んだ順に並ぶよう1枚ずつ送る。次の1枚の変換は、送っている間に済ませておく
   let next = talkPrepareFile(files[0]);
   const failed = [];
+  const sent = [];     // 送れたものの種類（まとめた通知の文面に使う）
   for(let i=0;i<files.length;i++){
     showToast(many ? `アップロード中… ${i+1}/${files.length}` : 'アップロード中…', 30000);
     const cur = next;
@@ -1292,7 +1335,13 @@ async function sendTalkPanelFile(fileInput){
     try{
       const {body,name,mime} = await cur;
       const fileUrl = await dbUploadChatFile(body, name, mime);
-      await dbAddChatMessage(thread,{role,type:'file',fileUrl,fileName:name,fileMime:mime});
+      // 何枚も送るときは、通知を1枚ごとに出さない。最後の1枚に「写真5枚」とまとめて1回だけ知らせる
+      const last = i===files.length-1;
+      sent.push(mime);
+      const batch = !many ? {} : last
+        ? { pushPreview: talkBatchPreview(sent) }
+        : { noPush:true };
+      await dbAddChatMessage(thread,{role,type:'file',fileUrl,fileName:name,fileMime:mime, ...batch});
       // 自分が送ったので、いちばん下まで送る（1枚ずつ出るので進み具合も分かる）
       if(thread===activeTalkPanelSupplier) renderTalkPanelMessages(true);
     }catch(e){

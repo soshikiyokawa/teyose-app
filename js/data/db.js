@@ -1015,9 +1015,18 @@ async function dbAddChatMessage(supplierName, msg){
 
   // 通知の送信。失敗してもチャット送信自体は成立させる（msg.silent=trueなら通知しない：自動転記用）
   if(msg.silent) return;
+  // まとめて送るとき（写真を何枚も送るなど）は、1通ごとの通知は出さない（msg.noPush）。
+  // 最後の1通に、まとめた文面（msg.pushPreview。「📷 写真5枚」など）を付けて1回だけ知らせる。
+  // ChatWorkへの転送は、これまでどおり1つずつ行う（ファイルそのものを添えるため）
+  const mute = !!msg.noPush, quiet = async()=>{};
+  const pushRole     = mute ? quiet : dbSendPush;
+  const pushNames    = mute ? quiet : dbSendPushToNames;
+  const pushNamesNow = mute ? quiet : dbSendPushToNamesNow;
+  const pushUser     = mute ? quiet : dbSendPushToUser;
   const preview = msg.type==='order' ? `📋 発注書 ${msg.orderData?.no||''}`
     : msg.type==='quote' ? `📝 見積依頼 ${msg.orderData?.no||''}`
     : msg.type==='file' ? `📎 ${msg.fileName||'ファイル'}` : (msg.text||'');
+  const pushText = msg.pushPreview || preview;
   // 宛先が指定されていれば、どのスレッドでもその人にだけ通知する（自分は除く）
   const picked = Array.isArray(msg.notifyNames)
     ? msg.notifyNames.filter(n=>n && n!==currentUserDisplayName) : [];
@@ -1038,41 +1047,41 @@ async function dbAddChatMessage(supplierName, msg){
     if(isClientUser()){
       // お客様 → きよかわの担当者へ
       const names = (chat?.memberNames||[]).filter(Boolean);
-      if(names.length) dbSendPushToNames(names, `${label}（お客様）`, preview, goTalk).catch(()=>{});
+      if(names.length) pushNames(names, `${label}（お客様）`, pushText, goTalk).catch(()=>{});
     } else {
       // きよかわ → その案件のお客様（ご主人・奥様など、ご登録済みの方みなさん）へ
       const ids = (proj?.clients||[]).map(c=>c.userId).filter(Boolean);
       if(!ids.length && proj?.clientUserId) ids.push(proj.clientUserId);
-      ids.forEach(uid=>dbSendPushToUser(uid, 'きよかわ より', preview, goTalk).catch(()=>{}));
+      ids.forEach(uid=>pushUser(uid, 'きよかわ より', pushText, goTalk).catch(()=>{}));
     }
   } else if(isGroup){
     const g = groupById(group_id);
     const names = picked.length ? picked
       : (g?.memberNames||[]).filter(n=>n && n!==currentUserDisplayName);
-    if(names.length) dbSendPushToNames(names, `${g?.name||'グループ'} ${currentUserDisplayName||''}`, preview, goTalk).catch(()=>{});
+    if(names.length) pushNames(names, `${g?.name||'グループ'} ${currentUserDisplayName||''}`, pushText, goTalk).catch(()=>{});
   } else if(isDirect){
     // 個別チャット：相手ひとりに知らせる
     const other=(allProfiles||[]).find(p=>p.id===otherId);
     if(other?.displayName){
-      dbSendPushToNames([other.displayName], `個別 ${currentUserDisplayName||''}`, preview, goTalk).catch(()=>{});
+      pushNames([other.displayName], `個別 ${currentUserDisplayName||''}`, pushText, goTalk).catch(()=>{});
     }
   } else if(isProject){
     // 案件チャット：指定があればその人、無ければ参加メンバー（自分以外）へ
     const proj = projects.find(p=>p.id===project_id);
     const names = picked.length ? picked : otherMemberNames(proj?.members);
-    if(names.length) dbSendPushToNames(names, `${supplierName} ${currentUserDisplayName||''}`, preview, goTalk).catch(()=>{});
+    if(names.length) pushNames(names, `${supplierName} ${currentUserDisplayName||''}`, pushText, goTalk).catch(()=>{});
   } else if(isInternal){
     const title = `${INTERNAL_THREAD} ${currentUserDisplayName||''}`;
     if(picked.length){
-      dbSendPushToNames(picked, title, preview, goTalk).catch(()=>{});
+      pushNames(picked, title, pushText, goTalk).catch(()=>{});
     } else {
       // 既定：自分以外の社員全員（staff＋carpenter）へ
-      dbSendPush('employee', null, title, preview, currentUserId, goTalk).catch(()=>{});
+      pushRole('employee', null, title, pushText, currentUserId, goTalk).catch(()=>{});
     }
   } else if(msg.role==='me'){
     // きよかわ→発注先。宛先を選んでいればその人だけ（発注先の担当者でも社員でも指名できる）
-    if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview, goTalk).catch(()=>{});
-    else dbSendPush('supplier', supplier_id, supplierName, preview, null, goTalk).catch(()=>{});
+    if(picked.length) pushNamesNow(picked, supplierName, pushText, goTalk).catch(()=>{});
+    else pushRole('supplier', supplier_id, supplierName, pushText, null, goTalk).catch(()=>{});
     // ChatWorkルームが設定されていれば転送。宛先の指定にかかわらず送る。
     // 写真・資料はファイルそのものを添える。発注書は dbSendOrderToSupplier が
     // PDFを添えて送るため、ここでは送らない（noChatwork）
@@ -1084,8 +1093,8 @@ async function dbAddChatMessage(supplierName, msg){
   } else {
     // 発注先→きよかわ。宛先を選んでいればその人だけ、
     // 指定なし（ALL）なら社員全員（管理者＋一般社員）へ。発注先チャットは大工も見られるため
-    if(picked.length) dbSendPushToNamesNow(picked, supplierName, preview, goTalk).catch(()=>{});
-    else dbSendPush('employee', null, supplierName, preview, currentUserId, goTalk).catch(()=>{});
+    if(picked.length) pushNamesNow(picked, supplierName, pushText, goTalk).catch(()=>{});
+    else pushRole('employee', null, supplierName, pushText, currentUserId, goTalk).catch(()=>{});
   }
 }
 

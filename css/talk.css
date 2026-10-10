@@ -158,3 +158,13 @@
 /* 検索から飛んできた吹き出し。しばらく色を付けて、どれか分かるようにする */
 .talk-bubble.talk-hit{animation:talk-hit 2.6s ease-out}
 @keyframes talk-hit{0%,55%{background:rgba(255,214,64,.45);box-shadow:0 0 0 6px rgba(255,214,64,.45)}100%{background:transparent;box-shadow:0 0 0 6px transparent}}
+
+/* ── 続けて送った写真は、小さく並べて1つにまとめる ── */
+.talk-album{max-width:84%;display:flex;flex-direction:column;gap:3px}
+.talk-album.me{align-self:flex-end;align-items:flex-end}
+.talk-album.them{align-self:flex-start;align-items:flex-start}
+.talk-album-grid{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,96px));gap:4px}
+.talk-bubble.in-album{max-width:none;align-self:auto;align-items:stretch;gap:2px}
+.talk-album-img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px;display:block;background:var(--surface2)}
+.talk-album>.ts{font-size:var(--fs1);color:var(--text-muted);padding:0 4px}
+.talk-bubble.in-album .reactions{justify-content:center}
