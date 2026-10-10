@@ -3,7 +3,7 @@
 // 流れ：
 //   1. きよかわが、電話などで業者さんにキャンセルを伝える
 //   2. 業者さんが「納品」タブで、その品目を「キャンセル品」に指定する（js/order/order-delivery.js）
-//   3. きよかわの管理者が、発注履歴の「キャンセル品を確認」から承認する（このファイル）
+//   3. きよかわの社員（管理者・一般社員）が、発注履歴の「キャンセル品を確認」から承認する（このファイル）
 //      → 承認して、はじめてキャンセルになる。ちがっていれば差し戻す
 //
 // キャンセルになった品目は、
@@ -37,7 +37,7 @@ function orderCancelPending(o){
   return (o?.items||[]).map((it,i)=>({it,i}))
     .filter(x=>!x.it.isShipping && !orderItemCancelled(o, x.i) && orderCancelRequested(o, x.i));
 }
-// 確認待ちが1つでもある発注の数（管理者に知らせるのに使う）
+// 確認待ちが1つでもある発注の数（社員に知らせるのに使う）
 function orderCancelPendingTotal(){
   return (orders||[]).filter(o=>orderCancelPending(o).length).length;
 }
@@ -73,7 +73,7 @@ function orderTotalHtml(o){
 function openOrderCancel(orderNo){
   const o = (orders||[]).find(x=>x.no===orderNo);
   if(!o){ showToast('発注が見つかりません。画面を更新してからお試しください'); return; }
-  if(currentUserRole!=='staff'){ showToast('キャンセル品を確認できるのは、きよかわの管理者だけです'); return; }
+  if(currentUserRole!=='staff' && currentUserRole!=='carpenter'){ showToast('キャンセル品を確認できるのは、きよかわの社員だけです'); return; }
   const rows = orderCancelPending(o).map(({it,i})=>{
     const req = orderCancelRequestOf(o, i);
     return { i, name: it.name||'', qty: it.qty, unit: it.unit||'', by: req?.by||'', at: req?.at||'', sel: true };

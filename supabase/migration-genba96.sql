@@ -284,10 +284,12 @@ $$;
 -- ── 「キャンセル品」の指定を外す ──
 -- 業者さんが押しまちがいを取り消すとき、または、きよかわが差し戻すとき
 -- 返すもの … { cancel_requests:いまの全体, changed:外したかどうか }
+-- 一般社員は発注の行を直接は書き換えられないので、この手続きは持ち主の権限で動かす（security definer）。
+-- そのぶん、だれが呼んでよいかはここで確かめる：きよかわの社員か、その発注の業者さん
 create or replace function public.app_withdraw_cancel(p_order_id bigint, p_i int, p_name text)
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path = public
 as $$
 declare
@@ -296,12 +298,16 @@ declare
   cur     jsonb;
   nxt     jsonb;
 begin
-  if my_role is null or my_role not in ('supplier', 'staff') then
+  if my_role is null or my_role not in ('supplier', 'staff', 'carpenter') then
     raise exception 'キャンセル品の指定を変える権限がありません';
   end if;
 
   select * into o from public.orders where id = p_order_id for update;
   if not found then
+    raise exception '発注が見つかりません。画面を更新してからお試しください';
+  end if;
+  -- 業者さんは、自社あての発注だけ
+  if my_role = 'supplier' and o.supplier_id is distinct from app_supplier_id() then
     raise exception '発注が見つかりません。画面を更新してからお試しください';
   end if;
 
@@ -327,16 +333,18 @@ revoke all on function public.app_withdraw_cancel(bigint, int, text) from public
 grant execute on function public.app_request_cancel(bigint, jsonb) to authenticated;
 grant execute on function public.app_withdraw_cancel(bigint, int, text) to authenticated;
 
--- ── きよかわが承認して、品目をキャンセルにする（管理者だけ） ──
+-- ── きよかわが承認して、品目をキャンセルにする（社員。管理者・一般社員） ──
 --   p_items  … [{ "i":0, "name":"品目名" }, …]（まるごとキャンセルのときは、送料の行も入れて呼ぶ）
 --   p_reason … 理由（空でもよい）
 -- 返すもの … { cancelled_items:いまの全体, changed:今回あらたにキャンセルした品目 }
 --   ・納品済みの品目はキャンセルできない（先に納品完了を取り消す）
 --   ・原価（cost_entries）から、その品目の行を1つ消す
+-- 一般社員は発注と原価の行を直接は書き換えられないので、持ち主の権限で動かす（security definer）。
+-- 呼べるのは、きよかわの社員（管理者・一般社員）だけ
 create or replace function public.app_cancel_order_items(p_order_id bigint, p_items jsonb, p_reason text)
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path = public
 as $$
 declare
@@ -352,8 +360,8 @@ declare
   q     numeric;
   done  jsonb := '[]'::jsonb;
 begin
-  if app_user_role() is distinct from 'staff' then
-    raise exception 'キャンセルできるのは、きよかわの管理者だけです';
+  if not app_is_employee() then
+    raise exception 'キャンセル品を承認できるのは、きよかわの社員だけです';
   end if;
 
   select * into o from public.orders where id = p_order_id for update;
