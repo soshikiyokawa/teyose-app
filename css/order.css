@@ -589,3 +589,33 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .dlv-bar .dlv-cxl-btn{flex:1 1 100%;padding:9px;font-size:var(--fs2);color:var(--danger);border-color:var(--danger);background:transparent}
 .dlv-bar .dlv-cxl-btn:disabled{opacity:.45}
 .badge.cancel-wait{background:var(--warn-bg);color:var(--warn-t);border:1px solid var(--warn-t)}
+
+/* ── 在庫（js/order/stock.js） ── */
+.stk-head{display:flex;gap:8px;align-items:center}
+.stk-head input{flex:1;min-width:0;margin:0;font-size:16px}
+.stk-sum{margin:10px 0 4px;font-size:var(--fs2);color:var(--text-sub)}
+.stk-sum b{color:var(--text);font-size:var(--fs3)}
+.stk-sum span{font-size:var(--fs1);color:var(--text-muted);margin-left:4px}
+.stk-zero{display:inline-flex!important;align-items:center;gap:6px;margin:0 0 8px!important;font-size:var(--fs1);color:var(--text-sub);cursor:pointer}
+.stk-zero input{width:auto;margin:0}
+.stk-list{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.stk-row{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:0.5px solid var(--border)}
+.stk-row:last-child{border-bottom:none}
+.stk-row.zero .stk-name,.stk-row.zero .stk-qty{color:var(--text-muted)}
+.stk-main{flex:1;min-width:0;cursor:pointer}
+.stk-name{font-size:var(--fs3);font-weight:700;line-height:1.5;overflow-wrap:anywhere}
+.stk-meta{font-size:var(--fs1);color:var(--text-sub);margin-top:1px}
+.stk-pend{margin-left:8px;color:var(--warn-t);font-weight:700}
+.stk-qty{flex:none;text-align:right;white-space:nowrap}
+.stk-qty b{font-size:19px;font-weight:800;color:var(--accent-t)}
+.stk-qty span{font-size:var(--fs1);color:var(--text-sub);margin-left:2px}
+.stk-qty.neg b{color:var(--danger)}
+.stk-btns{flex:none;display:flex;flex-direction:column;gap:4px}
+.stk-btns .btn{justify-content:center;min-width:52px}
+.stk-help{margin-top:10px;font-size:var(--fs1);color:var(--text-muted);line-height:1.8}
+.stk-move{padding:9px 10px;border-bottom:0.5px solid var(--border)}
+.stk-move:last-child{border-bottom:none}
+.stk-move-top{display:flex;justify-content:space-between;gap:8px;font-size:var(--fs2)}
+.stk-move-top b.in{color:var(--ok-t)}
+.stk-move-top b.out{color:var(--danger)}
+.stk-move-sub{font-size:var(--fs1);color:var(--text-sub);margin-top:2px;overflow-wrap:anywhere}

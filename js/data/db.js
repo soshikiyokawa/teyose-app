@@ -203,7 +203,7 @@ async function fetchAllData(){
     estSeq = estimates.length+1;
 
     orders = (R.orders?.data||[]).map(orderRowTo);
-    costEntries = (R.costs?.data||[]).map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status}));
+    costEntries = (R.costs?.data||[]).map(costRowTo);
   } else if(isSupplierUser){
     // 業者：参加している案件だけ（RLSでも絞られる）。案件情報の表示にも使う
     projects = (R.projects?.data||[])
@@ -219,6 +219,14 @@ async function fetchAllData(){
   // チャットは、案件と名簿がそろってから組み立てる。
   // 先に組み立てると、案件チャット・お客様チャットの名前が「（削除された案件）」になってしまう
   buildChatData(R.chat);
+}
+
+// 原価の明細の行を、画面が使う形にする。
+// createdByName・note は、手で入れた在庫の動きにだけ入る（migration-genba98.sql）
+function costRowTo(r){
+  return {id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),
+    supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status,
+    createdByName:r.created_by_name||'',note:r.note||''};
 }
 
 // 発注の行を、画面が使う形にする（社員も業者も同じ形）
@@ -2236,6 +2244,9 @@ async function refetchAndRerender(table){
   // 納品タブ（業者さん）。選んでいる品目は覚えてあるので、描き直しても消えない
   if(table==='orders' && document.getElementById('page-delivery')?.classList.contains('active')
      && typeof renderDeliveryPage==='function') renderDeliveryPage();
+  // 在庫は発注と原価から計算しているので、どちらかが変わったら描き直す
+  if((table==='orders'||table==='cost_entries') && document.getElementById('ordersub-stock')?.classList.contains('active')
+     && document.getElementById('page-order')?.classList.contains('active') && typeof renderStockPage==='function') renderStockPage();
   if((table==='orders'||table==='cost_entries') && (currentUserRole==='staff'||currentUserRole==='carpenter')){
     if(document.getElementById('ordersub-history')?.classList.contains('active')) renderOrders();
     if(document.getElementById('page-cost')?.classList.contains('active')) renderCost();

@@ -354,9 +354,7 @@ async function refetchOrdersAndCost(){
     if(rows) orders = rows.map(orderRowTo);
     if(currentUserRole==='staff' || currentUserRole==='carpenter'){
       const { data: cr } = await sb.from('cost_entries').select('*').order('created_at',{ascending:false});
-      if(cr) costEntries = cr.map(r=>({id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),
-        unit:r.unit,amount:Number(r.amount),supplier:supplierNameById(r.supplier_id),
-        orderNo:r.order_no,costType:r.cost_type,status:r.status}));
+      if(cr) costEntries = cr.map(costRowTo);
     }
   }catch(e){ console.warn('発注の取り直しに失敗', e); }
   try{ if(typeof fetchChatData==='function') await fetchChatData(); }
