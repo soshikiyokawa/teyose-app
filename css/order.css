@@ -643,3 +643,15 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 /* 在庫：カテゴリの見出し */
 .stk-cat-head{padding:6px 12px;background:var(--surface2);font-size:var(--fs2);font-weight:800;color:var(--accent-t);border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
 .stk-cat-head span{font-size:var(--fs1);font-weight:400;color:var(--text-muted)}
+
+/* 在庫：品目マスタと名前を合わせる */
+.stkm-sub{font-size:var(--fs2);color:var(--text-sub);margin:4px 0 10px;line-height:1.7;flex-shrink:0}
+.stkm-sub span{font-size:var(--fs1);color:var(--text-muted)}
+.stkm-row{display:flex!important;align-items:flex-start;gap:10px;padding:10px;margin:0!important;border-bottom:0.5px solid var(--border);cursor:pointer}
+.stkm-row.sel{background:var(--accent-bg)}
+.stkm-row .orv-ck{margin-top:3px}
+.stkm-main{flex:1;min-width:0}
+.stkm-from{font-size:var(--fs2);color:var(--text-sub);overflow-wrap:anywhere}
+.stkm-to{font-size:var(--fs3);font-weight:700;line-height:1.5;overflow-wrap:anywhere}
+.stkm-meta{font-size:var(--fs1);color:var(--text-sub);margin-top:2px}
+.stkm-note{flex-shrink:0;margin-top:8px;font-size:var(--fs1);color:var(--text-muted)}
