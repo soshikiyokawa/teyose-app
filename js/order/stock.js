@@ -65,6 +65,7 @@ function stkMoves(name, place){
         : tag===STK_TAG.first ? 'はじめの数' : tag===STK_TAG.cost ? '単価の修正' : '入庫（発注）';
       return { id:e.id, date:e.date||'', kind, qty: out ? -e.qty : e.qty, unit:e.unit||'',
         isCost: tag===STK_TAG.cost, amount:e.amount, place: stockPlaceOf(e),
+        manual: String(tag||'').startsWith('在庫:'),
         where: out ? e.project : (tag && !String(tag).startsWith('在庫:') ? `${e.supplier||''} ${tag}` : ''),
         by:(e.createdByName && e.createdByName!=='初期登録') ? e.createdByName : '', note:e.note||'' };
     })
@@ -304,7 +305,9 @@ function openStockHistory(name){
     `<button type="button" class="btn sm primary" ${all.qty>0?'':'disabled'} onclick="openStockForm('out','${nm}')">出庫</button>
      <button type="button" class="btn sm" onclick="openStockForm('in','${nm}')">入庫</button>
      <button type="button" class="btn sm" onclick="openStockForm('adjust','${nm}')">数を直す（棚卸し）</button>
-     <button type="button" class="btn sm" onclick="openStockForm('cost','${nm}')">単価・単位を直す</button>`;
+     <button type="button" class="btn sm" onclick="openStockForm('cost','${nm}')">単価・単位を直す</button>`
+    // 削除は管理者だけ
+    + (currentUserRole==='staff' ? `<button type="button" class="btn sm danger" onclick="deleteStockItem('${nm}')">この品目を削除</button>` : '');
   const moves = stkMoves(name);
   document.getElementById('stkh-list').innerHTML = moves.length ? moves.map(m=>`
     <div class="stk-move">
@@ -312,7 +315,58 @@ function openStockHistory(name){
         ${m.isCost ? `<b>${m.amount>0?'+':''}¥${fmt(m.amount)}</b>`
                    : `<b class="${m.qty<0?'out':'in'}">${m.qty>0?'+':''}${stkNum(m.qty)}${esc(m.unit)}</b>`}</div>
       ${(m.where||m.by||m.note) ? `<div class="stk-move-sub">${[m.where?esc(m.where):'', m.by?esc(m.by):'', m.note?esc(m.note):''].filter(Boolean).join('　')}</div>` : ''}
+      ${(m.manual && currentUserRole==='staff') ? `<button type="button" class="stk-move-del" onclick="deleteStockMove(${Number(m.id)}, '${nm}')">この記録を取り消す</button>` : ''}
     </div>`).join('') : '<div class="empty" style="padding:16px">動きの記録がありません</div>';
   document.getElementById('stock-hist-modal').classList.add('open');
 }
 function closeStockHistory(){ document.getElementById('stock-hist-modal').classList.remove('open'); }
+
+// ── 削除（管理者だけ） ──
+
+function stkDeleteFail(error, what){
+  const code = String(error?.code||''), msg = String(error?.message||'');
+  showToast((code==='PGRST202' || code==='42883' || /app_stock_delete/.test(msg) && /find|exist|schema cache/i.test(msg))
+    ? 'データベースの準備が必要です。supabase/migration-genba100.sql を実行してください'
+    : `${what}：${msg||'通信できませんでした'}`, 8000);
+}
+// 削除のあと、原価の明細を取り直して描き直す
+async function stkAfterDelete(name){
+  if(typeof refetchOrdersAndCost==='function'){ try{ await refetchOrdersAndCost(); }catch(_){} }
+  renderStockPage();
+  if(name && stkList('').some(x=>x.name===name)) openStockHistory(name);
+  else closeStockHistory();
+}
+
+// 品目を削除する。
+//   手で入れた記録しか無い品目 … 記録ごと消える
+//   発注で入れた記録や出庫の記録がある品目 … 記録は残し、数を 0 にする（ふだんの一覧からは隠れる）
+async function deleteStockItem(name){
+  if(currentUserRole!=='staff'){ showToast('削除できるのは、きよかわの管理者だけです'); return; }
+  if(stkState.busy) return;
+  const hasHistory = stkMoves(name).some(m=>!m.manual);
+  if(!confirm(hasHistory
+    ? `「${name}」を在庫から外しますか？\n\nこの品目には、発注で入れた記録か、出庫の記録があります。\n記録は消さずに、すべての置き場の数を 0 にします（ふだんの一覧からは隠れます）。`
+    : `「${name}」を在庫から削除しますか？\n\n入庫・棚卸しの記録ごと消えます。元には戻せません。`)) return;
+  stkState.busy = true;
+  const { data, error } = await sb.rpc('app_stock_delete_item', { p_name: name });
+  stkState.busy = false;
+  if(error){ stkDeleteFail(error, '削除できませんでした'); return; }
+  await stkAfterDelete(data?.mode==='zero' ? name : null);
+  showToast(data?.mode==='zero' ? '在庫の数を 0 にしました（記録は残っています）' : '在庫から削除しました');
+}
+
+// 手で入れた動きを1件取り消す（入れまちがい用）
+async function deleteStockMove(id, name){
+  if(currentUserRole!=='staff'){ showToast('取り消せるのは、きよかわの管理者だけです'); return; }
+  if(stkState.busy) return;
+  const m = stkMoves(name).find(x=>x.id===id);
+  if(!m) return;
+  const what = m.isCost ? `単価の修正（${m.amount>0?'+':''}¥${fmt(m.amount)}）` : `${m.kind} ${m.qty>0?'+':''}${stkNum(m.qty)}${m.unit}`;
+  if(!confirm(`${String(m.date).replace(/-/g,'/')} の「${what}」を取り消しますか？\n${m.kind==='出庫' ? `${m.where} の原価からも消えます。` : ''}元には戻せません。`)) return;
+  stkState.busy = true;
+  const { error } = await sb.rpc('app_stock_delete_move', { p_id: id });
+  stkState.busy = false;
+  if(error){ stkDeleteFail(error, '取り消せませんでした'); return; }
+  await stkAfterDelete(name);
+  showToast('記録を取り消しました');
+}

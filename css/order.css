@@ -625,3 +625,5 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .stk-place{border:1px solid var(--border);background:var(--surface);color:var(--text-sub);border-radius:999px;padding:7px 14px;font-size:var(--fs2);cursor:pointer}
 .stk-place.on{background:var(--wood);border-color:var(--wood);color:#fff;font-weight:700}
 .stk-nocost{color:var(--warn-t)}
+
+.stk-move-del{margin-top:4px;border:none;background:none;padding:2px 0;font-size:var(--fs1);color:var(--danger);text-decoration:underline;cursor:pointer}
