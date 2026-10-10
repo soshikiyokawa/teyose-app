@@ -110,10 +110,9 @@ function stkNum(v){ const n=Math.round(Number(v)*100)/100; return Number.isFinit
 function renderStockPage(){
   const el = document.getElementById('stock-list');
   if(!el) return;
-  // 置き場の切り替え
-  document.getElementById('stock-places').innerHTML =
-    [...STOCK_PLACES, ''].map(p=>`<button type="button" class="stk-place${stkState.place===p?' on':''}"
-      onclick="stkSetPlace('${p}')">${p||'すべて'}</button>`).join('');
+  // 在庫場所の絞り込み（カテゴリ・発注先と同じ並びに置く）
+  document.getElementById('stock-place').innerHTML =
+    ['', ...STOCK_PLACES].map(p=>`<option value="${p}"${stkState.place===p?' selected':''}>${p||'在庫場所：すべて'}</option>`).join('');
 
   const all = stkList().map(s=>({...s, info: stkInfoOf(s.name)}));
   const q = stkState.q.trim().toLowerCase();

@@ -635,3 +635,7 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .stk-cat,.stk-sup{font-size:var(--fs1);line-height:1.5;padding:0 7px;border-radius:999px;white-space:nowrap}
 .stk-cat{background:var(--accent-bg);color:var(--accent-t);font-weight:700}
 .stk-sup{background:var(--surface2);color:var(--text-sub)}
+
+/* 絞り込みが3つ並ぶ。狭い画面では折り返す */
+.stk-filters{flex-wrap:wrap}
+.stk-filters select{flex:1 1 30%;min-width:108px}
