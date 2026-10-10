@@ -24,7 +24,37 @@ const STOCK_PLACE_DEFAULT = STOCK_PLACES[0];
 function stockPlaceOf(e){ return e?.stockPlace || STOCK_PLACE_DEFAULT; }
 
 // place：見ている置き場。'' は、すべての置き場の合計
-let stkState = { q:'', zero:false, place:STOCK_PLACE_DEFAULT, form:null, busy:false };
+// cat・sup：カテゴリ・発注先での絞り込み（'' はすべて。'-' は「入っていないもの」）
+let stkState = { q:'', zero:false, place:STOCK_PLACE_DEFAULT, cat:'', sup:'', form:null, busy:false };
+
+// ── 品目ごとの情報（カテゴリ・いつもの発注先） ──
+//
+// 数は原価の明細から計算するが、カテゴリと発注先は品目の表（stock_items。migration-genba101.sql）に持つ。
+// 在庫タブを開いたときに読む（起動のときには読まない。立ち上がりを重くしないため）。
+// 表に入っていない品目は、品目マスタに同じ名前の品目があれば、そこから借りて見せる
+const STOCK_CATS = ['木材', '建材', '金物', '設備', '副資材', 'その他'];   // よく使うもの。自由に書いてもよい
+let stockItems = {};          // 品目名 -> {cat, supplierId}
+let stockItemsReady = true;   // 表がまだ無い環境では false（絞り込みと編集を出さない）
+
+async function stkLoadInfo(){
+  const { data, error } = await sb.from('stock_items').select('*');
+  if(error){ stockItemsReady = false; stockItems = {}; return; }
+  stockItemsReady = true;
+  stockItems = {};
+  (data||[]).forEach(r=>{ stockItems[r.name] = { cat:r.cat||'', supplierId:r.supplier_id||null }; });
+}
+// その品目のカテゴリと発注先（名前）
+function stkInfoOf(name){
+  const row = stockItems[name];
+  const m = ((typeof master!=='undefined' ? master : [])||[]).find(x=>x.name===name && x.supplier!==STOCK_NAME);
+  const supName = row?.supplierId ? ((suppliers||[]).find(s=>s.id===row.supplierId)?.name||'') : (row ? '' : (m?.supplier||''));
+  return { cat: row ? row.cat : (m?.cat||''), supplier: supName, supplierId: row?.supplierId||null };
+}
+// 在庫タブを開いたとき。品目の情報を読み直してから描く
+function openStockTab(){
+  renderStockPage();
+  stkLoadInfo().then(renderStockPage).catch(()=>{});
+}
 
 // 手で入れた動きの目印（原価の明細の「発注番号」の欄に入る）
 const STK_TAG = { 'in':'在庫:入庫', out:'在庫:出庫', adjust:'在庫:棚卸し', cost:'在庫:単価', first:'在庫:初期登録' };
@@ -85,9 +115,22 @@ function renderStockPage(){
     [...STOCK_PLACES, ''].map(p=>`<button type="button" class="stk-place${stkState.place===p?' on':''}"
       onclick="stkSetPlace('${p}')">${p||'すべて'}</button>`).join('');
 
-  const all = stkList();
+  const all = stkList().map(s=>({...s, info: stkInfoOf(s.name)}));
   const q = stkState.q.trim().toLowerCase();
-  const list = all.filter(s=>(stkState.zero || s.qty!==0 || s.pending>0) && (!q || s.name.toLowerCase().includes(q)));
+  // カテゴリ・発注先の選択肢は、いま在庫にある品目に付いているものから作る
+  const cats = [...new Set(all.map(s=>s.info.cat).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+  const sups = [...new Set(all.map(s=>s.info.supplier).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja'));
+  if(stkState.cat && stkState.cat!=='-' && !cats.includes(stkState.cat)) stkState.cat = '';
+  if(stkState.sup && stkState.sup!=='-' && !sups.includes(stkState.sup)) stkState.sup = '';
+  const opt = (v, label, cur)=>`<option value="${esc(v)}"${v===cur?' selected':''}>${esc(label)}</option>`;
+  document.getElementById('stock-cat').innerHTML = opt('', 'カテゴリ：すべて', stkState.cat)
+    + cats.map(c=>opt(c, c, stkState.cat)).join('') + opt('-', '（カテゴリなし）', stkState.cat);
+  document.getElementById('stock-sup').innerHTML = opt('', '発注先：すべて', stkState.sup)
+    + sups.map(c=>opt(c, c, stkState.sup)).join('') + opt('-', '（発注先なし）', stkState.sup);
+  const hit = (want, has)=> !want || (want==='-' ? !has : has===want);
+  const list = all.filter(s=>(stkState.zero || s.qty!==0 || s.pending>0)
+    && (!q || s.name.toLowerCase().includes(q))
+    && hit(stkState.cat, s.info.cat) && hit(stkState.sup, s.info.supplier));
   const total = all.reduce((sum,s)=>sum+s.value, 0);
   const have = all.filter(s=>s.qty>0).length;
   document.getElementById('stock-sum').innerHTML =
@@ -99,7 +142,7 @@ function renderStockPage(){
     return;
   }
   if(!list.length){
-    el.innerHTML = `<div class="empty">${q?'見つかりませんでした':'いま在庫のある品目はありません（「在庫が0の品目も出す」で、登録してある品目が出ます）'}</div>`;
+    el.innerHTML = `<div class="empty">${(q||stkState.cat||stkState.sup)?'見つかりませんでした':'いま在庫のある品目はありません（「在庫が0の品目も出す」で、登録してある品目が出ます）'}</div>`;
     return;
   }
   el.innerHTML = list.map(s=>{
@@ -107,6 +150,7 @@ function renderStockPage(){
     return `<div class="stk-row${s.qty<=0?' zero':''}">
       <div class="stk-main" onclick="openStockHistory('${nm}')">
         <div class="stk-name">${esc(s.name)}</div>
+        ${(s.info.cat||s.info.supplier) ? `<div class="stk-tags">${s.info.cat?`<span class="stk-cat">${esc(s.info.cat)}</span>`:''}${s.info.supplier?`<span class="stk-sup">${esc(s.info.supplier)}</span>`:''}</div>` : ''}
         <div class="stk-meta">${s.avgCost ? `平均 ¥${fmt(s.avgCost)}/${esc(s.unit||'')}　在庫金額 ¥${fmt(s.value)}` : '<span class="stk-nocost">単価が入っていません</span>'}${
           s.pending ? `<span class="stk-pend">うち納品待ち ${stkNum(s.pending)}${esc(s.unit||'')}</span>` : ''}</div>
       </div>
@@ -120,11 +164,13 @@ function renderStockPage(){
 }
 function stkSetQuery(v){ stkState.q = v||''; renderStockPage(); }
 function stkSetZero(on){ stkState.zero = !!on; renderStockPage(); }
+function stkSetCat(v){ stkState.cat = v||''; renderStockPage(); }
+function stkSetSup(v){ stkState.sup = v||''; renderStockPage(); }
 function stkSetPlace(p){ stkState.place = STOCK_PLACES.includes(p) ? p : ''; renderStockPage(); }
 
 // ── 入庫・出庫・棚卸し・単価の入力 ──
 
-// kind：'in' 入庫／'out' 出庫／'adjust' 棚卸し／'cost' 単価を直す。
+// kind：'in' 入庫／'out' 出庫／'adjust' 棚卸し／'cost' 単価を直す／'info' カテゴリ・発注先を直す。
 // name を渡さない入庫は、新しい品目も入れられる
 function openStockForm(kind, name){
   // 品目そのもの（単位・平均単価）は、すべての置き場をまとめたものから取る
@@ -132,7 +178,7 @@ function openStockForm(kind, name){
   if(kind!=='in' && !s){ showToast('品目が見つかりません'); return; }
   stkState.form = { kind, name: s?.name||'', fixed: !!s };
   document.getElementById('stkf-title').textContent =
-    { 'in':'入庫する', out:'出庫する', adjust:'数を直す（棚卸し）', cost:'単価・単位を直す' }[kind];
+    { 'in':'入庫する', out:'出庫する', adjust:'数を直す（棚卸し）', cost:'単価・単位を直す', info:'カテゴリ・発注先' }[kind];
 
   // 品目名：決まっているときは変えられない。新しく入れるときは、いまある品目と品目マスタから候補を出す
   const nameEl = document.getElementById('stkf-name');
@@ -146,7 +192,22 @@ function openStockForm(kind, name){
   const placeEl = document.getElementById('stkf-place');
   placeEl.innerHTML = STOCK_PLACES.map(p=>`<option value="${p}">${p}</option>`).join('');
   placeEl.value = stkState.place || STOCK_PLACE_DEFAULT;
-  document.getElementById('stkf-place-wrap').style.display = kind==='cost' ? 'none' : '';
+  document.getElementById('stkf-place-wrap').style.display = (kind==='cost' || kind==='info') ? 'none' : '';
+  // カテゴリ・発注先：直すとき（info）と、新しい品目を入庫するときに出す
+  const showInfo = stockItemsReady && (kind==='info' || (kind==='in' && !s));
+  document.getElementById('stkf-info-wrap').style.display = showInfo ? '' : 'none';
+  if(showInfo){
+    const info = s ? stkInfoOf(s.name) : { cat:'', supplier:'', supplierId:null };
+    const used = Object.values(stockItems).map(x=>x.cat).filter(Boolean);
+    document.getElementById('stkf-cats').innerHTML = [...new Set([...STOCK_CATS, ...used])].map(c=>`<option value="${esc(c)}">`).join('');
+    document.getElementById('stkf-cat').value = info.cat||'';
+    const supId = info.supplierId || (suppliers||[]).find(x=>x.name===info.supplier)?.id || '';
+    document.getElementById('stkf-sup').innerHTML = '<option value="">（決まっていない）</option>'
+      + (suppliers||[]).filter(x=>x.name!==STOCK_NAME).sort((a,b)=>String(a.name).localeCompare(String(b.name),'ja'))
+          .map(x=>`<option value="${x.id}"${String(x.id)===String(supId)?' selected':''}>${esc(x.name)}</option>`).join('');
+  }
+  document.getElementById('stkf-qty-wrap').style.display = kind==='info' ? 'none' : '';
+  document.getElementById('stkf-note-wrap').style.display = kind==='info' ? 'none' : '';
   document.getElementById('stkf-place-label').textContent =
     kind==='in' ? '入れる置き場' : kind==='out' ? '出す置き場' : '数える置き場';
 
@@ -157,6 +218,7 @@ function openStockForm(kind, name){
   document.getElementById('stkf-unit-wrap').style.display = (kind==='in' || kind==='cost') ? '' : 'none';
 
   document.getElementById('stkf-qty').closest('.fg').style.display = kind==='cost' ? 'none' : '';
+  if(kind==='info') document.getElementById('stkf-unit-wrap').style.display = 'none';
   document.getElementById('stkf-qty-label').textContent =
     kind==='in' ? '入庫する数 *' : kind==='out' ? '出庫する数 *' : '実際に数えた数 *';
 
@@ -177,7 +239,7 @@ function openStockForm(kind, name){
   }
   document.getElementById('stkf-note').value = '';
   const btn = document.getElementById('stkf-save');
-  btn.textContent = { 'in':'入庫する', out:'出庫する', adjust:'この数に直す', cost:'直す' }[kind];
+  btn.textContent = { 'in':'入庫する', out:'出庫する', adjust:'この数に直す', cost:'直す', info:'保存' }[kind];
   btn.disabled = false;
   stkFormPlaceChanged();
   document.getElementById('stock-form-modal').classList.add('open');
@@ -195,6 +257,7 @@ function stkFormPlaceChanged(){
   document.getElementById('stkf-sub').textContent =
     f.kind==='in' ? (f.name ? now : '発注を通さずに入ってきたもの（余り材を戻した、など）を入れます')
     : f.kind==='out' ? `${now}　出庫した分は、選んだ案件の原価に入ります`
+    : f.kind==='info' ? 'カテゴリと、いつもの発注先を入れておくと、一覧で絞り込めます'
     : f.kind==='adjust' ? `${now}　実際に数えた数を入れると、その数に直ります`
     : `いまの平均単価 ¥${fmt(all?.avgCost||0)}/${all?.unit||''}　在庫の金額と、これから出庫する分の原価が変わります`;
   if(f.kind==='adjust') document.getElementById('stkf-qty').value = stkNum(here?.qty||0);
@@ -219,6 +282,22 @@ async function saveStockForm(){
   const all  = stkList('').find(x=>x.name===name);       // 品目そのもの（すべての置き場）
   const here = stkList(place).find(x=>x.name===name);    // その置き場の数
   const hereQty = here?.qty||0;
+
+  // カテゴリ・発注先だけを直す
+  if(f.kind==='info'){
+    stkState.busy = true;
+    const ok = await stkSaveInfo(name);
+    stkState.busy = false;
+    if(!ok) return;
+    closeStockForm();
+    renderStockPage();
+    if(document.getElementById('stock-hist-modal')?.classList.contains('open')) openStockHistory(name);
+    showToast('保存しました');
+    return;
+  }
+  // 新しい品目の入庫では、カテゴリ・発注先もいっしょに入れられる（入れた分だけ保存する）
+  const withInfo = f.kind==='in' && !f.fixed && stockItemsReady
+    && (document.getElementById('stkf-cat').value.trim() || document.getElementById('stkf-sup').value);
 
   let cost = null, project = '';
   if(f.kind==='cost'){
@@ -277,6 +356,7 @@ async function saveStockForm(){
   if(data && data.id!=null && typeof costRowTo==='function'){
     costEntries = [costRowTo(data), ...(costEntries||[]).filter(e=>e.id!==data.id)];
   }
+  if(withInfo && !stockItems[name]) await stkSaveInfo(name, true);
   closeStockForm();
   renderStockPage();
   if(document.getElementById('stock-hist-modal')?.classList.contains('open')) openStockHistory(name);
@@ -286,6 +366,26 @@ async function saveStockForm(){
           : f.kind==='out' ? `${stkNum(qty)}${u} 出庫しました（${project} の原価に入ります）`
           : f.kind==='cost' ? '直しました'
           : '在庫の数を直しました');
+}
+
+// カテゴリ・発注先を保存する。quiet … 失敗しても何も出さない（入庫のついでに入れるとき）
+async function stkSaveInfo(name, quiet){
+  const cat = document.getElementById('stkf-cat').value.trim();
+  const supplierId = Number(document.getElementById('stkf-sup').value) || null;
+  const { error } = await sb.from('stock_items').upsert({
+    name, cat, supplier_id: supplierId, updated_at: new Date().toISOString(), updated_by: currentUserDisplayName||'' },
+    { onConflict:'name' });
+  if(error){
+    if(!quiet){
+      const msg = String(error.message||'');
+      showToast(/stock_items/.test(msg) && /find|exist|schema cache/i.test(msg)
+        ? 'データベースの準備が必要です。supabase/migration-genba101.sql を実行してください'
+        : '保存できませんでした：'+msg, 8000);
+    }
+    return false;
+  }
+  stockItems[name] = { cat, supplierId };
+  return true;
 }
 
 // ── 品目ごとの動き ──
@@ -298,14 +398,16 @@ function openStockHistory(name){
   // 置き場ごとの数
   const per = STOCK_PLACES.map(p=>{ const s = stkList(p).find(x=>x.name===name); return `${p} <b>${stkNum(s?.qty||0)}${u}</b>`; }).join('　');
   document.getElementById('stkh-title').textContent = all.name;
+  const info = stkInfoOf(name);
   document.getElementById('stkh-sub').innerHTML =
-    `${per}<br>${all.avgCost ? `平均 ¥${fmt(all.avgCost)}/${u}` : '単価が入っていません'}${
+    `${(info.cat||info.supplier) ? `<span class="stk-tags">${info.cat?`<span class="stk-cat">${esc(info.cat)}</span>`:''}${info.supplier?`<span class="stk-sup">${esc(info.supplier)}</span>`:''}</span><br>` : ''}${per}<br>${all.avgCost ? `平均 ¥${fmt(all.avgCost)}/${u}` : '単価が入っていません'}${
       all.pending ? `　うち納品待ち ${stkNum(all.pending)}${u}` : ''}`;
   document.getElementById('stkh-btns').innerHTML =
     `<button type="button" class="btn sm primary" ${all.qty>0?'':'disabled'} onclick="openStockForm('out','${nm}')">出庫</button>
      <button type="button" class="btn sm" onclick="openStockForm('in','${nm}')">入庫</button>
      <button type="button" class="btn sm" onclick="openStockForm('adjust','${nm}')">数を直す（棚卸し）</button>
      <button type="button" class="btn sm" onclick="openStockForm('cost','${nm}')">単価・単位を直す</button>`
+    + (stockItemsReady ? `<button type="button" class="btn sm" onclick="openStockForm('info','${nm}')">カテゴリ・発注先</button>` : '')
     // 削除は社員（管理者・一般社員）
     + (stkCanDelete() ? `<button type="button" class="btn sm danger" onclick="deleteStockItem('${nm}')">この品目を削除</button>` : '');
   const moves = stkMoves(name);
@@ -353,6 +455,10 @@ async function deleteStockItem(name){
   const { data, error } = await sb.rpc('app_stock_delete_item', { p_name: name });
   stkState.busy = false;
   if(error){ stkDeleteFail(error, '削除できませんでした'); return; }
+  if(data?.mode!=='zero'){
+    delete stockItems[name];
+    sb.from('stock_items').delete().eq('name', name).then(()=>{}, ()=>{});
+  }
   await stkAfterDelete(data?.mode==='zero' ? name : null);
   showToast(data?.mode==='zero' ? '在庫の数を 0 にしました（記録は残っています）' : '在庫から削除しました');
 }

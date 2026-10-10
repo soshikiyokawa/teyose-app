@@ -627,3 +627,11 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .stk-nocost{color:var(--warn-t)}
 
 .stk-move-del{margin-top:4px;border:none;background:none;padding:2px 0;font-size:var(--fs1);color:var(--danger);text-decoration:underline;cursor:pointer}
+
+/* 在庫：カテゴリ・発注先 */
+.stk-filters{display:flex;gap:8px;margin-top:8px}
+.stk-filters select{flex:1;min-width:0;margin:0}
+.stk-tags{display:inline-flex;gap:5px;flex-wrap:wrap;margin:2px 0 1px}
+.stk-cat,.stk-sup{font-size:var(--fs1);line-height:1.5;padding:0 7px;border-radius:999px;white-space:nowrap}
+.stk-cat{background:var(--accent-bg);color:var(--accent-t);font-weight:700}
+.stk-sup{background:var(--surface2);color:var(--text-sub)}

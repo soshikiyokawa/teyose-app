@@ -12,7 +12,7 @@ function orderSubTab(t){
   if(t==='card') renderCardPage();
   if(t==='receipt') renderReceiptLedger();
   if(t==='quote') renderQuotePage();
-  if(t==='stock' && typeof renderStockPage==='function') renderStockPage();
+  if(t==='stock' && typeof openStockTab==='function') openStockTab();
 }
 
 // ── STEP1: 発注先リスト ──
