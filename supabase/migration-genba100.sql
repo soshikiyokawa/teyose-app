@@ -2,7 +2,7 @@
 -- Supabaseダッシュボード → SQL Editor に全文貼り付けて実行してください。
 -- 先に migration-genba98.sql を実行しておいてください。（再実行しても安全です）
 --
--- どちらも、きよかわの管理者だけ。
+-- どちらも、きよかわの社員（管理者・一般社員）が使える。業者さん・お客様は使えない。
 --
 -- ① 品目を削除する（app_stock_delete_item）
 --    在庫は原価の明細から計算しているので、「品目を消す」は次のどちらかになる。
@@ -35,8 +35,8 @@ declare
   unit_now  text;
   n         int := 0;
 begin
-  if app_user_role() is distinct from 'staff' then
-    raise exception '在庫の品目を削除できるのは、きよかわの管理者だけです';
+  if not app_is_employee() then
+    raise exception '在庫の品目を削除できるのは、きよかわの社員だけです';
   end if;
   if nm = '' then raise exception '品目名がありません'; end if;
 
@@ -102,8 +102,8 @@ declare
   cur       numeric;
   is_out    boolean;
 begin
-  if app_user_role() is distinct from 'staff' then
-    raise exception '在庫の動きを取り消せるのは、きよかわの管理者だけです';
+  if not app_is_employee() then
+    raise exception '在庫の動きを取り消せるのは、きよかわの社員だけです';
   end if;
 
   select id into stock_sup from public.suppliers where name = '在庫分' order by id limit 1;

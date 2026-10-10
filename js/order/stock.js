@@ -306,8 +306,8 @@ function openStockHistory(name){
      <button type="button" class="btn sm" onclick="openStockForm('in','${nm}')">入庫</button>
      <button type="button" class="btn sm" onclick="openStockForm('adjust','${nm}')">数を直す（棚卸し）</button>
      <button type="button" class="btn sm" onclick="openStockForm('cost','${nm}')">単価・単位を直す</button>`
-    // 削除は管理者だけ
-    + (currentUserRole==='staff' ? `<button type="button" class="btn sm danger" onclick="deleteStockItem('${nm}')">この品目を削除</button>` : '');
+    // 削除は社員（管理者・一般社員）
+    + (stkCanDelete() ? `<button type="button" class="btn sm danger" onclick="deleteStockItem('${nm}')">この品目を削除</button>` : '');
   const moves = stkMoves(name);
   document.getElementById('stkh-list').innerHTML = moves.length ? moves.map(m=>`
     <div class="stk-move">
@@ -315,13 +315,15 @@ function openStockHistory(name){
         ${m.isCost ? `<b>${m.amount>0?'+':''}¥${fmt(m.amount)}</b>`
                    : `<b class="${m.qty<0?'out':'in'}">${m.qty>0?'+':''}${stkNum(m.qty)}${esc(m.unit)}</b>`}</div>
       ${(m.where||m.by||m.note) ? `<div class="stk-move-sub">${[m.where?esc(m.where):'', m.by?esc(m.by):'', m.note?esc(m.note):''].filter(Boolean).join('　')}</div>` : ''}
-      ${(m.manual && currentUserRole==='staff') ? `<button type="button" class="stk-move-del" onclick="deleteStockMove(${Number(m.id)}, '${nm}')">この記録を取り消す</button>` : ''}
+      ${(m.manual && stkCanDelete()) ? `<button type="button" class="stk-move-del" onclick="deleteStockMove(${Number(m.id)}, '${nm}')">この記録を取り消す</button>` : ''}
     </div>`).join('') : '<div class="empty" style="padding:16px">動きの記録がありません</div>';
   document.getElementById('stock-hist-modal').classList.add('open');
 }
 function closeStockHistory(){ document.getElementById('stock-hist-modal').classList.remove('open'); }
 
-// ── 削除（管理者だけ） ──
+// ── 削除（社員ならだれでも。業者さん・お客様は不可） ──
+
+function stkCanDelete(){ return currentUserRole==='staff' || currentUserRole==='carpenter'; }
 
 function stkDeleteFail(error, what){
   const code = String(error?.code||''), msg = String(error?.message||'');
@@ -341,7 +343,7 @@ async function stkAfterDelete(name){
 //   手で入れた記録しか無い品目 … 記録ごと消える
 //   発注で入れた記録や出庫の記録がある品目 … 記録は残し、数を 0 にする（ふだんの一覧からは隠れる）
 async function deleteStockItem(name){
-  if(currentUserRole!=='staff'){ showToast('削除できるのは、きよかわの管理者だけです'); return; }
+  if(!stkCanDelete()){ showToast('削除できるのは、きよかわの社員だけです'); return; }
   if(stkState.busy) return;
   const hasHistory = stkMoves(name).some(m=>!m.manual);
   if(!confirm(hasHistory
@@ -357,7 +359,7 @@ async function deleteStockItem(name){
 
 // 手で入れた動きを1件取り消す（入れまちがい用）
 async function deleteStockMove(id, name){
-  if(currentUserRole!=='staff'){ showToast('取り消せるのは、きよかわの管理者だけです'); return; }
+  if(!stkCanDelete()){ showToast('取り消せるのは、きよかわの社員だけです'); return; }
   if(stkState.busy) return;
   const m = stkMoves(name).find(x=>x.id===id);
   if(!m) return;
