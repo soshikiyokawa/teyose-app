@@ -655,3 +655,7 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .stkm-to{font-size:var(--fs3);font-weight:700;line-height:1.5;overflow-wrap:anywhere}
 .stkm-meta{font-size:var(--fs1);color:var(--text-sub);margin-top:2px}
 .stkm-note{flex-shrink:0;margin-top:8px;font-size:var(--fs1);color:var(--text-muted)}
+
+.stk-linked{color:var(--ok-t)}
+#stkl-list .stkm-row{cursor:pointer}
+#stkl-list .stkm-row:hover{background:var(--surface2)}

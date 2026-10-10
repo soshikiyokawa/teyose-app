@@ -413,7 +413,7 @@ function openStockHistory(name){
   document.getElementById('stkh-title').textContent = all.name;
   const info = stkInfoOf(name);
   document.getElementById('stkh-sub').innerHTML =
-    `${(info.cat||info.supplier) ? `<span class="stk-tags">${info.cat?`<span class="stk-cat">${esc(info.cat)}</span>`:''}${info.supplier?`<span class="stk-sup">${esc(info.supplier)}</span>`:''}</span><br>` : ''}${per}<br>${all.avgCost ? `平均 ¥${fmt(all.avgCost)}/${u}` : '単価が入っていません'}${
+    `${(info.cat||info.supplier) ? `<span class="stk-tags">${info.cat?`<span class="stk-cat">${esc(info.cat)}</span>`:''}${info.supplier?`<span class="stk-sup">${esc(info.supplier)}</span>`:''}</span><br>` : ''}${per}<br>${(typeof stkMasterOf==='function') ? (stkMasterOf(name) ? '<span class="stk-linked">品目マスタにあります</span>　' : '<span class="stk-nocost">品目マスタにありません</span>　') : ''}${all.avgCost ? `平均 ¥${fmt(all.avgCost)}/${u}` : '単価が入っていません'}${
       all.pending ? `　うち納品待ち ${stkNum(all.pending)}${u}` : ''}`;
   document.getElementById('stkh-btns').innerHTML =
     `<button type="button" class="btn sm primary" ${all.qty>0?'':'disabled'} onclick="openStockForm('out','${nm}')">出庫</button>
@@ -421,6 +421,7 @@ function openStockHistory(name){
      <button type="button" class="btn sm" onclick="openStockForm('adjust','${nm}')">数を直す（棚卸し）</button>
      <button type="button" class="btn sm" onclick="openStockForm('cost','${nm}')">単価・単位を直す</button>`
     + (stockItemsReady ? `<button type="button" class="btn sm" onclick="openStockForm('info','${nm}')">カテゴリ・発注先</button>` : '')
+    + (typeof openStockLink==='function' ? `<button type="button" class="btn sm" onclick="openStockLink('${nm}')">品目マスタと紐づける</button>` : '')
     // 削除は社員（管理者・一般社員）
     + (stkCanDelete() ? `<button type="button" class="btn sm danger" onclick="deleteStockItem('${nm}')">この品目を削除</button>` : '');
   const moves = stkMoves(name);

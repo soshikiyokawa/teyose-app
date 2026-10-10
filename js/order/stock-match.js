@@ -159,18 +159,10 @@ async function saveStockMatch(){
   renderStockMatch();
   let ok = 0, failed = null, costFailed = 0;
   for(const r of picked){
-    const sup = (suppliers||[]).find(x=>x.name===r.supplier);
-    const { error } = await sb.rpc('app_stock_rename', {
-      p_from: r.from, p_to: r.to, p_unit: r.unitTo||null, p_supplier_id: sup?.id||null, p_cat: r.cat||null });
-    if(error){ failed = error; break; }
+    const res = await stkApplyMaster(r);
+    if(res.error){ failed = res.error; break; }
     ok++;
-    // 単価も品目マスタに合わせる。まとまった先の在庫もふくめて、その品目の平均単価をそろえる。
-    // 在庫の数が 0 の品目は、手続きの側で何もしない（金額を持てないため）
-    if(r.costTo > 0){
-      const res = await sb.rpc('app_stock_move', { p_kind:'cost', p_name:r.to, p_unit:r.unitTo||'', p_qty:0,
-        p_unit_cost:r.costTo, p_project:'', p_note:'品目マスタの単価に合わせた', p_place:STOCK_PLACE_DEFAULT });
-      if(res.error) costFailed++;
-    }
+    if(res.costFailed) costFailed++;
   }
   stkMatch.busy = false;
   // 名前が変わったので、原価の明細と品目の情報を取り直す
@@ -189,4 +181,135 @@ async function saveStockMatch(){
   renderStockPage();
   stkMatch.rows = stkMatchRows();
   if(stkMatch.rows.length && !failed) renderStockMatch(); else if(!failed) closeStockMatch(); else renderStockMatch();
+}
+
+// 在庫の品目1つを、品目マスタの品目に合わせる（名前・単位・単価・発注先・カテゴリ）。
+//   r … {from:在庫の品目名, to:品目マスタの品目名, unitTo, costTo, supplier, cat}
+// 返すもの … {error, costFailed}
+async function stkApplyMaster(r){
+  const sup = (suppliers||[]).find(x=>x.name===r.supplier);
+  if(r.from !== r.to){
+    const { error } = await sb.rpc('app_stock_rename', {
+      p_from: r.from, p_to: r.to, p_unit: r.unitTo||null, p_supplier_id: sup?.id||null, p_cat: r.cat||null });
+    if(error) return { error };
+  } else if(stockItemsReady){
+    // 名前はもう同じ。発注先・カテゴリの空いているところだけ、品目マスタから入れる
+    const cur = stockItems[r.to] || { cat:'', supplierId:null };
+    const next = { cat: cur.cat || r.cat || '', supplierId: cur.supplierId || sup?.id || null };
+    if(next.cat!==cur.cat || next.supplierId!==cur.supplierId){
+      await sb.from('stock_items').upsert({ name:r.to, cat:next.cat, supplier_id:next.supplierId,
+        updated_at:new Date().toISOString(), updated_by:currentUserDisplayName||'' }, { onConflict:'name' }).then(()=>{}, ()=>{});
+    }
+  }
+  // 単位と単価を品目マスタに合わせる。まとまった先の在庫もふくめて、その品目の平均単価をそろえる。
+  // 在庫の数が 0 の品目は、手続きの側で単位だけ直す（金額を持てないため）
+  let costFailed = false;
+  if(r.costTo > 0 || r.unitTo){
+    const res = await sb.rpc('app_stock_move', { p_kind:'cost', p_name:r.to, p_unit:r.unitTo||'', p_qty:0,
+      p_unit_cost: r.costTo > 0 ? r.costTo : null, p_project:'', p_note:'品目マスタの単価に合わせた', p_place:STOCK_PLACE_DEFAULT });
+    if(res.error) costFailed = true;
+  }
+  return { error:null, costFailed };
+}
+
+// ════ 手で、品目マスタの品目と紐づける ════
+//
+// 自動の照らし合わせで見つからないもの（寸法が足されている・呼び名がちがう、など）を、
+// 自分で品目マスタから選んで合わせる。合わせ方は上と同じ（名前・単位・単価・発注先・カテゴリ）。
+// 在庫と品目マスタは「同じ名前」でつながるので、紐づける＝品目マスタの名前に付け替える、になる。
+
+let stkLink = { name:'', q:'', sup:'', list:[] };
+
+// その在庫の品目が、いま品目マスタにあるか（あれば、その品目）
+function stkMasterOf(name){
+  const info = stkInfoOf(name);
+  const list = ((typeof master!=='undefined' ? master : [])||[]).filter(m=>m.name===name && m.supplier!==STOCK_NAME);
+  return list.find(m=>m.supplier===info.supplier) || list[0] || null;
+}
+function stkMasterCost(m){ return Math.round((typeof itemCurrentCost==='function' ? itemCurrentCost(m) : Number(m.cost)) || 0); }
+
+function openStockLink(name){
+  const s = stkList('').find(x=>x.name===name);
+  if(!s){ showToast('品目が見つかりません'); return; }
+  if(!((typeof master!=='undefined' ? master : [])||[]).length){ showToast('品目マスタに品目がありません'); return; }
+  const info = stkInfoOf(name);
+  stkLink = { name, q:'', sup: info.supplier||'', list:[] };
+  document.getElementById('stkl-title').textContent = name;
+  const cur = stkMasterOf(name);
+  document.getElementById('stkl-sub').textContent = cur
+    ? `いまは、品目マスタの「${cur.name}」（${cur.supplier||'発注先なし'}）と同じ名前です。別の品目に付け替えることもできます。`
+    : '品目マスタから、同じ品目を選んでください。名前・単位・単価が、品目マスタに合います。';
+  // 発注先の絞り込み。在庫の品目に発注先が入っていれば、はじめからそれで絞る
+  const sups = [...new Set(((master||[]).filter(m=>m.supplier && m.supplier!==STOCK_NAME).map(m=>m.supplier)))].sort((a,b)=>a.localeCompare(b,'ja'));
+  document.getElementById('stkl-sup').innerHTML = '<option value="">発注先：すべて</option>'
+    + sups.map(n=>`<option value="${esc(n)}"${n===stkLink.sup?' selected':''}>${esc(n)}</option>`).join('');
+  if(stkLink.sup && !sups.includes(stkLink.sup)) stkLink.sup = '';
+  document.getElementById('stkl-q').value = '';
+  renderStockLink();
+  document.getElementById('stock-link-modal').classList.add('open');
+}
+function closeStockLink(){ document.getElementById('stock-link-modal').classList.remove('open'); }
+function stkLinkQuery(v){ stkLink.q = v||''; renderStockLink(); }
+function stkLinkSup(v){ stkLink.sup = v||''; renderStockLink(); }
+
+function renderStockLink(){
+  const words = stkNormName(stkLink.q) ? String(stkLink.q).trim().split(/[\s\u3000]+/).map(stkNormName).filter(Boolean) : [];
+  const me = stkNormCore(stkLink.name);
+  let list = ((master||[]).filter(m=>m && m.name && m.supplier!==STOCK_NAME))
+    .filter(m=>!stkLink.sup || m.supplier===stkLink.sup)
+    .filter(m=>{ const n = stkNormName(m.name); return words.every(w=>n.includes(w)); });
+  // 言葉を入れていないときは、在庫の品目名に似ている順に並べる（探す手がかりになる）
+  list = list.map(m=>({ m, sim: stkSimilar(stkNormCore(m.name), me) }))
+    .sort((a,b)=> b.sim-a.sim || a.m.name.localeCompare(b.m.name,'ja'));
+  const total = list.length;
+  list = list.slice(0, 60);
+  stkLink.list = list.map(x=>x.m);
+  document.getElementById('stkl-list').innerHTML = list.length ? list.map((x,i)=>{
+    const m = x.m, same = m.name===stkLink.name;
+    return `<div class="stkm-row${same?' sel':''}" onclick="pickStockLink(${i})">
+      <div class="stkm-main">
+        <div class="stkm-to">${esc(m.name)}</div>
+        <div class="stkm-meta">${esc(m.supplier||'発注先なし')}　¥${fmt(stkMasterCost(m))}/${esc(m.unit||'')}${m.cat?`　${esc(m.cat)}`:''}${same?'　（いまの名前と同じ）':''}</div>
+      </div>
+    </div>`;
+  }).join('') + (total>60 ? `<div class="empty" style="padding:12px">似ている順に60件まで出しています。言葉を入れて絞ってください</div>` : '')
+  : '<div class="empty" style="padding:18px">見つかりませんでした</div>';
+}
+
+async function pickStockLink(i){
+  const m = stkLink.list[i];
+  if(!m || stkMatch.busy) return;
+  const s = stkList('').find(x=>x.name===stkLink.name);
+  if(!s) return;
+  const r = { from: s.name, to: m.name, unitFrom: s.unit||'', unitTo: m.unit||'', supplier: m.supplier||'', cat: m.cat||'',
+    costTo: stkMasterCost(m), costFrom: Math.round(s.avgCost||0), hasQty: (s.allIn||0) > 0,
+    merge: s.name!==m.name && stkList('').some(x=>x.name===m.name) };
+  const lines = [];
+  if(r.from!==r.to) lines.push(`名前：${r.from}\n　→ ${r.to}`);
+  if(r.unitTo && r.unitTo!==r.unitFrom) lines.push(`単位：${r.unitFrom||'—'} → ${r.unitTo}`);
+  if(r.costTo>0 && r.costTo!==r.costFrom) lines.push(r.hasQty ? `単価：¥${fmt(r.costFrom)} → ¥${fmt(r.costTo)}` : `単価：在庫が0なので入りません（入庫のときに ¥${fmt(r.costTo)} を入れてください）`);
+  if(!lines.length){ closeStockLink(); showToast('もう品目マスタと同じです'); return; }
+  if(!confirm(`品目マスタの「${m.name}」（${m.supplier||'発注先なし'}）に合わせます。\n\n${lines.join('\n')}`
+    + (r.merge ? '\n\n同じ名前の在庫がもうあるので、1つにまとまります（数は足されます）。' : '')
+    + '\n\n数は変わりません。名前は元に戻せません。よろしいですか？')) return;
+
+  stkMatch.busy = true;
+  const res = await stkApplyMaster(r);
+  stkMatch.busy = false;
+  if(res.error){
+    const code = String(res.error.code||''), msg = String(res.error.message||'');
+    showToast((code==='PGRST202' || code==='42883' || /app_stock_rename/.test(msg) && /find|exist|schema cache/i.test(msg))
+      ? 'データベースの準備が必要です。supabase/migration-genba102.sql を実行してください'
+      : '合わせられませんでした：'+msg, 8000);
+    return;
+  }
+  if(typeof refetchOrdersAndCost==='function'){ try{ await refetchOrdersAndCost(); }catch(_){} }
+  try{ await stkLoadInfo(); }catch(_){}
+  closeStockLink();
+  renderStockPage();
+  // 名前が変わっているので、新しい名前で開き直す
+  if(document.getElementById('stock-hist-modal')?.classList.contains('open')){
+    if(stkList('').some(x=>x.name===r.to)) openStockHistory(r.to); else closeStockHistory();
+  }
+  showToast(res.costFailed ? '品目マスタに合わせました（単価は直せませんでした）' : '品目マスタに合わせました', res.costFailed?7000:3000);
 }
