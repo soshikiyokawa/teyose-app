@@ -1,4 +1,4 @@
-// ════ 在庫（加工場に置いてある材料） ════
+// ════ 在庫（加工場・倉庫に置いてある材料） ════
 //
 // 在庫は、原価の明細（costEntries）から計算する（calcStock。js/order/order-history.js）。
 //   入庫 … 案件「在庫分」で発注した明細
@@ -6,22 +6,33 @@
 //
 // これまでは、発注を通さないと入庫も出庫もできず、一覧も原価管理の奥にあった。
 // このページで、
-//   ・いまの在庫をすぐ見られる
+//   ・いまの在庫を、置き場ごとにすぐ見られる
 //   ・発注を通さない入庫（余り材を戻した、など）を入れられる
 //   ・案件を選んで出庫できる（その案件の原価に入る）
 //   ・数が合わないとき、数え直した数に直せる（棚卸し）
+//   ・単価がちがっていたら直せる
 // 書き込みはデータベースの手続き（app_stock_move。migration-genba98.sql）で行う。
 // 管理者も一般社員も使える。業者さん・お客様には見せない。
+//
+// 置き場：可部加工場・亀山倉庫。置き場の入っていない明細（これまでの分、発注から入った分）は
+// 可部加工場として数える。平均単価は、置き場で分けずに品目ごとに1つ。
 
-let stkState = { q:'', zero:false, form:null, busy:false };
+const STOCK_NAME = '在庫分';
+const STOCK_PLACES = ['可部加工場', '亀山倉庫'];
+const STOCK_PLACE_DEFAULT = STOCK_PLACES[0];
+// 明細の置き場（入っていなければ可部加工場）
+function stockPlaceOf(e){ return e?.stockPlace || STOCK_PLACE_DEFAULT; }
+
+// place：見ている置き場。'' は、すべての置き場の合計
+let stkState = { q:'', zero:false, place:STOCK_PLACE_DEFAULT, form:null, busy:false };
 
 // 手で入れた動きの目印（原価の明細の「発注番号」の欄に入る）
-const STK_TAG = { 'in':'在庫:入庫', out:'在庫:出庫', adjust:'在庫:棚卸し' };
-const STOCK_NAME = '在庫分';
+const STK_TAG = { 'in':'在庫:入庫', out:'在庫:出庫', adjust:'在庫:棚卸し', cost:'在庫:単価', first:'在庫:初期登録' };
 
 // ── 読み出し ──
 
-// まだ届いていない入庫（案件「在庫分」で発注して、納品完了になっていない品目）の数。品目名ごと
+// まだ届いていない入庫（案件「在庫分」で発注して、納品完了になっていない品目）の数。品目名ごと。
+// 発注から入る分は、可部加工場に入るものとして数える
 function stkPendingByName(){
   const by = {};
   (orders||[]).forEach(o=>{
@@ -34,22 +45,28 @@ function stkPendingByName(){
   });
   return by;
 }
-function stkList(){
-  const pend = stkPendingByName();
-  return Object.values(calcStock()).map(s=>({...s, pending: pend[s.name]||0,
+// place を渡すとその置き場の数、渡さなければ見ている置き場（すべてのときは合計）
+function stkList(place){
+  const p = place===undefined ? stkState.place : place;
+  const pend = (!p || p===STOCK_PLACE_DEFAULT) ? stkPendingByName() : {};
+  return Object.values(calcStock(p||undefined)).map(s=>({...s, pending: pend[s.name]||0,
     value: Math.max(0, s.qty*s.avgCost)}))
     .sort((a,b)=>a.name.localeCompare(b.name,'ja'));
 }
-// その品目の動き（新しい順）
-function stkMoves(name){
+// その品目の動き（新しい順）。place を渡すとその置き場のものだけ
+function stkMoves(name, place){
   return (costEntries||[]).filter(e=>e.name===name
-      && ((e.project===STOCK_NAME && e.supplier!==STOCK_NAME) || (e.supplier===STOCK_NAME && e.project!==STOCK_NAME)))
+      && ((e.project===STOCK_NAME && e.supplier!==STOCK_NAME) || (e.supplier===STOCK_NAME && e.project!==STOCK_NAME))
+      && (!place || stockPlaceOf(e)===place))
     .map(e=>{
       const out = e.supplier===STOCK_NAME;
-      const kind = out ? '出庫' : e.orderNo===STK_TAG.adjust ? '棚卸し' : e.orderNo===STK_TAG['in'] ? '入庫（手入力）' : '入庫（発注）';
+      const tag = e.orderNo;
+      const kind = out ? '出庫' : tag===STK_TAG.adjust ? '棚卸し' : tag===STK_TAG['in'] ? '入庫（手入力）'
+        : tag===STK_TAG.first ? 'はじめの数' : tag===STK_TAG.cost ? '単価の修正' : '入庫（発注）';
       return { id:e.id, date:e.date||'', kind, qty: out ? -e.qty : e.qty, unit:e.unit||'',
-        where: out ? e.project : (e.orderNo && !String(e.orderNo).startsWith('在庫:') ? `${e.supplier||''} ${e.orderNo}` : ''),
-        by:e.createdByName||'', note:e.note||'' };
+        isCost: tag===STK_TAG.cost, amount:e.amount, place: stockPlaceOf(e),
+        where: out ? e.project : (tag && !String(tag).startsWith('在庫:') ? `${e.supplier||''} ${tag}` : ''),
+        by:(e.createdByName && e.createdByName!=='初期登録') ? e.createdByName : '', note:e.note||'' };
     })
     .sort((a,b)=>String(b.date).localeCompare(String(a.date)) || (b.id||0)-(a.id||0));
 }
@@ -62,21 +79,26 @@ function stkNum(v){ const n=Math.round(Number(v)*100)/100; return Number.isFinit
 function renderStockPage(){
   const el = document.getElementById('stock-list');
   if(!el) return;
+  // 置き場の切り替え
+  document.getElementById('stock-places').innerHTML =
+    [...STOCK_PLACES, ''].map(p=>`<button type="button" class="stk-place${stkState.place===p?' on':''}"
+      onclick="stkSetPlace('${p}')">${p||'すべて'}</button>`).join('');
+
   const all = stkList();
   const q = stkState.q.trim().toLowerCase();
   const list = all.filter(s=>(stkState.zero || s.qty!==0 || s.pending>0) && (!q || s.name.toLowerCase().includes(q)));
   const total = all.reduce((sum,s)=>sum+s.value, 0);
   const have = all.filter(s=>s.qty>0).length;
   document.getElementById('stock-sum').innerHTML =
-    `在庫のある品目 <b>${have}</b>　在庫金額 <b>¥${fmt(total)}</b><span>（税抜・入庫の平均単価で計算）</span>`;
+    `${esc(stkState.place||'すべての置き場')}：在庫のある品目 <b>${have}</b>　在庫金額 <b>¥${fmt(total)}</b><span>（税抜・入庫の平均単価で計算）</span>`;
   document.getElementById('stock-zero').checked = stkState.zero;
 
   if(!all.length){
-    el.innerHTML = '<div class="empty">在庫の記録がありません。<br>「＋ 入庫」から入れるか、案件「在庫分」で発注すると在庫に入ります</div>';
+    el.innerHTML = `<div class="empty">${stkState.place?esc(stkState.place)+'には、':''}在庫の記録がありません。<br>「＋ 入庫」から入れられます</div>`;
     return;
   }
   if(!list.length){
-    el.innerHTML = `<div class="empty">${q?'見つかりませんでした':'いま在庫のある品目はありません'}</div>`;
+    el.innerHTML = `<div class="empty">${q?'見つかりませんでした':'いま在庫のある品目はありません（「在庫が0の品目も出す」で、登録してある品目が出ます）'}</div>`;
     return;
   }
   el.innerHTML = list.map(s=>{
@@ -84,7 +106,7 @@ function renderStockPage(){
     return `<div class="stk-row${s.qty<=0?' zero':''}">
       <div class="stk-main" onclick="openStockHistory('${nm}')">
         <div class="stk-name">${esc(s.name)}</div>
-        <div class="stk-meta">平均 ¥${fmt(s.avgCost)}/${esc(s.unit||'')}　在庫金額 ¥${fmt(s.value)}${
+        <div class="stk-meta">${s.avgCost ? `平均 ¥${fmt(s.avgCost)}/${esc(s.unit||'')}　在庫金額 ¥${fmt(s.value)}` : '<span class="stk-nocost">単価が入っていません</span>'}${
           s.pending ? `<span class="stk-pend">うち納品待ち ${stkNum(s.pending)}${esc(s.unit||'')}</span>` : ''}</div>
       </div>
       <div class="stk-qty${s.qty<0?' neg':''}"><b>${stkNum(s.qty)}</b><span>${esc(s.unit||'')}</span></div>
@@ -97,43 +119,52 @@ function renderStockPage(){
 }
 function stkSetQuery(v){ stkState.q = v||''; renderStockPage(); }
 function stkSetZero(on){ stkState.zero = !!on; renderStockPage(); }
+function stkSetPlace(p){ stkState.place = STOCK_PLACES.includes(p) ? p : ''; renderStockPage(); }
 
-// ── 入庫・出庫・棚卸しの入力 ──
+// ── 入庫・出庫・棚卸し・単価の入力 ──
 
-// kind：'in' 入庫／'out' 出庫／'adjust' 棚卸し。name を渡さない入庫は、新しい品目も入れられる
+// kind：'in' 入庫／'out' 出庫／'adjust' 棚卸し／'cost' 単価を直す。
+// name を渡さない入庫は、新しい品目も入れられる
 function openStockForm(kind, name){
-  const s = name ? stkList().find(x=>x.name===name) : null;
+  // 品目そのもの（単位・平均単価）は、すべての置き場をまとめたものから取る
+  const s = name ? stkList('').find(x=>x.name===name) : null;
   if(kind!=='in' && !s){ showToast('品目が見つかりません'); return; }
   stkState.form = { kind, name: s?.name||'', fixed: !!s };
-  const title = { 'in':'入庫する', out:'出庫する', adjust:'数を直す（棚卸し）' }[kind];
-  document.getElementById('stkf-title').textContent = title;
-  const now = s ? `いまの在庫 ${stkNum(s.qty)}${s.unit||''}` : '';
-  document.getElementById('stkf-sub').textContent =
-    kind==='in' ? (s ? now : '発注を通さずに入ってきたもの（余り材を戻した、など）を入れます')
-    : kind==='out' ? `${now}　出庫した分は、選んだ案件の原価に入ります`
-    : `${now}　実際に数えた数を入れると、その数に直ります`;
+  document.getElementById('stkf-title').textContent =
+    { 'in':'入庫する', out:'出庫する', adjust:'数を直す（棚卸し）', cost:'単価・単位を直す' }[kind];
 
   // 品目名：決まっているときは変えられない。新しく入れるときは、いまある品目と品目マスタから候補を出す
   const nameEl = document.getElementById('stkf-name');
   nameEl.value = s?.name||'';
   nameEl.readOnly = !!s;
   if(!s){
-    const names = [...new Set([...stkList().map(x=>x.name), ...((typeof master!=='undefined'?master:[])||[]).map(m=>m.name)])].filter(Boolean);
+    const names = [...new Set([...stkList('').map(x=>x.name), ...((typeof master!=='undefined'?master:[])||[]).map(m=>m.name)])].filter(Boolean);
     document.getElementById('stkf-names').innerHTML = names.slice(0,800).map(n=>`<option value="${esc(n)}">`).join('');
   }
+  // 置き場。見ている置き場をはじめに選んでおく（「すべて」を見ているときは可部加工場）
+  const placeEl = document.getElementById('stkf-place');
+  placeEl.innerHTML = STOCK_PLACES.map(p=>`<option value="${p}">${p}</option>`).join('');
+  placeEl.value = stkState.place || STOCK_PLACE_DEFAULT;
+  document.getElementById('stkf-place-wrap').style.display = kind==='cost' ? 'none' : '';
+  document.getElementById('stkf-place-label').textContent =
+    kind==='in' ? '入れる置き場' : kind==='out' ? '出す置き場' : '数える置き場';
+
   const unitEl = document.getElementById('stkf-unit');
   unitEl.value = s?.unit||'';
-  unitEl.readOnly = !!s;
-  document.getElementById('stkf-unit-wrap').style.display = kind==='in' ? '' : 'none';
+  // 単位は、いまある品目の入庫では変えられない（品目の中でばらつかないように）。直すのは「単価・単位を直す」から
+  unitEl.readOnly = !!s && kind!=='cost';
+  document.getElementById('stkf-unit-wrap').style.display = (kind==='in' || kind==='cost') ? '' : 'none';
 
-  const qtyEl = document.getElementById('stkf-qty');
-  qtyEl.value = kind==='adjust' ? stkNum(s.qty) : '';
+  document.getElementById('stkf-qty').closest('.fg').style.display = kind==='cost' ? 'none' : '';
   document.getElementById('stkf-qty-label').textContent =
     kind==='in' ? '入庫する数 *' : kind==='out' ? '出庫する数 *' : '実際に数えた数 *';
 
-  // 単価（入庫だけ）。いまある品目は平均単価を入れておく
-  document.getElementById('stkf-cost-wrap').style.display = kind==='in' ? '' : 'none';
-  document.getElementById('stkf-cost').value = (kind==='in' && s && s.avgCost) ? Math.round(s.avgCost) : '';
+  // 単価（入庫と、単価を直すとき）。いまある品目は平均単価を入れておく
+  document.getElementById('stkf-cost-wrap').style.display = (kind==='in' || kind==='cost') ? '' : 'none';
+  document.getElementById('stkf-cost').value = (s && s.avgCost) ? Math.round(s.avgCost) : '';
+  document.getElementById('stkf-cost').placeholder = kind==='cost' ? '0' : '空なら、いまの平均単価';
+  document.getElementById('stkf-cost-label').textContent =
+    kind==='cost' ? '正しい単価（税抜・1つあたり）' : '単価（税抜・1つあたり）';
 
   // 案件（出庫だけ）。もう終わった工事は出さない
   document.getElementById('stkf-proj-wrap').style.display = kind==='out' ? '' : 'none';
@@ -145,64 +176,102 @@ function openStockForm(kind, name){
   }
   document.getElementById('stkf-note').value = '';
   const btn = document.getElementById('stkf-save');
-  btn.textContent = { 'in':'入庫する', out:'出庫する', adjust:'この数に直す' }[kind];
+  btn.textContent = { 'in':'入庫する', out:'出庫する', adjust:'この数に直す', cost:'直す' }[kind];
   btn.disabled = false;
+  stkFormPlaceChanged();
   document.getElementById('stock-form-modal').classList.add('open');
-  setTimeout(()=>(s ? qtyEl : nameEl).focus(), 80);
+  setTimeout(()=>(kind==='cost' ? document.getElementById('stkf-cost') : s ? document.getElementById('stkf-qty') : nameEl).focus(), 80);
 }
 function closeStockForm(){ document.getElementById('stock-form-modal').classList.remove('open'); stkState.form = null; }
 
+// 置き場を変えたら、その置き場のいまの数を出し直す
+function stkFormPlaceChanged(){
+  const f = stkState.form; if(!f) return;
+  const place = document.getElementById('stkf-place').value;
+  const here = f.name ? stkList(place).find(x=>x.name===f.name) : null;
+  const all  = f.name ? stkList('').find(x=>x.name===f.name) : null;
+  const now = f.name ? `${place}のいまの在庫 ${stkNum(here?.qty||0)}${all?.unit||''}` : '';
+  document.getElementById('stkf-sub').textContent =
+    f.kind==='in' ? (f.name ? now : '発注を通さずに入ってきたもの（余り材を戻した、など）を入れます')
+    : f.kind==='out' ? `${now}　出庫した分は、選んだ案件の原価に入ります`
+    : f.kind==='adjust' ? `${now}　実際に数えた数を入れると、その数に直ります`
+    : `いまの平均単価 ¥${fmt(all?.avgCost||0)}/${all?.unit||''}　在庫の金額と、これから出庫する分の原価が変わります`;
+  if(f.kind==='adjust') document.getElementById('stkf-qty').value = stkNum(here?.qty||0);
+  else if(document.activeElement?.id!=='stkf-qty' && f.kind!=='cost' && !document.getElementById('stkf-qty').value) document.getElementById('stkf-qty').value = '';
+}
+
 // 全角の数字で入れても通す
 function stkParseNum(v){
-  const s = String(v??'').replace(/[０-９．]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[,，\s]/g,'');
+  const s = String(v??'').replace(/[０-９．]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[,，\s¥￥]/g,'');
   if(s==='') return NaN;
   return Number(s);
 }
 
 async function saveStockForm(){
   const f = stkState.form; if(!f || stkState.busy) return;
-  const name = document.getElementById('stkf-name').value.trim();
-  const unit = document.getElementById('stkf-unit').value.trim();
-  const qty  = stkParseNum(document.getElementById('stkf-qty').value);
-  const note = document.getElementById('stkf-note').value.trim();
+  const name  = document.getElementById('stkf-name').value.trim();
+  const unit  = document.getElementById('stkf-unit').value.trim();
+  const place = document.getElementById('stkf-place').value || STOCK_PLACE_DEFAULT;
+  const note  = document.getElementById('stkf-note').value.trim();
+  let qty = stkParseNum(document.getElementById('stkf-qty').value);
   if(!name){ showToast('品目名を入れてください'); return; }
-  if(!Number.isFinite(qty) || (f.kind!=='adjust' && qty<=0) || qty<0){ showToast('数を入れてください'); return; }
-  const cur = stkList().find(x=>x.name===name);
+  const all  = stkList('').find(x=>x.name===name);       // 品目そのもの（すべての置き場）
+  const here = stkList(place).find(x=>x.name===name);    // その置き場の数
+  const hereQty = here?.qty||0;
 
   let cost = null, project = '';
+  if(f.kind==='cost'){
+    qty = 0;
+    const c = stkParseNum(document.getElementById('stkf-cost').value);
+    if(Number.isFinite(c) && c<0){ showToast('正しい単価を入れてください'); return; }
+    cost = Number.isFinite(c) ? c : null;
+    if(!unit){ showToast('単位を入れてください（本・枚・箱など）'); return; }
+    const sameCost = cost===null || (all && Math.round(all.avgCost)===Math.round(cost));
+    if(sameCost && unit===(all?.unit||'')){ closeStockForm(); showToast('変わっていません'); return; }
+    // 在庫の数が 0 の品目は金額を持てないので、単価は入庫のときに入れてもらう
+    if(cost!==null && cost>0 && all && !(all.allIn>0)){
+      if(!confirm('この品目はいま在庫が無いので、単価は直せません（単位だけ直します）。\n単価は、入庫するときに入れてください。よろしいですか？')) return;
+      cost = null;
+    }
+  } else if(!Number.isFinite(qty) || (f.kind!=='adjust' && qty<=0) || qty<0){
+    showToast('数を入れてください'); return;
+  }
   if(f.kind==='in'){
-    if(!cur && !unit){ showToast('単位を入れてください（本・枚・箱など）'); return; }
+    if(!all && !unit){ showToast('単位を入れてください（本・枚・箱など）'); return; }
     const c = stkParseNum(document.getElementById('stkf-cost').value);
     if(Number.isFinite(c)){ if(c<0){ showToast('単価が正しくありません'); return; } cost = c; }
-    else if(!cur){
-      if(!confirm('単価が入っていません。0円の在庫として入れますか？\n（出庫したとき、案件の原価に金額が入りません）')) return;
+    else if(!all || !all.avgCost){
+      if(!confirm('単価が入っていません。0円の在庫として入れますか？\n（出庫したとき、案件の原価に金額が入りません。あとから「単価を直す」で入れられます）')) return;
       cost = 0;
     }
   }
   if(f.kind==='out'){
     project = document.getElementById('stkf-proj').value;
     if(!project){ showToast('出庫先の案件を選んでください'); return; }
-    if(cur && qty > cur.qty){ showToast(`在庫が足りません。いまの在庫は ${stkNum(cur.qty)}${cur.unit||''} です`, 6000); return; }
+    if(qty > hereQty){ showToast(`在庫が足りません。${place}のいまの在庫は ${stkNum(hereQty)}${all?.unit||''} です`, 6000); return; }
   }
   if(f.kind==='adjust'){
-    if(cur && qty===cur.qty){ closeStockForm(); showToast('数は合っています'); return; }
-    if(!confirm(`「${name}」の在庫を ${stkNum(cur?.qty||0)} → ${stkNum(qty)}${cur?.unit||''} に直します。よろしいですか？`)) return;
+    if(qty===hereQty){ closeStockForm(); showToast('数は合っています'); return; }
+    if(!confirm(`${place}の「${name}」の在庫を ${stkNum(hereQty)} → ${stkNum(qty)}${all?.unit||''} に直します。よろしいですか？`)) return;
   }
 
   stkState.busy = true;
   const btn = document.getElementById('stkf-save');
   btn.disabled = true;
   const { data, error } = await sb.rpc('app_stock_move', {
-    p_kind: f.kind, p_name: name, p_unit: unit, p_qty: qty, p_unit_cost: cost, p_project: project, p_note: note });
+    p_kind: f.kind, p_name: name, p_unit: unit, p_qty: qty, p_unit_cost: cost,
+    p_project: project, p_note: note, p_place: place });
   stkState.busy = false;
   if(error){
     btn.disabled = false;
     const code = String(error.code||''), msg = String(error.message||'');
-    showToast((code==='PGRST202' || code==='42883' || /app_stock_move/.test(msg) && /find|exist|schema cache/i.test(msg))
+    showToast((code==='PGRST202' || code==='42883' || /app_stock_move|stock_place/.test(msg) && /find|exist|schema cache/i.test(msg))
       ? 'データベースの準備が必要です。supabase/migration-genba98.sql を実行してください'
       : '保存できませんでした：'+msg, 8000);
     return;
   }
+  // 単位を直したときは、前からある明細も書き換わっているので、取り直す
+  if(f.kind==='cost' && typeof refetchOrdersAndCost==='function'){ try{ await refetchOrdersAndCost(); }catch(_){} }
   // 返ってきた明細を手元に足す（取り直さなくても、在庫と原価にすぐ出る）
   if(data && data.id!=null && typeof costRowTo==='function'){
     costEntries = [costRowTo(data), ...(costEntries||[]).filter(e=>e.id!==data.id)];
@@ -211,30 +280,37 @@ async function saveStockForm(){
   renderStockPage();
   if(document.getElementById('stock-hist-modal')?.classList.contains('open')) openStockHistory(name);
   try{ if(typeof renderCost==='function' && document.getElementById('page-cost')?.classList.contains('active')) renderCost(); }catch(_){}
-  showToast(f.kind==='in' ? `${stkNum(qty)}${cur?.unit||unit} 入庫しました`
-          : f.kind==='out' ? `${stkNum(qty)}${cur?.unit||''} 出庫しました（${project} の原価に入ります）`
+  const u = all?.unit||unit;
+  showToast(f.kind==='in' ? `${place}に ${stkNum(qty)}${u} 入庫しました`
+          : f.kind==='out' ? `${stkNum(qty)}${u} 出庫しました（${project} の原価に入ります）`
+          : f.kind==='cost' ? '直しました'
           : '在庫の数を直しました');
 }
 
 // ── 品目ごとの動き ──
 
 function openStockHistory(name){
-  const s = stkList().find(x=>x.name===name);
-  if(!s) return;
-  const nm = stkArg(s.name);
-  document.getElementById('stkh-title').textContent = s.name;
+  const all = stkList('').find(x=>x.name===name);
+  if(!all) return;
+  const nm = stkArg(all.name);
+  const u = esc(all.unit||'');
+  // 置き場ごとの数
+  const per = STOCK_PLACES.map(p=>{ const s = stkList(p).find(x=>x.name===name); return `${p} <b>${stkNum(s?.qty||0)}${u}</b>`; }).join('　');
+  document.getElementById('stkh-title').textContent = all.name;
   document.getElementById('stkh-sub').innerHTML =
-    `いまの在庫 <b>${stkNum(s.qty)}${esc(s.unit||'')}</b>　平均 ¥${fmt(s.avgCost)}/${esc(s.unit||'')}${
-      s.pending ? `　うち納品待ち ${stkNum(s.pending)}${esc(s.unit||'')}` : ''}`;
+    `${per}<br>${all.avgCost ? `平均 ¥${fmt(all.avgCost)}/${u}` : '単価が入っていません'}${
+      all.pending ? `　うち納品待ち ${stkNum(all.pending)}${u}` : ''}`;
   document.getElementById('stkh-btns').innerHTML =
-    `<button type="button" class="btn sm primary" ${s.qty>0?'':'disabled'} onclick="openStockForm('out','${nm}')">出庫</button>
+    `<button type="button" class="btn sm primary" ${all.qty>0?'':'disabled'} onclick="openStockForm('out','${nm}')">出庫</button>
      <button type="button" class="btn sm" onclick="openStockForm('in','${nm}')">入庫</button>
-     <button type="button" class="btn sm" onclick="openStockForm('adjust','${nm}')">数を直す（棚卸し）</button>`;
+     <button type="button" class="btn sm" onclick="openStockForm('adjust','${nm}')">数を直す（棚卸し）</button>
+     <button type="button" class="btn sm" onclick="openStockForm('cost','${nm}')">単価・単位を直す</button>`;
   const moves = stkMoves(name);
   document.getElementById('stkh-list').innerHTML = moves.length ? moves.map(m=>`
     <div class="stk-move">
-      <div class="stk-move-top"><span>${esc(String(m.date).replace(/-/g,'/'))}　${esc(m.kind)}</span>
-        <b class="${m.qty<0?'out':'in'}">${m.qty>0?'+':''}${stkNum(m.qty)}${esc(m.unit)}</b></div>
+      <div class="stk-move-top"><span>${esc(String(m.date).replace(/-/g,'/'))}　${esc(m.kind)}　${esc(m.place)}</span>
+        ${m.isCost ? `<b>${m.amount>0?'+':''}¥${fmt(m.amount)}</b>`
+                   : `<b class="${m.qty<0?'out':'in'}">${m.qty>0?'+':''}${stkNum(m.qty)}${esc(m.unit)}</b>`}</div>
       ${(m.where||m.by||m.note) ? `<div class="stk-move-sub">${[m.where?esc(m.where):'', m.by?esc(m.by):'', m.note?esc(m.note):''].filter(Boolean).join('　')}</div>` : ''}
     </div>`).join('') : '<div class="empty" style="padding:16px">動きの記録がありません</div>';
   document.getElementById('stock-hist-modal').classList.add('open');

@@ -619,3 +619,9 @@ body.drag-sorting .drag-handle{cursor:grabbing}
 .stk-move-top b.in{color:var(--ok-t)}
 .stk-move-top b.out{color:var(--danger)}
 .stk-move-sub{font-size:var(--fs1);color:var(--text-sub);margin-top:2px;overflow-wrap:anywhere}
+
+/* 在庫の置き場の切り替え */
+.stk-places{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.stk-place{border:1px solid var(--border);background:var(--surface);color:var(--text-sub);border-radius:999px;padding:7px 14px;font-size:var(--fs2);cursor:pointer}
+.stk-place.on{background:var(--wood);border-color:var(--wood);color:#fff;font-weight:700}
+.stk-nocost{color:var(--warn-t)}

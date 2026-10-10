@@ -222,11 +222,11 @@ async function fetchAllData(){
 }
 
 // 原価の明細の行を、画面が使う形にする。
-// createdByName・note は、手で入れた在庫の動きにだけ入る（migration-genba98.sql）
+// createdByName・note・stockPlace（置き場）は、手で入れた在庫の動きにだけ入る（migration-genba98.sql）
 function costRowTo(r){
   return {id:r.id,date:r.date,project:r.project,name:r.name,qty:Number(r.qty),unit:r.unit,amount:Number(r.amount),
     supplier:supplierNameById(r.supplier_id),orderNo:r.order_no,costType:r.cost_type,status:r.status,
-    createdByName:r.created_by_name||'',note:r.note||''};
+    createdByName:r.created_by_name||'',note:r.note||'',stockPlace:r.stock_place||''};
 }
 
 // 発注の行を、画面が使う形にする（社員も業者も同じ形）

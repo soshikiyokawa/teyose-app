@@ -89,20 +89,24 @@ const fmtNinku=v=>{const r=Math.round(v*100)/100;return Number.isInteger(r)?r.to
 // ── 在庫計算（原価データから常に導出。別テーブルは持たない） ──
 // 入庫＝案件「在庫分」で発注した明細／出庫＝発注先「在庫分」で現場向けに発注した明細
 // 現在庫 ＝ 入庫数量 − 出庫数量。出庫単価は入庫の平均単価を使う
-function calcStock(){
+// place を渡すと、その置き場（可部加工場・亀山倉庫。js/order/stock.js）の数だけを数える。
+// 渡さなければ、すべての置き場の合計。平均単価は、置き場で分けずに品目ごとに1つ
+function calcStock(place){
   const stock={}; // 品目名 -> {name, unit, inQty, inAmount, outQty, qty, avgCost}
+  const here = e => !place || (typeof stockPlaceOf==='function' ? stockPlaceOf(e) : '可部加工場')===place;
   costEntries.forEach(e=>{
-    const get=()=>stock[e.name]=stock[e.name]||{name:e.name,unit:e.unit,inQty:0,inAmount:0,outQty:0};
+    const get=()=>stock[e.name]=stock[e.name]||{name:e.name,unit:e.unit,inQty:0,inAmount:0,outQty:0,allIn:0,allAmount:0};
     if(e.project==='在庫分' && e.supplier!=='在庫分'){
-      const s=get(); s.inQty+=e.qty; s.inAmount+=e.amount;
+      const s=get(); s.allIn+=e.qty; s.allAmount+=e.amount;
+      if(here(e)){ s.inQty+=e.qty; s.inAmount+=e.amount; }
     }
     if(e.supplier==='在庫分' && e.project!=='在庫分'){
-      const s=get(); s.outQty+=e.qty;
+      const s=get(); if(here(e)) s.outQty+=e.qty;
     }
   });
   Object.values(stock).forEach(s=>{
     s.qty=Math.round((s.inQty-s.outQty)*100)/100;
-    s.avgCost=s.inQty ? s.inAmount/s.inQty : 0;
+    s.avgCost=s.allIn>0 ? s.allAmount/s.allIn : 0;
   });
   return stock;
 }
